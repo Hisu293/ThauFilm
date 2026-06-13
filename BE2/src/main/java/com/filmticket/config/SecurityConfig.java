@@ -49,6 +49,7 @@ public class SecurityConfig {
                     "/api/auth/refresh",
                     "/api/auth/logout",
                     "/api/movies/**",
+                    "/api/showtimes/**",
                     "/api/events/movies",
                     "/swagger-ui/**",
                     "/swagger-ui.html",

@@ -1,17 +1,24 @@
 package com.filmticket.service;
 
+import com.filmticket.dto.CinemaRoomResponse;
 import com.filmticket.dto.ShowtimeResponse;
 import com.filmticket.dto.UpsertShowtimeRequest;
 import com.filmticket.entity.CinemaRoom;
 import com.filmticket.entity.Movie;
+import com.filmticket.entity.Seat;
+import com.filmticket.entity.SeatAvailability;
 import com.filmticket.entity.Showtime;
 import com.filmticket.exception.BadRequestException;
+import com.filmticket.repository.SeatAvailabilityRepository;
+import com.filmticket.repository.SeatRepository;
 import com.filmticket.repository.ShowtimeRepository;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -22,6 +29,9 @@ public class ShowtimeService {
     private final ShowtimeRepository showtimeRepository;
     private final MovieService movieService;
     private final CinemaRoomService cinemaRoomService;
+    private final TheaterService theaterService;
+    private final SeatRepository seatRepository;
+    private final SeatAvailabilityRepository seatAvailabilityRepository;
 
     @Transactional(readOnly = true)
     public List<ShowtimeResponse> getAllShowtimes() {
@@ -45,7 +55,9 @@ public class ShowtimeService {
                 .status(request.getStatus())
                 .build();
 
-        return ShowtimeResponse.fromShowtime(showtimeRepository.save(showtime));
+        Showtime savedShowtime = showtimeRepository.save(showtime);
+        initializeSeatAvailabilities(savedShowtime);
+        return ShowtimeResponse.fromShowtime(savedShowtime);
     }
 
     @Transactional
@@ -74,6 +86,84 @@ public class ShowtimeService {
     public Showtime getShowtimeEntityOrThrow(UUID showtimeId) {
         return showtimeRepository.findById(showtimeId)
                 .orElseThrow(() -> new BadRequestException("Showtime not found"));
+    }
+
+    @Transactional(readOnly = true)
+    public List<ShowtimeResponse> getShowtimesByMovie(UUID movieId) {
+        movieService.getMovieEntityOrThrow(movieId);
+        return showtimeRepository.findByMovieIdOrderByStartTimeAsc(movieId).stream()
+                .map(ShowtimeResponse::fromShowtime)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<ShowtimeResponse> getShowtimesByDate(java.time.LocalDate date) {
+        return showtimeRepository.findByDate(date).stream()
+                .map(ShowtimeResponse::fromShowtime)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<ShowtimeResponse> getShowtimesByMovieAndDate(UUID movieId, java.time.LocalDate date) {
+        movieService.getMovieEntityOrThrow(movieId);
+        return showtimeRepository.findByMovieIdAndDate(movieId, date).stream()
+                .map(ShowtimeResponse::fromShowtime)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<ShowtimeResponse> getShowtimesByTheater(UUID theaterId) {
+        theaterService.getTheaterEntityOrThrow(theaterId);
+        return showtimeRepository.findByTheaterId(theaterId).stream()
+                .map(ShowtimeResponse::fromShowtime)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<ShowtimeResponse> getShowtimesByMovieAndTheater(UUID movieId, UUID theaterId) {
+        movieService.getMovieEntityOrThrow(movieId);
+        theaterService.getTheaterEntityOrThrow(theaterId);
+        return showtimeRepository.findByTheaterIdAndMovieId(theaterId, movieId).stream()
+                .map(ShowtimeResponse::fromShowtime)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<CinemaRoomResponse> getCinemasByMovie(UUID movieId) {
+        movieService.getMovieEntityOrThrow(movieId);
+        return showtimeRepository.findByMovieIdOrderByStartTimeAsc(movieId).stream()
+                .map(s -> s.getCinemaRoom())
+                .distinct()
+                .map(room -> CinemaRoomResponse.builder()
+                        .id(room.getId())
+                        .name(room.getName())
+                        .capacity(room.getCapacity())
+                        .status(room.getStatus())
+                        .build())
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<LocalDate> getShowDatesByMovie(UUID movieId) {
+        movieService.getMovieEntityOrThrow(movieId);
+        return showtimeRepository.findByMovieIdOrderByStartTimeAsc(movieId).stream()
+                .map(s -> s.getStartTime().toLocalDate())
+                .distinct()
+                .sorted()
+                .toList();
+    }
+
+    private void initializeSeatAvailabilities(Showtime showtime) {
+        List<Seat> seats = seatRepository.findAllByCinemaRoomIdOrderByRowNameAscSeatNumberAsc(showtime.getCinemaRoom().getId());
+        List<SeatAvailability> availabilities = seats.stream()
+                .map(seat -> SeatAvailability.builder()
+                        .showtime(showtime)
+                        .seat(seat)
+                        .available(true)
+                        .price(new BigDecimal("90000.00"))
+                        .build())
+                .toList();
+        seatAvailabilityRepository.saveAll(availabilities);
     }
 
     private void validateTimeRange(UpsertShowtimeRequest request) {

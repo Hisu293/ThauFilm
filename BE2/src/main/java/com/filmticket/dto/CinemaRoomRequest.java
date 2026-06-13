@@ -13,6 +13,9 @@ public class CinemaRoomRequest {
     @NotBlank(message = "Room name is required")
     private String name;
 
+    @NotNull(message = "Theater ID is required")
+    private java.util.UUID theaterId;
+
     @NotNull(message = "Rows count is required")
     @Min(value = 1, message = "Rows count must be greater than 0")
     private Integer rowsCount;

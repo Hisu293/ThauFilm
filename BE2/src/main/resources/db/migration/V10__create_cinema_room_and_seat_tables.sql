@@ -1,5 +1,5 @@
 -- 1. Tạo bảng cinema_room (Dùng snake_case để khớp với JPA/Hibernate)
-CREATE TABLE IF NOT EXISTS cinema_room (
+CREATE TABLE cinema_room (
                               id UUID PRIMARY KEY,
                               name VARCHAR(255) NOT NULL,
                               capacity INT,
@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS cinema_room (
 );
 
 -- 2. Tạo bảng seat
-CREATE TABLE IF NOT EXISTS seat (
+CREATE TABLE seat (
                         id UUID PRIMARY KEY,
                         cinema_room_id UUID NOT NULL,
                         row_name VARCHAR(5) NOT NULL,
