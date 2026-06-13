@@ -1,0 +1,84 @@
+import api from './api';
+
+/**
+ * Lấy phần `data` từ body chuẩn { success, message, data } của backend.
+ * Nếu backend trả thẳng object/array thì dùng luôn.
+ */
+const unwrap = (res) => (res?.data?.data !== undefined ? res.data.data : res?.data);
+
+/** Các field hợp lệ cho POST /api/admin/showtimes */
+export const SHOWTIME_FIELDS = [
+  'movieId',
+  'cinemaRoomId',
+  'startTime',
+  'endTime',
+  'status',
+];
+
+/** Chuyển form → payload theo API backend */
+export const toShowtimePayload = (form) => {
+  const payload = {};
+  for (const key of SHOWTIME_FIELDS) {
+    if (form[key] !== undefined && form[key] !== '') payload[key] = form[key];
+  }
+  // Đảm bảo UUID string
+  if (form.movieId !== undefined) payload.movieId = String(form.movieId);
+  if (form.cinemaRoomId !== undefined) payload.cinemaRoomId = String(form.cinemaRoomId);
+  // ISO UTC string
+  if (form.startTime) payload.startTime = toISOUTC(form.startTime);
+  if (form.endTime) payload.endTime = toISOUTC(form.endTime);
+  if (form.status !== undefined) payload.status = Number(form.status);
+  return payload;
+};
+
+/** Chuyển datetime-local (YYYY-MM-DDTHH:mm) sang ISO UTC string */
+export const toISOWithVietnamTZ = (localDateTime) => {
+  if (!localDateTime) return '';
+  const [date, time] = localDateTime.split('T');
+  // Tạo Date object với timezone Việt Nam (+07:00)
+  return `${date}T${time}:00.000+07:00`;
+};
+
+/** Chuyển datetime-local (YYYY-MM-DDTHH:mm) sang ISO UTC string (Z) */
+export const toISOUTC = (localDateTime) => {
+  if (!localDateTime) return '';
+  const [date, time] = localDateTime.split('T');
+  // Chuyển giờ Việt Nam sang UTC (trừ 7 tiếng)
+  const d = new Date(`${date}T${time}:00+07:00`);
+  return d.toISOString();
+};
+
+/** Payload cho PUT /api/admin/showtimes/{id} — chỉ status (số) */
+export const toShowtimeUpdatePayload = (form) => {
+  const payload = {};
+  if (form.status !== undefined) payload.status = Number(form.status);
+  return payload;
+};
+
+export const adminShowtimeService = {
+  /** GET /api/admin/showtimes — danh sách tất cả suất chiếu */
+  list: () => api.get('/api/admin/showtimes').then(unwrap),
+
+  /** POST /api/admin/showtimes — tạo suất chiếu mới */
+  create: (form) => api.post('/api/admin/showtimes', toShowtimePayload(form)).then(unwrap),
+
+  /** GET /api/admin/showtimes/{showtimeId} — chi tiết 1 suất chiếu */
+  getById: (showtimeId) => api.get(`/api/admin/showtimes/${showtimeId}`).then(unwrap),
+
+  /** PUT /api/admin/showtimes/{showtimeId} — cập nhật suất chiếu */
+  update: (showtimeId, form) => api.put(`/api/admin/showtimes/${showtimeId}`, toShowtimePayload(form)).then(unwrap),
+
+  /** PUT /api/admin/showtimes/{id} — chỉ cập nhật status */
+  updateShowtime: (showtimeId, form) => api.put(`/api/admin/showtimes/${showtimeId}`, toShowtimeUpdatePayload(form)).then(unwrap),
+
+  /** DELETE /api/admin/showtimes/{showtimeId} — xóa suất chiếu */
+  remove: (showtimeId) => api.delete(`/api/admin/showtimes/${showtimeId}`).then(unwrap),
+
+  /** GET /api/admin/showtimes/{showtimeId}/seats — lấy danh sách ghế của suất chiếu */
+  getSeats: (showtimeId) => api.get(`/api/admin/showtimes/${showtimeId}/seats`).then(unwrap),
+
+  /** PUT /api/admin/showtimes/{showtimeId}/seats — cập nhật trạng thái ghế (đặt/ghế trống) */
+  updateSeats: (showtimeId, seats) => api.put(`/api/admin/showtimes/${showtimeId}/seats`, { seats }).then(unwrap),
+};
+
+export default adminShowtimeService;

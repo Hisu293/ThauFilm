@@ -1,0 +1,8 @@
+CREATE TABLE IF NOT EXISTS movies (
+    id UUID PRIMARY KEY,
+    title VARCHAR(255) NOT NULL UNIQUE,
+    description TEXT,
+    duration_minutes INTEGER NOT NULL,
+    rating NUMERIC(10, 2) NOT NULL DEFAULT 0,
+    active BOOLEAN NOT NULL DEFAULT TRUE
+);

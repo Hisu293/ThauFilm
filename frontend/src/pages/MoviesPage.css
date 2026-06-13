@@ -1,0 +1,103 @@
+.movies-hero {
+  position: relative;
+  padding: 64px 0 48px;
+  background:
+    radial-gradient(circle at 80% 20%, rgba(229, 9, 20, 0.22) 0%, rgba(0,0,0,0) 45%),
+    linear-gradient(180deg, #161616 0%, #0b0b0b 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.movies-hero__inner { max-width: 1280px; margin: 0 auto; padding: 0 24px; }
+.movies-hero__title { font-size: clamp(2rem, 4vw, 3rem); font-weight: 900; margin: 6px 0 10px; letter-spacing: -0.02em; }
+.movies-hero__sub { color: rgba(255, 255, 255, 0.65); max-width: 540px; margin: 0; }
+
+.movies-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  background: #141414;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 6px;
+  margin-bottom: 20px;
+}
+.movies-tab {
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  font-weight: 700;
+  font-size: 0.92rem;
+  padding: 10px 18px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+.movies-tab:hover { color: #fff; }
+.movies-tab.is-active { background: #e50914; color: #fff; }
+
+.movies-toolbar {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+.movies-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 280px;
+  background: #141414;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  padding: 0 14px;
+  height: 46px;
+}
+.movies-search input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #fff;
+  font-size: 0.92rem;
+}
+.movies-filters { display: flex; gap: 10px; flex-wrap: wrap; }
+.movies-filters select {
+  height: 46px;
+  padding: 0 14px;
+  border-radius: 12px;
+  background: #141414;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-size: 0.9rem;
+  cursor: pointer;
+  outline: none;
+}
+.movies-filters select:focus { border-color: #e50914; }
+.movies-filters option { background: #1a1a1e; }
+
+.movies-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 20px;
+}
+
+.movies-pagination {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 36px;
+}
+.movies-pagination button {
+  min-width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #141414;
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+.movies-pagination button:hover:not(:disabled) { background: rgba(229, 9, 20, 0.3); }
+.movies-pagination button.is-active { background: #e50914; border-color: transparent; }
+.movies-pagination button:disabled { opacity: 0.4; cursor: not-allowed; }

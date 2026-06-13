@@ -1,0 +1,108 @@
+:root {
+  --search-bg: #0f172a;
+  --search-panel: #111827;
+  --search-border: rgba(148, 163, 184, 0.2);
+  --search-text: #e2e8f0;
+  --search-muted: #94a3b8;
+  --search-accent: #fbbf24;
+}
+
+.search-filter {
+  background: var(--search-bg);
+  padding: 20px 0;
+}
+
+.search-filter__inner {
+  max-width: 1126px;
+  margin: 0 auto;
+  padding: 16px 20px;
+  border-radius: 18px;
+  background: var(--search-panel);
+  border: 1px solid var(--search-border);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  align-items: center;
+}
+
+.search-filter__field {
+  flex: 1 1 260px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  background: rgba(15, 23, 42, 0.7);
+}
+
+.search-filter__field input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--search-text);
+  font-size: 14px;
+}
+
+.search-filter__field input::placeholder {
+  color: var(--search-muted);
+}
+
+.search-filter__icon {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--search-muted);
+}
+
+.search-filter__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.search-filter__chip {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--search-text);
+  background: rgba(30, 41, 59, 0.8);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.search-filter__chip:hover {
+  border-color: rgba(248, 250, 252, 0.4);
+}
+
+.search-filter__chip.is-active {
+  background: var(--search-accent);
+  color: #111827;
+  border-color: transparent;
+}
+
+@media (max-width: 768px) {
+  .search-filter__inner {
+    padding: 14px 16px;
+  }
+}
+
+@media (max-width: 560px) {
+  .search-filter__inner {
+    border-radius: 14px;
+  }
+
+  .search-filter__chips {
+    width: 100%;
+  }
+
+  .search-filter__chip {
+    flex: 1 1 auto;
+    text-align: center;
+  }
+}

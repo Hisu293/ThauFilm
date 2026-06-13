@@ -1,0 +1,4 @@
+
+ALTER TABLE "users" ADD COLUMN IF NOT EXISTS enabled BOOLEAN DEFAULT TRUE;
+
+UPDATE "users" SET enabled = TRUE WHERE enabled IS NULL;

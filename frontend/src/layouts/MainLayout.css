@@ -1,0 +1,136 @@
+:root {
+  --layout-bg: #0f172a;
+  --navbar-bg: #0b1120;
+  --navbar-border: rgba(148, 163, 184, 0.2);
+  --text-main: #e2e8f0;
+  --text-muted: #94a3b8;
+  --accent: #fbbf24;
+  --accent-strong: #f59e0b;
+}
+
+.layout {
+  min-height: 100vh;
+  background: var(--layout-bg);
+  color: var(--text-main);
+}
+
+.navbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  background: var(--navbar-bg);
+  border-bottom: 1px solid var(--navbar-border);
+}
+
+.navbar__inner {
+  max-width: 1126px;
+  margin: 0 auto;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.navbar__logo {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.navbar__links {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.navbar__link {
+  color: var(--text-main);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 8px 12px;
+  border-radius: 999px;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.navbar__link:hover {
+  background: rgba(248, 250, 252, 0.1);
+  color: #fff;
+}
+
+.navbar__actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.navbar__button {
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  padding: 8px 14px;
+  border-radius: 999px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.navbar__button--ghost {
+  color: var(--text-main);
+  border: 1px solid rgba(248, 250, 252, 0.25);
+}
+
+.navbar__button--ghost:hover {
+  background: rgba(248, 250, 252, 0.08);
+}
+
+.navbar__button--primary {
+  background: var(--accent);
+  color: #0b1120;
+  box-shadow: 0 10px 20px -14px rgba(251, 191, 36, 0.8);
+}
+
+.navbar__button--primary:hover {
+  background: var(--accent-strong);
+  transform: translateY(-1px);
+}
+
+.layout__content {
+  padding-bottom: 40px;
+}
+
+@media (max-width: 900px) {
+  .navbar__inner {
+    flex-wrap: wrap;
+  }
+
+  .navbar__links {
+    order: 3;
+    width: 100%;
+    justify-content: space-between;
+    background: rgba(15, 23, 42, 0.6);
+    padding: 10px 12px;
+    border-radius: 12px;
+  }
+
+  .navbar__actions {
+    margin-left: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .navbar__inner {
+    padding: 12px 16px;
+  }
+
+  .navbar__links {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .navbar__actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
