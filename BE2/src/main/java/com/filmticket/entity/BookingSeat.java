@@ -3,34 +3,32 @@ package com.filmticket.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
-import java.util.List;
+import java.math.BigDecimal;
 import java.util.UUID;
 
 @Entity
-@Table(name = "cinema_room")
+@Table(name = "booking_seats")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class CinemaRoom {
+public class BookingSeat {
+
     @Id
     @Column(nullable = false, updatable = false)
     private UUID id;
 
-    @Column(nullable = false)
-    private String name;
-
-    private Integer capacity;
-
-    private Integer status;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "booking_id", nullable = false)
+    private Booking booking;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "theater_id")
-    private Theater theater;
+    @JoinColumn(name = "seat_id", nullable = false)
+    private Seat seat;
 
-    @OneToMany(mappedBy = "cinemaRoom", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Seat> seats;
+    @Column(nullable = false, precision = 10, scale = 2)
+    private BigDecimal priceAtBooking;
 
     @PrePersist
     public void prePersist() {

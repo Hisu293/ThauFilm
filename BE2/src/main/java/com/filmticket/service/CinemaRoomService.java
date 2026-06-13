@@ -2,12 +2,16 @@ package com.filmticket.service;
 
 import com.filmticket.dto.CinemaRoomRequest;
 import com.filmticket.dto.CinemaRoomResponse;
+import com.filmticket.dto.CinemaRoomUpdateRequest;
 import com.filmticket.dto.SeatResponse;
 import com.filmticket.entity.CinemaRoom;
 import com.filmticket.entity.Seat;
+import com.filmticket.entity.Theater;
 import com.filmticket.exception.BadRequestException;
+import com.filmticket.model.RoomStatus;
 import com.filmticket.repository.CinemaRoomRepository;
 import com.filmticket.repository.SeatRepository;
+import com.filmticket.repository.TheaterRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,6 +27,7 @@ public class CinemaRoomService {
 
     private final CinemaRoomRepository cinemaRoomRepository;
     private final SeatRepository seatRepository;
+    private final TheaterRepository theaterRepository;
 
     private CinemaRoomResponse convertToResponse(CinemaRoom room) {
         return CinemaRoomResponse.builder()
@@ -30,6 +35,8 @@ public class CinemaRoomService {
                 .name(room.getName())
                 .capacity(room.getCapacity())
                 .status(room.getStatus())
+                .theaterId(room.getTheater() != null ? room.getTheater().getId() : null)
+                .theaterName(room.getTheater() != null ? room.getTheater().getName() : null)
                 .build();
     }
 
@@ -41,9 +48,21 @@ public class CinemaRoomService {
     }
 
     @Transactional(readOnly = true)
+    public List<CinemaRoomResponse> getAllRooms() {
+        return cinemaRoomRepository.findAll().stream()
+                .map(this::convertToResponse)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
     public CinemaRoom getRoomEntityOrThrow(UUID roomId) {
         return cinemaRoomRepository.findById(roomId)
                 .orElseThrow(() -> new BadRequestException("Cinema room not found"));
+    }
+
+    @Transactional(readOnly = true)
+    public CinemaRoomResponse getRoomById(UUID roomId) {
+        return convertToResponse(getRoomEntityOrThrow(roomId));
     }
 
     @Transactional(readOnly = true)
@@ -56,12 +75,16 @@ public class CinemaRoomService {
 
     @Transactional
     public CinemaRoomResponse createRoomAndGenerateSeats(CinemaRoomRequest request) {
+        Theater theater = theaterRepository.findById(request.getTheaterId())
+                .orElseThrow(() -> new BadRequestException("Theater not found"));
+
         int totalCapacity = request.getRowsCount() * request.getSeatsPerRow();
 
         CinemaRoom room = CinemaRoom.builder()
                 .name(request.getName())
                 .capacity(totalCapacity)
                 .status(1)
+                .theater(theater)
                 .build();
 
         CinemaRoom savedRoom = cinemaRoomRepository.save(room);
@@ -91,5 +114,25 @@ public class CinemaRoomService {
         CinemaRoom finalRoom = cinemaRoomRepository.save(savedRoom);
 
         return convertToResponse(finalRoom);
+    }
+
+    @Transactional
+    public CinemaRoomResponse updateRoom(UUID roomId, CinemaRoomUpdateRequest request) {
+        CinemaRoom room = getRoomEntityOrThrow(roomId);
+
+        room.setName(request.getName());
+        if (request.getStatus() != null) {
+            room.setStatus(request.getStatus().getValue());
+        }
+
+        CinemaRoom saved = cinemaRoomRepository.save(room);
+        return convertToResponse(saved);
+    }
+
+    @Transactional
+    public void deleteRoom(UUID roomId) {
+        CinemaRoom room = getRoomEntityOrThrow(roomId);
+        room.setStatus(0);
+        cinemaRoomRepository.save(room);
     }
 }

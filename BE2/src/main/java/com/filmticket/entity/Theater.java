@@ -7,13 +7,14 @@ import java.util.List;
 import java.util.UUID;
 
 @Entity
-@Table(name = "cinema_room")
+@Table(name = "theaters")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class CinemaRoom {
+public class Theater {
+
     @Id
     @Column(nullable = false, updatable = false)
     private UUID id;
@@ -21,16 +22,19 @@ public class CinemaRoom {
     @Column(nullable = false)
     private String name;
 
-    private Integer capacity;
+    @Column(length = 500)
+    private String address;
+
+    @Column(name = "city", length = 100)
+    private String city;
+
+    @Column(name = "phone_number", length = 20)
+    private String phoneNumber;
 
     private Integer status;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "theater_id")
-    private Theater theater;
-
-    @OneToMany(mappedBy = "cinemaRoom", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Seat> seats;
+    @OneToMany(mappedBy = "theater", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    private List<CinemaRoom> cinemaRooms;
 
     @PrePersist
     public void prePersist() {
