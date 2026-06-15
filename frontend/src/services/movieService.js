@@ -8,7 +8,30 @@ const placeholderPoster = '/placeholder.svg';
 /** Map a raw /api/movies record to the shape the UI expects. */
 const mapMovie = (movie) => {
   const status = String(movie.status ?? '').toUpperCase();
-  const poster = movie.posterUrl || placeholderPoster;
+  
+  let poster = movie.posterUrl || placeholderPoster;
+  if (!poster || poster === 'ok' || poster.includes('example.com') || poster.includes('placeholder')) {
+    const titleLower = String(movie.title ?? '').toLowerCase();
+    if (titleLower.includes('avengers')) {
+      poster = '/listfilm/film15.jpg';
+    } else if (titleLower.includes('inside out')) {
+      poster = '/listfilm/film9.jpg'; // Animation
+    } else if (titleLower.includes('dune')) {
+      poster = '/listfilm/film8.jpg'; // Sci-fi/Epic
+    } else if (titleLower.includes('spiderman') || titleLower.includes('spider-man') || titleLower.includes('spider-verse')) {
+      poster = '/listfilm/film16.jpg'; // Action/Sci-Fi
+    } else if (titleLower.includes('lật mặt') || titleLower.includes('l-t m-t')) {
+      poster = '/listfilm/film4.jpg'; // Action/Drama
+    } else if (titleLower.includes('conan')) {
+      poster = '/listfilm/film10.jpg'; // Mystery/Animation
+    } else {
+      // Determinstic fallback based on ID hash
+      const hash = String(movie.id || '').split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+      const index = (hash % 16) + 1;
+      poster = `/listfilm/film${index}.jpg`;
+    }
+  }
+
   return {
     id: movie.id,
     title: movie.title ?? 'Phim chưa đặt tên',
@@ -38,6 +61,36 @@ export const fetchMovies = async () => {
   const { data } = await api.get('/api/movies');
   const list = Array.isArray(data) ? data : (data?.data ?? []);
   return { movies: normalizeMovies(list), source: 'api' };
+};
+
+/** GET /api/movies/now-showing */
+export const fetchNowShowing = async () => {
+  const { data } = await api.get('/api/movies/now-showing');
+  const list = Array.isArray(data) ? data : (data?.data ?? []);
+  return normalizeMovies(list);
+};
+
+/** GET /api/movies/coming-soon */
+export const fetchComingSoon = async () => {
+  const { data } = await api.get('/api/movies/coming-soon');
+  const list = Array.isArray(data) ? data : (data?.data ?? []);
+  return normalizeMovies(list);
+};
+
+/** GET /api/movies/{movieId} — chi tiết 1 phim theo ID.
+ *  Backend trả { success, message, data: { id, title, rating (score), rated (age), ... } }
+ */
+export const fetchMovieById = async (movieId) => {
+  const { data } = await api.get(`/api/movies/${movieId}`);
+  const raw = data?.data ?? data ?? {};
+  const mapped = mapMovie(raw);
+  return {
+    ...mapped,
+    // Tách biệt đúng nghĩa: score = điểm số thực (7.9), ageRating = phân loại tuổi ("PG")
+    score: typeof raw.rating === 'number' ? raw.rating : null,
+    ageRating: raw.rated ?? null,
+    durationMinutes: raw.durationMinutes ?? null,
+  };
 };
 
 /** Pick up to `max` featured movies by popularity. */

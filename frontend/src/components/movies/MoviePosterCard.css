@@ -27,7 +27,8 @@
 }
 .mp-card:hover .mp-card__poster { transform: scale(1.06); }
 
-.mp-card__rating {
+/* Age rating badge (top-left) */
+.mp-card__badge {
   position: absolute;
   top: 10px;
   left: 10px;
@@ -37,6 +38,29 @@
   font-weight: 800;
   padding: 3px 9px;
   border-radius: 6px;
+  backdrop-filter: blur(4px);
+}
+
+/* Status badges (top-right) */
+.mp-card__status-now,
+.mp-card__status-soon {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 6px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.mp-card__status-now {
+  background: rgba(34, 197, 94, 0.88);
+  color: #fff;
+}
+.mp-card__status-soon {
+  background: rgba(251, 191, 36, 0.88);
+  color: #111;
 }
 
 .mp-card__overlay {
@@ -62,6 +86,7 @@
   cursor: pointer;
   transform: translateY(10px);
   transition: transform 0.25s ease;
+  white-space: nowrap;
 }
 .mp-card:hover .mp-card__cta { transform: translateY(0); }
 
@@ -78,8 +103,9 @@
 .mp-card__meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px 10px;
+  gap: 4px 8px;
   font-size: 0.78rem;
   color: rgba(255, 255, 255, 0.6);
 }
-.mp-card__meta b { color: rgba(255,255,255,0.85); font-weight: 600; }
+.mp-card__genres { color: rgba(255,255,255,0.82); font-weight: 600; }
+
