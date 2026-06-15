@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import PersonRoundedIcon from '@mui/icons-material/PersonRounded';
 import EventSeatRoundedIcon from '@mui/icons-material/EventSeatRounded';
@@ -24,6 +24,10 @@ import SecurityRoundedIcon from '@mui/icons-material/SecurityRounded';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import { useAuth } from '../context/AuthContext';
 import { profileUser, bookingHistory, upcomingTickets, favoriteMovies } from '../data/profileMock';
+import { useBooking } from '../hooks/useBooking';
+import { MOCK_MOVIES } from '../mock/bookingData';
+import { CircularProgress } from '@mui/material';
+import Box from '@mui/material/Box';
 import './ProfilePage.css';
 
 const MENU = [
@@ -134,6 +138,65 @@ const ProfilePage = () => {
   const [active, setActive] = useState(initialTab);
   const [favorites, setFavorites] = useState(favoriteMovies);
 
+  // Dynamic API state and side effects
+  const { loading: apiLoading, getHistory } = useBooking();
+  const [history, setHistory] = useState([]);
+  const [subTab, setSubTab] = useState('all');
+
+  useEffect(() => {
+    if (active === 'history' || active === 'upcoming') {
+      getHistory()
+        .then((data) => {
+          const mapped = data.map((b) => {
+            const date = new Date(b.startTime);
+            const isPast = date < new Date();
+            let displayStatus = 'Sắp chiếu';
+            if (b.status === 'CANCELLED') displayStatus = 'Đã hủy';
+            else if (b.status === 'CONFIRMED' && isPast) displayStatus = 'Đã xem';
+            else if (b.status === 'PENDING') displayStatus = 'Chờ thanh toán';
+
+            // Lookup mock movie details to retrieve the correct image URL
+            const mockMovie = MOCK_MOVIES.find((m) =>
+              m.title.toLowerCase().includes(b.movieTitle.toLowerCase())
+            );
+            const poster = mockMovie?.posterUrl || 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?q=80&w=300&auto=format&fit=crop';
+
+            return {
+              id: b.confirmationCode || b.id,
+              movie: b.movieTitle,
+              poster,
+              cinema: `ThauFilm Cinema • ${b.roomName}`,
+              showtime: date.toLocaleString('vi-VN', {
+                weekday: 'long',
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+              }),
+              seats: b.seats.map((s) => s.label),
+              bookedAt: b.status === 'CONFIRMED' ? 'Đã thanh toán' : 'Chờ thanh toán',
+              status: displayStatus,
+              rawStatus: b.status,
+              startTime: date
+            };
+          });
+          setHistory(mapped);
+        })
+        .catch(() => {});
+    }
+  }, [active, getHistory]);
+
+  const filteredHistory = history.filter((t) => {
+    if (subTab === 'done') return t.status === 'Đã xem';
+    if (subTab === 'cancel') return t.status === 'Đã hủy';
+    return true;
+  });
+
+  const upcomingList = history.filter(
+    (t) => t.status === 'Sắp chiếu' || t.status === 'Chờ thanh toán'
+  );
+
   /* settings state */
   const [notifEmail, setNotifEmail] = useState(true);
   const [notifPush, setNotifPush] = useState(true);
@@ -241,14 +304,43 @@ const ProfilePage = () => {
               <div className="pf-section-header">
                 <h2 className="pf-section__title">Vé của tôi</h2>
                 <div className="pf-tabs">
-                  <span className="pf-tab is-active">Tất cả ({bookingHistory.length})</span>
-                  <span className="pf-tab">{bookingHistory.filter(t => t.status === 'Đã xem').length} Đã xem</span>
-                  <span className="pf-tab">{bookingHistory.filter(t => t.status === 'Đã hủy').length} Đã hủy</span>
+                  <span 
+                    className={`pf-tab ${subTab === 'all' ? 'is-active' : ''}`}
+                    onClick={() => setSubTab('all')}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    Tất cả ({history.length})
+                  </span>
+                  <span 
+                    className={`pf-tab ${subTab === 'done' ? 'is-active' : ''}`}
+                    onClick={() => setSubTab('done')}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    {history.filter(t => t.status === 'Đã xem').length} Đã xem
+                  </span>
+                  <span 
+                    className={`pf-tab ${subTab === 'cancel' ? 'is-active' : ''}`}
+                    onClick={() => setSubTab('cancel')}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    {history.filter(t => t.status === 'Đã hủy').length} Đã hủy
+                  </span>
                 </div>
               </div>
-              <div className="pf-tickets">
-                {bookingHistory.map((t) => <TicketCard key={t.id} ticket={t} />)}
-              </div>
+              {apiLoading ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
+                  <CircularProgress sx={{ color: 'primary.main' }} />
+                </Box>
+              ) : filteredHistory.length ? (
+                <div className="pf-tickets">
+                  {filteredHistory.map((t) => <TicketCard key={t.id} ticket={t} />)}
+                </div>
+              ) : (
+                <div className="pf-empty-state" style={{ minHeight: 200 }}>
+                  <EventSeatRoundedIcon sx={{ fontSize: 48, color: 'rgba(255,255,255,0.15)' }} />
+                  <p>Không tìm thấy lịch sử đặt vé nào phù hợp.</p>
+                </div>
+              )}
             </div>
           )}
 
@@ -256,9 +348,13 @@ const ProfilePage = () => {
           {active === 'upcoming' && (
             <div className="pf-card">
               <h2 className="pf-section__title">Vé sắp chiếu</h2>
-              {upcomingTickets.length ? (
+              {apiLoading ? (
+                <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
+                  <CircularProgress sx={{ color: 'primary.main' }} />
+                </Box>
+              ) : upcomingList.length ? (
                 <div className="pf-tickets">
-                  {upcomingTickets.map((t) => <TicketCard key={t.id} ticket={t} />)}
+                  {upcomingList.map((t) => <TicketCard key={t.id} ticket={t} />)}
                 </div>
               ) : (
                 <div className="pf-empty-state">

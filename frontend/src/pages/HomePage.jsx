@@ -61,7 +61,7 @@ const HomePage = () => {
   return (
     <>
       <HeroSlider movies={featuredSlides} loading={apiLoading} />
-      <QuickBooking movies={apiMovies} loading={apiLoading} />
+      <QuickBooking />
 
       <Container maxWidth="xl" sx={{ py: { xs: 4, md: 6 } }}>
         <FilterPanel

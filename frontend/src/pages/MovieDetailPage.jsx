@@ -1,20 +1,25 @@
 import { useState, useEffect } from 'react';
-import { Link as RouterLink, useParams } from 'react-router-dom';
+import { Link as RouterLink, useParams, useNavigate } from 'react-router-dom';
 import {
   Box, Button, Chip, Container, Divider,
-  Skeleton, Stack, Typography,
+  Skeleton, Stack, Typography, Dialog, DialogContent, IconButton
 } from '@mui/material';
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
 import AccessTimeRoundedIcon from '@mui/icons-material/AccessTimeRounded';
 import StarRoundedIcon from '@mui/icons-material/StarRounded';
 import PlayArrowRoundedIcon from '@mui/icons-material/PlayArrowRounded';
-import NotificationsRoundedIcon from '@mui/icons-material/NotificationsRounded';
 import CalendarTodayRoundedIcon from '@mui/icons-material/CalendarTodayRounded';
 import LanguageRoundedIcon from '@mui/icons-material/LanguageRounded';
 import PersonRoundedIcon from '@mui/icons-material/PersonRounded';
 import GroupRoundedIcon from '@mui/icons-material/GroupRounded';
 import MovieRoundedIcon from '@mui/icons-material/MovieRounded';
+import CloseIcon from '@mui/icons-material/Close';
+
 import { fetchMovieById } from '../services/movieService';
+import { MOCK_MOVIES } from '../mock/bookingData';
+import BookingStepper from '../components/BookingStepper';
+import ShowtimeSelector from '../components/ShowtimeSelector';
+import StatusChip from '../components/common/StatusChip';
 import './MovieDetailPage.css';
 
 /* ---------- helpers ---------- */
@@ -29,17 +34,10 @@ const fmtDate = (dateStr) => {
   }
 };
 
-const STATUS_LABEL = {
-  NOW_SHOWING: 'Đang chiếu',
-  SHOWING: 'Đang chiếu',
-  COMING_SOON: 'Sắp chiếu',
-  UPCOMING: 'Sắp chiếu',
-};
-
 /* ---------- Skeleton loading ---------- */
 const MovieDetailSkeleton = () => (
-  <Box sx={{ minHeight: '100vh', bgcolor: '#0b0b0f', pt: { xs: 3, md: 6 }, pb: 8 }}>
-    <Container maxWidth="lg">
+  <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', pt: { xs: 3, md: 6 }, pb: 8 }}>
+    <Container maxWidth="xl">
       <Box className="mdp-skeleton" sx={{ width: 130, height: 36, mb: 4 }} />
       <Stack direction={{ xs: 'column', md: 'row' }} spacing={{ xs: 4, md: 6 }} alignItems="flex-start">
         <Box className="mdp-skeleton" sx={{ flexShrink: 0, width: { xs: '100%', md: 280 }, aspectRatio: '2/3', borderRadius: 3 }} />
@@ -61,20 +59,21 @@ const MovieDetailSkeleton = () => (
 /* ---------- Error / Not found ---------- */
 const MovieNotFound = ({ message }) => (
   <Box sx={{
-    minHeight: '100vh', bgcolor: '#0b0b0f', color: '#fff',
+    minHeight: '100vh', bgcolor: 'background.default', color: '#fff',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
   }}>
     <Stack alignItems="center" spacing={2.5} sx={{ textAlign: 'center', px: 4 }}>
       <MovieRoundedIcon sx={{ fontSize: 64, color: 'rgba(255,255,255,0.2)' }} />
       <Typography variant="h5" fontWeight={800}>Không tìm thấy phim</Typography>
-      <Typography sx={{ color: 'rgba(255,255,255,0.55)', maxWidth: 400 }}>
+      <Typography sx={{ color: 'text.secondary', maxWidth: 400 }}>
         {message || 'Phim bạn tìm kiếm không tồn tại hoặc đã bị xóa.'}
       </Typography>
       <Button
         component={RouterLink}
         to="/movies"
         variant="contained"
-        sx={{ bgcolor: '#e50914', '&:hover': { bgcolor: '#c10812' }, fontWeight: 700 }}
+        color="primary"
+        sx={{ fontWeight: 700 }}
       >
         Quay lại danh sách phim
       </Button>
@@ -87,9 +86,11 @@ const MovieNotFound = ({ message }) => (
    ===================================================== */
 const MovieDetailPage = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [movie, setMovie] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [openTrailer, setOpenTrailer] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -98,10 +99,36 @@ const MovieDetailPage = () => {
     setError(null);
     setMovie(null);
 
+    // Try fetching from service. If it fails (no backend), fall back to MOCK_MOVIES
     fetchMovieById(id)
-      .then((m) => { if (!cancelled) setMovie(m); })
-      .catch((err) => { if (!cancelled) setError(err.message || 'Không tải được thông tin phim.'); })
-      .finally(() => { if (!cancelled) setLoading(false); });
+      .then((m) => {
+        if (!cancelled) {
+          // If response has invalid structure or missing data, check mock fallback
+          if (!m || !m.title || m.title === 'Phim chưa đặt tên') {
+            const fallback = MOCK_MOVIES.find((item) => item.id === id);
+            if (fallback) {
+              setMovie(fallback);
+            } else {
+              setMovie(m);
+            }
+          } else {
+            setMovie(m);
+          }
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          const fallback = MOCK_MOVIES.find((item) => item.id === id);
+          if (fallback) {
+            setMovie(fallback);
+          } else {
+            setError(err.message || 'Không tải được thông tin phim.');
+          }
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
 
     return () => { cancelled = true; };
   }, [id]);
@@ -110,9 +137,6 @@ const MovieDetailPage = () => {
   if (error || !movie) return <MovieNotFound message={error} />;
 
   /* --- derived values --- */
-  const statusLabel = STATUS_LABEL[String(movie.status).toUpperCase()] ?? movie.status;
-  const isNowShowing = movie.isNowShowing;
-
   const genres = (movie.genre || '')
     .split(',').map((g) => g.trim()).filter(Boolean);
 
@@ -121,13 +145,25 @@ const MovieDetailPage = () => {
 
   const posterSrc = movie.posterUrl || movie.poster || '/placeholder.svg';
 
+  const handleSelectShowtime = (showtime) => {
+    navigate(`/booking/seats/${showtime.id}`, {
+      state: {
+        movie,
+        showtime
+      }
+    });
+  };
+
   return (
-    <Box className="mdp-root">
+    <Box className="mdp-root" sx={{ bgcolor: 'background.default', pb: 10 }}>
       {/* Blurred backdrop */}
       <div className="mdp-backdrop" style={{ backgroundImage: `url(${posterSrc})` }} />
-      <div className="mdp-backdrop-overlay" />
+      <div className="mdp-backdrop-overlay" style={{ background: 'linear-gradient(to bottom, rgba(15,23,42,0.6) 0%, #0F172A 100%)' }} />
 
-      <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 1, pt: { xs: 3, md: 6 }, pb: 10 }}>
+      <Container maxWidth="xl" sx={{ position: 'relative', zIndex: 1, pt: { xs: 2, md: 4 } }}>
+        
+        {/* Progress Stepper */}
+        <BookingStepper activeStep={0} />
 
         {/* Back button */}
         <Button
@@ -136,9 +172,10 @@ const MovieDetailPage = () => {
           startIcon={<ArrowBackRoundedIcon />}
           sx={{
             mb: { xs: 3, md: 4 },
-            color: 'rgba(255,255,255,0.7)',
+            color: 'text.secondary',
             fontWeight: 600,
-            '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.06)' },
+            pl: 0,
+            '&:hover': { color: 'primary.main', bgcolor: 'transparent', transform: 'translateX(-4px)' },
           }}
         >
           Danh sách phim
@@ -149,18 +186,19 @@ const MovieDetailPage = () => {
           direction={{ xs: 'column', md: 'row' }}
           spacing={{ xs: 4, md: 6 }}
           alignItems="flex-start"
+          sx={{ mb: 6 }}
         >
           {/* ---- Poster ---- */}
-          <Box className="mdp-poster-wrap">
+          <Box className="mdp-poster-wrap" sx={{ boxShadow: '0 20px 40px rgba(0,0,0,0.6)', border: '1px solid rgba(148,163,184,0.1)' }}>
             <img
               src={posterSrc}
               alt={movie.title}
               className="mdp-poster"
               onError={(e) => { e.currentTarget.src = '/placeholder.svg'; }}
             />
-            {statusLabel && (
-              <span className={`mdp-status-badge ${isNowShowing ? 'now' : 'soon'}`}>
-                {statusLabel}
+            {movie.status && (
+              <span className={`mdp-status-badge ${movie.isNowShowing ? 'now' : 'soon'}`} style={{ backgroundColor: movie.isNowShowing ? '#FBBF24' : '#64748B', color: movie.isNowShowing ? '#0F172A' : '#fff', fontWeight: 800 }}>
+                {movie.isNowShowing ? 'Đang chiếu' : 'Sắp chiếu'}
               </span>
             )}
           </Box>
@@ -169,85 +207,94 @@ const MovieDetailPage = () => {
           <Box sx={{ flex: 1, minWidth: 0 }}>
 
             {/* Genre chips + age rating */}
-            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 2 }}>
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ mb: 2.5 }}>
               {genres.map((g) => (
                 <Chip
                   key={g} label={g} size="small"
                   sx={{
-                    bgcolor: 'rgba(229,9,20,0.14)',
-                    color: '#ff7373',
-                    border: '1px solid rgba(229,9,20,0.28)',
+                    bgcolor: 'rgba(251,191,36,0.1)',
+                    color: 'primary.main',
+                    border: '1px solid rgba(251,191,36,0.2)',
                     fontWeight: 700,
                     fontSize: '0.78rem',
                   }}
                 />
               ))}
               {movie.ageRating && (
-                <Chip
-                  label={movie.ageRating} size="small" variant="outlined"
-                  sx={{ borderColor: 'rgba(255,255,255,0.28)', color: 'rgba(255,255,255,0.75)', fontWeight: 700 }}
-                />
+                <StatusChip label={movie.ageRating} type="age" />
               )}
             </Stack>
 
             {/* Title */}
-            <Typography className="mdp-title">{movie.title}</Typography>
+            <Typography variant="h3" sx={{ fontWeight: 900, mb: 1, letterSpacing: '-0.02em', textShadow: '0 2px 10px rgba(0,0,0,0.5)' }}>
+              {movie.title}
+            </Typography>
+            
+            {movie.originalTitle && movie.originalTitle !== movie.title && (
+              <Typography variant="h6" color="text.secondary" sx={{ mb: 2, fontWeight: 500 }}>
+                {movie.originalTitle}
+              </Typography>
+            )}
 
             {/* Score */}
-            {movie.score !== null && (
-              <Box className="mdp-score-ring" sx={{ mt: 2, mb: 0.5, display: 'inline-flex' }}>
-                <StarRoundedIcon sx={{ color: '#facc15', fontSize: 18 }} />
-                <Typography fontWeight={800} sx={{ color: '#facc15', fontSize: '1rem' }}>
+            {movie.score !== null && movie.score !== undefined && (
+              <Box sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.8, bgcolor: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.15)', px: 1.8, py: 0.8, borderRadius: 2, mb: 3 }}>
+                <StarRoundedIcon sx={{ color: 'primary.main', fontSize: 22 }} />
+                <Typography fontWeight={800} sx={{ color: 'primary.main', fontSize: '1.1rem', lineHeight: 1 }}>
                   {Number(movie.score).toFixed(1)}
                 </Typography>
-                <Typography sx={{ color: 'rgba(255,255,255,0.45)', fontSize: '0.82rem' }}>/10</Typography>
+                <Typography sx={{ color: 'text.secondary', fontSize: '0.85rem' }}>/ 10</Typography>
               </Box>
             )}
 
             {/* Meta row */}
             <Stack
-              direction="row" spacing={3} flexWrap="wrap" useFlexGap
-              sx={{ mt: 2, mb: 3, color: 'rgba(255,255,255,0.75)' }}
+              direction="row" spacing={3.5} flexWrap="wrap" useFlexGap
+              sx={{ mb: 3.5, color: 'text.secondary' }}
             >
-              {movie.durationMinutes && (
-                <Stack direction="row" alignItems="center" spacing={0.6}>
-                  <AccessTimeRoundedIcon sx={{ fontSize: 18, color: 'rgba(255,255,255,0.5)' }} />
-                  <Typography sx={{ fontSize: '0.93rem' }}>{movie.durationMinutes} phút</Typography>
+              {(movie.durationMinutes || movie.duration) && (
+                <Stack direction="row" alignItems="center" spacing={0.8}>
+                  <AccessTimeRoundedIcon sx={{ fontSize: 18, color: 'primary.main' }} />
+                  <Typography sx={{ fontSize: '0.93rem', fontWeight: 500 }}>
+                    {movie.durationMinutes || movie.duration} phút
+                  </Typography>
                 </Stack>
               )}
               {movie.releaseDate && (
-                <Stack direction="row" alignItems="center" spacing={0.6}>
-                  <CalendarTodayRoundedIcon sx={{ fontSize: 16, color: 'rgba(255,255,255,0.5)' }} />
-                  <Typography sx={{ fontSize: '0.93rem' }}>{fmtDate(movie.releaseDate)}</Typography>
+                <Stack direction="row" alignItems="center" spacing={0.8}>
+                  <CalendarTodayRoundedIcon sx={{ fontSize: 16, color: 'primary.main' }} />
+                  <Typography sx={{ fontSize: '0.93rem', fontWeight: 500 }}>{fmtDate(movie.releaseDate)}</Typography>
                 </Stack>
               )}
               {movie.language && (
-                <Stack direction="row" alignItems="center" spacing={0.6}>
-                  <LanguageRoundedIcon sx={{ fontSize: 18, color: 'rgba(255,255,255,0.5)' }} />
-                  <Typography sx={{ fontSize: '0.93rem' }}>{movie.language}</Typography>
+                <Stack direction="row" alignItems="center" spacing={0.8}>
+                  <LanguageRoundedIcon sx={{ fontSize: 18, color: 'primary.main' }} />
+                  <Typography sx={{ fontSize: '0.93rem', fontWeight: 500 }}>{movie.language}</Typography>
                 </Stack>
               )}
             </Stack>
 
             {/* Description */}
-            <Typography className="mdp-desc">{movie.description}</Typography>
+            <Typography variant="body1" sx={{ color: 'text.secondary', mb: 3.5, lineHeight: 1.7, fontSize: '1rem', maxWidth: '800px' }}>
+              {movie.description}
+            </Typography>
 
-            <Divider sx={{ borderColor: 'rgba(255,255,255,0.09)', my: 3 }} />
+            <Divider sx={{ borderColor: 'rgba(148, 163, 184, 0.1)', my: 3 }} />
 
             {/* Cast & Crew */}
-            <Box className="mdp-info-card">
+            <Box sx={{ p: 2.5, borderRadius: 3, bgcolor: 'background.paper', border: '1px solid rgba(148,163,184,0.06)', mb: 4 }}>
               <Stack spacing={2.5}>
                 {movie.director && (
-                  <Stack direction="row" spacing={1.5} alignItems="flex-start">
-                    <PersonRoundedIcon sx={{ color: 'rgba(255,255,255,0.4)', fontSize: 20, mt: 0.2, flexShrink: 0 }} />
+                  <Stack direction="row" spacing={2} alignItems="flex-start">
+                    <PersonRoundedIcon sx={{ color: 'primary.main', fontSize: 20, mt: 0.2, flexShrink: 0 }} />
                     <Box>
                       <Typography sx={{
-                        color: 'rgba(255,255,255,0.45)', fontSize: '0.73rem',
+                        color: 'text.secondary', fontSize: '0.73rem',
                         textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700, mb: 0.4,
                       }}>
                         Đạo diễn
                       </Typography>
-                      <Typography sx={{ color: '#fff', fontWeight: 600, fontSize: '0.97rem' }}>
+                      <Typography sx={{ color: 'text.primary', fontWeight: 600, fontSize: '0.97rem' }}>
                         {movie.director}
                       </Typography>
                     </Box>
@@ -255,16 +302,16 @@ const MovieDetailPage = () => {
                 )}
 
                 {actorList.length > 0 && (
-                  <Stack direction="row" spacing={1.5} alignItems="flex-start">
-                    <GroupRoundedIcon sx={{ color: 'rgba(255,255,255,0.4)', fontSize: 20, mt: 0.2, flexShrink: 0 }} />
+                  <Stack direction="row" spacing={2} alignItems="flex-start">
+                    <GroupRoundedIcon sx={{ color: 'primary.main', fontSize: 20, mt: 0.2, flexShrink: 0 }} />
                     <Box>
                       <Typography sx={{
-                        color: 'rgba(255,255,255,0.45)', fontSize: '0.73rem',
+                        color: 'text.secondary', fontSize: '0.73rem',
                         textTransform: 'uppercase', letterSpacing: '0.1em', fontWeight: 700, mb: 0.4,
                       }}>
                         Diễn viên
                       </Typography>
-                      <Typography sx={{ color: '#fff', fontWeight: 500, fontSize: '0.95rem', lineHeight: 1.75 }}>
+                      <Typography sx={{ color: 'text.primary', fontWeight: 500, fontSize: '0.95rem', lineHeight: 1.7 }}>
                         {actorList.join(' · ')}
                       </Typography>
                     </Box>
@@ -273,57 +320,84 @@ const MovieDetailPage = () => {
               </Stack>
             </Box>
 
-            {/* CTA */}
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mt: 4 }}>
-              {isNowShowing ? (
-                <Button
-                  className="mdp-cta-btn"
-                  variant="contained"
-                  size="large"
-                  startIcon={<PlayArrowRoundedIcon />}
-                  sx={{
-                    bgcolor: '#e50914',
-                    '&:hover': { bgcolor: '#c10812' },
-                    fontWeight: 800,
-                    px: 4.5, py: 1.6,
-                    borderRadius: 2,
-                    fontSize: '1rem',
-                    boxShadow: '0 6px 28px rgba(229,9,20,0.45)',
-                    transition: 'all 0.2s ease',
-                    '&:hover': {
-                      bgcolor: '#c10812',
-                      boxShadow: '0 8px 36px rgba(229,9,20,0.6)',
-                      transform: 'translateY(-1px)',
-                    },
-                  }}
-                >
-                  Đặt vé ngay
-                </Button>
-              ) : (
-                <Button
-                  variant="outlined"
-                  size="large"
-                  startIcon={<NotificationsRoundedIcon />}
-                  sx={{
-                    borderColor: 'rgba(255,255,255,0.28)',
-                    color: '#fff',
-                    fontWeight: 700,
-                    px: 4.5, py: 1.6,
-                    borderRadius: 2,
-                    fontSize: '0.97rem',
-                    '&:hover': {
-                      borderColor: 'rgba(255,255,255,0.55)',
-                      bgcolor: 'rgba(255,255,255,0.06)',
-                    },
-                  }}
-                >
-                  Nhắc tôi khi chiếu
-                </Button>
-              )}
-            </Stack>
+            {/* Trailer CTA */}
+            <Button
+              variant="outlined"
+              size="large"
+              startIcon={<PlayArrowRoundedIcon />}
+              onClick={() => setOpenTrailer(true)}
+              sx={{
+                borderColor: 'primary.main',
+                color: 'primary.main',
+                fontWeight: 700,
+                px: 4.5, py: 1.6,
+                borderRadius: 2,
+                fontSize: '0.97rem',
+                '&:hover': {
+                  borderColor: 'primary.light',
+                  bgcolor: 'rgba(251,191,36,0.06)',
+                },
+              }}
+            >
+              Xem Trailer
+            </Button>
           </Box>
         </Stack>
+
+        <Divider sx={{ borderColor: 'rgba(148, 163, 184, 0.1)', my: 4 }} />
+
+        {/* Showtimes Selection Section */}
+        <ShowtimeSelector movieId={movie.id} onSelectShowtime={handleSelectShowtime} />
+
       </Container>
+
+      {/* Trailer Dialog Modal */}
+      <Dialog
+        open={openTrailer}
+        onClose={() => setOpenTrailer(false)}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{
+          sx: {
+            bgcolor: '#000',
+            boxShadow: 'none',
+            backgroundImage: 'none',
+            borderRadius: 3,
+            overflow: 'hidden'
+          }
+        }}
+      >
+        <Box sx={{ position: 'relative', pt: '56.25%' /* 16:9 Aspect Ratio */ }}>
+          <IconButton
+            onClick={() => setOpenTrailer(false)}
+            sx={{
+              position: 'absolute',
+              top: 8,
+              right: 8,
+              color: '#fff',
+              bgcolor: 'rgba(0,0,0,0.5)',
+              zIndex: 1,
+              '&:hover': { bgcolor: 'rgba(0,0,0,0.8)' }
+            }}
+          >
+            <CloseIcon />
+          </IconButton>
+          <iframe
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              width: '100%',
+              height: '100%',
+              border: 0
+            }}
+            src={movie.trailerUrl || "https://www.youtube.com/embed/dQw4w9WgXcQ"}
+            title={`${movie.title} Trailer`}
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+          />
+        </Box>
+      </Dialog>
     </Box>
   );
 };
