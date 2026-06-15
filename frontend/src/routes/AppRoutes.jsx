@@ -16,6 +16,12 @@ import InfoPage from '../pages/InfoPage';
 import AdminRoute from './AdminRoute';
 import NotFoundPage from '../pages/NotFoundPage';
 
+// Booking Pages
+import SeatSelectionPage from '../pages/SeatSelectionPage';
+import BookingSummaryPage from '../pages/BookingSummaryPage';
+import PaymentPage from '../pages/PaymentPage';
+import BookingSuccessPage from '../pages/BookingSuccessPage';
+
 // Staff Pages
 import StaffDashboard from '../pages/staff/StaffDashboard';
 import TicketCheckIn from '../pages/staff/TicketCheckIn';
@@ -34,6 +40,12 @@ const AppRoutes = () => {
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/movies/:id" element={<MovieDetailPage />} />
         <Route path="/dashboard" element={<DashboardPage />} />
+         
+        <Route path="/booking/seats/:showtimeId" element={<SeatSelectionPage />} />
+        <Route path="/booking/summary" element={<BookingSummaryPage />} />
+        <Route path="/booking/payment" element={<PaymentPage />} />
+        <Route path="/booking/success" element={<BookingSuccessPage />} />
+
         {/* Trang nội dung tĩnh liên kết từ footer */}
         <Route path="/faq" element={<InfoPage contentKey="faq" />} />
         <Route path="/terms" element={<InfoPage contentKey="terms" />} />
@@ -41,6 +53,7 @@ const AppRoutes = () => {
         <Route path="/refund" element={<InfoPage contentKey="refund" />} />
         <Route path="/contact" element={<InfoPage contentKey="contact" />} />
         <Route path="/cookie" element={<InfoPage contentKey="cookie" />} />
+
       </Route>
 
       {/* Auth + admin — no public navbar */}

@@ -18,7 +18,7 @@ import {
 import MenuRoundedIcon from '@mui/icons-material/MenuRounded';
 import UserMenu, { AuthButtons } from '../UserMenu';
 import { useAuth } from '../../context/AuthContext';
-import { NAV_LINKS } from '../../theme/cinemaTheme';
+import { NAV_LINKS } from '../../theme/theme';
 
 const SiteNavbar = () => {
   const { isLoggedIn } = useAuth();
@@ -77,7 +77,7 @@ const SiteNavbar = () => {
                           bottom: 6,
                           height: 2,
                           borderRadius: 2,
-                          backgroundColor: '#e50914',
+                          backgroundColor: 'primary.main',
                         }
                       : {},
                     '&:hover': { color: '#fff', backgroundColor: 'rgba(255,255,255,0.07)' },
