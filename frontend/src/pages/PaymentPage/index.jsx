@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Container, Grid, Box, Alert, Typography, Button, Stack, Card, CardContent, Snackbar } from '@mui/material';
+import { Container, Grid, Box, Alert, Typography, Button, Stack, Card, CardContent, Divider, Snackbar } from '@mui/material';
 import LockIcon from '@mui/icons-material/Lock';
 
 import BookingStepper from '../../components/BookingStepper';
@@ -60,8 +60,16 @@ export const PaymentPage = () => {
     if (!bookingId || apiLoading) return;
     
     try {
+      // Map frontend payment method ID to backend payment method
+      const paymentMethodMap = {
+        'bank_card': 'VNPAY',
+        'e_wallet': 'MOMO',
+        'qr_pay': 'ZALOPAY',
+      };
+      const backendPaymentMethod = paymentMethodMap[paymentMethod] || 'CASH';
+      
       // Confirm and finalize payment on the backend
-      const result = await pay(bookingId);
+      const result = await pay(bookingId, backendPaymentMethod);
       
       // Navigate to success, passing transaction details
       navigate('/booking/success', {

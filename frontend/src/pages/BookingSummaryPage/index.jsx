@@ -3,13 +3,16 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { Container, Grid, Box, Alert, Typography, Checkbox, FormControlLabel, Button, Stack, Paper, Divider, Snackbar } from '@mui/material';
 import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import ShieldRoundedIcon from '@mui/icons-material/ShieldRounded';
+import CalendarTodayRoundedIcon from '@mui/icons-material/CalendarTodayRounded';
+import AccessTimeRoundedIcon from '@mui/icons-material/AccessTimeRounded';
+import MeetingRoomRoundedIcon from '@mui/icons-material/MeetingRoomRounded';
 
 import BookingStepper from '../../components/BookingStepper';
 import PageHeader from '../../components/common/PageHeader';
 import SectionCard from '../../components/common/SectionCard';
-import BookingSidebar from '../../components/BookingSidebar';
 import CustomButton from '../../components/common/CustomButton';
 import LoadingOverlay from '../../components/common/LoadingOverlay';
+import StatusChip from '../../components/common/StatusChip';
 
 import { useBooking } from '../../hooks/useBooking';
 
@@ -26,7 +29,6 @@ export const BookingSummaryPage = () => {
   const [agreedTerms, setAgreedTerms] = useState(false);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
 
-  // Stash bookingId in sessionStorage to prevent state loss on refresh
   useEffect(() => {
     let id = location.state?.bookingId;
     if (id) {
@@ -44,12 +46,10 @@ export const BookingSummaryPage = () => {
     if (location.state?.selectedSeats) setSelectedSeats(location.state.selectedSeats);
   }, [location.state]);
 
-  // Load details from GET /api/member/booking/{bookingId}
   useEffect(() => {
     if (bookingId) {
       getDetail(bookingId)
         .then((booking) => {
-          // If movie or showtime is missing (e.g., page refresh), rebuild from booking API details
           if (booking) {
             if (!movie) {
               setMovie({
@@ -57,6 +57,7 @@ export const BookingSummaryPage = () => {
                 posterUrl: location.state?.movie?.posterUrl || '/placeholder.svg',
                 genre: location.state?.movie?.genre || 'Đang cập nhật',
                 durationMinutes: location.state?.movie?.durationMinutes || 120,
+                ageRating: location.state?.movie?.ageRating,
               });
             }
             if (!showtime) {
@@ -77,6 +78,17 @@ export const BookingSummaryPage = () => {
         });
     }
   }, [bookingId, getDetail]);
+
+  const seatsTotal = selectedSeats.reduce((sum, seat) => sum + (seat.price || 0), 0);
+  const serviceFee = 10000;
+  const totalAmount = seatsTotal + serviceFee;
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('vi-VN', {
+      style: 'currency',
+      currency: 'VND',
+    }).format(amount);
+  };
 
   const handleProceedToPayment = () => {
     if (!agreedTerms || apiLoading) return;
@@ -137,9 +149,11 @@ export const BookingSummaryPage = () => {
       />
 
       <Grid container spacing={4}>
-        {/* Left Side: Summary components */}
+        {/* Left: Main Content */}
         <Grid item xs={12} lg={8}>
           <Stack spacing={3}>
+            
+            {/* Movie & Showtime Info Card */}
             <SectionCard
               title="Thông Tin Vé Đã Chọn"
               action={
@@ -149,20 +163,21 @@ export const BookingSummaryPage = () => {
                     onClick={() => navigate(`/booking/seats/${showtime.id}`, { state: { movie, showtime } })}
                     sx={{ color: 'primary.main', fontWeight: 700 }}
                   >
-                    Thay đổi ghế
+                    Thay đổi
                   </Button>
                 )
               }
             >
               <Grid container spacing={3}>
-                <Grid item xs={12} sm={4} sx={{ display: 'flex', justifyContent: 'center' }}>
+                {/* Poster */}
+                <Grid item xs={12} sm={4} sx={{ display: 'flex', justifyContent: { xs: 'center', sm: 'flex-start' } }}>
                   <Box
                     component="img"
                     src={movie?.posterUrl || '/placeholder.svg'}
                     alt={movie?.title}
                     sx={{
                       width: '100%',
-                      maxWidth: 160,
+                      maxWidth: 150,
                       aspectRatio: '2/3',
                       objectFit: 'cover',
                       borderRadius: 3,
@@ -172,47 +187,83 @@ export const BookingSummaryPage = () => {
                   />
                 </Grid>
                 
+                {/* Details */}
                 <Grid item xs={12} sm={8}>
                   <Stack spacing={2}>
-                    <Typography variant="h5" sx={{ fontWeight: 800, color: 'text.primary' }}>
-                      {movie?.title}
-                    </Typography>
+                    {/* Age Rating + Title */}
+                    <Box>
+                      {movie?.ageRating && <StatusChip label={movie.ageRating} type="age" sx={{ mb: 1 }} />}
+                      <Typography variant="h5" sx={{ fontWeight: 800, color: 'text.primary', lineHeight: 1.3 }}>
+                        {movie?.title}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                        {movie?.genre} • {movie?.durationMinutes || 120} phút
+                      </Typography>
+                    </Box>
                     
+                    <Divider />
+
+                    {/* Showtime Info */}
                     <Grid container spacing={2}>
                       <Grid item xs={6}>
-                        <Typography variant="caption" color="text.secondary">Thể loại</Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 600 }}>{movie?.genre}</Typography>
+                        <Stack direction="row" alignItems="center" spacing={1.5}>
+                          <CalendarTodayRoundedIcon sx={{ fontSize: 18, color: 'primary.main' }} />
+                          <Box>
+                            <Typography variant="caption" color="text.secondary">Ngày chiếu</Typography>
+                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                              {showtime?.date ? new Date(showtime.date).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}
+                            </Typography>
+                          </Box>
+                        </Stack>
                       </Grid>
                       <Grid item xs={6}>
-                        <Typography variant="caption" color="text.secondary">Thời lượng</Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 600 }}>{movie?.durationMinutes || movie?.duration} phút</Typography>
+                        <Stack direction="row" alignItems="center" spacing={1.5}>
+                          <AccessTimeRoundedIcon sx={{ fontSize: 18, color: 'primary.main' }} />
+                          <Box>
+                            <Typography variant="caption" color="text.secondary">Suất chiếu</Typography>
+                            <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                              {showtime?.time} • {showtime?.format || '2D'}
+                            </Typography>
+                          </Box>
+                        </Stack>
                       </Grid>
                       <Grid item xs={6}>
-                        <Typography variant="caption" color="text.secondary">Phòng chiếu</Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 600, color: 'primary.main' }}>{showtime?.room}</Typography>
+                        <Stack direction="row" alignItems="center" spacing={1.5}>
+                          <MeetingRoomRoundedIcon sx={{ fontSize: 18, color: 'primary.main' }} />
+                          <Box>
+                            <Typography variant="caption" color="text.secondary">Phòng chiếu</Typography>
+                            <Typography variant="body2" sx={{ fontWeight: 600, color: 'primary.main' }}>
+                              {showtime?.room}
+                            </Typography>
+                          </Box>
+                        </Stack>
                       </Grid>
                     </Grid>
 
                     <Divider />
 
+                    {/* Selected Seats */}
                     <Box>
-                      <Typography variant="caption" color="text.secondary">Ghế ngồi đã đặt giữ</Typography>
-                      <Stack direction="row" spacing={1} sx={{ mt: 1 }} flexWrap="wrap" useFlexGap>
+                      <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1.5 }}>
+                        Ghế đã đặt giữ:
+                      </Typography>
+                      <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                         {selectedSeats.map((seat) => (
                           <Paper
                             key={seat.id}
                             variant="outlined"
                             sx={{
-                              px: 1.5,
-                              py: 0.5,
+                              px: 2,
+                              py: 0.75,
                               borderRadius: 2,
-                              fontWeight: 800,
+                              fontWeight: 700,
+                              fontSize: 'body2',
                               borderColor: seat.type === 'VIP' ? '#8B5CF6' : seat.type === 'DOUBLE' ? '#EC4899' : 'rgba(148,163,184,0.3)',
                               color: seat.type === 'VIP' ? '#A78BFA' : seat.type === 'DOUBLE' ? '#F472B6' : 'text.primary',
                               bgcolor: 'rgba(30, 41, 59, 0.3)'
                             }}
                           >
-                            {seat.label || seat.id} ({seat.type})
+                            {seat.rowName}{seat.seatNumber} ({seat.type})
                           </Paper>
                         ))}
                       </Stack>
@@ -222,12 +273,13 @@ export const BookingSummaryPage = () => {
               </Grid>
             </SectionCard>
 
+            {/* Terms & Conditions */}
             <SectionCard title="Điều Khoản & Cam Kết">
               <Stack spacing={2}>
                 <Stack direction="row" spacing={1.5} alignItems="flex-start">
                   <ShieldRoundedIcon sx={{ color: 'primary.main', mt: 0.3 }} />
                   <Typography variant="body2" color="text.secondary">
-                    Vé xem phim đã chọn đang được đặt giữ tạm thời. Vui lòng hoàn tất thanh toán trước khi thời gian giữ vé kết thúc. Vé đã thanh toán không hỗ trợ đổi trả hoặc hoàn tiền.
+                    Vé xem phim đang được đặt giữ tạm thời. Vui lòng hoàn tất thanh toán trước khi thời gian giữ vé kết thúc. Vé đã thanh toán không hỗ trợ đổi trả hoặc hoàn tiền.
                   </Typography>
                 </Stack>
                 <Divider />
@@ -250,29 +302,79 @@ export const BookingSummaryPage = () => {
           </Stack>
         </Grid>
 
-        {/* Right Side: sidebar calculations */}
+        {/* Right: Payment Summary */}
         <Grid item xs={12} lg={4}>
-          <Stack spacing={3}>
-            {movie && showtime && (
-              <BookingSidebar
-                movie={movie}
-                showtime={showtime}
-                selectedSeats={selectedSeats}
-                showSummaryOnly={true}
-              />
-            )}
-            
-            <CustomButton
-              fullWidth
-              variant="primary"
-              size="large"
-              disabled={!agreedTerms || apiLoading}
-              onClick={handleProceedToPayment}
-              sx={{ py: 1.8 }}
-            >
-              Thanh toán
-            </CustomButton>
-          </Stack>
+          <Paper
+            sx={{
+              position: 'sticky',
+              top: 96,
+              p: 3,
+              borderRadius: 4,
+              bgcolor: 'background.paper',
+              border: '1px solid rgba(148, 163, 184, 0.08)',
+              boxShadow: '0 15px 35px rgba(0, 0, 0, 0.4)'
+            }}
+          >
+            <Typography variant="h6" sx={{ fontWeight: 800, mb: 2.5, color: 'text.primary' }}>
+              Chi Tiết Thanh Toán
+            </Typography>
+
+            <Stack spacing={2}>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Typography variant="body2" color="text.secondary">Tên phim:</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 700, textAlign: 'right', maxWidth: '60%' }}>
+                  {movie?.title}
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Typography variant="body2" color="text.secondary">Suất chiếu:</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                  {showtime?.time} • {showtime?.format || '2D'}
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Typography variant="body2" color="text.secondary">Phòng chiếu:</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>{showtime?.room}</Typography>
+              </Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                <Typography variant="body2" color="text.secondary">Ghế đã chọn:</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 800, color: 'primary.main' }}>
+                  {selectedSeats.map((s) => `${s.rowName}${s.seatNumber}`).join(', ')}
+                </Typography>
+              </Box>
+
+              <Divider />
+
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography variant="body2" color="text.secondary">Tổng giá vé:</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>{formatCurrency(seatsTotal)}</Typography>
+              </Box>
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography variant="body2" color="text.secondary">Phí tiện ích:</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>{formatCurrency(serviceFee)}</Typography>
+              </Box>
+
+              <Divider sx={{ borderStyle: 'dashed' }} />
+
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>Số tiền cần thanh toán:</Typography>
+                <Typography variant="h5" sx={{ fontWeight: 900, color: 'primary.main' }}>
+                  {formatCurrency(totalAmount)}
+                </Typography>
+              </Box>
+
+              <CustomButton
+                fullWidth
+                variant="primary"
+                size="large"
+                disabled={!agreedTerms || apiLoading}
+                onClick={handleProceedToPayment}
+                sx={{ py: 1.8, mt: 1 }}
+              >
+                Thanh toán
+              </CustomButton>
+            </Stack>
+          </Paper>
         </Grid>
       </Grid>
 

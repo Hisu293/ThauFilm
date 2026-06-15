@@ -90,11 +90,11 @@ export const useBooking = () => {
   }, []);
 
   // Pay and confirm booking: POST /api/member/booking/{bookingId}/pay
-  const pay = useCallback(async (bookingId) => {
+  const pay = useCallback(async (bookingId, paymentMethod = 'VNPAY') => {
     setLoading(true);
     setError(null);
     try {
-      const res = await bookingApi.payBooking(bookingId);
+      const res = await bookingApi.payBooking(bookingId, paymentMethod);
       return res?.data ?? res;
     } catch (err) {
       setError(err.message || 'Thanh toán thất bại.');

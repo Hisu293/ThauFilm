@@ -162,9 +162,16 @@ export const SeatSelectionPage = () => {
         onBack={() => navigate(`/movies/${movie.id}`)}
       />
 
-      <Box sx={{ display: 'flex', gap: 4, alignItems: 'flex-start', justifyContent: 'center' }}>
-        {/* Seats panel — centered, takes remaining space */}
-        <Box sx={{ flex: '1 1 0', minWidth: 0, maxWidth: 860 }}>
+      <Box sx={{ 
+        display: 'flex', 
+        flexDirection: 'row',
+        gap: 4, 
+        alignItems: 'flex-start', 
+        justifyContent: 'space-between',
+        width: '100%'
+      }}>
+        {/* Seats panel — takes 65% width */}
+        <Box sx={{ flex: '1 1 65%', minWidth: 0 }}>
           {seats.length === 0 && !apiLoading ? (
             <EmptyState
               title="Không tìm thấy sơ đồ ghế"
@@ -193,8 +200,8 @@ export const SeatSelectionPage = () => {
           )}
         </Box>
 
-        {/* Sidebar details — sticky on the right */}
-        <Box sx={{ width: 320, flexShrink: 0, display: { xs: 'none', lg: 'block' } }}>
+        {/* Sidebar details — 35% width, sticky on the right */}
+        <Box sx={{ flex: '0 0 340px', display: { xs: 'none', lg: 'block' } }}>
           <BookingSidebar
             movie={movie}
             showtime={showtime}

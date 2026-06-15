@@ -49,8 +49,10 @@ export const bookingApi = {
   },
 
   // Confirm payment: POST /api/member/booking/{bookingId}/pay
-  payBooking: (bookingId) => {
-    return axiosClient.post(`/api/member/booking/${bookingId}/pay`);
+  payBooking: (bookingId, paymentMethod = 'VNPAY') => {
+    return axiosClient.post(`/api/member/booking/${bookingId}/pay`, {
+      paymentMethod,
+    });
   },
 };
 
