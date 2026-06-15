@@ -282,20 +282,20 @@ export const MoviesSection = ({ crud }) => {
         saving={saving}
       >
         {formError && <Alert severity="error" sx={{ mb: 1 }}>{formError}</Alert>}
-        <TextField label="Tên phim" fullWidth value={form.title} onChange={set('title')} margin="dense" />
-        <TextField label="Mô tả" fullWidth multiline minRows={2} value={form.description} onChange={set('description')} margin="dense" />
+        <TextField label="Tên phim" fullWidth value={form.title} onChange={set('title')} />
+        <TextField label="Mô tả" fullWidth multiline minRows={2} value={form.description} onChange={set('description')} />
         <Stack direction="row" spacing={2}>
-          <TextField label="Thể loại" value={form.genre} onChange={set('genre')} margin="dense" sx={{ flex: 1 }} />
-          <TextField label="Đạo diễn" value={form.director} onChange={set('director')} margin="dense" sx={{ flex: 1 }} />
+          <TextField label="Thể loại" value={form.genre} onChange={set('genre')} sx={{ flex: 1 }} />
+          <TextField label="Đạo diễn" value={form.director} onChange={set('director')} sx={{ flex: 1 }} />
         </Stack>
-        <TextField label="Diễn viên" fullWidth value={form.actors} onChange={set('actors')} margin="dense" />
+        <TextField label="Diễn viên" fullWidth value={form.actors} onChange={set('actors')} />
         <Stack direction="row" spacing={2}>
-          <TextField label="Thời lượng (phút)" type="number" value={form.durationMinutes} onChange={set('durationMinutes')} margin="dense" sx={{ flex: 1 }} />
-          <TextField label="Đánh giá (0-10)" type="number" inputProps={{ min: 0, max: 10 }} value={form.rating} onChange={set('rating')} margin="dense" sx={{ flex: 1 }} />
+          <TextField label="Thời lượng (phút)" type="number" value={form.durationMinutes} onChange={set('durationMinutes')} sx={{ flex: 1 }} />
+          <TextField label="Đánh giá (0-10)" type="number" inputProps={{ min: 0, max: 10 }} value={form.rating} onChange={set('rating')} sx={{ flex: 1 }} />
         </Stack>
         <Stack direction="row" spacing={2}>
-          <TextField label="Ngôn ngữ" value={form.language} onChange={set('language')} margin="dense" sx={{ flex: 1 }} />
-          <TextField label="Phân loại (rated)" value={form.rated} onChange={set('rated')} margin="dense" sx={{ flex: 1 }} placeholder="VD: PG-13" />
+          <TextField label="Ngôn ngữ" value={form.language} onChange={set('language')} sx={{ flex: 1 }} />
+          <TextField label="Phân loại (rated)" value={form.rated} onChange={set('rated')} sx={{ flex: 1 }} placeholder="VD: PG-13" />
         </Stack>
         <Stack direction="row" spacing={2}>
           <TextField
@@ -303,11 +303,11 @@ export const MoviesSection = ({ crud }) => {
             type="date"
             value={form.releaseDate || ''}
             onChange={set('releaseDate')}
-            margin="dense"
+           
             sx={{ flex: 1 }}
             InputLabelProps={{ shrink: true }}
           />
-          <TextField select label="Trạng thái" value={form.status} onChange={set('status')} margin="dense" sx={{ flex: 1 }}>
+          <TextField select label="Trạng thái" value={form.status} onChange={set('status')} sx={{ flex: 1 }}>
             {MOVIE_STATUSES.map((s) => (
               <MenuItem key={s.value} value={s.value}>
                 {s.label}
@@ -315,7 +315,7 @@ export const MoviesSection = ({ crud }) => {
             ))}
           </TextField>
         </Stack>
-        <TextField label="Poster URL" fullWidth value={form.posterUrl} onChange={set('posterUrl')} margin="dense" />
+        <TextField label="Poster URL" fullWidth value={form.posterUrl} onChange={set('posterUrl')} />
         <FormControlLabel
           control={<Switch checked={!!form.active} onChange={(e) => setForm((f) => ({ ...f, active: e.target.checked }))} />}
           label="Kích hoạt (active)"
@@ -372,8 +372,8 @@ export const GenresSection = ({ crud }) => {
         </TableContainer>
       </Box>
       <EntityDialog open={!!dialog} title={dialog === 'add' ? 'Thêm thể loại' : 'Sửa thể loại'} onClose={() => setDialog(null)} onSave={save}>
-        <TextField label="Tên thể loại" fullWidth value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} margin="dense" />
-        <TextField label="Slug" fullWidth value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} margin="dense" />
+        <TextField label="Tên thể loại" fullWidth value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+        <TextField label="Slug" fullWidth value={form.slug} onChange={(e) => setForm({ ...form, slug: e.target.value })} />
       </EntityDialog>
     </>
   );
@@ -416,8 +416,8 @@ export const ActorsSection = ({ crud }) => {
         ))}
       </Box>
       <EntityDialog open={!!dialog} title={dialog === 'add' ? 'Thêm diễn viên' : 'Sửa diễn viên'} onClose={() => setDialog(null)} onSave={save}>
-        <TextField label="Họ tên" fullWidth value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} margin="dense" />
-        <TextField label="Quốc tịch" fullWidth value={form.nationality} onChange={(e) => setForm({ ...form, nationality: e.target.value })} margin="dense" />
+        <TextField label="Họ tên" fullWidth value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+        <TextField label="Quốc tịch" fullWidth value={form.nationality} onChange={(e) => setForm({ ...form, nationality: e.target.value })} />
       </EntityDialog>
     </>
   );
@@ -478,7 +478,9 @@ export const TrailersSection = ({ crud, movies }) => {
 const EntityDialog = ({ open, title, onClose, onSave, saving, children }) => (
   <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
     <DialogTitle sx={{ fontWeight: 700 }}>{title}</DialogTitle>
-    <DialogContent>{children}</DialogContent>
+    <DialogContent>
+      <Stack spacing={2.5} sx={{ mt: 1 }}>{children}</Stack>
+    </DialogContent>
     <DialogActions sx={{ px: 3, pb: 2 }}>
       <Button onClick={onClose} disabled={saving}>Hủy</Button>
       <Button variant="contained" onClick={onSave} disabled={saving} startIcon={saving ? <CircularProgress size={16} color="inherit" /> : null}>

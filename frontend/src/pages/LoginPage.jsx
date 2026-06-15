@@ -23,7 +23,17 @@ import { useAuth } from '../context/AuthContext';
 import { authService, parseAuthResponse } from '../services/authService';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PHONE_RE = /^[0-9]{9,11}$/;
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
+// Nhãn nằm trên ô nhập (kiểu form mới)
+const fieldLabelSx = {
+  display: 'block',
+  mb: 0.75,
+  fontSize: '0.9rem',
+  fontWeight: 700,
+  color: '#fff',
+};
 
 const LOGIN_POSTER = {
   tagline: 'ThauFilm',
@@ -160,8 +170,9 @@ const LoginPage = () => {
 
   const emailError = useMemo(() => {
     if (!submitted) return '';
-    if (!email.trim()) return 'Email là bắt buộc.';
-    if (!EMAIL_RE.test(email.trim())) return 'Vui lòng nhập địa chỉ email hợp lệ.';
+    const v = email.trim();
+    if (!v) return 'Email hoặc số điện thoại là bắt buộc.';
+    if (!EMAIL_RE.test(v) && !PHONE_RE.test(v)) return 'Vui lòng nhập email hoặc số điện thoại hợp lệ.';
     return '';
   }, [email, submitted]);
 
@@ -176,7 +187,8 @@ const LoginPage = () => {
     setSubmitted(true);
     setServerError('');
 
-    const hasEmailErr = !email.trim() || !EMAIL_RE.test(email.trim());
+    const idv = email.trim();
+    const hasEmailErr = !idv || (!EMAIL_RE.test(idv) && !PHONE_RE.test(idv));
     const hasPwErr = !password;
     if (hasEmailErr || hasPwErr) return;
 
@@ -247,48 +259,57 @@ const LoginPage = () => {
       </Collapse>
 
       <Box component="form" onSubmit={handleSubmit} noValidate>
-        <Stack spacing={2}>
-          <TextField
-            label="Email"
-            id="login-email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            error={Boolean(emailError)}
-            helperText={emailError || ' '}
-            autoComplete="email"
-            fullWidth
-            required
-            disabled={loading || success || googleLoading}
-          />
+        <Stack spacing={2.5}>
+          <Box>
+            <Typography component="label" htmlFor="login-email" sx={fieldLabelSx}>
+              Email hoặc số điện thoại
+            </Typography>
+            <TextField
+              id="login-email"
+              placeholder="Email hoặc số điện thoại"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              error={Boolean(emailError)}
+              helperText={emailError || ' '}
+              autoComplete="username"
+              fullWidth
+              required
+              disabled={loading || success || googleLoading}
+            />
+          </Box>
 
-          <TextField
-            label="Mật khẩu"
-            id="login-password"
-            type={showPassword ? 'text' : 'password'}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            error={Boolean(passwordError)}
-            helperText={passwordError || ' '}
-            autoComplete="current-password"
-            fullWidth
-            required
-            disabled={loading || success || googleLoading}
-            InputProps={{
-              endAdornment: (
-                <InputAdornment position="end">
-                  <IconButton
-                    aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-                    onClick={() => setShowPassword((v) => !v)}
-                    edge="end"
-                    sx={{ color: 'rgba(255,255,255,0.75)' }}
-                  >
-                    {showPassword ? <VisibilityOffRoundedIcon /> : <VisibilityRoundedIcon />}
-                  </IconButton>
-                </InputAdornment>
-              ),
-            }}
-          />
+          <Box>
+            <Typography component="label" htmlFor="login-password" sx={fieldLabelSx}>
+              Mật khẩu
+            </Typography>
+            <TextField
+              id="login-password"
+              placeholder="Mật khẩu"
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              error={Boolean(passwordError)}
+              helperText={passwordError || ' '}
+              autoComplete="current-password"
+              fullWidth
+              required
+              disabled={loading || success || googleLoading}
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton
+                      aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
+                      onClick={() => setShowPassword((v) => !v)}
+                      edge="end"
+                      sx={{ color: 'rgba(255,255,255,0.75)' }}
+                    >
+                      {showPassword ? <VisibilityOffRoundedIcon /> : <VisibilityRoundedIcon />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+              }}
+            />
+          </Box>
 
           <Stack
             direction="row"

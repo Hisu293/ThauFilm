@@ -9,7 +9,7 @@ export const cinemaTheme = createTheme({
   },
   shape: { borderRadius: 14 },
   typography: {
-    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+    fontFamily: '"Be Vietnam Pro", "Inter", "Roboto", "Helvetica", "Arial", sans-serif',
     h2: { fontWeight: 800, letterSpacing: 0.2 },
     h5: { fontWeight: 700 },
   },

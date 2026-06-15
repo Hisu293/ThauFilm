@@ -19,7 +19,7 @@ export const authTheme = createTheme({
     text: { primary: '#f7f7f7', secondary: 'rgba(255,255,255,0.75)' },
   },
   typography: {
-    fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+    fontFamily: '"Be Vietnam Pro", "Inter", "Roboto", "Helvetica", "Arial", sans-serif',
   },
   components: {
     MuiTextField: { defaultProps: { variant: 'outlined' } },
@@ -76,7 +76,7 @@ const AuthLayout = ({ children, poster = {}, maxFormWidth = 460 }) => {
           display: 'flex',
           alignItems: 'center',
           py: { xs: 0, sm: 4 },
-          fontFamily: '"Inter", "Roboto", "Helvetica", "Arial", sans-serif',
+          fontFamily: '"Be Vietnam Pro", "Inter", "Roboto", "Helvetica", "Arial", sans-serif',
         }}
       >
         <Container

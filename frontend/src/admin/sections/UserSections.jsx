@@ -94,7 +94,6 @@ const UserDetailDialog = ({ open, loading, user, onClose }) => (
           <InfoRow icon={PhoneRoundedIcon} label="Số điện thoại" value={user.phone} />
           <InfoRow icon={BadgeRoundedIcon} label="Vai trò" value={user.role} />
           <InfoRow icon={PublicRoundedIcon} label="Đăng nhập qua" value={user.provider} />
-          <InfoRow icon={BadgeRoundedIcon} label="ID" value={user.id} />
         </Stack>
       )}
     </DialogContent>

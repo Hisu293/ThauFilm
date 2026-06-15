@@ -19,21 +19,21 @@ const QUICK_LINKS = [
   { label: 'Rạp Chiếu', to: '/cinemas' },
   { label: 'Lịch Chiếu', to: '/movies' },
   { label: 'Khuyến Mãi', to: '/promotions' },
-  { label: 'Liên Hệ', to: '/' },
+  { label: 'Liên Hệ', to: '/contact' },
 ];
 
 const SUPPORT_LINKS = [
-  { label: 'FAQ', to: '/' },
-  { label: 'Điều Khoản Sử Dụng', to: '/' },
-  { label: 'Chính Sách Bảo Mật', to: '/' },
-  { label: 'Chính Sách Hoàn Vé', to: '/' },
+  { label: 'FAQ', to: '/faq' },
+  { label: 'Điều Khoản Sử Dụng', to: '/terms' },
+  { label: 'Chính Sách Bảo Mật', to: '/privacy' },
+  { label: 'Chính Sách Hoàn Vé', to: '/refund' },
 ];
 
 const SOCIALS = [
-  { label: 'Facebook', Icon: FacebookRoundedIcon },
-  { label: 'Instagram', Icon: Instagram },
-  { label: 'Youtube', Icon: YouTube },
-  { label: 'Tiktok', Icon: MusicNoteRoundedIcon },
+  { label: 'Facebook', Icon: FacebookRoundedIcon, href: 'https://facebook.com' },
+  { label: 'Instagram', Icon: Instagram, href: 'https://instagram.com' },
+  { label: 'Youtube', Icon: YouTube, href: 'https://youtube.com' },
+  { label: 'Tiktok', Icon: MusicNoteRoundedIcon, href: 'https://tiktok.com' },
 ];
 
 const SiteFooter = () => {
@@ -118,8 +118,8 @@ const SiteFooter = () => {
 
             <h4 className="footer-col__title" style={{ marginTop: 22 }}>Kết Nối</h4>
             <div className="footer-socials">
-              {SOCIALS.map(({ label, Icon }) => (
-                <a key={label} href="#" className="footer-social" aria-label={label} title={label}>
+              {SOCIALS.map(({ label, Icon, href }) => (
+                <a key={label} href={href} target="_blank" rel="noopener noreferrer" className="footer-social" aria-label={label} title={label}>
                   <Icon sx={{ fontSize: 20 }} />
                 </a>
               ))}
@@ -132,11 +132,11 @@ const SiteFooter = () => {
         <div className="site-footer__bottom">
           <p>© {2026} ThauFilm. Bản quyền thuộc Công ty Cổ phần Phim ThauFilm.</p>
           <div className="site-footer__legal">
-            <RouterLink to="/">Điều khoản</RouterLink>
+            <RouterLink to="/terms">Điều khoản</RouterLink>
             <span>•</span>
-            <RouterLink to="/">Bảo mật</RouterLink>
+            <RouterLink to="/privacy">Bảo mật</RouterLink>
             <span>•</span>
-            <RouterLink to="/">Cookie</RouterLink>
+            <RouterLink to="/cookie">Cookie</RouterLink>
           </div>
         </div>
       </div>

@@ -1,14 +1,14 @@
 .movies-hero {
   position: relative;
-  padding: 64px 0 48px;
+  padding: 72px 0 56px;
   background:
     radial-gradient(circle at 80% 20%, rgba(229, 9, 20, 0.22) 0%, rgba(0,0,0,0) 45%),
     linear-gradient(180deg, #161616 0%, #0b0b0b 100%);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 .movies-hero__inner { max-width: 1280px; margin: 0 auto; padding: 0 24px; }
-.movies-hero__title { font-size: clamp(2rem, 4vw, 3rem); font-weight: 900; margin: 6px 0 10px; letter-spacing: -0.02em; }
-.movies-hero__sub { color: rgba(255, 255, 255, 0.65); max-width: 540px; margin: 0; }
+.movies-hero__title { font-size: clamp(2rem, 4vw, 3rem); font-weight: 900; margin: 14px 0 16px; letter-spacing: -0.02em; line-height: 1.15; }
+.movies-hero__sub { color: rgba(255, 255, 255, 0.65); max-width: 540px; margin: 0; line-height: 1.6; }
 
 .movies-tabs {
   display: flex;
@@ -18,7 +18,7 @@
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 14px;
   padding: 6px;
-  margin-bottom: 20px;
+  margin-bottom: 28px;
 }
 .movies-tab {
   border: none;

@@ -7,6 +7,7 @@ import {
   DialogContent,
   DialogTitle,
   IconButton,
+  InputAdornment,
   MenuItem,
   Stack,
   Table,
@@ -21,6 +22,8 @@ import {
 import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import DeleteRoundedIcon from '@mui/icons-material/DeleteRounded';
 import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
+import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
+import MeetingRoomRoundedIcon from '@mui/icons-material/MeetingRoomRounded';
 import SectionHeader from '../components/SectionHeader';
 import StatusChip from '../components/StatusChip';
 
@@ -29,6 +32,7 @@ const thSx = { color: 'rgba(255,255,255,0.45)', fontWeight: 600 };
 export const TheatersSection = ({ crud }) => {
   const [dialog, setDialog] = useState(null);
   const [form, setForm] = useState({ name: '', address: '', city: '', phoneNumber: '', status: 1 });
+  const [search, setSearch] = useState('');
 
   const save = async () => {
     try {
@@ -62,58 +66,95 @@ export const TheatersSection = ({ crud }) => {
     );
   }
 
-  const getStatusLabel = (status) => status === 1 ? 'Hoạt động' : 'Bảo trì';
+  const q = search.trim().toLowerCase();
+  const filteredTheaters = q
+    ? crud.list.filter((t) =>
+        [t.name, t.address, t.city, t.phoneNumber]
+          .filter(Boolean)
+          .some((v) => String(v).toLowerCase().includes(q))
+      )
+    : crud.list;
 
   return (
     <>
       <SectionHeader title="Quản lý rạp" subtitle="Thêm · Sửa · Xóa rạp chiếu" onAction={() => { setForm({ name: '', address: '', city: '', phoneNumber: '', status: 1 }); setDialog('add'); }} actionLabel="Thêm rạp" />
+
+      {/* Bộ lọc tìm kiếm rạp */}
+      <Box className="admin-panel admin-animate-in" sx={{ p: 2, mb: 2, display: 'flex', flexWrap: 'wrap', gap: 1.5, alignItems: 'center' }}>
+        <TextField
+          size="small"
+          placeholder="Tìm theo tên, địa chỉ, thành phố hoặc SĐT…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          sx={{ flex: 1, minWidth: 240 }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <SearchRoundedIcon fontSize="small" sx={{ color: 'rgba(255,255,255,0.4)' }} />
+              </InputAdornment>
+            ),
+          }}
+        />
+        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', ml: 'auto' }}>
+          {filteredTheaters.length}/{crud.list.length} rạp
+        </Typography>
+      </Box>
+
       {crud.list.length === 0 ? (
         <Box sx={{ textAlign: 'center', py: 4, color: 'text.secondary' }}>
           Chưa có rạp nào. Nhấn "Thêm rạp" để tạo mới.
         </Box>
+      ) : filteredTheaters.length === 0 ? (
+        <Box sx={{ textAlign: 'center', py: 4, color: 'text.secondary' }}>
+          Không tìm thấy rạp khớp từ khóa "{search}".
+        </Box>
       ) : (
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
-          {crud.list.map((t) => (
-            <Box key={t.id} className="admin-panel admin-stat-card" sx={{ p: 2.5, '--accent': '#22c55e' }}>
-              <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-                <Box>
-                  <Typography fontWeight={700} variant="h6">
-                    {t.name}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
-                    {t.address}
-                  </Typography>
-                  {t.city && (
-                    <Typography variant="body2" color="text.secondary">
-                      {t.city}
-                    </Typography>
-                  )}
-                  {t.phoneNumber && (
-                    <Typography variant="body2" color="text.secondary">
-                      📞 {t.phoneNumber}
-                    </Typography>
-                  )}
-                </Box>
-                <StatusChip status={t.status} />
-              </Stack>
-              <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
-                <Button size="small" startIcon={<EditRoundedIcon />} onClick={() => { setForm(t); setDialog(t.id); }}>
-                  Sửa
-                </Button>
-                <Button size="small" color="error" startIcon={<DeleteRoundedIcon />} onClick={() => crud.remove(t.id)}>
-                  Xóa
-                </Button>
-              </Stack>
-            </Box>
-          ))}
+        <Box className="admin-panel admin-animate-in" sx={{ overflow: 'hidden' }}>
+          <TableContainer>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={thSx}>Rạp</TableCell>
+                  <TableCell sx={thSx}>Địa chỉ</TableCell>
+                  <TableCell sx={thSx}>Thành phố</TableCell>
+                  <TableCell sx={thSx}>Số điện thoại</TableCell>
+                  <TableCell sx={thSx}>Trạng thái</TableCell>
+                  <TableCell align="right" sx={thSx} />
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {filteredTheaters.map((t) => (
+                  <TableRow key={t.id} className="admin-table-row">
+                    <TableCell>
+                      <Typography fontWeight={600}>{t.name}</Typography>
+                    </TableCell>
+                    <TableCell sx={{ color: 'rgba(255,255,255,0.7)' }}>{t.address || '—'}</TableCell>
+                    <TableCell sx={{ color: 'rgba(255,255,255,0.7)' }}>{t.city || '—'}</TableCell>
+                    <TableCell sx={{ color: 'rgba(255,255,255,0.7)' }}>{t.phoneNumber || '—'}</TableCell>
+                    <TableCell>
+                      <StatusChip status={t.status} />
+                    </TableCell>
+                    <TableCell align="right">
+                      <IconButton size="small" onClick={() => { setForm(t); setDialog(t.id); }} title="Sửa">
+                        <EditRoundedIcon fontSize="small" />
+                      </IconButton>
+                      <IconButton size="small" onClick={() => crud.remove(t.id)} sx={{ color: '#f87171' }} title="Xóa">
+                        <DeleteRoundedIcon fontSize="small" />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
         </Box>
       )}
       <CrudDialog open={!!dialog} title={dialog === 'add' ? 'Thêm rạp' : 'Sửa rạp'} onClose={() => setDialog(null)} onSave={save}>
-        <TextField label="Tên rạp" fullWidth margin="dense" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-        <TextField label="Địa chỉ" fullWidth margin="dense" value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
-        <TextField label="Thành phố" fullWidth margin="dense" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
-        <TextField label="Số điện thoại" fullWidth margin="dense" value={form.phoneNumber} onChange={(e) => setForm({ ...form, phoneNumber: e.target.value })} />
-        <TextField select label="Trạng thái" fullWidth margin="dense" value={form.status} onChange={(e) => setForm({ ...form, status: Number(e.target.value) })}>
+        <TextField label="Tên rạp" fullWidth value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+        <TextField label="Địa chỉ" fullWidth value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
+        <TextField label="Thành phố" fullWidth value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
+        <TextField label="Số điện thoại" fullWidth value={form.phoneNumber} onChange={(e) => setForm({ ...form, phoneNumber: e.target.value })} />
+        <TextField select label="Trạng thái" fullWidth value={form.status} onChange={(e) => setForm({ ...form, status: Number(e.target.value) })}>
           <MenuItem value={1}>Hoạt động</MenuItem>
           <MenuItem value={0}>Bảo trì</MenuItem>
         </TextField>
@@ -195,37 +236,16 @@ export const RoomsSection = ({ crud, theaters, getTheaterName }) => {
                 </TableRow>
               ) : (
                 visibleRooms.map((r) => (
-                  <React.Fragment key={r.id}>
-                    <TableRow className="admin-table-row">
-                      <TableCell sx={{ width: '40px' }}>
-                        <IconButton size="small" onClick={() => setExpandedRoom(expandedRoom === r.id ? null : r.id)} sx={{ p: 0.5 }}>
-                          <ExpandMoreRoundedIcon fontSize="small" sx={{ transform: expandedRoom === r.id ? 'rotate(180deg)' : 'rotate(0deg)', transition: '0.2s' }} />
-                        </IconButton>
-                      </TableCell>
-                      <TableCell>
-                        <Typography fontWeight={600}>{r.name}</Typography>
-                      </TableCell>
-                      <TableCell>{getTheaterName(r.theaterId)}</TableCell>
-                      <TableCell>{r.rowsCount}</TableCell>
-                      <TableCell>{r.seatsPerRow}</TableCell>
-                      <TableCell>{(r.rowsCount || 0) * (r.seatsPerRow || 0)}</TableCell>
-                      <TableCell align="right">
-                        <IconButton size="small" onClick={() => { setForm({ ...r, status: r.status ?? 1 }); setDialog(r.id); }}>
-                          <EditRoundedIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton size="small" onClick={() => crud.remove(r.id)} sx={{ color: '#f87171' }}>
-                          <DeleteRoundedIcon fontSize="small" />
-                        </IconButton>
-                      </TableCell>
-                    </TableRow>
-                    {expandedRoom === r.id && (
-                      <TableRow>
-                        <TableCell colSpan={7} sx={{ p: 0, border: 0 }}>
-                          <SeatMapInline room={r} crud={crud} />
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </React.Fragment>
+                  <RoomRow
+                    key={r.id}
+                    room={r}
+                    crud={crud}
+                    theaterName={getTheaterName(r.theaterId)}
+                    expanded={expandedRoom === r.id}
+                    onToggle={() => setExpandedRoom(expandedRoom === r.id ? null : r.id)}
+                    onEdit={() => { setForm({ ...r, status: r.status ?? 1 }); setDialog(r.id); }}
+                    onDelete={() => crud.remove(r.id)}
+                  />
                 ))
               )}
             </TableBody>
@@ -233,65 +253,154 @@ export const RoomsSection = ({ crud, theaters, getTheaterName }) => {
         </TableContainer>
       </Box>
       <CrudDialog open={!!dialog} title={dialog === 'add' ? 'Thêm phòng' : 'Sửa phòng'} onClose={() => setDialog(null)} onSave={save}>
-        {dialog === 'add' ? (
-          <>
-            <TextField select label="Rạp" fullWidth margin="dense" value={String(form.theaterId || '')} onChange={(e) => setForm({ ...form, theaterId: String(e.target.value) })}>
+        {dialog === 'add' ? [
+            <TextField key="theater" select label="Rạp" fullWidth value={String(form.theaterId || '')} onChange={(e) => setForm({ ...form, theaterId: String(e.target.value) })}>
               {activeTheaters.map((t) => (
                 <MenuItem key={t.id} value={String(t.id)}>
                   {t.name}
                 </MenuItem>
               ))}
-            </TextField>
-            <TextField label="Tên phòng" fullWidth margin="dense" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-            <Stack direction="row" spacing={2}>
-              <TextField label="Số hàng ghế" type="number" margin="dense" value={form.rowsCount} onChange={(e) => setForm({ ...form, rowsCount: Number(e.target.value) })} sx={{ flex: 1 }} />
-              <TextField label="Ghế mỗi hàng" type="number" margin="dense" value={form.seatsPerRow} onChange={(e) => setForm({ ...form, seatsPerRow: Number(e.target.value) })} sx={{ flex: 1 }} />
-            </Stack>
-          </>
-        ) : (
-          <>
-            <TextField label="Tên phòng" fullWidth margin="dense" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-            <TextField select label="Trạng thái" fullWidth margin="dense" value={form.status} onChange={(e) => setForm({ ...form, status: Number(e.target.value) })}>
+            </TextField>,
+            <TextField key="name" label="Tên phòng" fullWidth value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />,
+            <Stack key="dims" direction="row" spacing={2}>
+              <TextField label="Số hàng ghế" type="number" value={form.rowsCount} onChange={(e) => setForm({ ...form, rowsCount: Number(e.target.value) })} sx={{ flex: 1 }} />
+              <TextField label="Ghế mỗi hàng" type="number" value={form.seatsPerRow} onChange={(e) => setForm({ ...form, seatsPerRow: Number(e.target.value) })} sx={{ flex: 1 }} />
+            </Stack>,
+        ] : [
+            <TextField key="name" label="Tên phòng" fullWidth value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />,
+            <TextField key="status" select label="Trạng thái" fullWidth value={form.status} onChange={(e) => setForm({ ...form, status: Number(e.target.value) })}>
               <MenuItem value={1}>Hoạt động</MenuItem>
               <MenuItem value={0}>Bảo trì</MenuItem>
-            </TextField>
-          </>
-        )}
+            </TextField>,
+        ]}
       </CrudDialog>
     </>
   );
 };
 
-// ─── Inline Seat Map ─────────────────────────────────────────────────────────
+// ─── Dòng phòng: tự tải ghế để hiện đúng số hàng / ghế-mỗi-hàng / tổng ghế ─────
 
-const SeatMapInline = ({ room, crud }) => {
+const RoomRow = ({ room, crud, theaterName, expanded, onToggle, onEdit, onDelete }) => {
   const [seats, setSeats] = useState([]);
-  const [seatDialog, setSeatDialog] = useState(null);
-  const [seatForm, setSeatForm] = useState({ type: 'STANDARD', status: 'ACTIVE' });
   const [loading, setLoading] = useState(true);
 
+  const loadSeats = async () => {
+    setLoading(true);
+    try {
+      const data = await crud.getSeatsByRoom(room.id);
+      setSeats(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Lỗi khi tải ghế:', err);
+      setSeats([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const load = async () => {
-      setLoading(true);
-      try {
-        const data = await crud.getSeatsByRoom(room.id);
-        setSeats(Array.isArray(data) ? data : []);
-      } catch (err) {
-        console.error('Lỗi khi tải ghế:', err);
-        setSeats([]);
-      } finally {
-        setLoading(false);
-      }
-    };
-    load();
-  }, [room.id, crud]);
+    loadSeats();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [room.id]);
+
+  // Tính số liệu thực tế từ danh sách ghế (ưu tiên), fallback về dữ liệu phòng
+  const rowNames = [...new Set(seats.map((s) => s.rowName).filter(Boolean))];
+  const rowsCount = rowNames.length || room.rowsCount || 0;
+  const seatsPerRow = seats.length
+    ? Math.max(...rowNames.map((rn) => seats.filter((s) => s.rowName === rn).length))
+    : room.seatsPerRow || 0;
+  const totalSeats = seats.length || rowsCount * seatsPerRow;
+
+  const numCell = (v) => (loading ? '…' : v || 0);
+
+  return (
+    <React.Fragment>
+      <TableRow className="admin-table-row">
+        <TableCell sx={{ width: '40px' }}>
+          <IconButton size="small" onClick={onToggle} sx={{ p: 0.5 }}>
+            <ExpandMoreRoundedIcon fontSize="small" sx={{ transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: '0.2s' }} />
+          </IconButton>
+        </TableCell>
+        <TableCell>
+          <Typography fontWeight={600}>{room.name}</Typography>
+        </TableCell>
+        <TableCell>{theaterName}</TableCell>
+        <TableCell>{numCell(rowsCount)}</TableCell>
+        <TableCell>{numCell(seatsPerRow)}</TableCell>
+        <TableCell>
+          <Box component="span" sx={{ px: 1.2, py: 0.4, borderRadius: 1, bgcolor: 'rgba(99,102,241,0.18)', color: '#a5b4fc', fontWeight: 700, fontSize: '0.85rem' }}>
+            {numCell(totalSeats)}
+          </Box>
+        </TableCell>
+        <TableCell align="right">
+          <IconButton size="small" onClick={onEdit}>
+            <EditRoundedIcon fontSize="small" />
+          </IconButton>
+          <IconButton size="small" onClick={onDelete} sx={{ color: '#f87171' }}>
+            <DeleteRoundedIcon fontSize="small" />
+          </IconButton>
+        </TableCell>
+      </TableRow>
+      {expanded && (
+        <TableRow>
+          <TableCell colSpan={7} sx={{ p: 0, border: 0 }}>
+            <SeatMapInline room={room} crud={crud} seats={seats} loading={loading} onReload={loadSeats} />
+          </TableCell>
+        </TableRow>
+      )}
+    </React.Fragment>
+  );
+};
+
+// ─── Cửa ra/vào đặt ở hai góc dưới khu ghế (như rạp thật) ──────────────────────
+
+const DoorMarker = ({ side }) => (
+  <Box
+    sx={{
+      position: 'absolute',
+      bottom: 0,
+      [side]: 0,
+      display: { xs: 'none', sm: 'flex' },
+      flexDirection: 'column',
+      alignItems: 'center',
+      gap: 0.3,
+      color: '#34d399',
+    }}
+  >
+    <Box
+      sx={{
+        width: 30,
+        height: 46,
+        borderRadius: 1,
+        border: '2px solid rgba(52,211,153,0.6)',
+        bgcolor: 'rgba(52,211,153,0.12)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      <MeetingRoomRoundedIcon sx={{ fontSize: 20 }} />
+    </Box>
+    <Typography sx={{ fontSize: '0.6rem', fontWeight: 700, letterSpacing: '0.08em', color: 'rgba(52,211,153,0.85)' }}>
+      CỬA
+    </Typography>
+  </Box>
+);
+
+// ─── Sơ đồ ghế kiểu CGV ───────────────────────────────────────────────────────
+
+const SEAT_TYPE_META = {
+  VIP: { label: 'Ghế VIP', color: '#fbbf24' },
+  STANDARD: { label: 'Ghế thường', color: '#64748b' },
+};
+
+const SeatMapInline = ({ room, crud, seats, loading, onReload }) => {
+  const [seatDialog, setSeatDialog] = useState(null);
+  const [seatForm, setSeatForm] = useState({ type: 'STANDARD', status: 'ACTIVE' });
 
   const handleUpdateSeat = async (seatId) => {
     try {
-      // PATCH /api/admin/rooms/seats/{id} — chỉ gửi type + status
       await crud.updateSeat(seatId, { type: seatForm.type, status: seatForm.status });
-      const data = await crud.getSeatsByRoom(room.id);
-      setSeats(Array.isArray(data) ? data : []);
+      await onReload();
       setSeatDialog(null);
       setSeatForm({ type: 'STANDARD', status: 'ACTIVE' });
     } catch (err) {
@@ -302,46 +411,109 @@ const SeatMapInline = ({ room, crud }) => {
   const handleDeleteSeat = async (seatId) => {
     try {
       await crud.removeSeat(seatId);
-      setSeats(seats.filter((s) => s.id !== seatId));
+      await onReload();
+      setSeatDialog(null);
     } catch (err) {
       alert('Lỗi: ' + (err.message || String(err)));
     }
   };
 
-  const getTypeColor = (type) => (type === 'VIP' ? '#fbbf24' : '#94a3b8');
+  // Gom ghế theo hàng, sắp xếp số ghế tăng dần
+  const rows = [...new Set(seats.map((s) => s.rowName).filter(Boolean))].sort();
+  const seatsByRow = rows.map((rn) => ({
+    rowName: rn,
+    seats: seats
+      .filter((s) => s.rowName === rn)
+      .sort((a, b) => (Number(a.seatNumber) || 0) - (Number(b.seatNumber) || 0)),
+  }));
+
+  const seatColor = (s) => {
+    if (s.status === 'INACTIVE') return 'rgba(255,255,255,0.08)';
+    return s.type === 'VIP' ? '#fbbf24' : '#475569';
+  };
 
   return (
-    <Box sx={{ bgcolor: 'rgba(0,0,0,0.25)', py: 2, px: 3 }}>
+    <Box sx={{ bgcolor: 'rgba(0,0,0,0.4)', py: 3, px: { xs: 1.5, md: 4 } }}>
       {loading ? (
-        <Typography variant="body2" color="text.secondary">Đang tải ghế...</Typography>
+        <Typography variant="body2" color="text.secondary" align="center">Đang tải sơ đồ ghế…</Typography>
       ) : seats.length === 0 ? (
-        <Typography variant="body2" color="text.secondary">Chưa có ghế nào.</Typography>
+        <Typography variant="body2" color="text.secondary" align="center">Chưa có ghế nào trong phòng này.</Typography>
       ) : (
-        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-          {seats.map((s) => (
+        <>
+          {/* Màn hình */}
+          <Box sx={{ maxWidth: 640, mx: 'auto', mb: 3 }}>
             <Box
-              key={s.id}
-              onClick={() => { setSeatForm({ type: s.type || 'STANDARD', status: s.status || 'ACTIVE' }); setSeatDialog(s.id); }}
               sx={{
-                width: 32,
-                height: 32,
-                borderRadius: 1,
-                bgcolor: s.status === 'INACTIVE' ? 'rgba(255,255,255,0.1)' : getTypeColor(s.type),
-                color: s.status === 'INACTIVE' ? 'rgba(255,255,255,0.3)' : '#fff',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '0.7rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                border: '1px solid rgba(255,255,255,0.15)',
-                '&:hover': { opacity: 0.8 },
+                height: 26,
+                borderRadius: '50% 50% 6px 6px / 100% 100% 6px 6px',
+                background: 'linear-gradient(180deg, rgba(229,9,20,0.55), rgba(229,9,20,0))',
+                boxShadow: '0 0 30px 4px rgba(229,9,20,0.35)',
               }}
-            >
-              {s.rowName}{s.seatNumber}
+            />
+            <Typography align="center" sx={{ mt: 0.5, fontSize: '0.72rem', letterSpacing: '0.4em', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase' }}>
+              Màn hình
+            </Typography>
+          </Box>
+
+          {/* Lưới ghế + cửa ra vào hai bên */}
+          <Box sx={{ position: 'relative', width: 'fit-content', mx: 'auto', px: { xs: 0, sm: 7 } }}>
+            <DoorMarker side="left" />
+            <DoorMarker side="right" />
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, alignItems: 'center' }}>
+              {seatsByRow.map(({ rowName, seats: rowSeats }) => (
+                <Box key={rowName} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box sx={{ width: 18, textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: '0.72rem', fontWeight: 700 }}>
+                    {rowName}
+                  </Box>
+                  <Box sx={{ display: 'flex', gap: 0.6 }}>
+                    {rowSeats.map((s) => (
+                      <Box
+                        key={s.id}
+                        title={`${s.rowName}${s.seatNumber} · ${s.type === 'VIP' ? 'VIP' : 'Thường'}${s.status === 'INACTIVE' ? ' · Đã khóa' : ''}`}
+                        onClick={() => { setSeatForm({ type: s.type || 'STANDARD', status: s.status || 'ACTIVE' }); setSeatDialog(s.id); }}
+                        sx={{
+                          width: 26,
+                          height: 24,
+                          borderRadius: '6px 6px 3px 3px',
+                          bgcolor: seatColor(s),
+                          color: s.status === 'INACTIVE' ? 'rgba(255,255,255,0.25)' : '#fff',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '0.6rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          border: s.status === 'INACTIVE' ? '1px dashed rgba(255,255,255,0.2)' : '1px solid rgba(0,0,0,0.25)',
+                          transition: 'transform 0.12s ease, filter 0.12s ease',
+                          '&:hover': { transform: 'translateY(-2px)', filter: 'brightness(1.15)' },
+                        }}
+                      >
+                        {s.seatNumber}
+                      </Box>
+                    ))}
+                  </Box>
+                  <Box sx={{ width: 18, textAlign: 'center', color: 'rgba(255,255,255,0.4)', fontSize: '0.72rem', fontWeight: 700 }}>
+                    {rowName}
+                  </Box>
+                </Box>
+              ))}
             </Box>
-          ))}
-        </Box>
+          </Box>
+
+          {/* Chú thích */}
+          <Stack direction="row" spacing={3} justifyContent="center" sx={{ mt: 3, flexWrap: 'wrap', gap: 1.5 }}>
+            {Object.values(SEAT_TYPE_META).map((m) => (
+              <Stack key={m.label} direction="row" spacing={0.8} alignItems="center">
+                <Box sx={{ width: 18, height: 16, borderRadius: '5px 5px 2px 2px', bgcolor: m.color }} />
+                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.65)' }}>{m.label}</Typography>
+              </Stack>
+            ))}
+            <Stack direction="row" spacing={0.8} alignItems="center">
+              <Box sx={{ width: 18, height: 16, borderRadius: '5px 5px 2px 2px', bgcolor: 'rgba(255,255,255,0.08)', border: '1px dashed rgba(255,255,255,0.2)' }} />
+              <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.65)' }}>Đã khóa</Typography>
+            </Stack>
+          </Stack>
+        </>
       )}
 
       {/* Edit dialog — chỉ có type + status */}
@@ -362,7 +534,7 @@ const SeatMapInline = ({ room, crud }) => {
         <DialogActions sx={{ px: 3, pb: 2 }}>
           <Button onClick={() => setSeatDialog(null)}>Hủy</Button>
           <Button variant="contained" onClick={() => handleUpdateSeat(seatDialog)}>Lưu</Button>
-          <Button color="error" onClick={() => { handleDeleteSeat(seatDialog); setSeatDialog(null); }}>Xóa</Button>
+          <Button color="error" onClick={() => handleDeleteSeat(seatDialog)}>Xóa</Button>
         </DialogActions>
       </Dialog>
     </Box>
@@ -502,27 +674,25 @@ export const ShowtimesSection = ({ crud, movies, theaters, rooms }) => {
         </TableContainer>
       </Box>
       <CrudDialog open={!!dialog} title={dialog === 'add' ? 'Tạo suất chiếu' : 'Sửa suất chiếu'} onClose={() => setDialog(null)} onSave={save}>
-        {dialog === 'add' ? (
-          <>
-            <TextField select label="Phim" fullWidth margin="dense" value={form.movieId || ''} onChange={(e) => setForm({ ...form, movieId: String(e.target.value) })}>
+        {dialog === 'add' ? [
+            <TextField key="movie" select label="Phim" fullWidth value={form.movieId || ''} onChange={(e) => setForm({ ...form, movieId: String(e.target.value) })}>
               {movies.map((m) => (
                 <MenuItem key={m.id} value={m.id}>
                   {m.title}
                 </MenuItem>
               ))}
-            </TextField>
-            <TextField select label="Phòng chiếu" fullWidth margin="dense" value={form.cinemaRoomId || ''} onChange={(e) => setForm({ ...form, cinemaRoomId: String(e.target.value) })}>
+            </TextField>,
+            <TextField key="room" select label="Phòng chiếu" fullWidth value={form.cinemaRoomId || ''} onChange={(e) => setForm({ ...form, cinemaRoomId: String(e.target.value) })}>
               {activeRooms.map((r) => (
                 <MenuItem key={r.id} value={r.cinemaRoomId || r.id}>
                   {r.name} — {getTheaterName(r.theaterId)}
                 </MenuItem>
               ))}
-            </TextField>
-            <TextField label="Giờ bắt đầu" type="datetime-local" fullWidth margin="dense" InputLabelProps={{ shrink: true }} value={form.startTime || ''} onChange={(e) => setForm({ ...form, startTime: e.target.value })} />
-            <TextField label="Giờ kết thúc" type="datetime-local" fullWidth margin="dense" InputLabelProps={{ shrink: true }} value={form.endTime || ''} onChange={(e) => setForm({ ...form, endTime: e.target.value })} />
-          </>
-        ) : (
-          <TextField select label="Trạng thái" fullWidth margin="dense" value={form.status ?? 0} onChange={(e) => setForm({ ...form, status: Number(e.target.value) })}>
+            </TextField>,
+            <TextField key="start" label="Giờ bắt đầu" type="datetime-local" fullWidth InputLabelProps={{ shrink: true }} value={form.startTime || ''} onChange={(e) => setForm({ ...form, startTime: e.target.value })} />,
+            <TextField key="end" label="Giờ kết thúc" type="datetime-local" fullWidth InputLabelProps={{ shrink: true }} value={form.endTime || ''} onChange={(e) => setForm({ ...form, endTime: e.target.value })} />,
+        ] : (
+          <TextField select label="Trạng thái" fullWidth value={form.status ?? 0} onChange={(e) => setForm({ ...form, status: Number(e.target.value) })}>
             <MenuItem value={0}>Lên lịch</MenuItem>
             <MenuItem value={1}>Đang chiếu</MenuItem>
             <MenuItem value={2}>Hoàn thành</MenuItem>
@@ -537,7 +707,9 @@ export const ShowtimesSection = ({ crud, movies, theaters, rooms }) => {
 const CrudDialog = ({ open, title, onClose, onSave, children }) => (
   <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
     <DialogTitle sx={{ fontWeight: 700 }}>{title}</DialogTitle>
-    <DialogContent>{children}</DialogContent>
+    <DialogContent>
+      <Stack spacing={2.5} sx={{ mt: 1 }}>{children}</Stack>
+    </DialogContent>
     <DialogActions sx={{ px: 3, pb: 2 }}>
       <Button onClick={onClose}>Hủy</Button>
       <Button variant="contained" onClick={onSave}>

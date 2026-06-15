@@ -1,12 +1,23 @@
+import { useEffect } from 'react';
 import { Box, CssBaseline, ThemeProvider } from '@mui/material';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import SiteNavbar from '../components/layout/SiteNavbar';
 import SiteFooter from '../components/layout/SiteFooter';
 import { cinemaTheme } from '../theme/cinemaTheme';
 
+// Cuộn lên đầu trang mỗi khi đổi route (vd: bấm link ở footer)
+const ScrollToTop = () => {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, [pathname]);
+  return null;
+};
+
 const PublicLayout = () => (
   <ThemeProvider theme={cinemaTheme}>
     <CssBaseline />
+    <ScrollToTop />
     <Box
       sx={{
         minHeight: '100vh',
