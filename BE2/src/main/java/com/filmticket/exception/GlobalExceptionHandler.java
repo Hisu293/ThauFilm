@@ -10,6 +10,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -55,6 +56,22 @@ public class GlobalExceptionHandler {
         log.error("Malformed JSON request: {}", ex.getMostSpecificCause().getMessage());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error("Malformed JSON request body"));
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
+        log.error("DataIntegrityViolationException: {}", ex.getMessage());
+
+        String message = ex.getMessage();
+        String returnMessage = "Không thể xóa dữ liệu do có ràng buộc liên quan hệ thống!";
+
+        // Bẫy đúng tên constraint ngoại khóa của bảng bookings khi xóa showtime
+        if (message != null && message.contains("bookings_showtime_id_fkey")) {
+            returnMessage = "Không thể xóa suất chiếu này vì đã có khách đặt vé!";
+        }
+
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(returnMessage));
     }
 
     @ExceptionHandler(Exception.class)
