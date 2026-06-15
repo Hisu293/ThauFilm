@@ -13,7 +13,7 @@ export const adminTheme = createTheme({
   },
   shape: { borderRadius: 12 },
   typography: {
-    fontFamily: '"Inter", "IBM Plex Sans", system-ui, sans-serif',
+    fontFamily: '"Be Vietnam Pro", "Inter", system-ui, sans-serif',
     h4: { fontWeight: 700, letterSpacing: '-0.02em' },
     h5: { fontWeight: 700 },
     h6: { fontWeight: 600 },

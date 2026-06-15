@@ -11,6 +11,7 @@ export const THEATER_FIELDS = [
   'name',
   'address',
   'city',
+  'phoneNumber',
   'status',
 ];
 

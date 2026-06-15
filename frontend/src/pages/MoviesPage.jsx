@@ -84,8 +84,7 @@ const MoviesPage = () => {
         </div>
       </div>
 
-      <Container maxWidth="xl" sx={{ mt: -2 }}>
-        {/* Tabs */}
+      <Container maxWidth="xl" sx={{ mt: 4 }}>
         <div className="movies-tabs">
           <button
             type="button"

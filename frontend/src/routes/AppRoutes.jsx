@@ -12,6 +12,7 @@ import RegisterPage from '../pages/RegisterPage';
 import MovieDetailPage from '../pages/MovieDetailPage';
 import DashboardPage from '../pages/DashboardPage';
 import AdminPage from '../pages/AdminPage';
+import InfoPage from '../pages/InfoPage';
 import AdminRoute from './AdminRoute';
 import NotFoundPage from '../pages/NotFoundPage';
 
@@ -33,6 +34,13 @@ const AppRoutes = () => {
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/movies/:id" element={<MovieDetailPage />} />
         <Route path="/dashboard" element={<DashboardPage />} />
+        {/* Trang nội dung tĩnh liên kết từ footer */}
+        <Route path="/faq" element={<InfoPage contentKey="faq" />} />
+        <Route path="/terms" element={<InfoPage contentKey="terms" />} />
+        <Route path="/privacy" element={<InfoPage contentKey="privacy" />} />
+        <Route path="/refund" element={<InfoPage contentKey="refund" />} />
+        <Route path="/contact" element={<InfoPage contentKey="contact" />} />
+        <Route path="/cookie" element={<InfoPage contentKey="cookie" />} />
       </Route>
 
       {/* Auth + admin — no public navbar */}
