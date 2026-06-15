@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useParams, useNavigate } from 'react-router-dom';
-import { Container, Grid, Box, Alert, Snackbar, Button } from '@mui/material';
+import { Container, Box, Alert, Snackbar, Button } from '@mui/material';
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
 
 import BookingStepper from '../../components/BookingStepper';
@@ -162,9 +162,9 @@ export const SeatSelectionPage = () => {
         onBack={() => navigate(`/movies/${movie.id}`)}
       />
 
-      <Grid container spacing={4}>
-        {/* Seats panel */}
-        <Grid item xs={12} lg={8.5}>
+      <Box sx={{ display: 'flex', gap: 4, alignItems: 'flex-start', justifyContent: 'center' }}>
+        {/* Seats panel — centered, takes remaining space */}
+        <Box sx={{ flex: '1 1 0', minWidth: 0, maxWidth: 860 }}>
           {seats.length === 0 && !apiLoading ? (
             <EmptyState
               title="Không tìm thấy sơ đồ ghế"
@@ -173,28 +173,28 @@ export const SeatSelectionPage = () => {
               onAction={() => navigate(`/movies/${movie.id}`)}
             />
           ) : (
-            <SectionCard 
-              title="Sơ Đồ Ghế Ngồi" 
-              sx={{ 
+            <SectionCard
+              title="Sơ Đồ Ghế Ngồi"
+              sx={{
                 bgcolor: 'background.paper',
-                display: 'flex', 
-                flexDirection: 'column', 
+                display: 'flex',
+                flexDirection: 'column',
                 alignItems: 'center',
                 py: 5,
-                position: 'relative'
+                position: 'relative',
               }}
             >
-              <SeatMap 
-                seats={seats} 
-                selectedSeats={selectedSeats} 
-                onToggleSelectSeat={handleToggleSelectSeat} 
+              <SeatMap
+                seats={seats}
+                selectedSeats={selectedSeats}
+                onToggleSelectSeat={handleToggleSelectSeat}
               />
             </SectionCard>
           )}
-        </Grid>
+        </Box>
 
-        {/* Sidebar details */}
-        <Grid item xs={12} lg={3.5}>
+        {/* Sidebar details — sticky on the right */}
+        <Box sx={{ width: 320, flexShrink: 0, display: { xs: 'none', lg: 'block' } }}>
           <BookingSidebar
             movie={movie}
             showtime={showtime}
@@ -203,8 +203,20 @@ export const SeatSelectionPage = () => {
             proceedText="Tiếp tục thanh toán"
             disabled={selectedSeats.length === 0 || apiLoading}
           />
-        </Grid>
-      </Grid>
+        </Box>
+      </Box>
+
+      {/* Mobile sidebar — shown below seat map on small screens */}
+      <Box sx={{ display: { xs: 'block', lg: 'none' }, mt: 3 }}>
+        <BookingSidebar
+          movie={movie}
+          showtime={showtime}
+          selectedSeats={selectedSeats}
+          onProceed={handleProceed}
+          proceedText="Tiếp tục thanh toán"
+          disabled={selectedSeats.length === 0 || apiLoading}
+        />
+      </Box>
 
       {/* API warnings overlay */}
       <Snackbar

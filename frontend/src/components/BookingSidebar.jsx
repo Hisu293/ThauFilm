@@ -9,14 +9,14 @@ export const BookingSidebar = ({
   movie = {},
   showtime = {},
   selectedSeats = [],
-  serviceFee = 10000,
   onProceed,
   proceedText = 'Tiếp tục thanh toán',
   disabled = false,
   showSummaryOnly = false
 }) => {
-  const seatsTotal = selectedSeats.reduce((sum, seat) => sum + seat.price, 0);
-  const totalAmount = seatsTotal > 0 ? seatsTotal + serviceFee : 0;
+  // Total = sum of individual seat prices only (no service fee)
+  const seatsTotal = selectedSeats.reduce((sum, seat) => sum + (seat.price || 0), 0);
+  const totalAmount = seatsTotal;
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('vi-VN', {
@@ -27,19 +27,39 @@ export const BookingSidebar = ({
 
   const getSeatGroupText = () => {
     if (selectedSeats.length === 0) return 'Chưa chọn ghế';
-    return selectedSeats.map((s) => s.id).join(', ');
+    // Use human-readable label (A1, B2…) instead of UUID
+    return selectedSeats.map((s) => s.label || s.id).join(', ');
   };
 
-  const formattedDate = showtime.dateId
-    ? new Date(
-        new Date().setDate(new Date().getDate() + parseInt(showtime.dateId.replace('date-', ''), 10))
-      ).toLocaleDateString('vi-VN', {
-        weekday: 'long',
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric'
-      })
-    : '';
+  // Resolve display date from multiple possible showtime shapes:
+  //   - API shape:  showtime.date = 'YYYY-MM-DD'
+  //   - Quick Booking shape: showtime.date = 'YYYY-MM-DD'
+  //   - Legacy mock shape: showtime.dateId = 'date-N'
+  const formattedDate = (() => {
+    const raw = showtime.date || showtime.startTime;
+    if (raw) {
+      try {
+        return new Date(raw.slice(0, 10) + 'T00:00:00').toLocaleDateString('vi-VN', {
+          weekday: 'long',
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+        });
+      } catch { /* fall through */ }
+    }
+    // Legacy mock fallback: dateId = 'date-N' means today + N days
+    if (showtime.dateId) {
+      const offset = parseInt(showtime.dateId.replace('date-', ''), 10);
+      if (!isNaN(offset)) {
+        const d = new Date();
+        d.setDate(d.getDate() + offset);
+        return d.toLocaleDateString('vi-VN', {
+          weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric',
+        });
+      }
+    }
+    return '—';
+  })();
 
   return (
     <Card 
@@ -123,8 +143,8 @@ export const BookingSidebar = ({
 
         {/* Pricing calculations */}
         <Stack spacing={1.5} sx={{ mb: 3 }}>
-          <Box sx={{ display: 'flex', justifyContent: 'between', alignItems: 'center' }}>
-            <Box sx={{ flex: 1 }}>
+          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+            <Box sx={{ flex: 1, mr: 1 }}>
               <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary' }}>
                 Ghế chọn:
               </Typography>
@@ -137,24 +157,15 @@ export const BookingSidebar = ({
             </Typography>
           </Box>
 
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Typography variant="body2" color="text.secondary">
-              Phí dịch vụ:
-            </Typography>
-            <Typography variant="body2" sx={{ color: 'text.primary', fontWeight: 600 }}>
-              {selectedSeats.length > 0 ? formatCurrency(serviceFee) : formatCurrency(0)}
-            </Typography>
-          </Box>
-
-          <Divider sx={{ borderStyle: 'dashed', my: 0.5 }} />
-
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 800, color: 'text.primary' }}>
-              Tổng tiền:
-            </Typography>
-            <Typography variant="h5" sx={{ fontWeight: 900, color: 'primary.main' }}>
-              {formatCurrency(totalAmount)}
-            </Typography>
+          <Box sx={{ borderTop: '1px dashed rgba(148,163,184,0.2)', pt: 1.5 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Typography variant="subtitle1" sx={{ fontWeight: 800, color: 'text.primary' }}>
+                Tổng tiền:
+              </Typography>
+              <Typography variant="h5" sx={{ fontWeight: 900, color: 'primary.main' }}>
+                {formatCurrency(totalAmount)}
+              </Typography>
+            </Box>
           </Box>
         </Stack>
 
