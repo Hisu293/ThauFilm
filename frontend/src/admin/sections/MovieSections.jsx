@@ -124,6 +124,8 @@ export const MoviesSection = ({ crud }) => {
       if (dialog === 'add') await crud.add(form);
       else await crud.update(dialog, form);
       setDialog(null);
+      // Force reload danh sách phim sau khi lưu
+      await crud.reload();
     } catch (err) {
       setFormError(err.message || 'Lưu phim thất bại');
     } finally {

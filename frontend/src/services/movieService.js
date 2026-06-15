@@ -10,26 +10,9 @@ const mapMovie = (movie) => {
   const status = String(movie.status ?? '').toUpperCase();
   
   let poster = movie.posterUrl || placeholderPoster;
+  // Chỉ dùng posterUrl từ API, không hard-code fallback ảnh cục bộ
   if (!poster || poster === 'ok' || poster.includes('example.com') || poster.includes('placeholder')) {
-    const titleLower = String(movie.title ?? '').toLowerCase();
-    if (titleLower.includes('avengers')) {
-      poster = '/listfilm/film15.jpg';
-    } else if (titleLower.includes('inside out')) {
-      poster = '/listfilm/film9.jpg'; // Animation
-    } else if (titleLower.includes('dune')) {
-      poster = '/listfilm/film8.jpg'; // Sci-fi/Epic
-    } else if (titleLower.includes('spiderman') || titleLower.includes('spider-man') || titleLower.includes('spider-verse')) {
-      poster = '/listfilm/film16.jpg'; // Action/Sci-Fi
-    } else if (titleLower.includes('lật mặt') || titleLower.includes('l-t m-t')) {
-      poster = '/listfilm/film4.jpg'; // Action/Drama
-    } else if (titleLower.includes('conan')) {
-      poster = '/listfilm/film10.jpg'; // Mystery/Animation
-    } else {
-      // Determinstic fallback based on ID hash
-      const hash = String(movie.id || '').split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-      const index = (hash % 16) + 1;
-      poster = `/listfilm/film${index}.jpg`;
-    }
+    poster = placeholderPoster;
   }
 
   return {
