@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -34,6 +36,10 @@ public class Showtime {
 
     @Column(nullable = false)
     private Integer status;
+
+    @OneToMany(mappedBy = "showtime", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<SeatAvailability> seatAvailabilities = new ArrayList<>();
 
     @PrePersist
     public void prePersist() {

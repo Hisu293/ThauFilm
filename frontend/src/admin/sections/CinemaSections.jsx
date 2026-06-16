@@ -26,6 +26,7 @@ import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
 import MeetingRoomRoundedIcon from '@mui/icons-material/MeetingRoomRounded';
 import SectionHeader from '../components/SectionHeader';
 import StatusChip from '../components/StatusChip';
+import { fromUTCToLocal } from '../../services/adminShowtimeService';
 
 const thSx = { color: 'rgba(255,255,255,0.45)', fontWeight: 600 };
 
@@ -553,6 +554,26 @@ export const ShowtimesSection = ({ crud, movies, theaters, rooms }) => {
     status: 0,
   });
 
+  // Convert ISO string (stored as Vietnam UTC) → datetime-local for input display
+  const toInputValue = (iso) => {
+    if (!iso) return '';
+    try {
+      // Parse as Vietnam time (UTC+7) then show as local browser time
+      const [datePart, timePart] = iso.split('T');
+      const [year, month, day] = datePart.split('-').map(Number);
+      const [time, rest] = timePart.split('.');
+      const [hour, minute, second] = time.split(':').map(Number);
+      // Create date in Vietnam timezone and get local equivalent
+      const vnDate = new Date(Date.UTC(year, month - 1, day, hour - 7, minute, second || 0));
+      const offset = vnDate.getTimezoneOffset();
+      const localDate = new Date(vnDate.getTime() - offset * 60000);
+      const pad = (n) => String(n).padStart(2, '0');
+      return `${localDate.getFullYear()}-${pad(localDate.getMonth() + 1)}-${pad(localDate.getDate())}T${pad(localDate.getHours())}:${pad(localDate.getMinutes())}`;
+    } catch {
+      return '';
+    }
+  };
+
   const save = async () => {
     try {
       if (dialog === 'add') {
@@ -658,7 +679,7 @@ export const ShowtimesSection = ({ crud, movies, theaters, rooms }) => {
                       <StatusChip status={statusStr} />
                     </TableCell>
                     <TableCell align="right">
-                      <IconButton size="small" onClick={() => { setForm({ ...s, status: s.status ?? 0 }); setDialog(s.id); }}>
+                      <IconButton size="small" onClick={() => { setForm({ ...s, status: s.status ?? 0, startTime: fromUTCToLocal(s.startTime), endTime: fromUTCToLocal(s.endTime) }); setDialog(s.id); }}>
                         <EditRoundedIcon fontSize="small" />
                       </IconButton>
                       <IconButton size="small" onClick={() => crud.remove(s.id)} sx={{ color: '#f87171' }}>

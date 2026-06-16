@@ -4,11 +4,20 @@ import com.filmticket.dto.*;
 import com.filmticket.entity.*;
 import com.filmticket.exception.BadRequestException;
 import com.filmticket.repository.*;
+import com.filmticket.util.TicketPdfGenerator;
 import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import jakarta.mail.internet.MimeMessage;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.text.NumberFormat;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -17,12 +26,16 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class BookingService {
 
+    private static final Logger log = LoggerFactory.getLogger(BookingService.class);
     private final BookingRepository bookingRepository;
     private final SeatAvailabilityRepository seatAvailabilityRepository;
     private final PaymentRepository paymentRepository;
     private final TicketRepository ticketRepository;
     private final ShowtimeRepository showtimeRepository;
     private final UserRepository userRepository;
+    private final ComboService comboService;
+    private final DiscountService discountService;
+    private final JavaMailSender mailSender;
 
     private static final int HOLD_MINUTES = 15;
 
@@ -51,7 +64,7 @@ public class BookingService {
 
         List<SeatAvailability> availabilities = new ArrayList<>();
         List<Seat> seats = new ArrayList<>();
-        BigDecimal total = BigDecimal.ZERO;
+        BigDecimal seatTotal = BigDecimal.ZERO;
 
         for (UUID seatId : request.getSeatIds()) {
             SeatAvailability av = seatAvailabilityRepository
@@ -63,16 +76,31 @@ public class BookingService {
             }
             availabilities.add(av);
             seats.add(av.getSeat());
-            total = total.add(av.getPrice());
+            seatTotal = seatTotal.add(av.getPrice());
         }
 
-        // Mark seats as unavailable
+        BigDecimal comboTotal = BigDecimal.ZERO;
+        if (request.getComboIds() != null && !request.getComboIds().isEmpty()) {
+            List<ComboResponse> combos = comboService.getCombos(request.getComboIds());
+            for (ComboResponse combo : combos) {
+                comboTotal = comboTotal.add(combo.getPrice());
+            }
+        }
+
+        BigDecimal total = seatTotal.add(comboTotal);
+        if ("ONLINE".equalsIgnoreCase(request.getChannel())) {
+            total = seatTotal.add(comboTotal);
+        } else if ("OFFLINE".equalsIgnoreCase(request.getChannel())) {
+            total = seatTotal.add(comboTotal);
+        } else {
+            throw new BadRequestException("Invalid booking channel: " + request.getChannel());
+        }
+
         for (SeatAvailability av : availabilities) {
             av.setAvailable(false);
         }
         seatAvailabilityRepository.saveAll(availabilities);
 
-        // Create booking
         Booking booking = Booking.builder()
                 .user(user)
                 .showtime(showtime)
@@ -82,7 +110,6 @@ public class BookingService {
                 .holdExpiresAt(LocalDateTime.now().plusMinutes(HOLD_MINUTES))
                 .build();
 
-        // Link seats
         for (int i = 0; i < seats.size(); i++) {
             BookingSeat bs = BookingSeat.builder()
                     .seat(seats.get(i))
@@ -109,10 +136,20 @@ public class BookingService {
             throw new BadRequestException("Booking hold has expired");
         }
 
-        // Simulate payment
+        BigDecimal originalAmount = booking.getTotalAmount();
+        BigDecimal discountAmount = BigDecimal.ZERO;
+        String discountCode = null;
+
+        if (request.getDiscountCode() != null && !request.getDiscountCode().isBlank()) {
+            discountAmount = discountService.calculateDiscount(request.getDiscountCode(), originalAmount, userId);
+            discountCode = request.getDiscountCode();
+        }
+
+        BigDecimal finalAmount = originalAmount.subtract(discountAmount);
+
         Payment payment = Payment.builder()
                 .booking(booking)
-                .amount(booking.getTotalAmount())
+                .amount(finalAmount)
                 .paymentMethod(request.getPaymentMethod())
                 .status(PaymentStatus.PAID)
                 .transactionId(UUID.randomUUID().toString())
@@ -120,12 +157,10 @@ public class BookingService {
                 .build();
         paymentRepository.save(payment);
 
-        // Confirm booking
         booking.setStatus(BookingStatus.CONFIRMED);
         booking.setConfirmedAt(LocalDateTime.now());
         booking = bookingRepository.save(booking);
 
-        // Generate tickets
         List<Ticket> tickets = new ArrayList<>();
         for (BookingSeat bs : booking.getBookingSeats()) {
             Ticket ticket = Ticket.builder()
@@ -141,11 +176,16 @@ public class BookingService {
                 .map(TicketResponse::fromTicket)
                 .toList();
 
-        return BookingPaymentResponse.builder()
-                .booking(toBookingResponse(booking))
-                .payment(PaymentResponse.fromPayment(payment))
-                .tickets(ticketResponses)
-                .build();
+        BookingPaymentResponse response = BookingPaymentResponse.fromPaymentResult(
+                booking, payment, ticketResponses, originalAmount, discountAmount, discountCode);
+
+        try {
+            sendTicketEmail(booking.getUser().getEmail(), booking, tickets, payment, discountAmount, finalAmount);
+        } catch (Exception ex) {
+            log.error("Failed to send ticket email for booking {}", booking.getId(), ex);
+        }
+
+        return response;
     }
 
     @Transactional(readOnly = true)
@@ -188,18 +228,86 @@ public class BookingService {
                 .toList();
     }
 
+    private void sendTicketEmail(String to, Booking booking, List<Ticket> tickets, Payment payment,
+                                 BigDecimal discountAmount, BigDecimal finalAmount) throws Exception {
+        String subject = "Ve xem phim - " + booking.getShowtime().getMovie().getTitle();
+        String html = buildHtmlBody(booking, tickets, payment, discountAmount, finalAmount);
+
+        MimeMessage message = mailSender.createMimeMessage();
+        MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+        helper.setTo(to);
+        helper.setSubject(subject);
+        helper.setText(html, true);
+
+        byte[] pdfBytes = TicketPdfGenerator.generateTicketPdf(booking, tickets);
+        helper.addAttachment("ticket.pdf", new ByteArrayResource(pdfBytes));
+
+        mailSender.send(message);
+    }
+
+    private String buildHtmlBody(Booking booking, List<Ticket> tickets, Payment payment,
+                                 BigDecimal discountAmount, BigDecimal finalAmount) {
+        String movieTitle = booking.getShowtime().getMovie().getTitle();
+        String cinema = booking.getShowtime().getCinemaRoom().getName();
+        String showtime = booking.getShowtime().getStartTime().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"));
+        String confirmationCode = booking.getConfirmationCode();
+
+        StringBuilder ticketListHtml = new StringBuilder();
+        for (Ticket ticket : tickets) {
+            ticketListHtml.append("<li>").append(ticket.getTicketCode()).append("</li>");
+        }
+
+        StringBuilder builder = new StringBuilder();
+        builder.append("<!DOCTYPE html><html><body style='font-family:Arial,sans-serif;color:#222;max-width:640px;margin:auto'>");
+        builder.append("<h2 style='color:#111;margin-bottom:8px'>").append(escape(movieTitle)).append("</h2>");
+        builder.append("<p style='color:#555'>").append(escape(booking.getUser().getFullName())).append(",</p>");
+        builder.append("<p>Cam on quy khach da mua ve. Thong tin ve:</p>");
+        builder.append("<table style='width:100%;border-collapse:collapse;margin:10px 0 16px'>");
+        builder.append("<tr><td style='padding:6px 8px;color:#666;width:120px'>Rap</td><td style='padding:6px 8px'>").append(escape(cinema)).append("</td></tr>");
+        builder.append("<tr><td style='padding:6px 8px;color:#666'>Gio chieu</td><td style='padding:6px 8px'>").append(escape(showtime)).append("</td></tr>");
+        builder.append("<tr><td style='padding:6px 8px;color:#666'>Ma dat ve</td><td style='padding:6px 8px'>").append(escape(confirmationCode)).append("</td></tr>");
+        builder.append("</table>");
+        builder.append("<p>Danh sach ve:</p><ul>").append(ticketListHtml).append("</ul>");
+        builder.append("<p>Tong tien: <b>").append(formatMoney(booking.getTotalAmount())).append(" VND</b></p>");
+        if (discountAmount.compareTo(BigDecimal.ZERO) > 0) {
+            builder.append("<p>Giam gia: <b>-").append(formatMoney(discountAmount)).append(" VND</b></p>");
+        }
+        builder.append("<p>Thanh toan: <b>").append(formatMoney(finalAmount)).append(" VND</b></p>");
+        builder.append("<p>Phuong thuc: ").append(escape(payment.getPaymentMethod())).append("</p>");
+        builder.append("<p>Ma giao dich: ").append(escape(payment.getTransactionId())).append("</p>");
+        builder.append("<p style='margin-top:18px;color:#444'>File dinh kem la PDF ve dien tu. Vui long xuat trinh ma ve khi den rap.</p>");
+        builder.append("<p>Chuc quy khach xem phim vui ve!</p>");
+        builder.append("</body></html>");
+        return builder.toString();
+    }
+
     private BookingResponse toBookingResponse(Booking booking) {
         List<ShowtimeSeatResponse> seats = booking.getBookingSeats().stream()
                 .map(bs -> ShowtimeSeatResponse.builder()
                         .seatId(bs.getSeat().getId())
                         .rowName(bs.getSeat().getRowName())
                         .seatNumber(bs.getSeat().getSeatNumber())
-                        .type(bs.getSeat().getType())
+                        .type(bs.getSeat().getType().toStorageValue())
                         .available(false)
                         .price(bs.getPriceAtBooking())
                         .build())
                 .collect(Collectors.toList());
         return BookingResponse.fromBooking(booking, seats);
+    }
+
+    private String formatMoney(BigDecimal value) {
+        BigDecimal rounded = value.setScale(0, RoundingMode.HALF_UP);
+        NumberFormat format = NumberFormat.getCurrencyInstance(new Locale("vi", "VN"));
+        format.setMaximumFractionDigits(0);
+        format.setMinimumFractionDigits(0);
+        String formatted = format.format(rounded);
+        return formatted.replace("₫", "").trim();
+    }
+
+    private String escape(String value) {
+        return value == null ? "" : value.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;");
     }
 
     private String generateConfirmationCode() {

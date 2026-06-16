@@ -39,13 +39,25 @@ export const toISOWithVietnamTZ = (localDateTime) => {
   return `${date}T${time}:00.000+07:00`;
 };
 
-/** Chuyển datetime-local (YYYY-MM-DDTHH:mm) sang ISO UTC string (Z) */
+/** Chuyển datetime-local (YYYY-MM-DDTHH:mm) sang ISO UTC string (Z) — giả định gió nhập là Việt Nam (UTC+7) */
 export const toISOUTC = (localDateTime) => {
   if (!localDateTime) return '';
   const [date, time] = localDateTime.split('T');
-  // Chuyển giờ Việt Nam sang UTC (trừ 7 tiếng)
   const d = new Date(`${date}T${time}:00+07:00`);
   return d.toISOString();
+};
+
+/** Chuyển ISO UTC string về datetime-local (YYYY-MM-DDTHH:mm) để hiển thị giờ Việt Nam */
+export const fromUTCToLocal = (iso) => {
+  if (!iso) return '';
+  try {
+    const d = new Date(iso);
+    const vnTime = new Date(d.getTime() + 7 * 60 * 60 * 1000);
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${vnTime.getFullYear()}-${pad(vnTime.getMonth() + 1)}-${pad(vnTime.getDate())}T${pad(vnTime.getHours())}:${pad(vnTime.getMinutes())}`;
+  } catch {
+    return '';
+  }
 };
 
 /** Payload cho PUT /api/admin/showtimes/{id} — chỉ status (số) */

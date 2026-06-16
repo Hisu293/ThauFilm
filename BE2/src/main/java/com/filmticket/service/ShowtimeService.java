@@ -32,6 +32,7 @@ public class ShowtimeService {
     private final TheaterService theaterService;
     private final SeatRepository seatRepository;
     private final SeatAvailabilityRepository seatAvailabilityRepository;
+    private final PricingService pricingService;
 
     @Transactional(readOnly = true)
     public List<ShowtimeResponse> getAllShowtimes() {
@@ -56,7 +57,7 @@ public class ShowtimeService {
                 .build();
 
         Showtime savedShowtime = showtimeRepository.save(showtime);
-        initializeSeatAvailabilities(savedShowtime);
+        ensureSeatAvailabilities(savedShowtime);
         return ShowtimeResponse.fromShowtime(savedShowtime);
     }
 
@@ -74,7 +75,9 @@ public class ShowtimeService {
         showtime.setEndTime(request.getEndTime());
         showtime.setStatus(request.getStatus());
 
-        return ShowtimeResponse.fromShowtime(showtimeRepository.save(showtime));
+        Showtime savedShowtime = showtimeRepository.save(showtime);
+        ensureSeatAvailabilities(savedShowtime);
+        return ShowtimeResponse.fromShowtime(savedShowtime);
     }
 
     @Transactional
@@ -153,17 +156,25 @@ public class ShowtimeService {
                 .toList();
     }
 
-    private void initializeSeatAvailabilities(Showtime showtime) {
-        List<Seat> seats = seatRepository.findAllByCinemaRoomIdOrderByRowNameAscSeatNumberAsc(showtime.getCinemaRoom().getId());
-        List<SeatAvailability> availabilities = seats.stream()
-                .map(seat -> SeatAvailability.builder()
-                        .showtime(showtime)
-                        .seat(seat)
-                        .available(true)
-                        .price(new BigDecimal("90000.00"))
-                        .build())
-                .toList();
-        seatAvailabilityRepository.saveAll(availabilities);
+    private void ensureSeatAvailabilities(Showtime showtime) {
+        List<SeatAvailability> existing = seatAvailabilityRepository.findByShowtimeIdOrderBySeatRowNameAscSeatSeatNumberAsc(showtime.getId());
+        if (existing.isEmpty()) {
+            List<Seat> seats = seatRepository.findAllByCinemaRoomIdOrderByRowNameAscSeatNumberAsc(showtime.getCinemaRoom().getId());
+            List<SeatAvailability> newAvailabilities = seats.stream()
+                    .map(seat -> SeatAvailability.builder()
+                            .showtime(showtime)
+                            .seat(seat)
+                            .available(true)
+                            .price(BigDecimal.ZERO)
+                            .build())
+                    .toList();
+            seatAvailabilityRepository.saveAll(newAvailabilities);
+            pricingService.applyDefaultPricing(newAvailabilities);
+            seatAvailabilityRepository.saveAll(newAvailabilities);
+        } else {
+            pricingService.applyDefaultPricing(existing);
+            seatAvailabilityRepository.saveAll(existing);
+        }
     }
 
     private void validateTimeRange(UpsertShowtimeRequest request) {

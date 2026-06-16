@@ -13,6 +13,37 @@ import java.util.UUID;
 @AllArgsConstructor
 @Builder
 public class Seat {
+
+    public enum Type {
+        VIP, STANDARD, COUPLE;
+
+        public static Type fromStorageValue(String value) {
+            if (value == null) return STANDARD;
+            String normalized = value.trim().toUpperCase();
+            return switch (normalized) {
+                case "VIP" -> VIP;
+                case "COUPLE" -> COUPLE;
+                default -> STANDARD;
+            };
+        }
+
+        public String toStorageValue() {
+            return switch (this) {
+                case VIP -> "VIP";
+                case STANDARD -> "STANDARD";
+                case COUPLE -> "COUPLE";
+            };
+        }
+
+        public String toDisplayValue() {
+            return switch (this) {
+                case VIP -> "VIP";
+                case STANDARD -> "Thường";
+                case COUPLE -> "Đôi";
+            };
+        }
+    }
+
     @Id
     @Column(nullable = false, updatable = false)
     private UUID id;
@@ -27,9 +58,14 @@ public class Seat {
     @Column(name = "seat_number", nullable = false)
     private Integer seatNumber;
 
-    private String type;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private Type type = Type.STANDARD;
 
-    private Integer status;
+    @Column(nullable = false)
+    @Builder.Default
+    private Integer status = 1;
 
     @PrePersist
     public void prePersist() {

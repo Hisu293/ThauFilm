@@ -13,4 +13,6 @@ import lombok.NoArgsConstructor;
 public class PayBookingRequest {
     @NotBlank(message = "Payment method is required")
     private String paymentMethod;
+
+    private String discountCode;
 }

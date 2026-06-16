@@ -2,24 +2,27 @@ export const bookingService = {
   /**
    * Normalize seat layout array returned by the API
    * Backend shape: { seatId, rowName, seatNumber, type, available, price }
-   * UI shape: { id, row, col, type, price, isSold, label }
+   * UI shape: { id, row, col, type, price, isSold, label, rowName, seatNumber }
    */
   normalizeSeats: (backendSeats = []) => {
     if (!Array.isArray(backendSeats)) return [];
-    
+
     return backendSeats.map((seat) => {
-      const row = seat.rowName || 'A';
-      const col = parseInt(seat.seatNumber, 10) || 1;
+      const rowName = seat.rowName || 'A';
+      const seatNumber = seat.seatNumber;
+      const col = typeof seatNumber === 'number' && Number.isFinite(seatNumber) ? seatNumber : parseInt(String(seatNumber), 10) || 1;
       const typeNormalized = String(seat.type || 'STANDARD').toUpperCase();
 
       return {
-        id: seat.seatId, // UUID for backend payloads
-        label: `${row}${col}`, // Display code (e.g., A5)
-        row,
+        id: seat.seatId,
+        label: `${rowName}${col}`,
+        row: rowName,
         col,
         type: typeNormalized === 'NORMAL' ? 'STANDARD' : typeNormalized,
         price: Number(seat.price) || 0,
-        isSold: !seat.available, // if not available, it is sold/held
+        isSold: !seat.available,
+        rowName,
+        seatNumber,
       };
     });
   },
@@ -30,7 +33,24 @@ export const bookingService = {
    */
   normalizeBooking: (backendBooking = {}) => {
     if (!backendBooking) return null;
-    
+
+    const seats = (backendBooking.seats || []).map((s) => {
+      const rowName = s.rowName || s.row || 'A';
+      const seatNumber = s.seatNumber ?? s.col;
+      const col = typeof seatNumber === 'number' && Number.isFinite(seatNumber) ? seatNumber : parseInt(String(seatNumber), 10) || 1;
+
+      return {
+        id: s.seatId,
+        label: `${rowName}${col}`,
+        row: rowName,
+        col,
+        type: (s.type || 'STANDARD') === 'NORMAL' ? 'STANDARD' : (s.type || 'STANDARD'),
+        price: Number(s.price) || 0,
+        rowName,
+        seatNumber,
+      };
+    });
+
     return {
       id: backendBooking.id,
       userId: backendBooking.userId,
@@ -38,17 +58,10 @@ export const bookingService = {
       movieTitle: backendBooking.movieTitle || 'Vé xem phim',
       roomName: backendBooking.cinemaRoomName || 'Phòng chiếu',
       startTime: backendBooking.startTime,
-      totalAmount: backendBooking.totalAmount || 0,
+      totalAmount: Number(backendBooking.totalAmount) || 0,
       status: backendBooking.status,
       confirmationCode: backendBooking.confirmationCode || '—',
-      seats: (backendBooking.seats || []).map((s) => ({
-        id: s.seatId,
-        label: `${s.rowName}${s.seatNumber}`,
-        row: s.rowName,
-        col: s.seatNumber,
-        type: s.type === 'NORMAL' ? 'STANDARD' : s.type,
-        price: s.price,
-      })),
+      seats,
     };
   },
 
