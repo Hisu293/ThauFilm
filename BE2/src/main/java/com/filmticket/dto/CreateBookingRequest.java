@@ -20,4 +20,9 @@ public class CreateBookingRequest {
 
     @NotEmpty(message = "At least one seat must be selected")
     private List<UUID> seatIds;
+
+    @NotNull(message = "Booking channel is required")
+    private String channel;
+
+    private List<UUID> comboIds;
 }

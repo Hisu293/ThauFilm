@@ -7,7 +7,6 @@ import com.filmticket.dto.UpsertSeatRequest;
 import com.filmticket.entity.CinemaRoom;
 import com.filmticket.entity.Seat;
 import com.filmticket.exception.BadRequestException;
-import com.filmticket.model.SeatType;
 import com.filmticket.repository.SeatRepository;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -36,16 +35,16 @@ public class SeatService {
         int seatsPerRow = seatsByRow.isEmpty() ? 0 : seatsByRow.values().iterator().next().size();
         int totalSeats = seats.size();
 
-        int standardCount = (int) seats.stream().filter(s -> "STANDARD".equalsIgnoreCase(s.getType())).count();
-        int vipCount = (int) seats.stream().filter(s -> "VIP".equalsIgnoreCase(s.getType())).count();
+        int standardCount = (int) seats.stream().filter(s -> s.getType() == Seat.Type.STANDARD).count();
+        int vipCount = (int) seats.stream().filter(s -> s.getType() == Seat.Type.VIP).count();
 
         Map<String, SeatMapResponse.RowInfo> rowInfoMap = new LinkedHashMap<>();
         for (Map.Entry<String, List<Seat>> entry : seatsByRow.entrySet()) {
             List<Seat> rowSeats = entry.getValue();
-            String type = rowSeats.stream()
+            Seat.Type type = rowSeats.stream()
                     .findFirst()
                     .map(Seat::getType)
-                    .orElse("STANDARD");
+                    .orElse(Seat.Type.STANDARD);
             int availableCount = (int) rowSeats.stream()
                     .filter(s -> s.getStatus() != null && s.getStatus() == 1)
                     .count();
@@ -53,7 +52,7 @@ public class SeatService {
             rowInfoMap.put(entry.getKey(), SeatMapResponse.RowInfo.builder()
                     .rowName(entry.getKey())
                     .seatCount(rowSeats.size())
-                    .type(type)
+                    .type(type.toStorageValue())
                     .availableSeats(availableCount)
                     .build());
         }
@@ -79,7 +78,7 @@ public class SeatService {
                 .cinemaRoom(room)
                 .rowName(normalizeRowName(request.getRowName()))
                 .seatNumber(request.getSeatNumber())
-                .type(normalize(request.getType()))
+                .type(Seat.Type.fromStorageValue(request.getType()))
                 .status(request.getStatus())
                 .build();
 
@@ -95,7 +94,7 @@ public class SeatService {
         seat.setCinemaRoom(room);
         seat.setRowName(normalizeRowName(request.getRowName()));
         seat.setSeatNumber(request.getSeatNumber());
-        seat.setType(normalize(request.getType()));
+        seat.setType(Seat.Type.fromStorageValue(request.getType()));
         seat.setStatus(request.getStatus());
 
         return SeatResponse.fromSeat(seatRepository.save(seat));
@@ -105,7 +104,7 @@ public class SeatService {
     public SeatResponse updateSeatTypeStatus(UUID seatId, UpdateSeatRequest request) {
         Seat seat = getSeatEntityOrThrow(seatId);
 
-        seat.setType(request.getType().toStorageValue());
+        seat.setType(Seat.Type.fromStorageValue(request.getType()));
         seat.setStatus(request.getStatus().getValue());
 
         return SeatResponse.fromSeat(seatRepository.save(seat));

@@ -96,13 +96,22 @@ public class CinemaRoomService {
             String rowName = String.valueOf((char) (startRow + i));
 
             for (int j = 1; j <= request.getSeatsPerRow(); j++) {
-                String seatType = (i >= 3) ? "VIP" : "STANDARD";
+                String seatType;
+                if (i >= 4) {
+                    seatType = "COUPLE";
+                } else if (i >= 2) {
+                    seatType = "VIP";
+                } else {
+                    seatType = "STANDARD";
+                }
+
+                Seat.Type type = Seat.Type.fromStorageValue(seatType);
 
                 Seat seat = Seat.builder()
                         .cinemaRoom(savedRoom)
                         .rowName(rowName)
                         .seatNumber(j)
-                        .type(seatType)
+                        .type(type)
                         .status(1)
                         .build();
 

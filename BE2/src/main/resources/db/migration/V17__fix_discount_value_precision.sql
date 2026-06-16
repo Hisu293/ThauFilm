@@ -1,0 +1,1 @@
+ALTER TABLE discounts ALTER COLUMN value TYPE NUMERIC(10,2);

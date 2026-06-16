@@ -4,6 +4,8 @@ import com.filmticket.dto.*;
 import com.filmticket.exception.BadRequestException;
 import com.filmticket.repository.UserRepository;
 import com.filmticket.service.BookingService;
+import com.filmticket.service.ComboService;
+import com.filmticket.service.DiscountService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
@@ -28,6 +30,8 @@ public class MemberBookingController {
 
     private final BookingService bookingService;
     private final UserRepository userRepository;
+    private final ComboService comboService;
+    private final DiscountService discountService;
 
     @Operation(summary = "Get available seats for a showtime")
     @GetMapping("/showtimes/{showtimeId}/seats")
@@ -96,6 +100,24 @@ public class MemberBookingController {
         return ResponseEntity.ok(ApiResponse.success(
                 "Tickets fetched",
                 bookingService.getBookingTickets(bookingId, userId)
+        ));
+    }
+
+    @Operation(summary = "List active combos for member")
+    @GetMapping("/combos")
+    public ResponseEntity<ApiResponse<List<ComboResponse>>> getActiveCombos() {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Active combos fetched",
+                comboService.getAllActiveCombos()
+        ));
+    }
+
+    @Operation(summary = "List active discounts for member")
+    @GetMapping("/discounts")
+    public ResponseEntity<ApiResponse<List<DiscountResponse>>> getActiveDiscounts() {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Active discounts fetched",
+                discountService.getActiveDiscounts()
         ));
     }
 

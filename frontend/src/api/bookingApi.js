@@ -30,6 +30,7 @@ export const bookingApi = {
     return axiosClient.post('/api/member/booking', {
       showtimeId,
       seatIds,
+      channel: 'ONLINE',
     });
   },
 

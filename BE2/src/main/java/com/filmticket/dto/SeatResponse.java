@@ -26,7 +26,7 @@ public class SeatResponse {
                 .cinemaRoomId(seat.getCinemaRoom().getId())
                 .rowName(seat.getRowName())
                 .seatNumber(seat.getSeatNumber())
-                .type(seat.getType())
+                .type(seat.getType().toStorageValue())
                 .status(seat.getStatus())
                 .build();
     }
