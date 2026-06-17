@@ -1,10 +1,10 @@
 CREATE TABLE bookings (
     id UUID PRIMARY KEY,
-    user_id UUID NOT NULL REFERENCES users(id),
-    showtime_id UUID NOT NULL REFERENCES showtime(id),
+    user_id UUID NOT NULL,
+    showtime_id UUID NOT NULL,
     total_amount NUMERIC(10,2) NOT NULL,
     status VARCHAR(20) NOT NULL,
-    confirmation_code VARCHAR(20) UNIQUE,
+    confirmation_code VARCHAR(20),
     hold_expires_at TIMESTAMP NOT NULL,
     created_at TIMESTAMP NOT NULL,
     confirmed_at TIMESTAMP
@@ -12,39 +12,37 @@ CREATE TABLE bookings (
 
 CREATE TABLE booking_seats (
     id UUID PRIMARY KEY,
-    booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
-    seat_id UUID NOT NULL REFERENCES seat(id),
-    price_at_booking NUMERIC(10,2) NOT NULL,
-    CONSTRAINT uq_booking_seat UNIQUE (booking_id, seat_id)
+    booking_id UUID NOT NULL,
+    seat_id UUID NOT NULL,
+    price_at_booking NUMERIC(10,2) NOT NULL
 );
 
 CREATE TABLE payments (
     id UUID PRIMARY KEY,
-    booking_id UUID NOT NULL UNIQUE REFERENCES bookings(id) ON DELETE CASCADE,
+    booking_id UUID NOT NULL,
     amount NUMERIC(10,2) NOT NULL,
     payment_method VARCHAR(50),
     status VARCHAR(20) NOT NULL,
-    transaction_id VARCHAR(100) UNIQUE,
+    transaction_id VARCHAR(100),
     created_at TIMESTAMP NOT NULL,
     paid_at TIMESTAMP
 );
 
 CREATE TABLE tickets (
     id UUID PRIMARY KEY,
-    booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
-    seat_id UUID NOT NULL REFERENCES seat(id),
-    ticket_code VARCHAR(20) NOT NULL UNIQUE,
+    booking_id UUID NOT NULL,
+    seat_id UUID NOT NULL,
+    ticket_code VARCHAR(20) NOT NULL,
     checked_in BOOLEAN NOT NULL DEFAULT FALSE,
     created_at TIMESTAMP NOT NULL
 );
 
 CREATE TABLE seat_availabilities (
     id UUID PRIMARY KEY,
-    showtime_id UUID NOT NULL REFERENCES showtime(id) ON DELETE CASCADE,
-    seat_id UUID NOT NULL REFERENCES seat(id) ON DELETE CASCADE,
+    showtime_id UUID NOT NULL,
+    seat_id UUID NOT NULL,
     available BOOLEAN NOT NULL DEFAULT TRUE,
-    price NUMERIC(10,2) NOT NULL,
-    CONSTRAINT uq_showtime_seat UNIQUE (showtime_id, seat_id)
+    price NUMERIC(10,2) NOT NULL
 );
 
 INSERT INTO seat_availabilities (id, showtime_id, seat_id, available, price)

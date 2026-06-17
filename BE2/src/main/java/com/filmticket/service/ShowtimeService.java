@@ -3,12 +3,12 @@ package com.filmticket.service;
 import com.filmticket.dto.CinemaRoomResponse;
 import com.filmticket.dto.ShowtimeResponse;
 import com.filmticket.dto.UpsertShowtimeRequest;
-import com.filmticket.entity.CinemaRoom;
-import com.filmticket.entity.Movie;
 import com.filmticket.entity.Seat;
 import com.filmticket.entity.SeatAvailability;
 import com.filmticket.entity.Showtime;
 import com.filmticket.exception.BadRequestException;
+import com.filmticket.repository.CinemaRoomRepository;
+import com.filmticket.repository.MovieRepository;
 import com.filmticket.repository.SeatAvailabilityRepository;
 import com.filmticket.repository.SeatRepository;
 import com.filmticket.repository.ShowtimeRepository;
@@ -27,9 +27,8 @@ import java.util.UUID;
 public class ShowtimeService {
 
     private final ShowtimeRepository showtimeRepository;
-    private final MovieService movieService;
-    private final CinemaRoomService cinemaRoomService;
-    private final TheaterService theaterService;
+    private final MovieRepository movieRepository;
+    private final CinemaRoomRepository cinemaRoomRepository;
     private final SeatRepository seatRepository;
     private final SeatAvailabilityRepository seatAvailabilityRepository;
     private final PricingService pricingService;
@@ -44,13 +43,15 @@ public class ShowtimeService {
     @Transactional
     public ShowtimeResponse createShowtime(@Valid UpsertShowtimeRequest request) {
         validateTimeRange(request);
-        Movie movie = movieService.getMovieEntityOrThrow(request.getMovieId());
-        CinemaRoom room = cinemaRoomService.getRoomEntityOrThrow(request.getCinemaRoomId());
+        movieRepository.findById(request.getMovieId())
+                .orElseThrow(() -> new BadRequestException("Movie not found"));
+        cinemaRoomRepository.findById(request.getCinemaRoomId())
+                .orElseThrow(() -> new BadRequestException("CinemaRoom not found"));
         validateNoOverlap(request.getCinemaRoomId(), request.getStartTime(), request.getEndTime(), null);
 
         Showtime showtime = Showtime.builder()
-                .movie(movie)
-                .cinemaRoom(room)
+                .movieId(request.getMovieId())
+                .cinemaRoomId(request.getCinemaRoomId())
                 .startTime(request.getStartTime())
                 .endTime(request.getEndTime())
                 .status(request.getStatus())
@@ -65,12 +66,14 @@ public class ShowtimeService {
     public ShowtimeResponse updateShowtime(UUID showtimeId, @Valid UpsertShowtimeRequest request) {
         validateTimeRange(request);
         Showtime showtime = getShowtimeEntityOrThrow(showtimeId);
-        Movie movie = movieService.getMovieEntityOrThrow(request.getMovieId());
-        CinemaRoom room = cinemaRoomService.getRoomEntityOrThrow(request.getCinemaRoomId());
+        movieRepository.findById(request.getMovieId())
+                .orElseThrow(() -> new BadRequestException("Movie not found"));
+        cinemaRoomRepository.findById(request.getCinemaRoomId())
+                .orElseThrow(() -> new BadRequestException("CinemaRoom not found"));
         validateNoOverlap(request.getCinemaRoomId(), request.getStartTime(), request.getEndTime(), showtimeId);
 
-        showtime.setMovie(movie);
-        showtime.setCinemaRoom(room);
+        showtime.setMovieId(request.getMovieId());
+        showtime.setCinemaRoomId(request.getCinemaRoomId());
         showtime.setStartTime(request.getStartTime());
         showtime.setEndTime(request.getEndTime());
         showtime.setStatus(request.getStatus());
@@ -93,7 +96,9 @@ public class ShowtimeService {
 
     @Transactional(readOnly = true)
     public List<ShowtimeResponse> getShowtimesByMovie(UUID movieId) {
-        movieService.getMovieEntityOrThrow(movieId);
+        if (!movieRepository.existsById(movieId)) {
+            throw new BadRequestException("Movie not found");
+        }
         return showtimeRepository.findByMovieIdOrderByStartTimeAsc(movieId).stream()
                 .map(ShowtimeResponse::fromShowtime)
                 .toList();
@@ -108,7 +113,9 @@ public class ShowtimeService {
 
     @Transactional(readOnly = true)
     public List<ShowtimeResponse> getShowtimesByMovieAndDate(UUID movieId, java.time.LocalDate date) {
-        movieService.getMovieEntityOrThrow(movieId);
+        if (!movieRepository.existsById(movieId)) {
+            throw new BadRequestException("Movie not found");
+        }
         return showtimeRepository.findByMovieIdAndDate(movieId, date).stream()
                 .map(ShowtimeResponse::fromShowtime)
                 .toList();
@@ -116,7 +123,6 @@ public class ShowtimeService {
 
     @Transactional(readOnly = true)
     public List<ShowtimeResponse> getShowtimesByTheater(UUID theaterId) {
-        theaterService.getTheaterEntityOrThrow(theaterId);
         return showtimeRepository.findByTheaterId(theaterId).stream()
                 .map(ShowtimeResponse::fromShowtime)
                 .toList();
@@ -124,8 +130,9 @@ public class ShowtimeService {
 
     @Transactional(readOnly = true)
     public List<ShowtimeResponse> getShowtimesByMovieAndTheater(UUID movieId, UUID theaterId) {
-        movieService.getMovieEntityOrThrow(movieId);
-        theaterService.getTheaterEntityOrThrow(theaterId);
+        if (!movieRepository.existsById(movieId)) {
+            throw new BadRequestException("Movie not found");
+        }
         return showtimeRepository.findByTheaterIdAndMovieId(theaterId, movieId).stream()
                 .map(ShowtimeResponse::fromShowtime)
                 .toList();
@@ -133,10 +140,14 @@ public class ShowtimeService {
 
     @Transactional(readOnly = true)
     public List<CinemaRoomResponse> getCinemasByMovie(UUID movieId) {
-        movieService.getMovieEntityOrThrow(movieId);
-        return showtimeRepository.findByMovieIdOrderByStartTimeAsc(movieId).stream()
-                .map(s -> s.getCinemaRoom())
-                .distinct()
+        if (!movieRepository.existsById(movieId)) {
+            throw new BadRequestException("Movie not found");
+        }
+        List<UUID> roomIds = showtimeRepository.findDistinctCinemaRoomIdsByMovieId(movieId);
+        return roomIds.stream()
+                .map(cinemaRoomRepository::findById)
+                .filter(java.util.Optional::isPresent)
+                .map(java.util.Optional::get)
                 .map(room -> CinemaRoomResponse.builder()
                         .id(room.getId())
                         .name(room.getName())
@@ -148,7 +159,9 @@ public class ShowtimeService {
 
     @Transactional(readOnly = true)
     public List<LocalDate> getShowDatesByMovie(UUID movieId) {
-        movieService.getMovieEntityOrThrow(movieId);
+        if (!movieRepository.existsById(movieId)) {
+            throw new BadRequestException("Movie not found");
+        }
         return showtimeRepository.findByMovieIdOrderByStartTimeAsc(movieId).stream()
                 .map(s -> s.getStartTime().toLocalDate())
                 .distinct()
@@ -157,13 +170,14 @@ public class ShowtimeService {
     }
 
     private void ensureSeatAvailabilities(Showtime showtime) {
-        List<SeatAvailability> existing = seatAvailabilityRepository.findByShowtimeIdOrderBySeatRowNameAscSeatSeatNumberAsc(showtime.getId());
+        List<SeatAvailability> existing = seatAvailabilityRepository.findByShowtimeIdOrderBySeatId(showtime.getId());
         if (existing.isEmpty()) {
-            List<Seat> seats = seatRepository.findAllByCinemaRoomIdOrderByRowNameAscSeatNumberAsc(showtime.getCinemaRoom().getId());
+            List<Seat> seats = seatRepository
+                    .findAllByCinemaRoomIdOrderByRowNameAscSeatNumberAsc(showtime.getCinemaRoomId());
             List<SeatAvailability> newAvailabilities = seats.stream()
                     .map(seat -> SeatAvailability.builder()
-                            .showtime(showtime)
-                            .seat(seat)
+                            .showtimeId(showtime.getId())
+                            .seatId(seat.getId())
                             .available(true)
                             .price(BigDecimal.ZERO)
                             .build())
@@ -183,7 +197,8 @@ public class ShowtimeService {
         }
     }
 
-    private void validateNoOverlap(UUID cinemaRoomId, java.time.LocalDateTime startTime, java.time.LocalDateTime endTime, UUID excludeId) {
+    private void validateNoOverlap(UUID cinemaRoomId, java.time.LocalDateTime startTime,
+            java.time.LocalDateTime endTime, UUID excludeId) {
         boolean hasOverlap = excludeId == null
                 ? !showtimeRepository.findByCinemaRoomIdAndStartTimeLessThanAndEndTimeGreaterThan(
                         cinemaRoomId, endTime, startTime).isEmpty()

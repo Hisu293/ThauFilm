@@ -22,7 +22,7 @@ public class TicketResponse {
     public static TicketResponse fromTicket(Ticket ticket) {
         return TicketResponse.builder()
                 .id(ticket.getId())
-                .bookingId(ticket.getBooking().getId())
+                .bookingId(ticket.getBookingId())
                 .seatId(ticket.getSeatId())
                 .ticketCode(ticket.getTicketCode())
                 .checkedIn(ticket.isCheckedIn())

@@ -7,6 +7,7 @@ import com.filmticket.dto.UpsertSeatRequest;
 import com.filmticket.entity.CinemaRoom;
 import com.filmticket.entity.Seat;
 import com.filmticket.exception.BadRequestException;
+import com.filmticket.repository.CinemaRoomRepository;
 import com.filmticket.repository.SeatRepository;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -21,11 +22,12 @@ import java.util.stream.Collectors;
 public class SeatService {
 
     private final SeatRepository seatRepository;
-    private final CinemaRoomService cinemaRoomService;
+    private final CinemaRoomRepository cinemaRoomRepository;
 
     @Transactional(readOnly = true)
     public SeatMapResponse getSeatMap(UUID roomId) {
-        CinemaRoom room = cinemaRoomService.getRoomEntityOrThrow(roomId);
+        CinemaRoom room = cinemaRoomRepository.findById(roomId)
+                .orElseThrow(() -> new BadRequestException("CinemaRoom not found"));
         List<Seat> seats = seatRepository.findAllByCinemaRoomIdOrderByRowNameAscSeatNumberAsc(roomId);
 
         Map<String, List<Seat>> seatsByRow = seats.stream()
@@ -71,11 +73,13 @@ public class SeatService {
 
     @Transactional
     public SeatResponse createSeat(@Valid UpsertSeatRequest request) {
-        CinemaRoom room = cinemaRoomService.getRoomEntityOrThrow(request.getCinemaRoomId());
+        if (!cinemaRoomRepository.existsById(request.getCinemaRoomId())) {
+            throw new BadRequestException("CinemaRoom not found");
+        }
         validateUniqueSeat(request, null);
 
         Seat seat = Seat.builder()
-                .cinemaRoom(room)
+                .cinemaRoomId(request.getCinemaRoomId())
                 .rowName(normalizeRowName(request.getRowName()))
                 .seatNumber(request.getSeatNumber())
                 .type(Seat.Type.fromStorageValue(request.getType()))
@@ -88,10 +92,12 @@ public class SeatService {
     @Transactional
     public SeatResponse updateSeat(UUID seatId, @Valid UpsertSeatRequest request) {
         Seat seat = getSeatEntityOrThrow(seatId);
-        CinemaRoom room = cinemaRoomService.getRoomEntityOrThrow(request.getCinemaRoomId());
+        if (!cinemaRoomRepository.existsById(request.getCinemaRoomId())) {
+            throw new BadRequestException("CinemaRoom not found");
+        }
         validateUniqueSeat(request, seatId);
 
-        seat.setCinemaRoom(room);
+        seat.setCinemaRoomId(request.getCinemaRoomId());
         seat.setRowName(normalizeRowName(request.getRowName()));
         seat.setSeatNumber(request.getSeatNumber());
         seat.setType(Seat.Type.fromStorageValue(request.getType()));

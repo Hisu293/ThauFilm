@@ -15,8 +15,8 @@ CREATE TABLE IF NOT EXISTS discounts (
 
 CREATE TABLE IF NOT EXISTS discount_usages (
     id UUID PRIMARY KEY,
-    discount_id UUID NOT NULL REFERENCES discounts(id) ON DELETE CASCADE,
-    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    discount_id UUID NOT NULL,
+    user_id UUID NOT NULL,
     used_at TIMESTAMP NOT NULL
 );
 
@@ -24,4 +24,5 @@ INSERT INTO discounts (id, code, name, type, value, min_purchase_amount, max_dis
 VALUES
     (gen_random_uuid(), 'WEDTHU45', 'Giảm giá thành viên ngày thứ 3/thứ 4', 'FIXED', 15000, 45000, 75000, '2026-01-01 00:00:00', '2027-12-31 23:59:59', 1000, TRUE),
     (gen_random_uuid(), 'PAYMENT20', 'Giảm 20% khi thanh toán qua ví điện tử/ngân hàng', 'PERCENTAGE', 20, 50000, 100000, '2026-01-01 00:00:00', '2027-12-31 23:59:59', 500, TRUE),
-    (gen_random_uuid(), 'COMBO10', 'Giảm 10% combo bắp nước', 'PERCENTAGE', 10, 30000, 50000, '2026-01-01 00:00:00', '2027-12-31 23:59:59', 200, TRUE);
+    (gen_random_uuid(), 'COMBO10', 'Giảm 10% combo bắp nước', 'PERCENTAGE', 10, 30000, 50000, '2026-01-01 00:00:00', '2027-12-31 23:59:59', 200, TRUE)
+ON CONFLICT (code) DO NOTHING;

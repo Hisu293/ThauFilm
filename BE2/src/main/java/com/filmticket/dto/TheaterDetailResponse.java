@@ -17,7 +17,6 @@ public class TheaterDetailResponse {
     private String city;
     private String phoneNumber;
     private Integer status;
-    private java.util.List<CinemaRoomResponse> cinemaRooms;
 
     public static TheaterDetailResponse fromTheater(Theater theater) {
         return TheaterDetailResponse.builder()
@@ -27,11 +26,6 @@ public class TheaterDetailResponse {
                 .city(theater.getCity())
                 .phoneNumber(theater.getPhoneNumber())
                 .status(theater.getStatus())
-                .cinemaRooms(theater.getCinemaRooms() != null 
-                        ? theater.getCinemaRooms().stream()
-                                .map(CinemaRoomResponse::fromCinemaRoom)
-                                .toList()
-                        : null)
                 .build();
     }
 }

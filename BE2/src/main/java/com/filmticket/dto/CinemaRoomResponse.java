@@ -24,8 +24,7 @@ public class CinemaRoomResponse {
                 .name(room.getName())
                 .capacity(room.getCapacity())
                 .status(room.getStatus())
-                .theaterId(room.getTheater() != null ? room.getTheater().getId() : null)
-                .theaterName(room.getTheater() != null ? room.getTheater().getName() : null)
+                .theaterId(room.getTheaterId())
                 .build();
     }
 }

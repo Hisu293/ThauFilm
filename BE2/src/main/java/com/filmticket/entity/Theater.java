@@ -3,7 +3,6 @@ package com.filmticket.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
-import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -32,9 +31,6 @@ public class Theater {
     private String phoneNumber;
 
     private Integer status;
-
-    @OneToMany(mappedBy = "theater", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<CinemaRoom> cinemaRooms;
 
     @PrePersist
     public void prePersist() {

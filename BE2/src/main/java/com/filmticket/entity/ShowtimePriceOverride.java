@@ -8,7 +8,10 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "showtime_price_overrides",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"showtime_id", "seat_type"}))
+    uniqueConstraints = @UniqueConstraint(columnNames = {"showtime_id", "seat_type"}),
+    indexes = {
+        @Index(name = "idx_showtime_price_showtime", columnList = "showtime_id")
+    })
 @Getter
 @Setter
 @NoArgsConstructor
@@ -20,9 +23,8 @@ public class ShowtimePriceOverride {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "showtime_id", nullable = false)
-    private Showtime showtime;
+    @Column(name = "showtime_id", nullable = false)
+    private UUID showtimeId;
 
     @Column(nullable = false, length = 30)
     private String seatType;

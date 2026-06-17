@@ -121,6 +121,17 @@ public class MemberBookingController {
         ));
     }
 
+    @Operation(summary = "Cancel my booking (release seats if in HOLD status)")
+    @PostMapping("/{bookingId}/cancel")
+    public ResponseEntity<ApiResponse<BookingResponse>> cancelBooking(@PathVariable UUID bookingId) {
+        UUID userId = getCurrentUserId();
+        bookingService.cancelBooking(bookingId, userId);
+        return ResponseEntity.ok(ApiResponse.success(
+                "Booking cancelled successfully",
+                bookingService.getBookingDetail(bookingId, userId)
+        ));
+    }
+
     private UUID getCurrentUserId() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         UserDetails ud = (UserDetails) auth.getPrincipal();

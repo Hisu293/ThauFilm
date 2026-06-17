@@ -26,16 +26,7 @@ public class BookingPaymentResponse {
     public static BookingPaymentResponse fromPaymentResult(Booking booking, Payment payment, List<TicketResponse> tickets,
                                                            BigDecimal originalAmount, BigDecimal discountAmount, String discountCode) {
         return BookingPaymentResponse.builder()
-                .booking(BookingResponse.fromBooking(booking, booking.getBookingSeats().stream()
-                        .map(bs -> ShowtimeSeatResponse.builder()
-                                .seatId(bs.getSeat().getId())
-                                .rowName(bs.getSeat().getRowName())
-                                .seatNumber(bs.getSeat().getSeatNumber())
-                                .type(bs.getSeat().getType().toDisplayValue())
-                                .available(false)
-                                .price(bs.getPriceAtBooking())
-                                .build())
-                        .toList()))
+                .booking(BookingResponse.fromBooking(booking, List.of()))
                 .payment(PaymentResponse.fromPayment(payment))
                 .tickets(tickets)
                 .originalAmount(originalAmount)

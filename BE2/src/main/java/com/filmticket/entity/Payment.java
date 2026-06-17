@@ -7,7 +7,11 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 @Entity
-@Table(name = "payments")
+@Table(name = "payments", indexes = {
+    @Index(name = "idx_payment_booking", columnList = "booking_id"),
+    @Index(name = "idx_payment_status", columnList = "status"),
+    @Index(name = "idx_payment_transaction", columnList = "transaction_id")
+})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -19,9 +23,8 @@ public class Payment {
     @Column(nullable = false, updatable = false)
     private UUID id;
 
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "booking_id", nullable = false, unique = true)
-    private Booking booking;
+    @Column(name = "booking_id", nullable = false)
+    private UUID bookingId;
 
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal amount;

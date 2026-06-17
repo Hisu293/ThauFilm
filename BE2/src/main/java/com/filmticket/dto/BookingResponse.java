@@ -32,11 +32,8 @@ public class BookingResponse {
     public static BookingResponse fromBooking(Booking booking, List<ShowtimeSeatResponse> seats) {
         return BookingResponse.builder()
                 .id(booking.getId())
-                .userId(booking.getUser().getId())
-                .showtimeId(booking.getShowtime().getId())
-                .movieTitle(booking.getShowtime().getMovie().getTitle())
-                .cinemaRoomName(booking.getShowtime().getCinemaRoom().getName())
-                .startTime(booking.getShowtime().getStartTime())
+                .userId(booking.getUserId())
+                .showtimeId(booking.getShowtimeId())
                 .totalAmount(booking.getTotalAmount())
                 .status(booking.getStatus().name())
                 .confirmationCode(booking.getConfirmationCode())

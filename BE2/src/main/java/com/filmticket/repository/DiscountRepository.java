@@ -10,4 +10,5 @@ import java.util.UUID;
 @Repository
 public interface DiscountRepository extends JpaRepository<Discount, UUID> {
     Optional<Discount> findByCodeAndActiveTrue(String code);
+    Optional<Discount> findByCode(String code);
 }

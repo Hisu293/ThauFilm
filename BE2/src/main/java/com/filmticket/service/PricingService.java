@@ -1,11 +1,11 @@
 package com.filmticket.service;
 
+import com.filmticket.entity.Seat;
 import com.filmticket.entity.SeatAvailability;
 import com.filmticket.entity.SeatTypePriceConfig;
-import com.filmticket.entity.ShowtimePriceOverride;
 import com.filmticket.exception.BadRequestException;
+import com.filmticket.repository.SeatRepository;
 import com.filmticket.repository.SeatTypePriceConfigRepository;
-import com.filmticket.repository.ShowtimePriceOverrideRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -20,7 +21,7 @@ import java.util.stream.Collectors;
 public class PricingService {
 
     private final SeatTypePriceConfigRepository seatTypePriceConfigRepository;
-    private final ShowtimePriceOverrideRepository showtimePriceOverrideRepository;
+    private final SeatRepository seatRepository;
 
     @Transactional
     public void applyDefaultPricing(List<SeatAvailability> availabilities) {
@@ -32,12 +33,25 @@ public class PricingService {
                 .collect(Collectors.toMap(SeatTypePriceConfig::getSeatType, SeatTypePriceConfig::getPrice));
 
         for (SeatAvailability availability : availabilities) {
-            String seatType = availability.getSeat().getType().toStorageValue();
+            Seat seat = seatRepository.findById(availability.getSeatId()).orElse(null);
+            if (seat == null) {
+                throw new BadRequestException("Seat not found: " + availability.getSeatId());
+            }
+            String seatType = seat.getType().toStorageValue();
             BigDecimal configPrice = configMap.get(seatType);
             if (configPrice == null) {
                 throw new BadRequestException("Missing price config for seat type: " + seatType);
             }
             availability.setPrice(configPrice);
         }
+    }
+
+    public BigDecimal getPriceForSeatType(UUID showtimeId, String seatType) {
+        List<SeatTypePriceConfig> configs = seatTypePriceConfigRepository.findByActiveTrue();
+        return configs.stream()
+                .filter(c -> c.getSeatType().equals(seatType))
+                .findFirst()
+                .map(SeatTypePriceConfig::getPrice)
+                .orElse(BigDecimal.ZERO);
     }
 }

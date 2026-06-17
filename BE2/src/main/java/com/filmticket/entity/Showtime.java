@@ -4,29 +4,33 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.UUID;
 
 @Entity
-@Table(name = "showtime")
+@Table(name = "showtime",
+    uniqueConstraints = @UniqueConstraint(columnNames = {"cinema_room_id", "start_time"}),
+    indexes = {
+        @Index(name = "idx_showtime_movie", columnList = "movie_id"),
+        @Index(name = "idx_showtime_cinema_room", columnList = "cinema_room_id"),
+        @Index(name = "idx_showtime_start_time", columnList = "start_time"),
+        @Index(name = "idx_showtime_status", columnList = "status")
+    })
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class Showtime {
+
     @Id
     @Column(nullable = false, updatable = false)
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "movie_id", nullable = false)
-    private Movie movie;
+    @Column(name = "movie_id", nullable = false)
+    private UUID movieId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "cinema_room_id", nullable = false)
-    private CinemaRoom cinemaRoom;
+    @Column(name = "cinema_room_id", nullable = false)
+    private UUID cinemaRoomId;
 
     @Column(name = "start_time", nullable = false)
     private LocalDateTime startTime;
@@ -36,10 +40,6 @@ public class Showtime {
 
     @Column(nullable = false)
     private Integer status;
-
-    @OneToMany(mappedBy = "showtime", cascade = CascadeType.ALL, orphanRemoval = true)
-    @Builder.Default
-    private List<SeatAvailability> seatAvailabilities = new ArrayList<>();
 
     @PrePersist
     public void prePersist() {

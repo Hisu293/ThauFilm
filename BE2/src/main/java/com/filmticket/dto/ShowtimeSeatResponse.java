@@ -23,10 +23,7 @@ public class ShowtimeSeatResponse {
 
     public static ShowtimeSeatResponse fromSeatAvailability(SeatAvailability availability) {
         return ShowtimeSeatResponse.builder()
-                .seatId(availability.getSeat().getId())
-                .rowName(availability.getSeat().getRowName())
-                .seatNumber(availability.getSeat().getSeatNumber())
-                .type(availability.getSeat().getType().toStorageValue())
+                .seatId(availability.getSeatId())
                 .available(availability.isAvailable())
                 .price(availability.getPrice())
                 .build();
