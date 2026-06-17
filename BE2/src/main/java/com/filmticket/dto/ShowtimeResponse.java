@@ -1,6 +1,7 @@
 package com.filmticket.dto;
 
 import com.filmticket.entity.Showtime;
+import com.filmticket.model.ShowtimeStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -23,7 +24,7 @@ public class ShowtimeResponse {
     private String theaterName;
     private LocalDateTime startTime;
     private LocalDateTime endTime;
-    private Integer status;
+    private ShowtimeStatus status;
 
     public static ShowtimeResponse fromShowtime(Showtime showtime) {
         return ShowtimeResponse.builder()

@@ -3,6 +3,7 @@ package com.filmticket.scheduler;
 import com.filmticket.entity.Booking;
 import com.filmticket.entity.BookingStatus;
 import com.filmticket.entity.BookingSeat;
+import com.filmticket.model.SeatBookingStatus;
 import com.filmticket.repository.BookingRepository;
 import com.filmticket.repository.BookingSeatRepository;
 import com.filmticket.repository.SeatAvailabilityRepository;
@@ -60,7 +61,7 @@ public class BookingExpiredScheduler {
             seatAvailabilityRepository
                     .findByShowtimeIdAndSeatId(booking.getShowtimeId(), bs.getSeatId())
                     .ifPresent(av -> {
-                        av.setAvailable(true);
+                        av.setStatus(SeatBookingStatus.AVAILABLE);
                         seatAvailabilityRepository.save(av);
                     });
         }

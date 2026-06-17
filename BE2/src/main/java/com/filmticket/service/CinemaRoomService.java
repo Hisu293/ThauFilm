@@ -7,6 +7,8 @@ import com.filmticket.dto.SeatResponse;
 import com.filmticket.entity.CinemaRoom;
 import com.filmticket.entity.Seat;
 import com.filmticket.exception.BadRequestException;
+import com.filmticket.model.RoomStatus;
+import com.filmticket.model.RoomType;
 import com.filmticket.repository.CinemaRoomRepository;
 import com.filmticket.repository.SeatRepository;
 import com.filmticket.repository.TheaterRepository;
@@ -31,6 +33,7 @@ public class CinemaRoomService {
         return CinemaRoomResponse.builder()
                 .id(room.getId())
                 .name(room.getName())
+                .type(room.getType())
                 .capacity(room.getCapacity())
                 .status(room.getStatus())
                 .theaterId(room.getTheaterId())
@@ -39,7 +42,7 @@ public class CinemaRoomService {
 
     @Transactional(readOnly = true)
     public List<CinemaRoomResponse> getAllActiveRooms() {
-        return cinemaRoomRepository.findByStatus(1).stream()
+        return cinemaRoomRepository.findByStatus(RoomStatus.ACTIVE).stream()
                 .map(this::convertToResponse)
                 .collect(Collectors.toList());
     }
@@ -80,8 +83,9 @@ public class CinemaRoomService {
 
         CinemaRoom room = CinemaRoom.builder()
                 .name(request.getName())
+                .type(request.getType())
                 .capacity(totalCapacity)
-                .status(1)
+                .status(RoomStatus.ACTIVE)
                 .theaterId(request.getTheaterId())
                 .build();
 
@@ -110,7 +114,7 @@ public class CinemaRoomService {
                         .rowName(rowName)
                         .seatNumber(j)
                         .type(type)
-                        .status(1)
+                        .status(Seat.Status.ACTIVE)
                         .build();
 
                 seats.add(seat);
@@ -128,7 +132,7 @@ public class CinemaRoomService {
 
         room.setName(request.getName());
         if (request.getStatus() != null) {
-            room.setStatus(request.getStatus().getValue());
+            room.setStatus(request.getStatus());
         }
 
         CinemaRoom saved = cinemaRoomRepository.save(room);
@@ -138,7 +142,7 @@ public class CinemaRoomService {
     @Transactional
     public void deleteRoom(UUID roomId) {
         CinemaRoom room = getRoomEntityOrThrow(roomId);
-        room.setStatus(0);
+        room.setStatus(RoomStatus.INACTIVE);
         cinemaRoomRepository.save(room);
     }
 }

@@ -1,23 +1,29 @@
 package com.filmticket.dto;
 
 import com.filmticket.entity.Seat;
-import com.filmticket.model.SeatStatus;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
-@Getter
-@Setter
+@Data
+@Builder
 @NoArgsConstructor
 @AllArgsConstructor
-@Builder
 public class UpdateSeatRequest {
-    @NotNull(message = "Seat type is required")
+    @NotBlank(message = "Seat type is required")
     private String type;
 
-    @NotNull(message = "Seat status is required")
-    private SeatStatus status;
+    @NotBlank(message = "Seat status is required")
+    private String status;
 
     public Seat.Type toSeatType() {
         return Seat.Type.fromStorageValue(type);
+    }
+
+    public Seat.Status toSeatStatus() {
+        return Seat.Status.fromStorageValue(status);
     }
 }

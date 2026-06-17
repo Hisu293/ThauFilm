@@ -9,6 +9,8 @@ import com.filmticket.dto.CinemaRoomResponse;
 import com.filmticket.entity.CinemaRoom;
 import com.filmticket.entity.Theater;
 import com.filmticket.exception.BadRequestException;
+import com.filmticket.model.RoomStatus;
+import com.filmticket.model.TheaterStatus;
 import com.filmticket.repository.CinemaRoomRepository;
 import com.filmticket.repository.ShowtimeRepository;
 import com.filmticket.repository.TheaterRepository;
@@ -30,7 +32,7 @@ public class TheaterService {
 
     @Transactional(readOnly = true)
     public List<TheaterResponse> getAllActiveTheaters() {
-        return theaterRepository.findByStatus(1).stream()
+        return theaterRepository.findByStatus(TheaterStatus.ACTIVE).stream()
                 .map(this::toResponse)
                 .collect(Collectors.toList());
     }
@@ -66,7 +68,7 @@ public class TheaterService {
             throw new BadRequestException("Theater not found");
         }
         return cinemaRoomRepository.findByTheaterId(theaterId).stream()
-                .filter(room -> room.getStatus() == 1)
+                .filter(room -> room.getStatus() == RoomStatus.ACTIVE)
                 .map(this::toCinemaRoomResponse)
                 .collect(Collectors.toList());
     }
@@ -84,7 +86,7 @@ public class TheaterService {
                 .address(request.getAddress())
                 .city(request.getCity())
                 .phoneNumber(request.getPhoneNumber())
-                .status(request.getStatus() != null ? request.getStatus() : 1)
+                .status(request.getStatus() != null ? request.getStatus() : TheaterStatus.ACTIVE)
                 .build();
 
         Theater saved = theaterRepository.save(theater);
@@ -109,7 +111,7 @@ public class TheaterService {
     @Transactional
     public void deleteTheater(UUID theaterId) {
         Theater theater = getTheaterEntityOrThrow(theaterId);
-        theater.setStatus(0);
+        theater.setStatus(TheaterStatus.INACTIVE);
         theaterRepository.save(theater);
     }
 
@@ -145,9 +147,9 @@ public class TheaterService {
 
     private TheaterWithRoomsResponse toWithRoomsResponse(Theater theater) {
         List<CinemaRoomResponse> rooms = cinemaRoomRepository.findByTheaterId(theater.getId()).stream()
-                .filter(room -> room.getStatus() == 1)
+                .filter(room -> room.getStatus() == RoomStatus.ACTIVE)
                 .map(this::toCinemaRoomResponse)
-                .collect(Collectors.toList());
+                .toList();
 
         return TheaterWithRoomsResponse.builder()
                 .id(theater.getId())

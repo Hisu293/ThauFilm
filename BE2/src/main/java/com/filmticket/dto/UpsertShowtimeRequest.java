@@ -1,5 +1,6 @@
 package com.filmticket.dto;
 
+import com.filmticket.model.ShowtimeStatus;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -27,5 +28,5 @@ public class UpsertShowtimeRequest {
     private LocalDateTime endTime;
 
     @NotNull(message = "Status is required")
-    private Integer status;
+    private ShowtimeStatus status;
 }

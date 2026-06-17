@@ -1,13 +1,13 @@
 package com.filmticket.model;
 
-public enum RoomStatus {
+public enum TheaterStatus {
     ACTIVE("ACTIVE"),
     INACTIVE("INACTIVE"),
     MAINTENANCE("MAINTENANCE");
 
     private final String value;
 
-    RoomStatus(String value) {
+    TheaterStatus(String value) {
         this.value = value;
     }
 
@@ -15,11 +15,11 @@ public enum RoomStatus {
         return value;
     }
 
-    public static RoomStatus fromValue(String value) {
+    public static TheaterStatus fromValue(String value) {
         if (value == null) {
             return ACTIVE;
         }
-        for (RoomStatus status : values()) {
+        for (TheaterStatus status : values()) {
             if (status.value.equalsIgnoreCase(value)) {
                 return status;
             }

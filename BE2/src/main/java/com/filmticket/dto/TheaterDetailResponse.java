@@ -1,6 +1,7 @@
 package com.filmticket.dto;
 
 import com.filmticket.entity.Theater;
+import com.filmticket.model.TheaterStatus;
 import lombok.*;
 
 import java.util.UUID;
@@ -16,7 +17,7 @@ public class TheaterDetailResponse {
     private String address;
     private String city;
     private String phoneNumber;
-    private Integer status;
+    private TheaterStatus status;
 
     public static TheaterDetailResponse fromTheater(Theater theater) {
         return TheaterDetailResponse.builder()

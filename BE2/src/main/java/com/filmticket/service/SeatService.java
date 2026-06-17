@@ -48,7 +48,7 @@ public class SeatService {
                     .map(Seat::getType)
                     .orElse(Seat.Type.STANDARD);
             int availableCount = (int) rowSeats.stream()
-                    .filter(s -> s.getStatus() != null && s.getStatus() == 1)
+                    .filter(s -> s.getStatus() != null && s.getStatus() == Seat.Status.ACTIVE)
                     .count();
 
             rowInfoMap.put(entry.getKey(), SeatMapResponse.RowInfo.builder()
@@ -82,8 +82,8 @@ public class SeatService {
                 .cinemaRoomId(request.getCinemaRoomId())
                 .rowName(normalizeRowName(request.getRowName()))
                 .seatNumber(request.getSeatNumber())
-                .type(Seat.Type.fromStorageValue(request.getType()))
-                .status(request.getStatus())
+                .type(request.toSeatType())
+                .status(request.toSeatStatus())
                 .build();
 
         return SeatResponse.fromSeat(seatRepository.save(seat));
@@ -100,8 +100,8 @@ public class SeatService {
         seat.setCinemaRoomId(request.getCinemaRoomId());
         seat.setRowName(normalizeRowName(request.getRowName()));
         seat.setSeatNumber(request.getSeatNumber());
-        seat.setType(Seat.Type.fromStorageValue(request.getType()));
-        seat.setStatus(request.getStatus());
+        seat.setType(request.toSeatType());
+        seat.setStatus(request.toSeatStatus());
 
         return SeatResponse.fromSeat(seatRepository.save(seat));
     }
@@ -110,8 +110,8 @@ public class SeatService {
     public SeatResponse updateSeatTypeStatus(UUID seatId, UpdateSeatRequest request) {
         Seat seat = getSeatEntityOrThrow(seatId);
 
-        seat.setType(Seat.Type.fromStorageValue(request.getType()));
-        seat.setStatus(request.getStatus().getValue());
+        seat.setType(request.toSeatType());
+        seat.setStatus(request.toSeatStatus());
 
         return SeatResponse.fromSeat(seatRepository.save(seat));
     }

@@ -7,6 +7,7 @@ import com.filmticket.entity.Seat;
 import com.filmticket.entity.SeatAvailability;
 import com.filmticket.entity.Showtime;
 import com.filmticket.exception.BadRequestException;
+import com.filmticket.model.SeatBookingStatus;
 import com.filmticket.repository.CinemaRoomRepository;
 import com.filmticket.repository.MovieRepository;
 import com.filmticket.repository.SeatAvailabilityRepository;
@@ -178,7 +179,7 @@ public class ShowtimeService {
                     .map(seat -> SeatAvailability.builder()
                             .showtimeId(showtime.getId())
                             .seatId(seat.getId())
-                            .available(true)
+                            .status(SeatBookingStatus.AVAILABLE)
                             .price(BigDecimal.ZERO)
                             .build())
                     .toList();

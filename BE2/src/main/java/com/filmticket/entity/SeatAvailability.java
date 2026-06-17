@@ -1,5 +1,6 @@
 package com.filmticket.entity;
 
+import com.filmticket.model.SeatBookingStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -31,9 +32,10 @@ public class SeatAvailability {
     @Column(name = "seat_id", nullable = false)
     private UUID seatId;
 
-    @Column(nullable = false)
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
     @Builder.Default
-    private boolean available = true;
+    private SeatBookingStatus status = SeatBookingStatus.AVAILABLE;
 
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal price;

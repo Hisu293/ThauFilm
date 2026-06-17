@@ -1,5 +1,6 @@
 package com.filmticket.dto;
 
+import com.filmticket.entity.Seat;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -29,5 +30,13 @@ public class UpsertSeatRequest {
     private String type;
 
     @NotNull(message = "Seat status is required")
-    private Integer status;
+    private String status;
+
+    public Seat.Type toSeatType() {
+        return Seat.Type.fromStorageValue(type);
+    }
+
+    public Seat.Status toSeatStatus() {
+        return Seat.Status.fromStorageValue(status);
+    }
 }

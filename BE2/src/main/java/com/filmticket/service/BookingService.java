@@ -3,6 +3,7 @@ package com.filmticket.service;
 import com.filmticket.dto.*;
 import com.filmticket.entity.*;
 import com.filmticket.exception.BadRequestException;
+import com.filmticket.model.SeatBookingStatus;
 import com.filmticket.repository.*;
 import com.filmticket.util.TicketPdfGenerator;
 import lombok.RequiredArgsConstructor;
@@ -76,7 +77,7 @@ public class BookingService {
                     .findByShowtimeIdAndSeatId(request.getShowtimeId(), seatId)
                     .orElseThrow(() -> new BadRequestException("Seat not found in this showtime: " + seatId));
 
-            if (!av.isAvailable()) {
+            if (av.getStatus() != SeatBookingStatus.AVAILABLE) {
                 Seat seat = seatRepository.findById(seatId).orElse(null);
                 String seatInfo = seat != null ? seat.getRowName() + seat.getSeatNumber() : seatId.toString();
                 throw new BadRequestException("Seat is already taken: " + seatInfo);
@@ -104,7 +105,7 @@ public class BookingService {
         }
 
         for (SeatAvailability av : availabilities) {
-            av.setAvailable(false);
+            av.setStatus(SeatBookingStatus.HOLDING);
         }
         seatAvailabilityRepository.saveAll(availabilities);
 
@@ -283,7 +284,7 @@ public class BookingService {
                     .findByShowtimeIdAndSeatId(booking.getShowtimeId(), bs.getSeatId())
                     .orElse(null);
             if (av != null) {
-                av.setAvailable(true);
+                av.setStatus(SeatBookingStatus.AVAILABLE);
                 seatAvailabilityRepository.save(av);
             }
         }
@@ -371,7 +372,7 @@ public class BookingService {
                     .rowName(seat.getRowName())
                     .seatNumber(seat.getSeatNumber())
                     .type(seat.getType().toStorageValue())
-                    .available(false)
+                    .status(SeatBookingStatus.SOLD)
                     .price(BigDecimal.ZERO)
                     .build());
         }
@@ -390,7 +391,7 @@ public class BookingService {
                         .rowName(seat.getRowName())
                         .seatNumber(seat.getSeatNumber())
                         .type(seat.getType().toStorageValue())
-                        .available(false)
+                        .status(SeatBookingStatus.SOLD)
                         .price(bs.getPriceAtBooking())
                         .build());
             }

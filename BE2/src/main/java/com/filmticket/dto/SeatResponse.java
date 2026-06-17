@@ -18,7 +18,7 @@ public class SeatResponse {
     private String rowName;
     private Integer seatNumber;
     private String type;
-    private Integer status;
+    private String status;
 
     public static SeatResponse fromSeat(Seat seat) {
         return SeatResponse.builder()
@@ -27,7 +27,7 @@ public class SeatResponse {
                 .rowName(seat.getRowName())
                 .seatNumber(seat.getSeatNumber())
                 .type(seat.getType().toStorageValue())
-                .status(seat.getStatus())
+                .status(seat.getStatus().toStorageValue())
                 .build();
     }
 }

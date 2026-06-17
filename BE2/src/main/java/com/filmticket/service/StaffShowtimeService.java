@@ -6,6 +6,8 @@ import com.filmticket.dto.ShowtimeSeatResponse;
 import com.filmticket.entity.Showtime;
 import com.filmticket.entity.SeatAvailability;
 import com.filmticket.exception.BadRequestException;
+import com.filmticket.model.SeatBookingStatus;
+import com.filmticket.model.ShowtimeStatus;
 import com.filmticket.repository.SeatAvailabilityRepository;
 import com.filmticket.repository.ShowtimeRepository;
 import lombok.RequiredArgsConstructor;
@@ -40,7 +42,7 @@ public class StaffShowtimeService {
     public void cancelShowtime(UUID showtimeId) {
         Showtime showtime = showtimeRepository.findById(showtimeId)
                 .orElseThrow(() -> new BadRequestException("Showtime not found"));
-        showtime.setStatus(0);
+        showtime.setStatus(ShowtimeStatus.CANCELLED);
         showtimeRepository.save(showtime);
     }
 
@@ -50,7 +52,7 @@ public class StaffShowtimeService {
         List<ShowtimeSeatResponse> seats = availabilities.stream()
                 .map(ShowtimeSeatResponse::fromSeatAvailability)
                 .toList();
-        long sold = availabilities.stream().filter(av -> !av.isAvailable()).count();
+        long sold = availabilities.stream().filter(av -> av.getStatus() != SeatBookingStatus.AVAILABLE).count();
         Map<String, Object> result = new java.util.HashMap<>();
         result.put("showtimeId", showtimeId);
         result.put("totalSeats", availabilities.size());

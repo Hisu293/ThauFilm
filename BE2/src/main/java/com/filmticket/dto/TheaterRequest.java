@@ -1,5 +1,6 @@
 package com.filmticket.dto;
 
+import com.filmticket.model.TheaterStatus;
 import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 
@@ -18,5 +19,5 @@ public class TheaterRequest {
 
     private String phoneNumber;
 
-    private Integer status;
+    private TheaterStatus status;
 }

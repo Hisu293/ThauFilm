@@ -49,6 +49,33 @@ public class Seat {
         }
     }
 
+    public enum Status {
+        ACTIVE, INACTIVE;
+
+        public static Status fromStorageValue(String value) {
+            if (value == null) return ACTIVE;
+            String normalized = value.trim().toUpperCase();
+            return switch (normalized) {
+                case "INACTIVE" -> INACTIVE;
+                default -> ACTIVE;
+            };
+        }
+
+        public String toStorageValue() {
+            return switch (this) {
+                case ACTIVE -> "ACTIVE";
+                case INACTIVE -> "INACTIVE";
+            };
+        }
+
+        public String toDisplayValue() {
+            return switch (this) {
+                case ACTIVE -> "Đang hoạt động";
+                case INACTIVE -> "Đã tắt";
+            };
+        }
+    }
+
     @Id
     @Column(nullable = false, updatable = false)
     private UUID id;
@@ -67,9 +94,10 @@ public class Seat {
     @Builder.Default
     private Type type = Type.STANDARD;
 
-    @Column(nullable = false)
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
     @Builder.Default
-    private Integer status = 1;
+    private Status status = Status.ACTIVE;
 
     @PrePersist
     public void prePersist() {

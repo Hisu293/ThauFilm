@@ -1,5 +1,6 @@
 package com.filmticket.entity;
 
+import com.filmticket.model.TheaterStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -30,7 +31,10 @@ public class Theater {
     @Column(name = "phone_number", length = 20)
     private String phoneNumber;
 
-    private Integer status;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private TheaterStatus status = TheaterStatus.ACTIVE;
 
     @PrePersist
     public void prePersist() {

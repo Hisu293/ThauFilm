@@ -1,5 +1,7 @@
 package com.filmticket.entity;
 
+import com.filmticket.model.RoomStatus;
+import com.filmticket.model.RoomType;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -25,9 +27,17 @@ public class CinemaRoom {
     @Column(nullable = false)
     private String name;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private RoomType type = RoomType.STANDARD;
+
     private Integer capacity;
 
-    private Integer status;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private RoomStatus status = RoomStatus.ACTIVE;
 
     @Column(name = "theater_id")
     private UUID theaterId;

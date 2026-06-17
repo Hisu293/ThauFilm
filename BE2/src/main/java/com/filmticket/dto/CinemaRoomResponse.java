@@ -1,6 +1,8 @@
 package com.filmticket.dto;
 
 import com.filmticket.entity.CinemaRoom;
+import com.filmticket.model.RoomStatus;
+import com.filmticket.model.RoomType;
 import lombok.*;
 
 import java.util.UUID;
@@ -13,8 +15,9 @@ import java.util.UUID;
 public class CinemaRoomResponse {
     private UUID id;
     private String name;
+    private RoomType type;
     private Integer capacity;
-    private Integer status;
+    private RoomStatus status;
     private UUID theaterId;
     private String theaterName;
 
@@ -22,6 +25,7 @@ public class CinemaRoomResponse {
         return CinemaRoomResponse.builder()
                 .id(room.getId())
                 .name(room.getName())
+                .type(room.getType())
                 .capacity(room.getCapacity())
                 .status(room.getStatus())
                 .theaterId(room.getTheaterId())

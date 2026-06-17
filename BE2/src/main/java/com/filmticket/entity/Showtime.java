@@ -1,5 +1,6 @@
 package com.filmticket.entity;
 
+import com.filmticket.model.ShowtimeStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -38,8 +39,10 @@ public class Showtime {
     @Column(name = "end_time", nullable = false)
     private LocalDateTime endTime;
 
-    @Column(nullable = false)
-    private Integer status;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private ShowtimeStatus status = ShowtimeStatus.SCHEDULED;
 
     @PrePersist
     public void prePersist() {
