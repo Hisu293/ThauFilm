@@ -1,20 +1,23 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Box, Button, Container, Stack, Typography } from '@mui/material';
-import MovieCard from '../components/MovieCard';
-import '../components/MovieCard.css';
+import { Box, Button, Container, Stack, Tab, Tabs, Typography } from '@mui/material';
 import FilterPanel from '../components/FilterPanel';
 import HeroSlider from '../components/home/HeroSlider';
 import QuickBooking from '../components/home/QuickBooking';
+import MovieGrid from '../components/MovieGrid';
 import { fetchMovies, selectFeatured } from '../services/movieService';
+import { t } from '../i18n/labels';
 
 const ALL_GENRES = 'Tất cả thể loại';
 const ALL_LOCATIONS = 'Tất cả khu vực';
 const locations = [ALL_LOCATIONS, 'TP. Hồ Chí Minh', 'Hà Nội', 'Đà Nẵng', 'Cần Thơ', 'Hải Phòng'];
+const MOVIES_PER_PAGE = 8;
 
 const HomePage = () => {
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState(ALL_GENRES);
   const [location, setLocation] = useState(ALL_LOCATIONS);
+  const [movieTab, setMovieTab] = useState('nowShowing');
+  const [visibleMovies, setVisibleMovies] = useState(MOVIES_PER_PAGE);
 
   const [apiMovies, setApiMovies] = useState([]);
   const [apiLoading, setApiLoading] = useState(true);
@@ -57,6 +60,22 @@ const HomePage = () => {
 
   const nowShowing = filteredMovies.filter((movie) => movie.isNowShowing);
   const comingSoon = filteredMovies.filter((movie) => movie.isComingSoon);
+  const activeMovies = movieTab === 'nowShowing' ? nowShowing : comingSoon;
+  const visibleMovieList = activeMovies.slice(0, visibleMovies);
+  const hasMoreMovies = visibleMovies < activeMovies.length;
+
+  useEffect(() => {
+    setVisibleMovies(MOVIES_PER_PAGE);
+  }, [query, category, location]);
+
+  const handleMovieTabChange = (_event, value) => {
+    setMovieTab(value);
+    setVisibleMovies(MOVIES_PER_PAGE);
+  };
+
+  const handleLoadMore = () => {
+    setVisibleMovies((count) => Math.min(count + MOVIES_PER_PAGE, activeMovies.length));
+  };
 
   return (
     <>
@@ -75,45 +94,92 @@ const HomePage = () => {
           locations={locations}
         />
 
-        <Box sx={{ mb: 6 }}>
-          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 3.5 }}>
-            <Typography variant="h4" sx={{ fontWeight: 800, color: '#fff' }}>
-              Đang chiếu
+        <Box
+          component="section"
+          sx={{
+            maxWidth: 1240,
+            mx: 'auto',
+            mb: 4,
+            pt: { xs: 1, md: 2 },
+          }}
+        >
+          <Stack spacing={2.5} alignItems="center" sx={{ mb: { xs: 3, md: 4 } }}>
+            <Typography
+              variant="h4"
+              sx={{
+                color: '#fff',
+                fontWeight: 900,
+                textAlign: 'center',
+                letterSpacing: 0,
+                fontSize: { xs: '1.65rem', md: '2.2rem' },
+              }}
+            >
+              {t('movies', 'title')}
             </Typography>
-            <Button variant="text" color="primary" sx={{ textTransform: 'none', fontWeight: 700 }}>
-              Xem tất cả →
-            </Button>
+
+            <Tabs
+              value={movieTab}
+              onChange={handleMovieTabChange}
+              centered
+              aria-label="Movie status tabs"
+              sx={{
+                minHeight: 46,
+                '& .MuiTabs-indicator': {
+                  height: 3,
+                  borderRadius: 99,
+                  backgroundColor: '#e50914',
+                },
+                '& .MuiTab-root': {
+                  minHeight: 46,
+                  px: { xs: 1.5, sm: 3 },
+                  color: 'rgba(255,255,255,0.58)',
+                  fontWeight: 900,
+                  fontSize: { xs: '0.86rem', sm: '0.98rem' },
+                  textTransform: 'uppercase',
+                  letterSpacing: 0,
+                },
+                '& .Mui-selected': {
+                  color: '#fff',
+                },
+              }}
+            >
+              <Tab value="nowShowing" label={t('movies', 'nowShowing')} />
+              <Tab value="comingSoon" label={t('movies', 'comingSoon')} />
+            </Tabs>
           </Stack>
-          <Box className="movie-grid">
-            {nowShowing.map((movie) => (
-              <MovieCard key={movie.id} movie={movie} variant="nowShowing" />
-            ))}
-          </Box>
-          {!apiLoading && nowShowing.length === 0 && (
+
+          <MovieGrid movies={visibleMovieList} variant={movieTab} />
+
+          {!apiLoading && activeMovies.length === 0 && (
             <Typography variant="body1" color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
-              Không tìm thấy phim phù hợp.
+              {movieTab === 'nowShowing' ? t('movies', 'noMatches') : t('movies', 'noComingSoon')}
             </Typography>
           )}
-        </Box>
 
-        <Box sx={{ mb: 4 }}>
-          <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 3.5 }}>
-            <Typography variant="h4" sx={{ fontWeight: 800, color: '#fff' }}>
-              Sắp chiếu
-            </Typography>
-            <Button variant="text" color="primary" sx={{ textTransform: 'none', fontWeight: 700 }}>
-              Xem tất cả →
-            </Button>
-          </Stack>
-          <Box className="movie-grid">
-            {comingSoon.map((movie) => (
-              <MovieCard key={movie.id} movie={movie} variant="comingSoon" />
-            ))}
-          </Box>
-          {!apiLoading && comingSoon.length === 0 && (
-            <Typography variant="body1" color="text.secondary" sx={{ textAlign: 'center', py: 4 }}>
-              Không có phim sắp chiếu.
-            </Typography>
+          {activeMovies.length > 0 && (
+            <Stack alignItems="center" sx={{ mt: { xs: 4, md: 5 } }}>
+              <Button
+                variant="outlined"
+                onClick={handleLoadMore}
+                disabled={!hasMoreMovies}
+                sx={{
+                  minWidth: 148,
+                  borderRadius: 999,
+                  px: 3,
+                  py: 1.1,
+                  color: '#fff',
+                  borderColor: hasMoreMovies ? 'rgba(255,255,255,0.42)' : 'rgba(255,255,255,0.16)',
+                  textTransform: 'none',
+                  fontWeight: 800,
+                  '&:hover': {
+                    borderColor: '#e50914',
+                    backgroundColor: 'rgba(229,9,20,0.12)',
+                  },
+                }}
+              >
+                {t('common', 'loadMore')}
+              </Button>
+            </Stack>
           )}
         </Box>
       </Container>

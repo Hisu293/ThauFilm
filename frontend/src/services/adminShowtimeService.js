@@ -24,27 +24,26 @@ export const toShowtimePayload = (form) => {
   // Đảm bảo UUID string
   if (form.movieId !== undefined) payload.movieId = String(form.movieId);
   if (form.cinemaRoomId !== undefined) payload.cinemaRoomId = String(form.cinemaRoomId);
-  // ISO UTC string
-  if (form.startTime) payload.startTime = toISOUTC(form.startTime);
-  if (form.endTime) payload.endTime = toISOUTC(form.endTime);
+  // Backend uses LocalDateTime, so send local wall-clock time without timezone.
+  if (form.startTime) payload.startTime = toBackendLocalDateTime(form.startTime);
+  if (form.endTime) payload.endTime = toBackendLocalDateTime(form.endTime);
   if (form.status !== undefined) payload.status = Number(form.status);
   return payload;
 };
 
-/** Chuyển datetime-local (YYYY-MM-DDTHH:mm) sang ISO UTC string */
-export const toISOWithVietnamTZ = (localDateTime) => {
+/** Chuyển datetime-local (YYYY-MM-DDTHH:mm) sang LocalDateTime cho backend */
+export const toBackendLocalDateTime = (localDateTime) => {
   if (!localDateTime) return '';
-  const [date, time] = localDateTime.split('T');
-  // Tạo Date object với timezone Việt Nam (+07:00)
-  return `${date}T${time}:00.000+07:00`;
+  const [date, time = ''] = localDateTime.split('T');
+  const [hour = '00', minute = '00', second = '00'] = time.split(':');
+  return `${date}T${hour.padStart(2, '0')}:${minute.padStart(2, '0')}:${second.padStart(2, '0')}`;
 };
 
-/** Chuyển datetime-local (YYYY-MM-DDTHH:mm) sang ISO UTC string (Z) — giả định gió nhập là Việt Nam (UTC+7) */
+export const toISOWithVietnamTZ = toBackendLocalDateTime;
+
+/** Alias cũ, giữ tương thích nhưng không đổi sang UTC nữa */
 export const toISOUTC = (localDateTime) => {
-  if (!localDateTime) return '';
-  const [date, time] = localDateTime.split('T');
-  const d = new Date(`${date}T${time}:00+07:00`);
-  return d.toISOString();
+  return toBackendLocalDateTime(localDateTime);
 };
 
 /** Chuyển ISO UTC string về datetime-local (YYYY-MM-DDTHH:mm) để hiển thị giờ Việt Nam */

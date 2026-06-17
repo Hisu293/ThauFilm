@@ -9,9 +9,10 @@ import {
   Typography,
   createTheme,
 } from '@mui/material';
+import { cinemaTheme as authTheme } from '../theme/cinemaTheme';
 
 /* ─── Shared dark cinema theme ─────────────────────────────────────────── */
-export const authTheme = createTheme({
+const legacyAuthTheme = createTheme({
   palette: {
     mode: 'dark',
     primary: { main: '#e50914' },

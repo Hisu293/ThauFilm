@@ -73,7 +73,8 @@ const QuickBooking = () => {
           date: selectedDate,
           room: slotObj.room,
           format: slotObj.format,
-          theaterName: theaterObj.name,
+          theaterName: slotObj.theaterName || theaterObj.name,
+          startTime: slotObj.startTime,
         }
       : { id: selectedShowtimeId };
 

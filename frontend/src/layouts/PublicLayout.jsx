@@ -1,9 +1,8 @@
 import { useEffect } from 'react';
-import { Box, CssBaseline, ThemeProvider } from '@mui/material';
+import { Box } from '@mui/material';
 import { Outlet, useLocation } from 'react-router-dom';
 import SiteNavbar from '../components/layout/SiteNavbar';
 import SiteFooter from '../components/layout/SiteFooter';
-import { bookingTheme } from '../theme/theme';
 
 // Cuộn lên đầu trang mỗi khi đổi route (vd: bấm link ở footer)
 const ScrollToTop = () => {
@@ -15,15 +14,14 @@ const ScrollToTop = () => {
 };
 
 const PublicLayout = () => (
-  <ThemeProvider theme={bookingTheme}>
-    <CssBaseline />
+  <>
     <ScrollToTop />
     <Box
       sx={{
         minHeight: '100vh',
         display: 'flex',
         flexDirection: 'column',
-        background: 'radial-gradient(circle at 15% 10%, rgba(251, 191, 36, 0.06) 0%, rgba(0, 0, 0, 0) 40%), #0F172A',
+        background: 'radial-gradient(circle at 15% 8%, rgba(251, 191, 36, 0.10) 0%, rgba(251, 191, 36, 0) 34%), radial-gradient(circle at 85% 12%, rgba(229, 9, 20, 0.08) 0%, rgba(229, 9, 20, 0) 30%), #0B1020',
       }}
     >
       <SiteNavbar />
@@ -32,7 +30,7 @@ const PublicLayout = () => (
       </Box>
       <SiteFooter />
     </Box>
-  </ThemeProvider>
+  </>
 );
 
 export default PublicLayout;

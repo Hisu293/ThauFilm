@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link as RouterLink, useParams, useNavigate } from 'react-router-dom';
 import {
   Box, Button, Chip, Container, Divider,
-  Skeleton, Stack, Typography, Dialog, DialogContent, IconButton
+  Skeleton, Stack, Typography, Dialog, IconButton
 } from '@mui/material';
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
 import AccessTimeRoundedIcon from '@mui/icons-material/AccessTimeRounded';
@@ -16,7 +16,6 @@ import MovieRoundedIcon from '@mui/icons-material/MovieRounded';
 import CloseIcon from '@mui/icons-material/Close';
 
 import { fetchMovieById } from '../services/movieService';
-import { MOCK_MOVIES } from '../mock/bookingData';
 import BookingStepper from '../components/BookingStepper';
 import ShowtimeSelector from '../components/ShowtimeSelector';
 import StatusChip from '../components/common/StatusChip';
@@ -99,13 +98,11 @@ const MovieDetailPage = () => {
     setError(null);
     setMovie(null);
 
-    // Try fetching from service. If it fails (no backend), fall back to MOCK_MOVIES
     fetchMovieById(id)
       .then((m) => {
         if (!cancelled) {
-          // If response has invalid structure or missing data, check mock fallback
           if (!m || !m.title || m.title === 'Phim chưa đặt tên') {
-            const fallback = MOCK_MOVIES.find((item) => item.id === id);
+            const fallback = null;
             if (fallback) {
               setMovie(fallback);
             } else {
@@ -118,7 +115,7 @@ const MovieDetailPage = () => {
       })
       .catch((err) => {
         if (!cancelled) {
-          const fallback = MOCK_MOVIES.find((item) => item.id === id);
+          const fallback = null;
           if (fallback) {
             setMovie(fallback);
           } else {
@@ -320,7 +317,7 @@ const MovieDetailPage = () => {
               </Stack>
             </Box>
 
-            {/* Trailer CTA */}
+            {/* Online movie CTA */}
             <Button
               variant="outlined"
               size="large"
@@ -339,7 +336,7 @@ const MovieDetailPage = () => {
                 },
               }}
             >
-              Xem Trailer
+              Xem phim online
             </Button>
           </Box>
         </Stack>
@@ -392,7 +389,7 @@ const MovieDetailPage = () => {
               border: 0
             }}
             src={movie.trailerUrl || "https://www.youtube.com/embed/dQw4w9WgXcQ"}
-            title={`${movie.title} Trailer`}
+            title={`${movie.title} Online`}
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
           />

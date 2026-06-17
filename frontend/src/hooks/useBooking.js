@@ -28,13 +28,13 @@ export const useBooking = () => {
     }
   }, []);
 
-  const create = useCallback(async (showtimeId, seatIds) => {
+  // Create booking (hold seats): POST /api/member/booking
+  const create = useCallback(async (showtimeId, seatIds, channel = 'ONLINE') => {
     setLoading(true);
     setError(null);
     try {
-      const response = await bookingApi.createBooking(showtimeId, seatIds);
-      const rawBooking = resolveData(response);
-      if (!rawBooking) return null;
+      const res = await bookingApi.createBooking(showtimeId, seatIds, channel);
+      const rawBooking = res?.data ?? res;
       return bookingService.normalizeBooking(rawBooking);
     } catch (err) {
       setError(err.message || 'Không thể tạo đơn giữ ghế.');
@@ -90,6 +90,37 @@ export const useBooking = () => {
     }
   }, []);
 
+  const getDiscounts = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await bookingApi.fetchActiveDiscounts();
+      const rawDiscounts = res?.data ?? res ?? [];
+      return bookingService.normalizeDiscounts(rawDiscounts);
+    } catch (err) {
+      setError(err.message || 'Không thể tải danh sách khuyến mãi.');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const getCombos = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await bookingApi.fetchActiveCombos();
+      const rawCombos = res?.data ?? res ?? [];
+      return bookingService.normalizeCombos(rawCombos);
+    } catch (err) {
+      setError(err.message || 'Không thể tải danh sách combo.');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  // Pay and confirm booking: POST /api/member/booking/{bookingId}/pay
   const pay = useCallback(async (bookingId, paymentMethod = 'VNPAY') => {
     setLoading(true);
     setError(null);
@@ -114,6 +145,8 @@ export const useBooking = () => {
     getHistory,
     getDetail,
     getTickets,
+    getDiscounts,
+    getCombos,
     pay,
   };
 };

@@ -1,33 +1,100 @@
-import { useState, useEffect } from 'react';
-import { Box, Tabs, Tab, Typography, Grid, Button, Stack, Chip, Card, CardContent } from '@mui/material';
-import { getActiveDates, getShowtimesForMovieAndDate } from '../mock/bookingData';
+import { useEffect, useMemo, useState } from 'react';
+import { Alert, Box, Button, Card, Grid, Stack, Tab, Tabs, Typography } from '@mui/material';
 import ScheduleRoundedIcon from '@mui/icons-material/ScheduleRounded';
-import MeetingRoomRoundedIcon from '@mui/icons-material/MeetingRoomRounded';
-import StatusChip from './common/StatusChip';
+import LocationOnRoundedIcon from '@mui/icons-material/LocationOnRounded';
+import { bookingApi } from '../api/bookingApi';
+import { bookingService } from '../services/bookingService';
+
+const formatDateTab = (dateStr, index) => {
+  if (!dateStr) return { dayName: '', dateLabel: '' };
+  const date = new Date(`${dateStr}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return { dayName: '', dateLabel: dateStr };
+
+  const today = new Date();
+  const isToday = date.toDateString() === today.toDateString();
+  const dayName = isToday
+    ? 'Hôm nay'
+    : date.toLocaleDateString('vi-VN', { weekday: 'short' });
+
+  return {
+    dayName: index === 0 && isToday ? 'Hôm nay' : dayName,
+    dateLabel: date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' }),
+  };
+};
 
 export const ShowtimeSelector = ({ movieId, onSelectShowtime }) => {
-  const dates = getActiveDates();
   const [selectedDateIdx, setSelectedDateIdx] = useState(0);
   const [showtimes, setShowtimes] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
   useEffect(() => {
-    if (movieId && dates.length > 0) {
-      const activeDate = dates[selectedDateIdx];
-      const items = getShowtimesForMovieAndDate(movieId, activeDate.id);
-      setShowtimes(items);
-    }
-  }, [movieId, selectedDateIdx]);
+    if (!movieId) return;
 
-  // Group showtimes by format (2D, 3D, IMAX 2D)
-  const groupedShowtimes = showtimes.reduce((acc, st) => {
-    if (!acc[st.format]) {
-      acc[st.format] = [];
-    }
-    acc[st.format].push(st);
-    return acc;
-  }, {});
+    let cancelled = false;
+    setLoading(true);
+    setError('');
 
-  const handleTabChange = (event, newValue) => {
+    bookingApi.fetchShowtimesByMovie(movieId)
+      .then((res) => {
+        if (cancelled) return;
+        const raw = res?.data ?? res ?? [];
+        const normalized = bookingService
+          .normalizeShowtimes(raw)
+          .sort((a, b) => String(a.startTime).localeCompare(String(b.startTime)));
+        setShowtimes(normalized);
+        setSelectedDateIdx(0);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setShowtimes([]);
+          setError(err.message || 'Không tải được lịch chiếu.');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [movieId]);
+
+  const dates = useMemo(() => {
+    return [...new Set(showtimes.map((s) => s.date).filter(Boolean))].sort();
+  }, [showtimes]);
+
+  const selectedDate = dates[selectedDateIdx] || '';
+  const dateShowtimes = selectedDate
+    ? showtimes.filter((s) => s.date === selectedDate)
+    : showtimes;
+
+  const theaterGroups = useMemo(() => {
+    const grouped = dateShowtimes.reduce((acc, showtime) => {
+      if (showtime.startTime) {
+        const showtimeMs = new Date(showtime.startTime).getTime();
+        if (!Number.isNaN(showtimeMs) && showtimeMs <= Date.now()) {
+          return acc;
+        }
+      }
+
+      const theaterKey = showtime.theaterId || showtime.theaterName || 'unknown-theater';
+      if (!acc[theaterKey]) {
+        acc[theaterKey] = {
+          id: theaterKey,
+          name: showtime.theaterName || 'Rạp chưa cập nhật',
+          showtimes: [],
+        };
+      }
+      acc[theaterKey].showtimes.push(showtime);
+      return acc;
+    }, {});
+
+    return Object.values(grouped).map((group) => ({
+      ...group,
+      showtimes: group.showtimes.sort((a, b) => String(a.startTime).localeCompare(String(b.startTime))),
+    }));
+  }, [dateShowtimes]);
+
+  const handleTabChange = (_event, newValue) => {
     setSelectedDateIdx(newValue);
   };
 
@@ -38,51 +105,64 @@ export const ShowtimeSelector = ({ movieId, onSelectShowtime }) => {
         Lịch Chiếu & Suất Chiếu
       </Typography>
 
-      {/* Date tabs */}
-      <Tabs
-        value={selectedDateIdx}
-        onChange={handleTabChange}
-        variant="scrollable"
-        scrollButtons="auto"
-        sx={{
-          mb: 4,
-          '& .MuiTabs-flexContainer': {
-            gap: 1.5,
-          },
-        }}
-      >
-        {dates.map((date, index) => (
-          <Tab
-            key={date.id}
-            label={
-              <Box sx={{ textAlign: 'center' }}>
-                <Typography sx={{ fontSize: '0.8rem', fontWeight: 500, textTransform: 'uppercase', opacity: 0.7 }}>
-                  {date.dayName}
-                </Typography>
-                <Typography sx={{ fontSize: '1.2rem', fontWeight: 800 }}>
-                  {date.dateStr}
-                </Typography>
-              </Box>
-            }
-            sx={{
-              minWidth: 90,
-              bgcolor: selectedDateIdx === index ? 'primary.main' : 'background.paper',
-              color: selectedDateIdx === index ? 'primary.contrastText' : 'text.secondary',
-              border: '1px solid rgba(148, 163, 184, 0.08)',
-              borderRadius: 2,
-              '&.Mui-selected': {
-                color: 'primary.contrastText',
-                bgcolor: 'primary.main',
-                boxShadow: '0 4px 15px rgba(251, 191, 36, 0.25)',
-              },
-              transition: 'all 0.2s ease',
-            }}
-          />
-        ))}
-      </Tabs>
+      {error && (
+        <Alert severity="error" sx={{ mb: 3, borderRadius: 3 }}>
+          {error}
+        </Alert>
+      )}
 
-      {/* Showtimes listing */}
-      {Object.keys(groupedShowtimes).length === 0 ? (
+      {dates.length > 0 && (
+        <Tabs
+          value={selectedDateIdx}
+          onChange={handleTabChange}
+          variant="scrollable"
+          scrollButtons="auto"
+          sx={{
+            mb: 4,
+            '& .MuiTabs-flexContainer': {
+              gap: 1.5,
+            },
+          }}
+        >
+          {dates.map((date, index) => {
+            const tab = formatDateTab(date, index);
+            return (
+              <Tab
+                key={date}
+                label={
+                  <Box sx={{ textAlign: 'center' }}>
+                    <Typography sx={{ fontSize: '0.8rem', fontWeight: 500, textTransform: 'uppercase', opacity: 0.7 }}>
+                      {tab.dayName}
+                    </Typography>
+                    <Typography sx={{ fontSize: '1.2rem', fontWeight: 800 }}>
+                      {tab.dateLabel}
+                    </Typography>
+                  </Box>
+                }
+                sx={{
+                  minWidth: 90,
+                  bgcolor: selectedDateIdx === index ? 'primary.main' : 'background.paper',
+                  color: selectedDateIdx === index ? 'primary.contrastText' : 'text.secondary',
+                  border: '1px solid rgba(148, 163, 184, 0.08)',
+                  borderRadius: 2,
+                  '&.Mui-selected': {
+                    color: 'primary.contrastText',
+                    bgcolor: 'primary.main',
+                    boxShadow: '0 4px 15px rgba(251, 191, 36, 0.25)',
+                  },
+                  transition: 'all 0.2s ease',
+                }}
+              />
+            );
+          })}
+        </Tabs>
+      )}
+
+      {loading ? (
+        <Card sx={{ p: 4, textAlign: 'center' }}>
+          <Typography color="text.secondary">Đang tải lịch chiếu...</Typography>
+        </Card>
+      ) : theaterGroups.length === 0 ? (
         <Card sx={{ p: 4, textAlign: 'center' }}>
           <Typography color="text.secondary">
             Rất tiếc, không tìm thấy suất chiếu nào cho ngày đã chọn.
@@ -90,26 +170,45 @@ export const ShowtimeSelector = ({ movieId, onSelectShowtime }) => {
         </Card>
       ) : (
         <Stack spacing={3}>
-          {Object.entries(groupedShowtimes).map(([format, list]) => (
-            <Card key={format} sx={{ p: 2.5, bgcolor: 'background.paper' }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2, gap: 1.5 }}>
-                <StatusChip label={format} type="format" sx={{ px: 1.5, py: 1.8, fontSize: '0.85rem' }} />
-                <Typography variant="subtitle2" color="text.secondary">
-                  {list.length} suất chiếu
-                </Typography>
+          {theaterGroups.map((group) => (
+            <Card key={group.id} sx={{ p: 2.5, bgcolor: 'background.paper' }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2.25, gap: 1.25, flexWrap: 'wrap' }}>
+                <Box
+                  sx={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: 2,
+                    bgcolor: 'rgba(251, 191, 36, 0.12)',
+                    color: 'primary.main',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <LocationOnRoundedIcon sx={{ fontSize: 19 }} />
+                </Box>
+                <Box sx={{ minWidth: 0, flex: 1 }}>
+                  <Typography variant="h6" sx={{ fontWeight: 800, color: 'text.primary', lineHeight: 1.25 }}>
+                    {group.name}
+                  </Typography>
+                  <Typography variant="subtitle2" color="text.secondary">
+                    {group.showtimes.length} suất chiếu hiện có
+                  </Typography>
+                </Box>
               </Box>
+
               <Grid container spacing={2}>
-                {list.map((st) => (
-                  <Grid item xs={6} sm={4} md={3} lg={2.4} key={st.id}>
+                {group.showtimes.map((showtime) => (
+                  <Grid item xs={6} sm={4} md={3} lg={2} key={showtime.id}>
                     <Button
                       fullWidth
                       variant="outlined"
-                      onClick={() => onSelectShowtime(st)}
+                      onClick={() => onSelectShowtime(showtime)}
                       sx={{
                         display: 'flex',
                         flexDirection: 'column',
                         alignItems: 'center',
-                        py: 1.8,
+                        py: 1.7,
                         borderRadius: 2.5,
                         borderColor: 'rgba(148, 163, 184, 0.15)',
                         bgcolor: 'rgba(30, 41, 59, 0.4)',
@@ -124,14 +223,13 @@ export const ShowtimeSelector = ({ movieId, onSelectShowtime }) => {
                       }}
                     >
                       <Typography variant="h6" sx={{ fontWeight: 800, color: 'primary.main' }}>
-                        {st.time}
+                        {showtime.time}
                       </Typography>
-                      <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mt: 0.5 }}>
-                        <MeetingRoomRoundedIcon sx={{ fontSize: 13, color: 'text.secondary' }} />
-                        <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 600 }}>
-                          {st.room}
+                      {showtime.format && (
+                        <Typography variant="caption" color="text.secondary" sx={{ mt: 0.4, fontWeight: 700 }}>
+                          {showtime.format}
                         </Typography>
-                      </Stack>
+                      )}
                     </Button>
                   </Grid>
                 ))}
