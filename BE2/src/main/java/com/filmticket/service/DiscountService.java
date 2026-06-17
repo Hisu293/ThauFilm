@@ -65,8 +65,8 @@ public class DiscountService {
         discountRepository.save(discount);
 
         DiscountUsage usage = DiscountUsage.builder()
-                .discount(discount)
-                .user(com.filmticket.entity.User.builder().id(userId).build())
+                .discountId(discount.getId())
+                .userId(userId)
                 .build();
         discountUsageRepository.save(usage);
 

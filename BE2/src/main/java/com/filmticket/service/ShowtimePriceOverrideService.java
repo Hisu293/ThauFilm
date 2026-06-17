@@ -2,7 +2,6 @@ package com.filmticket.service;
 
 import com.filmticket.dto.ShowtimePriceOverrideRequest;
 import com.filmticket.dto.ShowtimePriceOverrideResponse;
-import com.filmticket.entity.Showtime;
 import com.filmticket.entity.ShowtimePriceOverride;
 import com.filmticket.exception.BadRequestException;
 import com.filmticket.repository.ShowtimePriceOverrideRepository;
@@ -36,20 +35,21 @@ public class ShowtimePriceOverrideService {
 
     @Transactional
     public ShowtimePriceOverrideResponse setOverride(ShowtimePriceOverrideRequest request) {
-        Showtime showtime = showtimeRepository.findById(request.getShowtimeId())
-                .orElseThrow(() -> new BadRequestException("Showtime not found"));
+        if (!showtimeRepository.existsById(request.getShowtimeId())) {
+            throw new BadRequestException("Showtime not found");
+        }
 
         ShowtimePriceOverride override = showtimePriceOverrideRepository
                 .findByShowtimeIdAndSeatType(request.getShowtimeId(), request.getSeatType())
                 .orElseGet(() -> ShowtimePriceOverride.builder()
-                        .showtime(showtime)
+                        .showtimeId(request.getShowtimeId())
                         .seatType(request.getSeatType())
                         .build());
         override.setPrice(request.getPrice());
         ShowtimePriceOverride saved = showtimePriceOverrideRepository.save(override);
         return ShowtimePriceOverrideResponse.builder()
                 .id(saved.getId())
-                .showtimeId(saved.getShowtime().getId())
+                .showtimeId(saved.getShowtimeId())
                 .seatType(saved.getSeatType())
                 .price(saved.getPrice())
                 .build();

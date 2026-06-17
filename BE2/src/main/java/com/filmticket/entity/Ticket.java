@@ -6,7 +6,11 @@ import lombok.*;
 import java.util.UUID;
 
 @Entity
-@Table(name = "tickets")
+@Table(name = "tickets", indexes = {
+    @Index(name = "idx_ticket_booking", columnList = "booking_id"),
+    @Index(name = "idx_ticket_seat", columnList = "seat_id"),
+    @Index(name = "idx_ticket_code", columnList = "ticket_code")
+})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -18,9 +22,8 @@ public class Ticket {
     @Column(nullable = false, updatable = false)
     private UUID id;
 
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "booking_id", nullable = false)
-    private Booking booking;
+    @Column(name = "booking_id", nullable = false)
+    private UUID bookingId;
 
     @Column(nullable = false)
     private UUID seatId;

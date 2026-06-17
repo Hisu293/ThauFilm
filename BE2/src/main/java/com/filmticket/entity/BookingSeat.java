@@ -7,7 +7,12 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 @Entity
-@Table(name = "booking_seats")
+@Table(name = "booking_seats", 
+    uniqueConstraints = @UniqueConstraint(columnNames = {"booking_id", "seat_id"}),
+    indexes = {
+        @Index(name = "idx_booking_seat_booking", columnList = "booking_id"),
+        @Index(name = "idx_booking_seat_seat", columnList = "seat_id")
+    })
 @Getter
 @Setter
 @NoArgsConstructor
@@ -19,13 +24,11 @@ public class BookingSeat {
     @Column(nullable = false, updatable = false)
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "booking_id", nullable = false)
-    private Booking booking;
+    @Column(name = "booking_id", nullable = false)
+    private UUID bookingId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "seat_id", nullable = false)
-    private Seat seat;
+    @Column(name = "seat_id", nullable = false)
+    private UUID seatId;
 
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal priceAtBooking;

@@ -6,9 +6,7 @@ import com.filmticket.dto.CinemaRoomUpdateRequest;
 import com.filmticket.dto.SeatResponse;
 import com.filmticket.entity.CinemaRoom;
 import com.filmticket.entity.Seat;
-import com.filmticket.entity.Theater;
 import com.filmticket.exception.BadRequestException;
-import com.filmticket.model.RoomStatus;
 import com.filmticket.repository.CinemaRoomRepository;
 import com.filmticket.repository.SeatRepository;
 import com.filmticket.repository.TheaterRepository;
@@ -35,8 +33,7 @@ public class CinemaRoomService {
                 .name(room.getName())
                 .capacity(room.getCapacity())
                 .status(room.getStatus())
-                .theaterId(room.getTheater() != null ? room.getTheater().getId() : null)
-                .theaterName(room.getTheater() != null ? room.getTheater().getName() : null)
+                .theaterId(room.getTheaterId())
                 .build();
     }
 
@@ -75,8 +72,9 @@ public class CinemaRoomService {
 
     @Transactional
     public CinemaRoomResponse createRoomAndGenerateSeats(CinemaRoomRequest request) {
-        Theater theater = theaterRepository.findById(request.getTheaterId())
-                .orElseThrow(() -> new BadRequestException("Theater not found"));
+        if (!theaterRepository.existsById(request.getTheaterId())) {
+            throw new BadRequestException("Theater not found");
+        }
 
         int totalCapacity = request.getRowsCount() * request.getSeatsPerRow();
 
@@ -84,7 +82,7 @@ public class CinemaRoomService {
                 .name(request.getName())
                 .capacity(totalCapacity)
                 .status(1)
-                .theater(theater)
+                .theaterId(request.getTheaterId())
                 .build();
 
         CinemaRoom savedRoom = cinemaRoomRepository.save(room);
@@ -108,7 +106,7 @@ public class CinemaRoomService {
                 Seat.Type type = Seat.Type.fromStorageValue(seatType);
 
                 Seat seat = Seat.builder()
-                        .cinemaRoom(savedRoom)
+                        .cinemaRoomId(savedRoom.getId())
                         .rowName(rowName)
                         .seatNumber(j)
                         .type(type)
@@ -119,10 +117,9 @@ public class CinemaRoomService {
             }
         }
 
-        savedRoom.setSeats(seats);
-        CinemaRoom finalRoom = cinemaRoomRepository.save(savedRoom);
+        seatRepository.saveAll(seats);
 
-        return convertToResponse(finalRoom);
+        return convertToResponse(savedRoom);
     }
 
     @Transactional

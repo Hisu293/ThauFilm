@@ -1,7 +1,6 @@
 package com.filmticket.repository;
 
 import com.filmticket.entity.RefreshToken;
-import com.filmticket.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -14,9 +13,9 @@ import java.util.UUID;
 @Repository
 public interface RefreshTokenRepository extends JpaRepository<RefreshToken, UUID> {
     Optional<RefreshToken> findByToken(String token);
-    List<RefreshToken> findAllByUser(User user);
+    List<RefreshToken> findAllByUserId(UUID userId);
 
     @Modifying
-    @Query("delete from RefreshToken rt where rt.user = :user")
-    void deleteAllByUser(User user);
+    @Query("delete from RefreshToken rt where rt.userId = :userId")
+    void deleteAllByUserId(UUID userId);
 }

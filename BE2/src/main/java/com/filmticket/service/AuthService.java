@@ -121,7 +121,8 @@ public class AuthService {
             throw new BadRequestException("Refresh token is expired or revoked");
         }
 
-        User user = storedToken.getUser();
+        User user = userRepository.findById(storedToken.getUserId())
+                .orElseThrow(() -> new BadRequestException("User not found"));
         String accessToken = jwtTokenProvider.generateAccessToken(user.getEmail(), user.getRole().name());
 
         return AuthResponse.builder()
@@ -156,11 +157,11 @@ public class AuthService {
         String accessToken = jwtTokenProvider.generateAccessToken(user.getEmail(), role);
         String refreshTokenValue = jwtTokenProvider.generateRefreshToken(user.getEmail(), role);
 
-        refreshTokenRepository.deleteAllByUser(user);
+        refreshTokenRepository.deleteAllByUserId(user.getId());
 
         RefreshToken refreshToken = RefreshToken.builder()
                 .token(refreshTokenValue)
-                .user(user)
+                .userId(user.getId())
                 .expiryDate(Instant.now().plusMillis(jwtTokenProvider.getRefreshTokenExpiration()))
                 .revoked(false)
                 .build();

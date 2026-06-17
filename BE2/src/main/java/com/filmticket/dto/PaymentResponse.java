@@ -26,7 +26,7 @@ public class PaymentResponse {
     public static PaymentResponse fromPayment(Payment payment) {
         return PaymentResponse.builder()
                 .id(payment.getId())
-                .bookingId(payment.getBooking().getId())
+                .bookingId(payment.getBookingId())
                 .amount(payment.getAmount())
                 .paymentMethod(payment.getPaymentMethod())
                 .status(payment.getStatus().name())

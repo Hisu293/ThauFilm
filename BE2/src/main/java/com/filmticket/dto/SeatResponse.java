@@ -23,7 +23,7 @@ public class SeatResponse {
     public static SeatResponse fromSeat(Seat seat) {
         return SeatResponse.builder()
                 .id(seat.getId())
-                .cinemaRoomId(seat.getCinemaRoom().getId())
+                .cinemaRoomId(seat.getCinemaRoomId())
                 .rowName(seat.getRowName())
                 .seatNumber(seat.getSeatNumber())
                 .type(seat.getType().toStorageValue())

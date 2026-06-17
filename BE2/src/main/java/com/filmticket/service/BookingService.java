@@ -20,7 +20,6 @@ import java.math.RoundingMode;
 import java.text.NumberFormat;
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -28,23 +27,28 @@ public class BookingService {
 
     private static final Logger log = LoggerFactory.getLogger(BookingService.class);
     private final BookingRepository bookingRepository;
+    private final BookingSeatRepository bookingSeatRepository;
     private final SeatAvailabilityRepository seatAvailabilityRepository;
     private final PaymentRepository paymentRepository;
     private final TicketRepository ticketRepository;
     private final ShowtimeRepository showtimeRepository;
+    private final MovieRepository movieRepository;
+    private final CinemaRoomRepository cinemaRoomRepository;
     private final UserRepository userRepository;
+    private final SeatRepository seatRepository;
     private final ComboService comboService;
     private final DiscountService discountService;
     private final JavaMailSender mailSender;
+    private final TicketPdfGenerator ticketPdfGenerator;
 
-    private static final int HOLD_MINUTES = 15;
+    private static final int HOLD_MINUTES = 5;
 
     @Transactional(readOnly = true)
     public List<ShowtimeSeatResponse> getAvailableSeats(UUID showtimeId) {
         if (!showtimeRepository.existsById(showtimeId)) {
             throw new BadRequestException("Showtime not found");
         }
-        return seatAvailabilityRepository.findByShowtimeIdOrderBySeatRowNameAscSeatSeatNumberAsc(showtimeId)
+        return seatAvailabilityRepository.findByShowtimeIdOrderBySeatId(showtimeId)
                 .stream()
                 .map(ShowtimeSeatResponse::fromSeatAvailability)
                 .toList();
@@ -52,8 +56,9 @@ public class BookingService {
 
     @Transactional
     public BookingResponse createBooking(UUID userId, CreateBookingRequest request) {
-        User user = userRepository.findById(userId)
-                .orElseThrow(() -> new BadRequestException("User not found"));
+        if (!userRepository.existsById(userId)) {
+            throw new BadRequestException("User not found");
+        }
 
         Showtime showtime = showtimeRepository.findById(request.getShowtimeId())
                 .orElseThrow(() -> new BadRequestException("Showtime not found"));
@@ -72,10 +77,16 @@ public class BookingService {
                     .orElseThrow(() -> new BadRequestException("Seat not found in this showtime: " + seatId));
 
             if (!av.isAvailable()) {
-                throw new BadRequestException("Seat is already taken: " + av.getSeat().getRowName() + av.getSeat().getSeatNumber());
+                Seat seat = seatRepository.findById(seatId).orElse(null);
+                String seatInfo = seat != null ? seat.getRowName() + seat.getSeatNumber() : seatId.toString();
+                throw new BadRequestException("Seat is already taken: " + seatInfo);
             }
+
             availabilities.add(av);
-            seats.add(av.getSeat());
+            Seat seat = seatRepository.findById(seatId).orElse(null);
+            if (seat != null) {
+                seats.add(seat);
+            }
             seatTotal = seatTotal.add(av.getPrice());
         }
 
@@ -88,11 +99,7 @@ public class BookingService {
         }
 
         BigDecimal total = seatTotal.add(comboTotal);
-        if ("ONLINE".equalsIgnoreCase(request.getChannel())) {
-            total = seatTotal.add(comboTotal);
-        } else if ("OFFLINE".equalsIgnoreCase(request.getChannel())) {
-            total = seatTotal.add(comboTotal);
-        } else {
+        if (!"ONLINE".equalsIgnoreCase(request.getChannel()) && !"OFFLINE".equalsIgnoreCase(request.getChannel())) {
             throw new BadRequestException("Invalid booking channel: " + request.getChannel());
         }
 
@@ -102,24 +109,26 @@ public class BookingService {
         seatAvailabilityRepository.saveAll(availabilities);
 
         Booking booking = Booking.builder()
-                .user(user)
-                .showtime(showtime)
+                .userId(userId)
+                .showtimeId(request.getShowtimeId())
                 .totalAmount(total)
-                .status(BookingStatus.PENDING)
+                .status(BookingStatus.HOLD)
                 .confirmationCode(generateConfirmationCode())
                 .holdExpiresAt(LocalDateTime.now().plusMinutes(HOLD_MINUTES))
                 .build();
 
+        booking = bookingRepository.save(booking);
+
         for (int i = 0; i < seats.size(); i++) {
             BookingSeat bs = BookingSeat.builder()
-                    .seat(seats.get(i))
+                    .bookingId(booking.getId())
+                    .seatId(seats.get(i).getId())
                     .priceAtBooking(availabilities.get(i).getPrice())
                     .build();
-            booking.addSeat(bs);
+            bookingSeatRepository.save(bs);
         }
 
-        booking = bookingRepository.save(booking);
-        return toBookingResponse(booking);
+        return toBookingResponse(booking, seats);
     }
 
     @Transactional
@@ -127,11 +136,12 @@ public class BookingService {
         Booking booking = bookingRepository.findByIdAndUserId(bookingId, userId)
                 .orElseThrow(() -> new BadRequestException("Booking not found"));
 
-        if (booking.getStatus() != BookingStatus.PENDING) {
-            throw new BadRequestException("Booking is not in pending status");
+        if (booking.getStatus() != BookingStatus.HOLD) {
+            throw new BadRequestException("Booking is not in HOLD status");
         }
         if (booking.getHoldExpiresAt().isBefore(LocalDateTime.now())) {
-            booking.setStatus(BookingStatus.CANCELLED);
+            releaseSeats(booking);
+            booking.setStatus(BookingStatus.EXPIRED);
             bookingRepository.save(booking);
             throw new BadRequestException("Booking hold has expired");
         }
@@ -148,7 +158,7 @@ public class BookingService {
         BigDecimal finalAmount = originalAmount.subtract(discountAmount);
 
         Payment payment = Payment.builder()
-                .booking(booking)
+                .bookingId(booking.getId())
                 .amount(finalAmount)
                 .paymentMethod(request.getPaymentMethod())
                 .status(PaymentStatus.PAID)
@@ -161,11 +171,14 @@ public class BookingService {
         booking.setConfirmedAt(LocalDateTime.now());
         booking = bookingRepository.save(booking);
 
+        List<BookingSeat> bookingSeats = bookingSeatRepository.findByBookingId(bookingId);
+        User user = userRepository.findById(userId).orElse(null);
+
         List<Ticket> tickets = new ArrayList<>();
-        for (BookingSeat bs : booking.getBookingSeats()) {
+        for (BookingSeat bs : bookingSeats) {
             Ticket ticket = Ticket.builder()
-                    .booking(booking)
-                    .seatId(bs.getSeat().getId())
+                    .bookingId(booking.getId())
+                    .seatId(bs.getSeatId())
                     .ticketCode(generateTicketCode())
                     .checkedIn(false)
                     .build();
@@ -180,7 +193,9 @@ public class BookingService {
                 booking, payment, ticketResponses, originalAmount, discountAmount, discountCode);
 
         try {
-            sendTicketEmail(booking.getUser().getEmail(), booking, tickets, payment, discountAmount, finalAmount);
+            if (user != null) {
+                sendTicketEmail(user.getEmail(), booking, tickets, payment, discountAmount, finalAmount);
+            }
         } catch (Exception ex) {
             log.error("Failed to send ticket email for booking {}", booking.getId(), ex);
         }
@@ -190,8 +205,9 @@ public class BookingService {
 
     @Transactional(readOnly = true)
     public List<BookingResponse> getMyBookings(UUID userId) {
-        return bookingRepository.findByUserIdOrderByCreatedAtDesc(userId).stream()
-                .map(this::toBookingResponse)
+        List<Booking> bookings = bookingRepository.findByUserIdOrderByCreatedAtDesc(userId);
+        return bookings.stream()
+                .map(this::toBookingResponseWithoutSeats)
                 .toList();
     }
 
@@ -199,7 +215,7 @@ public class BookingService {
     public BookingResponse getBookingDetail(UUID bookingId, UUID userId) {
         Booking booking = bookingRepository.findByIdAndUserId(bookingId, userId)
                 .orElseThrow(() -> new BadRequestException("Booking not found"));
-        return toBookingResponse(booking);
+        return toBookingResponseWithoutSeats(booking);
     }
 
     @Transactional
@@ -210,7 +226,9 @@ public class BookingService {
         if (ticket.isCheckedIn()) {
             throw new BadRequestException("Ticket already checked in");
         }
-        if (ticket.getBooking().getStatus() != BookingStatus.CONFIRMED) {
+
+        Booking booking = bookingRepository.findById(ticket.getBookingId()).orElse(null);
+        if (booking == null || booking.getStatus() != BookingStatus.CONFIRMED) {
             throw new BadRequestException("Booking is not confirmed");
         }
 
@@ -228,10 +246,64 @@ public class BookingService {
                 .toList();
     }
 
+    @Transactional
+    public void expireBooking(UUID bookingId) {
+        Booking booking = bookingRepository.findById(bookingId)
+                .orElseThrow(() -> new BadRequestException("Booking not found"));
+
+        if (booking.getStatus() == BookingStatus.HOLD) {
+            releaseSeats(booking);
+            booking.setStatus(BookingStatus.EXPIRED);
+            bookingRepository.save(booking);
+        }
+    }
+
+    @Transactional
+    public void cancelBooking(UUID bookingId, UUID userId) {
+        Booking booking = bookingRepository.findByIdAndUserId(bookingId, userId)
+                .orElseThrow(() -> new BadRequestException("Booking not found"));
+
+        if (booking.getStatus() == BookingStatus.HOLD) {
+            releaseSeats(booking);
+            booking.setStatus(BookingStatus.CANCELLED);
+            bookingRepository.save(booking);
+        } else if (booking.getStatus() == BookingStatus.CONFIRMED) {
+            booking.setStatus(BookingStatus.CANCELLED);
+            bookingRepository.save(booking);
+        } else {
+            throw new BadRequestException("Cannot cancel booking with status: " + booking.getStatus());
+        }
+    }
+
+    @Transactional
+    public void releaseSeats(Booking booking) {
+        List<BookingSeat> bookingSeats = bookingSeatRepository.findByBookingId(booking.getId());
+        for (BookingSeat bs : bookingSeats) {
+            SeatAvailability av = seatAvailabilityRepository
+                    .findByShowtimeIdAndSeatId(booking.getShowtimeId(), bs.getSeatId())
+                    .orElse(null);
+            if (av != null) {
+                av.setAvailable(true);
+                seatAvailabilityRepository.save(av);
+            }
+        }
+    }
+
     private void sendTicketEmail(String to, Booking booking, List<Ticket> tickets, Payment payment,
                                  BigDecimal discountAmount, BigDecimal finalAmount) throws Exception {
-        String subject = "Ve xem phim - " + booking.getShowtime().getMovie().getTitle();
-        String html = buildHtmlBody(booking, tickets, payment, discountAmount, finalAmount);
+        String subject = "Ve xem phim";
+        String movieTitle = "Phim";
+
+        Showtime s = showtimeRepository.findById(booking.getShowtimeId()).orElse(null);
+        if (s != null) {
+            Movie m = movieRepository.findById(s.getMovieId()).orElse(null);
+            if (m != null) {
+                subject = "Ve xem phim - " + m.getTitle();
+                movieTitle = m.getTitle();
+            }
+        }
+
+        String html = buildHtmlBody(booking, tickets, payment, discountAmount, finalAmount, movieTitle);
 
         MimeMessage message = mailSender.createMimeMessage();
         MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
@@ -239,18 +311,28 @@ public class BookingService {
         helper.setSubject(subject);
         helper.setText(html, true);
 
-        byte[] pdfBytes = TicketPdfGenerator.generateTicketPdf(booking, tickets);
+        byte[] pdfBytes = ticketPdfGenerator.generateTicketPdf(booking, tickets);
         helper.addAttachment("ticket.pdf", new ByteArrayResource(pdfBytes));
 
         mailSender.send(message);
     }
 
     private String buildHtmlBody(Booking booking, List<Ticket> tickets, Payment payment,
-                                 BigDecimal discountAmount, BigDecimal finalAmount) {
-        String movieTitle = booking.getShowtime().getMovie().getTitle();
-        String cinema = booking.getShowtime().getCinemaRoom().getName();
-        String showtime = booking.getShowtime().getStartTime().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"));
-        String confirmationCode = booking.getConfirmationCode();
+                                 BigDecimal discountAmount, BigDecimal finalAmount, String movieTitle) {
+        String cinema = "Rap";
+        String showtime = "";
+
+        Showtime s = showtimeRepository.findById(booking.getShowtimeId()).orElse(null);
+        if (s != null) {
+            CinemaRoom room = cinemaRoomRepository.findById(s.getCinemaRoomId()).orElse(null);
+            if (room != null) {
+                cinema = room.getName();
+            }
+            showtime = s.getStartTime().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"));
+        }
+
+        User user = userRepository.findById(booking.getUserId()).orElse(null);
+        String userName = user != null ? user.getFullName() : "";
 
         StringBuilder ticketListHtml = new StringBuilder();
         for (Ticket ticket : tickets) {
@@ -260,12 +342,12 @@ public class BookingService {
         StringBuilder builder = new StringBuilder();
         builder.append("<!DOCTYPE html><html><body style='font-family:Arial,sans-serif;color:#222;max-width:640px;margin:auto'>");
         builder.append("<h2 style='color:#111;margin-bottom:8px'>").append(escape(movieTitle)).append("</h2>");
-        builder.append("<p style='color:#555'>").append(escape(booking.getUser().getFullName())).append(",</p>");
+        builder.append("<p style='color:#555'>").append(escape(userName)).append(",</p>");
         builder.append("<p>Cam on quy khach da mua ve. Thong tin ve:</p>");
         builder.append("<table style='width:100%;border-collapse:collapse;margin:10px 0 16px'>");
         builder.append("<tr><td style='padding:6px 8px;color:#666;width:120px'>Rap</td><td style='padding:6px 8px'>").append(escape(cinema)).append("</td></tr>");
         builder.append("<tr><td style='padding:6px 8px;color:#666'>Gio chieu</td><td style='padding:6px 8px'>").append(escape(showtime)).append("</td></tr>");
-        builder.append("<tr><td style='padding:6px 8px;color:#666'>Ma dat ve</td><td style='padding:6px 8px'>").append(escape(confirmationCode)).append("</td></tr>");
+        builder.append("<tr><td style='padding:6px 8px;color:#666'>Ma dat ve</td><td style='padding:6px 8px'>").append(escape(booking.getConfirmationCode())).append("</td></tr>");
         builder.append("</table>");
         builder.append("<p>Danh sach ve:</p><ul>").append(ticketListHtml).append("</ul>");
         builder.append("<p>Tong tien: <b>").append(formatMoney(booking.getTotalAmount())).append(" VND</b></p>");
@@ -281,18 +363,40 @@ public class BookingService {
         return builder.toString();
     }
 
-    private BookingResponse toBookingResponse(Booking booking) {
-        List<ShowtimeSeatResponse> seats = booking.getBookingSeats().stream()
-                .map(bs -> ShowtimeSeatResponse.builder()
-                        .seatId(bs.getSeat().getId())
-                        .rowName(bs.getSeat().getRowName())
-                        .seatNumber(bs.getSeat().getSeatNumber())
-                        .type(bs.getSeat().getType().toStorageValue())
+    private BookingResponse toBookingResponse(Booking booking, List<Seat> seats) {
+        List<ShowtimeSeatResponse> seatResponses = new ArrayList<>();
+        for (Seat seat : seats) {
+            seatResponses.add(ShowtimeSeatResponse.builder()
+                    .seatId(seat.getId())
+                    .rowName(seat.getRowName())
+                    .seatNumber(seat.getSeatNumber())
+                    .type(seat.getType().toStorageValue())
+                    .available(false)
+                    .price(BigDecimal.ZERO)
+                    .build());
+        }
+        return BookingResponse.fromBooking(booking, seatResponses);
+    }
+
+    private BookingResponse toBookingResponseWithoutSeats(Booking booking) {
+        List<BookingSeat> bookingSeats = bookingSeatRepository.findByBookingId(booking.getId());
+        List<ShowtimeSeatResponse> seatResponses = new ArrayList<>();
+
+        for (BookingSeat bs : bookingSeats) {
+            Seat seat = seatRepository.findById(bs.getSeatId()).orElse(null);
+            if (seat != null) {
+                seatResponses.add(ShowtimeSeatResponse.builder()
+                        .seatId(seat.getId())
+                        .rowName(seat.getRowName())
+                        .seatNumber(seat.getSeatNumber())
+                        .type(seat.getType().toStorageValue())
                         .available(false)
                         .price(bs.getPriceAtBooking())
-                        .build())
-                .collect(Collectors.toList());
-        return BookingResponse.fromBooking(booking, seats);
+                        .build());
+            }
+        }
+
+        return BookingResponse.fromBooking(booking, seatResponses);
     }
 
     private String formatMoney(BigDecimal value) {

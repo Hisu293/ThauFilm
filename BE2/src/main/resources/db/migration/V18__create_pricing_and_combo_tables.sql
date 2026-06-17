@@ -15,13 +15,13 @@ CREATE TABLE combos (
 
 CREATE TABLE showtime_price_overrides (
     id UUID PRIMARY KEY,
-    showtime_id UUID NOT NULL REFERENCES showtime(id),
+    showtime_id UUID NOT NULL,
     seat_type VARCHAR(30) NOT NULL,
-    price NUMERIC(10,2) NOT NULL,
-    UNIQUE (showtime_id, seat_type)
+    price NUMERIC(10,2) NOT NULL
 );
 
 INSERT INTO seat_type_price_configs (id, seat_type, price, active) VALUES
 (gen_random_uuid(), 'STANDARD', 90000.00, TRUE),
 (gen_random_uuid(), 'VIP', 120000.00, TRUE),
-(gen_random_uuid(), 'COUPLE', 220000.00, TRUE);
+(gen_random_uuid(), 'COUPLE', 220000.00, TRUE)
+ON CONFLICT DO NOTHING;

@@ -21,18 +21,18 @@ public interface ShowtimeRepository extends JpaRepository<Showtime, UUID> {
     @Query("SELECT s FROM Showtime s WHERE DATE(s.startTime) = :date ORDER BY s.startTime ASC")
     List<Showtime> findByDate(@Param("date") LocalDate date);
 
-    @Query("SELECT s FROM Showtime s WHERE s.movie.id = :movieId AND DATE(s.startTime) = :date ORDER BY s.startTime ASC")
+    @Query("SELECT s FROM Showtime s WHERE s.movieId = :movieId AND DATE(s.startTime) = :date ORDER BY s.startTime ASC")
     List<Showtime> findByMovieIdAndDate(@Param("movieId") UUID movieId, @Param("date") LocalDate date);
 
     @Query("SELECT s FROM Showtime s WHERE DATE(s.startTime) >= :today ORDER BY s.startTime ASC")
     List<Showtime> findUpcoming(@Param("today") LocalDate today);
 
-    @Query("SELECT s FROM Showtime s WHERE s.cinemaRoom.theater.id = :theaterId ORDER BY s.startTime ASC")
+    @Query("SELECT s FROM Showtime s WHERE s.cinemaRoomId IN (SELECT c.id FROM CinemaRoom c WHERE c.theaterId = :theaterId) ORDER BY s.startTime ASC")
     List<Showtime> findByTheaterId(@Param("theaterId") UUID theaterId);
 
-    @Query("SELECT s FROM Showtime s WHERE s.cinemaRoom.theater.id = :theaterId AND s.movie.id = :movieId ORDER BY s.startTime ASC")
+    @Query("SELECT s FROM Showtime s WHERE s.cinemaRoomId IN (SELECT c.id FROM CinemaRoom c WHERE c.theaterId = :theaterId) AND s.movieId = :movieId ORDER BY s.startTime ASC")
     List<Showtime> findByTheaterIdAndMovieId(@Param("theaterId") UUID theaterId, @Param("movieId") UUID movieId);
 
-    @Query("SELECT DISTINCT s.cinemaRoom.theater.id FROM Showtime s WHERE s.movie.id = :movieId")
-    List<UUID> findDistinctTheaterIdsByMovieId(@Param("movieId") UUID movieId);
+    @Query("SELECT DISTINCT s.cinemaRoomId FROM Showtime s WHERE s.movieId = :movieId")
+    List<UUID> findDistinctCinemaRoomIdsByMovieId(@Param("movieId") UUID movieId);
 }

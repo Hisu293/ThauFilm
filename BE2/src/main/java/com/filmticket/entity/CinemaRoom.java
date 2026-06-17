@@ -3,17 +3,21 @@ package com.filmticket.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
-import java.util.List;
 import java.util.UUID;
 
 @Entity
-@Table(name = "cinema_room")
+@Table(name = "cinema_room",
+    indexes = {
+        @Index(name = "idx_cinema_room_theater", columnList = "theater_id"),
+        @Index(name = "idx_cinema_room_status", columnList = "status")
+    })
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
 public class CinemaRoom {
+
     @Id
     @Column(nullable = false, updatable = false)
     private UUID id;
@@ -25,12 +29,8 @@ public class CinemaRoom {
 
     private Integer status;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "theater_id")
-    private Theater theater;
-
-    @OneToMany(mappedBy = "cinemaRoom", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private List<Seat> seats;
+    @Column(name = "theater_id")
+    private UUID theaterId;
 
     @PrePersist
     public void prePersist() {

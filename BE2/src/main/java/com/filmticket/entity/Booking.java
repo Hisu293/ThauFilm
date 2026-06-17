@@ -4,12 +4,16 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.UUID;
 
 @Entity
-@Table(name = "bookings")
+@Table(name = "bookings", indexes = {
+    @Index(name = "idx_booking_user", columnList = "user_id"),
+    @Index(name = "idx_booking_showtime", columnList = "showtime_id"),
+    @Index(name = "idx_booking_confirmation", columnList = "confirmation_code"),
+    @Index(name = "idx_booking_status", columnList = "status"),
+    @Index(name = "idx_booking_hold_expires", columnList = "hold_expires_at")
+})
 @Getter
 @Setter
 @NoArgsConstructor
@@ -21,17 +25,11 @@ public class Booking {
     @Column(nullable = false, updatable = false)
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
+    @Column(name = "user_id", nullable = false)
+    private UUID userId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "showtime_id", nullable = false)
-    private Showtime showtime;
-
-    @OneToMany(mappedBy = "booking", cascade = CascadeType.ALL, orphanRemoval = true)
-    @Builder.Default
-    private List<BookingSeat> bookingSeats = new ArrayList<>();
+    @Column(name = "showtime_id", nullable = false)
+    private UUID showtimeId;
 
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal totalAmount;
@@ -39,7 +37,7 @@ public class Booking {
     @Column(nullable = false, length = 20)
     @Enumerated(EnumType.STRING)
     @Builder.Default
-    private BookingStatus status = BookingStatus.PENDING;
+    private BookingStatus status = BookingStatus.HOLD;
 
     @Column(unique = true, length = 20)
     private String confirmationCode;
@@ -58,10 +56,5 @@ public class Booking {
             id = UUID.randomUUID();
             createdAt = java.time.LocalDateTime.now();
         }
-    }
-
-    public void addSeat(BookingSeat seat) {
-        bookingSeats.add(seat);
-        seat.setBooking(this);
     }
 }

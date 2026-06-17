@@ -1,0 +1,68 @@
+package com.filmticket.scheduler;
+
+import com.filmticket.entity.Booking;
+import com.filmticket.entity.BookingStatus;
+import com.filmticket.entity.BookingSeat;
+import com.filmticket.repository.BookingRepository;
+import com.filmticket.repository.BookingSeatRepository;
+import com.filmticket.repository.SeatAvailabilityRepository;
+import lombok.RequiredArgsConstructor;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.context.annotation.Lazy;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
+@Component
+@Lazy
+@RequiredArgsConstructor
+public class BookingExpiredScheduler {
+
+    private static final Logger log = LoggerFactory.getLogger(BookingExpiredScheduler.class);
+
+    private final BookingRepository bookingRepository;
+    private final BookingSeatRepository bookingSeatRepository;
+    private final SeatAvailabilityRepository seatAvailabilityRepository;
+
+    @Scheduled(fixedRate = 60000, initialDelay = 30000)
+    @Transactional
+    public void releaseExpiredBookings() {
+        LocalDateTime now = LocalDateTime.now();
+        List<Booking> expiredBookings = bookingRepository.findExpiredHolds(BookingStatus.HOLD, now);
+
+        if (expiredBookings.isEmpty()) {
+            return;
+        }
+
+        log.info("Found {} expired bookings to process", expiredBookings.size());
+
+        for (Booking booking : expiredBookings) {
+            try {
+                releaseSeats(booking);
+                booking.setStatus(BookingStatus.EXPIRED);
+                bookingRepository.save(booking);
+                List<BookingSeat> seats = bookingSeatRepository.findByBookingId(booking.getId());
+                log.info("Expired booking {} and released {} seats",
+                        booking.getId(), seats.size());
+            } catch (Exception e) {
+                log.error("Failed to expire booking {}: {}", booking.getId(), e.getMessage());
+            }
+        }
+    }
+
+    private void releaseSeats(Booking booking) {
+        List<BookingSeat> bookingSeats = bookingSeatRepository.findByBookingId(booking.getId());
+        for (BookingSeat bs : bookingSeats) {
+            seatAvailabilityRepository
+                    .findByShowtimeIdAndSeatId(booking.getShowtimeId(), bs.getSeatId())
+                    .ifPresent(av -> {
+                        av.setAvailable(true);
+                        seatAvailabilityRepository.save(av);
+                    });
+        }
+    }
+}

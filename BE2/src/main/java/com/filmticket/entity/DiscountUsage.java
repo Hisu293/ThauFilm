@@ -7,7 +7,12 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "discount_usages")
+@Table(name = "discount_usages",
+    uniqueConstraints = @UniqueConstraint(columnNames = {"discount_id", "user_id"}),
+    indexes = {
+        @Index(name = "idx_discount_usage_discount", columnList = "discount_id"),
+        @Index(name = "idx_discount_usage_user", columnList = "user_id")
+    })
 @Getter
 @Setter
 @NoArgsConstructor
@@ -19,13 +24,11 @@ public class DiscountUsage {
     @Column(nullable = false, updatable = false)
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "discount_id", nullable = false)
-    private Discount discount;
+    @Column(name = "discount_id", nullable = false)
+    private UUID discountId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
+    @Column(name = "user_id", nullable = false)
+    private UUID userId;
 
     @Column(nullable = false, updatable = false)
     private LocalDateTime usedAt;

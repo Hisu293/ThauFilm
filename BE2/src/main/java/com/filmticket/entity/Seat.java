@@ -6,7 +6,12 @@ import lombok.*;
 import java.util.UUID;
 
 @Entity
-@Table(name = "seat")
+@Table(name = "seat",
+    uniqueConstraints = @UniqueConstraint(columnNames = {"cinema_room_id", "row_name", "seat_number"}),
+    indexes = {
+        @Index(name = "idx_seat_cinema_room", columnList = "cinema_room_id"),
+        @Index(name = "idx_seat_type", columnList = "type")
+    })
 @Getter
 @Setter
 @NoArgsConstructor
@@ -48,9 +53,8 @@ public class Seat {
     @Column(nullable = false, updatable = false)
     private UUID id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "cinema_room_id", nullable = false)
-    private CinemaRoom cinemaRoom;
+    @Column(name = "cinema_room_id", nullable = false)
+    private UUID cinemaRoomId;
 
     @Column(name = "row_name", nullable = false)
     private String rowName;
