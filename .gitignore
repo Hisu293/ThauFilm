@@ -1,5 +1,5 @@
 .idea/
 .vscode/
 __MACOSX/
-target1/
+target2/
 echo "node_modules/" >> .gitignore
