@@ -36,4 +36,19 @@ public class ShowtimeResponse {
                 .status(showtime.getStatus())
                 .build();
     }
+
+    public static ShowtimeResponse fromShowtimeContext(Showtime showtime, String movieTitle, String cinemaRoomName, UUID theaterId, String theaterName) {
+        return ShowtimeResponse.builder()
+                .id(showtime.getId())
+                .movieId(showtime.getMovieId())
+                .movieTitle(movieTitle)
+                .cinemaRoomId(showtime.getCinemaRoomId())
+                .cinemaRoomName(cinemaRoomName)
+                .theaterId(theaterId)
+                .theaterName(theaterName)
+                .startTime(showtime.getStartTime())
+                .endTime(showtime.getEndTime())
+                .status(showtime.getStatus())
+                .build();
+    }
 }

@@ -24,7 +24,7 @@ export const SeatSelectionPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const { loading: apiLoading, error: apiError, clearError, getSeats, create, getHistory } = useBooking();
+  const { loading: apiLoading, error: apiError, clearError, getSeats, create, getHistory, getDetail } = useBooking();
 
   const [movie, setMovie] = useState(null);
   const [showtime, setShowtime] = useState(null);
