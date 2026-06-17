@@ -49,9 +49,35 @@ public class BookingService {
         if (!showtimeRepository.existsById(showtimeId)) {
             throw new BadRequestException("Showtime not found");
         }
-        return seatAvailabilityRepository.findByShowtimeIdOrderBySeatId(showtimeId)
+        List<SeatAvailability> availabilities = seatAvailabilityRepository.findByShowtimeIdOrderBySeatId(showtimeId);
+        List<UUID> seatIds = availabilities.stream()
+                .map(SeatAvailability::getSeatId)
+                .toList();
+
+        Map<UUID, Seat> seatById = seatRepository.findAllById(seatIds)
                 .stream()
-                .map(ShowtimeSeatResponse::fromSeatAvailability)
+                .collect(java.util.stream.Collectors.toMap(Seat::getId, seat -> seat));
+
+        return availabilities.stream()
+                .map(availability -> {
+                    Seat seat = seatById.get(availability.getSeatId());
+                    ShowtimeSeatResponse response = ShowtimeSeatResponse.fromSeatAvailability(availability);
+                    if (seat != null) {
+                        response.setRowName(seat.getRowName());
+                        response.setSeatNumber(seat.getSeatNumber());
+                        response.setType(seat.getType().toStorageValue());
+                    }
+                    return response;
+                })
+                .sorted(Comparator
+                        .comparing((ShowtimeSeatResponse seat) -> {
+                            String rowName = seat.getRowName();
+                            return rowName != null ? rowName : "";
+                        })
+                        .thenComparing(seat -> {
+                            Integer seatNumber = seat.getSeatNumber();
+                            return seatNumber != null ? seatNumber : 0;
+                        }))
                 .toList();
     }
 

@@ -8,7 +8,6 @@ import com.filmticket.entity.CinemaRoom;
 import com.filmticket.entity.Seat;
 import com.filmticket.exception.BadRequestException;
 import com.filmticket.model.RoomStatus;
-import com.filmticket.model.RoomType;
 import com.filmticket.repository.CinemaRoomRepository;
 import com.filmticket.repository.SeatRepository;
 import com.filmticket.repository.TheaterRepository;

@@ -1,6 +1,5 @@
 package com.filmticket.dto;
 
-import com.filmticket.model.RoomStatus;
 import com.filmticket.model.RoomType;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;

@@ -455,7 +455,7 @@ export const BookingSummaryPage = () => {
                   Ghế đã chọn:
                 </Typography>
                 <Typography variant="body2" sx={{ fontWeight: 800, color: 'primary.main' }}>
-                  {selectedSeats.map((seat) => `${seat.rowName}${seat.seatNumber}`).join(', ')}
+                  {selectedSeats.map((seat) => seat.label || `${seat.rowName ?? ''}${seat.seatNumber ?? ''}`).join(', ')}
                 </Typography>
               </Box>
 

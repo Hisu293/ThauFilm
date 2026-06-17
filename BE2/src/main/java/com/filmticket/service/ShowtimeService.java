@@ -21,7 +21,9 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -34,11 +36,38 @@ public class ShowtimeService {
     private final SeatAvailabilityRepository seatAvailabilityRepository;
     private final PricingService pricingService;
 
+    private List<ShowtimeResponse> enrich(List<Showtime> showtimes) {
+        if (showtimes.isEmpty()) return List.of();
+
+        List<UUID> movieIds = showtimes.stream().map(Showtime::getMovieId).distinct().toList();
+        List<UUID> roomIds = showtimes.stream().map(Showtime::getCinemaRoomId).distinct().toList();
+
+        Map<UUID, String> movieTitleByMovieId = movieRepository.findAllById(movieIds).stream()
+                .collect(Collectors.toMap(com.filmticket.entity.Movie::getId, com.filmticket.entity.Movie::getTitle));
+
+        Map<UUID, com.filmticket.entity.CinemaRoom> roomByRoomId = cinemaRoomRepository.findAllById(roomIds).stream()
+                .collect(Collectors.toMap(com.filmticket.entity.CinemaRoom::getId, room -> room));
+
+        return showtimes.stream()
+                .map(s -> {
+                    com.filmticket.entity.CinemaRoom room = roomByRoomId.get(s.getCinemaRoomId());
+                    String cinemaRoomName = room != null ? room.getName() : null;
+                    UUID theaterId = room != null ? room.getTheaterId() : null;
+                    String theaterName = null;
+                    return ShowtimeResponse.fromShowtimeContext(
+                            s,
+                            movieTitleByMovieId.get(s.getMovieId()),
+                            cinemaRoomName,
+                            theaterId,
+                            theaterName
+                    );
+                })
+                .toList();
+    }
+
     @Transactional(readOnly = true)
     public List<ShowtimeResponse> getAllShowtimes() {
-        return showtimeRepository.findAll().stream()
-                .map(ShowtimeResponse::fromShowtime)
-                .toList();
+        return enrich(showtimeRepository.findAll());
     }
 
     @Transactional
@@ -100,16 +129,12 @@ public class ShowtimeService {
         if (!movieRepository.existsById(movieId)) {
             throw new BadRequestException("Movie not found");
         }
-        return showtimeRepository.findByMovieIdOrderByStartTimeAsc(movieId).stream()
-                .map(ShowtimeResponse::fromShowtime)
-                .toList();
+        return enrich(showtimeRepository.findByMovieIdOrderByStartTimeAsc(movieId));
     }
 
     @Transactional(readOnly = true)
     public List<ShowtimeResponse> getShowtimesByDate(java.time.LocalDate date) {
-        return showtimeRepository.findByDate(date).stream()
-                .map(ShowtimeResponse::fromShowtime)
-                .toList();
+        return enrich(showtimeRepository.findByDate(date));
     }
 
     @Transactional(readOnly = true)
@@ -117,16 +142,12 @@ public class ShowtimeService {
         if (!movieRepository.existsById(movieId)) {
             throw new BadRequestException("Movie not found");
         }
-        return showtimeRepository.findByMovieIdAndDate(movieId, date).stream()
-                .map(ShowtimeResponse::fromShowtime)
-                .toList();
+        return enrich(showtimeRepository.findByMovieIdAndDate(movieId, date));
     }
 
     @Transactional(readOnly = true)
     public List<ShowtimeResponse> getShowtimesByTheater(UUID theaterId) {
-        return showtimeRepository.findByTheaterId(theaterId).stream()
-                .map(ShowtimeResponse::fromShowtime)
-                .toList();
+        return enrich(showtimeRepository.findByTheaterId(theaterId));
     }
 
     @Transactional(readOnly = true)
@@ -134,9 +155,7 @@ public class ShowtimeService {
         if (!movieRepository.existsById(movieId)) {
             throw new BadRequestException("Movie not found");
         }
-        return showtimeRepository.findByTheaterIdAndMovieId(theaterId, movieId).stream()
-                .map(ShowtimeResponse::fromShowtime)
-                .toList();
+        return enrich(showtimeRepository.findByTheaterIdAndMovieId(theaterId, movieId));
     }
 
     @Transactional(readOnly = true)

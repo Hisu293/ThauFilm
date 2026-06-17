@@ -9,20 +9,22 @@ export const bookingService = {
 
     return backendSeats.map((seat) => {
       const rowName = seat.rowName || 'A';
-      const seatNumber = seat.seatNumber;
-      const col = typeof seatNumber === 'number' && Number.isFinite(seatNumber) ? seatNumber : parseInt(String(seatNumber), 10) || 1;
-      const typeNormalized = String(seat.type || 'STANDARD').toUpperCase();
+      const seatNumber = typeof seat.seatNumber === 'number' && Number.isFinite(seat.seatNumber)
+        ? seat.seatNumber
+        : parseInt(String(seat.seatNumber || ''), 10) || 0;
+      const col = seatNumber > 0 ? seatNumber : NaN;
+      const normalizedType = String(seat.type || 'STANDARD').toUpperCase();
 
       return {
         id: seat.seatId,
-        label: `${row}${col}`,
-        row,
-        rowName: row,
+        label: `${rowName}${seatNumber}`,
+        row: rowName,
+        rowName,
         col,
-        seatNumber: col,
-        type: typeNormalized === 'NORMAL' ? 'STANDARD' : typeNormalized,
+        seatNumber,
+        type: normalizedType === 'NORMAL' || normalizedType === 'STANDARD' ? 'STANDARD' : normalizedType,
         price: Number(seat.price) || 0,
-        isSold: !seat.available,
+        isSold: seat.status !== 'AVAILABLE',
       };
     });
   },
