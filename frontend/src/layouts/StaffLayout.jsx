@@ -40,6 +40,7 @@ import NotificationsNoneRoundedIcon from '@mui/icons-material/NotificationsNoneR
 import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import { useAuth } from '../context/AuthContext';
+import cinemaTheme from '../theme/cinemaTheme';
 
 const drawerWidth = 280;
 
@@ -68,7 +69,7 @@ const StaffLayout = () => {
 
   const theme = useMemo(
     () =>
-      createTheme({
+      createTheme(cinemaTheme, {
         palette: {
           mode,
           primary: { main: '#e50914' },
@@ -86,7 +87,7 @@ const StaffLayout = () => {
         },
         shape: { borderRadius: 12 },
         typography: {
-          fontFamily: '"Inter", "IBM Plex Sans", system-ui, sans-serif',
+          fontFamily: '"Be Vietnam Pro", "Inter", system-ui, sans-serif',
           h4: { fontWeight: 700, letterSpacing: '-0.02em' },
           h6: { fontWeight: 600 },
         },

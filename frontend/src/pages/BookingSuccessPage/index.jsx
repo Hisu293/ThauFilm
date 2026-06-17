@@ -24,12 +24,15 @@ export const BookingSuccessPage = () => {
   useEffect(() => {
     if (location.state) {
       setBookingData(location.state);
+      if (Array.isArray(location.state.tickets)) {
+        setTickets(location.state.tickets);
+      }
     }
   }, [location.state]);
 
   // Load ticket details via API: GET /api/member/booking/{bookingId}/tickets
   useEffect(() => {
-    if (bookingData?.bookingId) {
+    if (bookingData?.bookingId && tickets.length === 0) {
       getTickets(bookingData.bookingId)
         .then((ticketList) => {
           setTickets(ticketList);
@@ -38,7 +41,7 @@ export const BookingSuccessPage = () => {
           setSnackbarOpen(true);
         });
     }
-  }, [bookingData?.bookingId, getTickets]);
+  }, [bookingData?.bookingId, getTickets, tickets.length]);
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('vi-VN', {
@@ -91,11 +94,11 @@ export const BookingSuccessPage = () => {
   }
 
   const { movie, showtime, selectedSeats, bookingCode, totalAmount, paymentMethod } = bookingData;
+  const theaterName = showtime?.theaterName || showtime?.cinemaName || 'ThauFilm Cinema';
 
-  const formattedDate = showtime?.dateId
-    ? new Date(
-        new Date().setDate(new Date().getDate() + parseInt(showtime.dateId.replace('date-', ''), 10))
-      ).toLocaleDateString('vi-VN', {
+  const showDate = showtime?.date || (showtime?.startTime ? String(showtime.startTime).slice(0, 10) : '');
+  const formattedDate = showDate
+    ? new Date(`${showDate}T00:00:00`).toLocaleDateString('vi-VN', {
         weekday: 'long',
         day: '2-digit',
         month: '2-digit',
@@ -191,7 +194,7 @@ export const BookingSuccessPage = () => {
                     Rạp chiếu
                   </Typography>
                   <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                    ThauFilm Cinema
+                    {theaterName}
                   </Typography>
                 </Grid>
                 <Grid item xs={6}>

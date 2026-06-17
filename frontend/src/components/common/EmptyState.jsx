@@ -1,9 +1,10 @@
-import { Box, Typography, Button } from '@mui/material';
+import { Box, Button, Typography } from '@mui/material';
 import InboxIcon from '@mui/icons-material/Inbox';
+import { t } from '../../i18n/labels';
 
 export const EmptyState = ({
   icon: IconComponent = InboxIcon,
-  title = 'Không có dữ liệu',
+  title = t('common', 'empty'),
   description = 'Hiện tại danh sách này đang trống, vui lòng thử lại sau.',
   actionText,
   onAction,
@@ -17,38 +18,32 @@ export const EmptyState = ({
         alignItems: 'center',
         justifyContent: 'center',
         textAlign: 'center',
-        p: 6,
+        p: { xs: 4, md: 6 },
         borderRadius: 4,
         bgcolor: 'background.paper',
-        border: '1px dashed rgba(148, 163, 184, 0.2)',
+        border: '1px dashed',
+        borderColor: 'divider',
         minHeight: 300,
+        boxShadow: '0 18px 45px rgba(0, 0, 0, 0.18)',
         ...sx,
       }}
     >
       <IconComponent
         sx={{
           fontSize: 60,
-          color: 'text.secondary',
+          color: 'primary.main',
           mb: 2,
-          opacity: 0.3,
+          opacity: 0.6,
         }}
       />
-      <Typography variant="h6" fontWeight={700} color="text.primary" sx={{ mb: 1 }}>
+      <Typography variant="h6" fontWeight={800} color="text.primary" sx={{ mb: 1 }}>
         {title}
       </Typography>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 3, maxWidth: 350 }}>
+      <Typography variant="body2" color="text.secondary" sx={{ mb: 3, maxWidth: 380 }}>
         {description}
       </Typography>
       {actionText && onAction && (
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={onAction}
-          sx={{
-            fontWeight: 700,
-            px: 4,
-          }}
-        >
+        <Button variant="contained" color="primary" onClick={onAction}>
           {actionText}
         </Button>
       )}

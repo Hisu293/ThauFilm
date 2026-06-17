@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
+  Alert,
   Box,
   Button,
   Dialog,
@@ -546,6 +547,7 @@ const SeatMapInline = ({ room, crud, seats, loading, onReload }) => {
 
 export const ShowtimesSection = ({ crud, movies, theaters, rooms }) => {
   const [dialog, setDialog] = useState(null);
+  const [formError, setFormError] = useState('');
   const [form, setForm] = useState({
     movieId: '',
     cinemaRoomId: '',
@@ -576,7 +578,16 @@ export const ShowtimesSection = ({ crud, movies, theaters, rooms }) => {
 
   const save = async () => {
     try {
+      setFormError('');
       if (dialog === 'add') {
+        if (!form.movieId || !form.cinemaRoomId || !form.startTime || !form.endTime) {
+          setFormError('Vui lòng chọn đầy đủ phim, phòng chiếu, giờ bắt đầu và giờ kết thúc.');
+          return;
+        }
+        if (new Date(form.endTime).getTime() <= new Date(form.startTime).getTime()) {
+          setFormError('Giờ kết thúc phải sau giờ bắt đầu.');
+          return;
+        }
         await crud.add({
           movieId: String(form.movieId),
           cinemaRoomId: String(form.cinemaRoomId),
@@ -588,8 +599,10 @@ export const ShowtimesSection = ({ crud, movies, theaters, rooms }) => {
         await crud.updateShowtime(dialog, { status: form.status });
       }
       setDialog(null);
+      setFormError('');
       setForm({ movieId: '', cinemaRoomId: '', startTime: '', endTime: '', status: 0 });
     } catch (err) {
+      setFormError(err.message || 'Không thể lưu suất chiếu.');
       console.error('Lỗi khi lưu suất chiếu:', err);
     }
   };
@@ -696,7 +709,8 @@ export const ShowtimesSection = ({ crud, movies, theaters, rooms }) => {
       </Box>
       <CrudDialog open={!!dialog} title={dialog === 'add' ? 'Tạo suất chiếu' : 'Sửa suất chiếu'} onClose={() => setDialog(null)} onSave={save}>
         {dialog === 'add' ? [
-            <TextField key="movie" select label="Phim" fullWidth value={form.movieId || ''} onChange={(e) => setForm({ ...form, movieId: String(e.target.value) })}>
+            formError && <Alert key="showtime-error" severity="error">{formError}</Alert>,
+            <TextField key="movie" select label="Phim" fullWidth value={form.movieId || ''} onChange={(e) => { setFormError(''); setForm({ ...form, movieId: String(e.target.value) }); }}>
               {movies.map((m) => (
                 <MenuItem key={m.id} value={m.id}>
                   {m.title}

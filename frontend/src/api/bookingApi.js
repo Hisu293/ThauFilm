@@ -1,5 +1,7 @@
 import axiosClient from './axiosClient';
 
+const DEFAULT_BOOKING_CHANNEL = 'ONLINE';
+
 export const bookingApi = {
   // ── Quick Booking widget endpoints ─────────────────────────────────────────
 
@@ -18,6 +20,11 @@ export const bookingApi = {
     return axiosClient.get(`/api/showtimes/movie/${movieId}`);
   },
 
+  // Get showtimes with optional filters: GET /api/showtimes
+  fetchShowtimes: (params = {}) => {
+    return axiosClient.get('/api/showtimes', { params });
+  },
+
   // ── Member booking endpoints ────────────────────────────────────────────────
 
   // Fetch seat layout for a selected showtime: GET /api/member/booking/showtimes/{showtimeId}/seats
@@ -26,11 +33,11 @@ export const bookingApi = {
   },
 
   // Create booking and temporarily hold seats: POST /api/member/booking
-  createBooking: (showtimeId, seatIds) => {
+  createBooking: (showtimeId, seatIds, channel = DEFAULT_BOOKING_CHANNEL) => {
     return axiosClient.post('/api/member/booking', {
       showtimeId,
       seatIds,
-      channel: 'ONLINE',
+      channel,
     });
   },
 
@@ -47,6 +54,16 @@ export const bookingApi = {
   // Display purchased tickets: GET /api/member/booking/{bookingId}/tickets
   fetchPurchasedTickets: (bookingId) => {
     return axiosClient.get(`/api/member/booking/${bookingId}/tickets`);
+  },
+
+  // List active discounts for the current member: GET /api/member/booking/discounts
+  fetchActiveDiscounts: () => {
+    return axiosClient.get('/api/member/booking/discounts');
+  },
+
+  // List active combos for the current member: GET /api/member/booking/combos
+  fetchActiveCombos: () => {
+    return axiosClient.get('/api/member/booking/combos');
   },
 
   // Confirm payment: POST /api/member/booking/{bookingId}/pay

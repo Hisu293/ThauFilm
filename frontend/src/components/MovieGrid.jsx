@@ -1,19 +1,14 @@
 import MovieCard from './MovieCard';
 import './MovieGrid.css';
 
-const MovieGrid = ({ movies = [] }) => {
+const MovieGrid = ({ movies = [], variant = 'nowShowing' }) => {
   return (
-    <section className="movie-grid">
+    <section className="movie-grid" aria-live="polite">
       {movies.map(movie => (
         <MovieCard
           key={movie.id}
-          id={movie.id}
-          title={movie.title}
-          image={movie.poster}
-          genre={movie.genre}
-          duration={movie.duration}
-          rating={movie.rating}
-          price={movie.price}
+          movie={movie}
+          variant={variant}
         />
       ))}
     </section>

@@ -44,6 +44,7 @@ const STATUS_CLASS = {
   'Đã xem': 'is-done',
   'Đã hủy': 'is-cancel',
   'Sắp chiếu': 'is-upcoming',
+  'Chờ thanh toán': 'is-pending',
 };
 
 const initialsOf = (name = '') =>
@@ -56,7 +57,7 @@ const formatDate = (iso) => {
 };
 
 /* ─── Premium ticket card ─── */
-const TicketCard = ({ ticket }) => (
+const TicketCard = ({ ticket, onResume }) => (
   <article className="pf-ticket">
     <div className="pf-ticket__left">
       <img className="pf-ticket__poster" src={ticket.poster} alt={ticket.movie} loading="lazy" />
@@ -86,7 +87,23 @@ const TicketCard = ({ ticket }) => (
         </div>
       </div>
       <div className="pf-ticket__footer">
-        <span className="pf-ticket__code">{ticket.id}</span>
+        <div className="pf-ticket__footer-main">
+          <span className="pf-ticket__code">{ticket.id}</span>
+          {ticket.remainingText && (
+            <span className={`pf-ticket__hold ${ticket.isExpired ? 'is-expired' : ''}`}>
+              {ticket.isExpired ? 'Hết thời gian giữ ghế' : `Còn ${ticket.remainingText} để thanh toán`}
+            </span>
+          )}
+        </div>
+        {ticket.canResume && (
+          <button
+            type="button"
+            className="pf-btn pf-btn--sm"
+            onClick={() => onResume(ticket)}
+          >
+            Tiếp tục thanh toán
+          </button>
+        )}
         <div className="pf-ticket__barcode">
           {Array.from({ length: 28 }, (_, i) => (
             <span key={i} className="pf-ticket__bar" style={{ height: `${10 + (i * 7 + 13) % 18}px` }} />
@@ -142,6 +159,17 @@ const ProfilePage = () => {
   const { loading: apiLoading, getHistory } = useBooking();
   const [history, setHistory] = useState([]);
   const [subTab, setSubTab] = useState('all');
+  const [nowTs, setNowTs] = useState(Date.now());
+
+  useEffect(() => {
+    if (active !== 'history' && active !== 'upcoming') return undefined;
+
+    const timer = window.setInterval(() => {
+      setNowTs(Date.now());
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, [active]);
 
   useEffect(() => {
     if (active === 'history' || active === 'upcoming') {
@@ -150,6 +178,13 @@ const ProfilePage = () => {
           const mapped = data.map((b) => {
             const date = new Date(b.startTime);
             const isPast = date < new Date();
+            const holdExpiresAt = b.holdExpiresAt ? new Date(b.holdExpiresAt) : null;
+            const holdExpiresMs = holdExpiresAt ? holdExpiresAt.getTime() : 0;
+            const remainingMs = holdExpiresMs ? Math.max(0, holdExpiresMs - nowTs) : 0;
+            const remainingTotalSeconds = Math.floor(remainingMs / 1000);
+            const remainingText = holdExpiresMs
+              ? `${String(Math.floor(remainingTotalSeconds / 60)).padStart(2, '0')}:${String(remainingTotalSeconds % 60).padStart(2, '0')}`
+              : '';
             let displayStatus = 'Sắp chiếu';
             if (b.status === 'CANCELLED') displayStatus = 'Đã hủy';
             else if (b.status === 'CONFIRMED' && isPast) displayStatus = 'Đã xem';
@@ -163,6 +198,7 @@ const ProfilePage = () => {
 
             return {
               id: b.confirmationCode || b.id,
+              bookingId: b.id,
               movie: b.movieTitle,
               poster,
               cinema: `ThauFilm Cinema • ${b.roomName}`,
@@ -178,7 +214,24 @@ const ProfilePage = () => {
               bookedAt: b.status === 'CONFIRMED' ? 'Đã thanh toán' : 'Chờ thanh toán',
               status: displayStatus,
               rawStatus: b.status,
-              startTime: date
+              startTime: date,
+              holdExpiresAt: b.holdExpiresAt,
+              remainingText,
+              isExpired: b.status === 'PENDING' && holdExpiresMs > 0 && remainingMs <= 0,
+              canResume: b.status === 'PENDING' && holdExpiresMs > nowTs,
+              moviePayload: {
+                title: b.movieTitle,
+                posterUrl: poster,
+              },
+              showtimePayload: {
+                id: b.showtimeId,
+                date: b.startTime ? String(b.startTime).slice(0, 10) : '',
+                time: b.startTime ? String(b.startTime).slice(11, 16) : '',
+                room: b.roomName,
+                format: '2D',
+                startTime: b.startTime,
+              },
+              selectedSeats: b.seats || [],
             };
           });
           setHistory(mapped);
@@ -186,6 +239,23 @@ const ProfilePage = () => {
         .catch(() => {});
     }
   }, [active, getHistory]);
+
+  useEffect(() => {
+    setHistory((current) => current.map((ticket) => {
+      if (!ticket.holdExpiresAt || ticket.rawStatus !== 'PENDING') return ticket;
+
+      const holdExpiresMs = new Date(ticket.holdExpiresAt).getTime();
+      const remainingMs = holdExpiresMs ? Math.max(0, holdExpiresMs - nowTs) : 0;
+      const remainingTotalSeconds = Math.floor(remainingMs / 1000);
+
+      return {
+        ...ticket,
+        remainingText: `${String(Math.floor(remainingTotalSeconds / 60)).padStart(2, '0')}:${String(remainingTotalSeconds % 60).padStart(2, '0')}`,
+        isExpired: holdExpiresMs > 0 && remainingMs <= 0,
+        canResume: holdExpiresMs > nowTs,
+      };
+    }));
+  }, [nowTs]);
 
   const filteredHistory = history.filter((t) => {
     if (subTab === 'done') return t.status === 'Đã xem';
@@ -224,6 +294,17 @@ const ProfilePage = () => {
   };
 
   const removeFavorite = (id) => setFavorites((list) => list.filter((m) => m.id !== id));
+  const resumePayment = (ticket) => {
+    navigate('/booking/payment', {
+      state: {
+        bookingId: ticket.bookingId,
+        movie: ticket.moviePayload,
+        showtime: ticket.showtimePayload,
+        selectedSeats: ticket.selectedSeats,
+        holdExpiresAt: ticket.holdExpiresAt,
+      },
+    });
+  };
 
   const MembershipCard = (
     <div className="pf-card pf-membership">
@@ -333,7 +414,7 @@ const ProfilePage = () => {
                 </Box>
               ) : filteredHistory.length ? (
                 <div className="pf-tickets">
-                  {filteredHistory.map((t) => <TicketCard key={t.id} ticket={t} />)}
+                  {filteredHistory.map((t) => <TicketCard key={t.id} ticket={t} onResume={resumePayment} />)}
                 </div>
               ) : (
                 <div className="pf-empty-state" style={{ minHeight: 200 }}>
@@ -354,7 +435,7 @@ const ProfilePage = () => {
                 </Box>
               ) : upcomingList.length ? (
                 <div className="pf-tickets">
-                  {upcomingList.map((t) => <TicketCard key={t.id} ticket={t} />)}
+                  {upcomingList.map((t) => <TicketCard key={t.id} ticket={t} onResume={resumePayment} />)}
                 </div>
               ) : (
                 <div className="pf-empty-state">

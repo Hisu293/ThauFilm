@@ -19,20 +19,16 @@ axiosClient.interceptors.request.use(
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
 // Response interceptor to handle connection timeouts, errors and extract clean messages
 axiosClient.interceptors.response.use(
-  (response) => {
-    return response.data; // Return raw data directly if API returns { success, message, data }
-  },
+  (response) => response.data,
   (error) => {
     if (!error.response) {
       return Promise.reject(
-        new Error(`Không thể kết nối đến server tại ${API_BASE_URL}. Vui lòng kiểm tra kết nối mạng hoặc server backend.`)
+        new Error(`KhÃ´ng thá»ƒ káº¿t ná»‘i Ä‘áº¿n server táº¡i ${API_BASE_URL}. Vui lÃ²ng kiá»ƒm tra káº¿t ná»‘i máº¡ng hoáº·c server backend.`)
       );
     }
 
@@ -40,9 +36,14 @@ axiosClient.interceptors.response.use(
       error.response?.data?.message ||
       error.response?.data?.error ||
       error.message ||
-      'Đã xảy ra lỗi hệ thống. Vui lòng thử lại sau.';
+      'ÄÃ£ xáº£y ra lá»—i há»‡ thá»‘ng. Vui lÃ²ng thá»­ láº¡i sau.';
 
-    return Promise.reject(new Error(message));
+    const normalizedError = new Error(message);
+    normalizedError.status = error.response?.status;
+    normalizedError.details = error.response?.data?.data;
+    normalizedError.raw = error.response?.data;
+
+    return Promise.reject(normalizedError);
   }
 );
 

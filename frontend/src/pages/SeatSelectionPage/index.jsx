@@ -12,21 +12,19 @@ import LoadingOverlay from '../../components/common/LoadingOverlay';
 import EmptyState from '../../components/common/EmptyState';
 
 import { useBooking } from '../../hooks/useBooking';
-import { MOCK_MOVIES, getShowtimesForMovieAndDate } from '../../mock/bookingData';
+import { bookingApi } from '../../api/bookingApi';
+import { bookingService } from '../../services/bookingService';
+import { fetchMovieById } from '../../services/movieService';
+import { pruneExpiredPendingBookings, savePendingBooking } from '../../utils/pendingBookingStorage';
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export const SeatSelectionPage = () => {
   const { showtimeId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
 
-  const {
-    loading: apiLoading,
-    error: apiError,
-    clearError,
-    getSeats,
-    create,
-    getDetail,
-  } = useBooking();
+  const { loading: apiLoading, error: apiError, clearError, getSeats, create, getHistory } = useBooking();
 
   const [movie, setMovie] = useState(null);
   const [showtime, setShowtime] = useState(null);
@@ -38,38 +36,80 @@ export const SeatSelectionPage = () => {
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
 
-  // Danh sách ghế đang bị khóa theo BE (sold/held)
-  const soldSeatIds = useMemo(() => {
-    const ids = new Set();
-    seats.forEach((s) => { if (s.isSold) ids.add(s.id); });
-    return ids;
-  }, [seats]);
+  const resumePendingBooking = (booking, seatsToUse) => {
+    savePendingBooking({
+      id: booking.id,
+      movie,
+      showtime,
+      selectedSeats: seatsToUse,
+      holdExpiresAt: booking.holdExpiresAt,
+      confirmationCode: booking.confirmationCode,
+    });
 
-  // Load movie/showtime từ router state hoặc fallback mock
+    navigate('/booking/summary', {
+      state: {
+        bookingId: booking.id,
+        movie,
+        showtime,
+        selectedSeats: seatsToUse,
+        holdExpiresAt: booking.holdExpiresAt,
+      },
+    });
+  };
+
+  // 1. Resolve movie and showtime configurations on page load/refresh
   useEffect(() => {
+    pruneExpiredPendingBookings();
+
+    let cancelled = false;
+
     let currentMovie = location.state?.movie;
     let currentShowtime = location.state?.showtime;
-
-    if ((!currentMovie || !currentShowtime) && showtimeId) {
-      for (const m of MOCK_MOVIES) {
-        for (let d = 0; d < 5; d++) {
-          const list = getShowtimesForMovieAndDate(m.id, `date-${d}`);
-          const found = list.find((s) => s.id === showtimeId);
-          if (found) {
-            currentMovie = m;
-            currentShowtime = found;
-            break;
-          }
-        }
-        if (currentShowtime) break;
-      }
-    }
 
     if (currentMovie && currentShowtime) {
       setMovie(currentMovie);
       setShowtime(currentShowtime);
+      setLoadingDetails(false);
+      return () => { cancelled = true; };
     }
-    setLoadingDetails(false);
+
+    if (!showtimeId) {
+      setLoadingDetails(false);
+      return () => { cancelled = true; };
+    }
+
+    setLoadingDetails(true);
+    bookingApi.fetchShowtimes()
+      .then((res) => {
+        if (cancelled) return null;
+        const rawShowtimes = res?.data ?? res ?? [];
+        const found = bookingService
+          .normalizeShowtimes(rawShowtimes)
+          .find((item) => item.id === String(showtimeId));
+
+        if (!found) return null;
+        setShowtime(found);
+
+        if (found.movieId) {
+          return fetchMovieById(found.movieId).then((movieDetail) => {
+            if (!cancelled) setMovie(movieDetail);
+          });
+        }
+
+        if (!cancelled) {
+          setMovie({ id: '', title: found.movieTitle || 'Phim đang chiếu', posterUrl: '/placeholder.svg' });
+        }
+        return null;
+      })
+      .catch((err) => {
+        setSnackbarMessage(err.message || 'Không tải được thông tin suất chiếu.');
+        setSnackbarOpen(true);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingDetails(false);
+      });
+
+    return () => { cancelled = true; };
   }, [showtimeId, location.state]);
 
   // Lấy sơ đồ ghế khi có showtimeId
@@ -154,38 +194,95 @@ export const SeatSelectionPage = () => {
   };
 
   const handleProceed = async () => {
-    if (apiLoading) return;
-    if (selectedSeats.length === 0) {
-      setSnackbarMessage('Vui lòng chọn ít nhất 1 ghế.');
-      setSnackbarOpen(true);
-      return;
-    }
+    if (selectedSeats.length === 0 || apiLoading) return;
 
-    const invalidSeat = selectedSeats.find((s) => soldSeatIds.has(s.id) || s.isSold);
-    if (invalidSeat) {
-      setSelectedSeats((prev) => prev.filter((s) => s.id !== invalidSeat.id));
-      setSnackbarMessage('Ghế bạn chọn vừa hết. Vui lòng chọn ghế khác.');
-      setSnackbarOpen(true);
-      return;
+    if (showtime?.startTime) {
+      const showtimeMs = new Date(showtime.startTime).getTime();
+      if (!Number.isNaN(showtimeMs) && showtimeMs <= Date.now()) {
+        setSnackbarMessage('Suất chiếu này đã qua giờ đặt vé. Vui lòng chọn suất chiếu khác.');
+        setSnackbarOpen(true);
+        return;
+      }
     }
-
+    
     const seatIds = selectedSeats.map((s) => s.id);
+    const invalidShowtimeId = !UUID_PATTERN.test(String(showtimeId || ''));
+    const invalidSeatIds = seatIds.filter((id) => !UUID_PATTERN.test(String(id || '')));
+
+    if (invalidShowtimeId || invalidSeatIds.length > 0) {
+      const localMessage = invalidShowtimeId
+        ? 'Suất chiếu hiện tại có mã không hợp lệ.'
+        : `Có ${invalidSeatIds.length} ghế đang mang mã không hợp lệ.`;
+
+      setSnackbarMessage(`${localMessage} Vui lòng tải lại trang hoặc chọn lại suất chiếu.`);
+      setSnackbarOpen(true);
+      console.error('Create booking blocked by local UUID validation', {
+        showtimeId,
+        seatIds,
+        invalidShowtimeId,
+        invalidSeatIds,
+      });
+      return;
+    }
+
     try {
-      const bookingResult = await create(showtimeId, seatIds);
+      // Create a booking hold on the backend
+      const bookingResult = await create(showtimeId, seatIds, 'ONLINE');
       if (bookingResult && bookingResult.id) {
-        setActiveBooking(bookingResult);
+        savePendingBooking({
+          id: bookingResult.id,
+          movie,
+          showtime,
+          selectedSeats,
+          holdExpiresAt: bookingResult.holdExpiresAt,
+          confirmationCode: bookingResult.confirmationCode,
+        });
+
         navigate('/booking/summary', {
           state: {
             bookingId: bookingResult.id,
             movie,
             showtime,
             selectedSeats,
-            activeBooking: bookingResult,
+            holdExpiresAt: bookingResult.holdExpiresAt,
           },
         });
       }
     } catch (err) {
-      // Lỗi đã được hook quản lý
+      try {
+        const history = await getHistory();
+        const selectedIdSet = new Set(seatIds.map(String));
+        const matchedPendingBooking = history.find((booking) => {
+          if (booking.status !== 'PENDING') return false;
+          if (String(booking.showtimeId) !== String(showtimeId)) return false;
+          if (!booking.holdExpiresAt || new Date(booking.holdExpiresAt).getTime() <= Date.now()) return false;
+
+          const bookingSeatIds = (booking.seats || []).map((seat) => String(seat.id));
+          if (bookingSeatIds.length !== selectedIdSet.size) return false;
+
+          return bookingSeatIds.every((id) => selectedIdSet.has(id));
+        });
+
+        if (matchedPendingBooking) {
+          resumePendingBooking(matchedPendingBooking, matchedPendingBooking.seats || selectedSeats);
+          return;
+        }
+      } catch {
+        // Fall through to snackbar with original API error
+      }
+
+      setSnackbarMessage(
+        err.message || 'Không thể giữ ghế. Có thể các ghế này đang nằm trong một đơn chờ thanh toán khác.'
+      );
+      console.error('Create booking failed', {
+        message: err.message,
+        details: err.details,
+        raw: err.raw,
+        showtimeId,
+        showtimeStartTime: showtime?.startTime,
+        seatIds,
+      });
+      setSnackbarOpen(true);
     }
   };
 
@@ -232,7 +329,7 @@ export const SeatSelectionPage = () => {
       <PageHeader
         title="Chọn Ghế Xem Phim"
         subtitle={`${movie.title} • ${showtime.time} • ${showtime.room}`}
-        onBack={() => navigate(`/movies/${movie.id}`)}
+        onBack={() => navigate(movie?.id ? `/movies/${movie.id}` : '/movies')}
       />
 
       <Box
@@ -251,7 +348,7 @@ export const SeatSelectionPage = () => {
               title="Không tìm thấy sơ đồ ghế"
               description="Hiện tại phòng chiếu này chưa được cấu hình sơ đồ ghế ngồi. Vui lòng chọn suất chiếu khác."
               actionText="Quay lại"
-              onAction={() => navigate(`/movies/${movie.id}`)}
+              onAction={() => navigate(movie?.id ? `/movies/${movie.id}` : '/movies')}
             />
           ) : (
             <SectionCard

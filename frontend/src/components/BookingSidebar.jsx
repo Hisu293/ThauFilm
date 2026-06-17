@@ -1,9 +1,9 @@
-import { Box, Card, CardContent, Divider, Stack, Typography, Button } from '@mui/material';
-import CustomButton from './common/CustomButton';
-import StatusChip from './common/StatusChip';
+import { Box, Card, CardContent, Divider, Stack, Typography } from '@mui/material';
 import CalendarTodayRoundedIcon from '@mui/icons-material/CalendarTodayRounded';
 import AccessTimeRoundedIcon from '@mui/icons-material/AccessTimeRounded';
-import MeetingRoomRoundedIcon from '@mui/icons-material/MeetingRoomRounded';
+import LocationOnRoundedIcon from '@mui/icons-material/LocationOnRounded';
+import CustomButton from './common/CustomButton';
+import StatusChip from './common/StatusChip';
 
 export const BookingSidebar = ({
   movie = {},
@@ -12,11 +12,11 @@ export const BookingSidebar = ({
   onProceed,
   proceedText = 'Tiếp tục thanh toán',
   disabled = false,
-  showSummaryOnly = false
+  showSummaryOnly = false,
 }) => {
-  // Total = sum of individual seat prices only (no service fee)
   const seatsTotal = selectedSeats.reduce((sum, seat) => sum + (seat.price || 0), 0);
   const totalAmount = seatsTotal;
+  const theaterName = showtime.theaterName || showtime.cinemaName || 'ThauFilm Cinema';
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('vi-VN', {
@@ -27,67 +27,52 @@ export const BookingSidebar = ({
 
   const getSeatGroupText = () => {
     if (selectedSeats.length === 0) return 'Chưa chọn ghế';
-    // Use human-readable label (A1, B2…) instead of UUID
-    return selectedSeats.map((s) => s.label || s.id).join(', ');
+    return selectedSeats.map((seat) => seat.label || seat.id).join(', ');
   };
 
-  // Resolve display date from multiple possible showtime shapes:
-  //   - API shape:  showtime.date = 'YYYY-MM-DD'
-  //   - Quick Booking shape: showtime.date = 'YYYY-MM-DD'
-  //   - Legacy mock shape: showtime.dateId = 'date-N'
   const formattedDate = (() => {
     const raw = showtime.date || showtime.startTime;
     if (raw) {
       try {
-        return new Date(raw.slice(0, 10) + 'T00:00:00').toLocaleDateString('vi-VN', {
+        return new Date(`${String(raw).slice(0, 10)}T00:00:00`).toLocaleDateString('vi-VN', {
           weekday: 'long',
           day: '2-digit',
           month: '2-digit',
           year: 'numeric',
         });
-      } catch { /* fall through */ }
-    }
-    // Legacy mock fallback: dateId = 'date-N' means today + N days
-    if (showtime.dateId) {
-      const offset = parseInt(showtime.dateId.replace('date-', ''), 10);
-      if (!isNaN(offset)) {
-        const d = new Date();
-        d.setDate(d.getDate() + offset);
-        return d.toLocaleDateString('vi-VN', {
-          weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric',
-        });
+      } catch {
+        return raw;
       }
     }
     return '—';
   })();
 
   return (
-    <Card 
-      sx={{ 
-        position: 'sticky', 
-        top: 96, 
+    <Card
+      sx={{
+        position: 'sticky',
+        top: 96,
         bgcolor: 'background.paper',
         borderRadius: 4,
         boxShadow: '0 15px 35px rgba(0, 0, 0, 0.4)',
-        border: '1px solid rgba(148, 163, 184, 0.08)'
+        border: '1px solid rgba(148, 163, 184, 0.08)',
       }}
     >
       <CardContent sx={{ p: 3 }}>
-        {/* Movie Info */}
         <Stack direction="row" spacing={2} sx={{ mb: 2.5 }}>
           <Box
             component="img"
-            src={movie.posterUrl}
+            src={movie.posterUrl || movie.poster || '/placeholder.svg'}
             alt={movie.title}
             sx={{
               width: 70,
               height: 100,
               objectFit: 'cover',
               borderRadius: 2,
-              border: '1px solid rgba(148, 163, 184, 0.1)'
+              border: '1px solid rgba(148, 163, 184, 0.1)',
             }}
           />
-          <Box sx={{ flex: 1 }}>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
             {movie.ageRating && <StatusChip label={movie.ageRating} type="age" sx={{ mb: 1 }} />}
             <Typography variant="subtitle1" sx={{ fontWeight: 800, lineHeight: 1.3, color: 'text.primary' }}>
               {movie.title}
@@ -100,7 +85,6 @@ export const BookingSidebar = ({
 
         <Divider sx={{ mb: 2 }} />
 
-        {/* Showtime detail */}
         <Stack spacing={1.5} sx={{ mb: 2.5 }}>
           <Stack direction="row" alignItems="center" spacing={1.5}>
             <CalendarTodayRoundedIcon sx={{ fontSize: 18, color: 'primary.main' }} />
@@ -108,7 +92,7 @@ export const BookingSidebar = ({
               <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
                 Ngày chiếu
               </Typography>
-              <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary', textTransform: 'capitalize' }}>
+              <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary', textTransform: 'capitalize' }}>
                 {formattedDate}
               </Typography>
             </Box>
@@ -120,20 +104,20 @@ export const BookingSidebar = ({
               <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
                 Suất chiếu
               </Typography>
-              <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
-                {showtime.time} • {showtime.format}
+              <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary' }}>
+                {showtime.time} {showtime.format ? `• ${showtime.format}` : ''}
               </Typography>
             </Box>
           </Stack>
 
           <Stack direction="row" alignItems="center" spacing={1.5}>
-            <MeetingRoomRoundedIcon sx={{ fontSize: 18, color: 'primary.main' }} />
+            <LocationOnRoundedIcon sx={{ fontSize: 18, color: 'primary.main' }} />
             <Box>
               <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
-                Rạp & Phòng chiếu
+                Rạp chiếu
               </Typography>
-              <Typography variant="body2" sx={{ fontWeight: 600, color: 'text.primary' }}>
-                ThauFilm Cinema • {showtime.room}
+              <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary' }}>
+                {theaterName}
               </Typography>
             </Box>
           </Stack>
@@ -141,18 +125,17 @@ export const BookingSidebar = ({
 
         <Divider sx={{ mb: 2 }} />
 
-        {/* Pricing calculations */}
         <Stack spacing={1.5} sx={{ mb: 3 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <Box sx={{ flex: 1, mr: 1 }}>
-              <Typography variant="body2" sx={{ fontWeight: 700, color: 'text.primary' }}>
+              <Typography variant="body2" sx={{ fontWeight: 800, color: 'text.primary' }}>
                 Ghế chọn:
               </Typography>
               <Typography variant="caption" color="text.secondary" sx={{ wordBreak: 'break-word' }}>
                 {getSeatGroupText()}
               </Typography>
             </Box>
-            <Typography variant="body2" sx={{ fontWeight: 700, color: 'primary.main', minWidth: 'fit-content' }}>
+            <Typography variant="body2" sx={{ fontWeight: 800, color: 'primary.main', minWidth: 'fit-content' }}>
               {formatCurrency(seatsTotal)}
             </Typography>
           </Box>
@@ -169,7 +152,6 @@ export const BookingSidebar = ({
           </Box>
         </Stack>
 
-        {/* Proceed Action Button */}
         {!showSummaryOnly && onProceed && (
           <CustomButton
             fullWidth

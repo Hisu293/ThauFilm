@@ -1,8 +1,7 @@
-import { Box, Typography, Stack } from '@mui/material';
+import { Box, Stack, Typography } from '@mui/material';
 import SeatItem from './SeatItem';
 
 export const SeatMap = ({ seats = [], selectedSeats = [], onToggleSelectSeat }) => {
-  // Group seats by row
   const seatsByRow = seats.reduce((acc, seat) => {
     if (!acc[seat.row]) {
       acc[seat.row] = [];
@@ -15,18 +14,17 @@ export const SeatMap = ({ seats = [], selectedSeats = [], onToggleSelectSeat }) 
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
-      {/* Curved Screen Design */}
       <Box sx={{ width: '80%', mb: 6, textAlign: 'center', position: 'relative' }}>
-        <Typography 
-          variant="caption" 
-          color="text.secondary" 
-          sx={{ 
-            display: 'block', 
-            mb: 1, 
-            letterSpacing: '0.3em', 
-            textTransform: 'uppercase', 
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{
+            display: 'block',
+            mb: 1,
+            letterSpacing: '0.3em',
+            textTransform: 'uppercase',
             fontWeight: 800,
-            opacity: 0.6
+            opacity: 0.6,
           }}
         >
           MÀN HÌNH CHIẾU
@@ -40,7 +38,6 @@ export const SeatMap = ({ seats = [], selectedSeats = [], onToggleSelectSeat }) 
             transform: 'perspective(100px) rotateX(-5deg)',
           }}
         />
-        {/* Ambient light glow behind screen */}
         <Box
           sx={{
             position: 'absolute',
@@ -54,32 +51,23 @@ export const SeatMap = ({ seats = [], selectedSeats = [], onToggleSelectSeat }) 
         />
       </Box>
 
-      {/* Seat Layout Grid */}
       <Box sx={{ overflowX: 'auto', width: '100%', pb: 3, display: 'flex', justifyContent: 'center' }}>
         <Stack spacing={1.5} sx={{ minWidth: 'max-content', px: 2 }}>
           {rows.map((row) => (
-            <Stack 
-              key={row} 
-              direction="row" 
-              alignItems="center" 
-              justifyContent="center" 
-              spacing={{ xs: 1, sm: 1.5 }}
-            >
-              {/* Row Label Left */}
-              <Typography 
-                variant="subtitle2" 
-                sx={{ 
-                  width: 20, 
-                  textAlign: 'center', 
-                  fontWeight: 700, 
+            <Stack key={row} direction="row" alignItems="center" justifyContent="center" spacing={{ xs: 1, sm: 1.5 }}>
+              <Typography
+                variant="subtitle2"
+                sx={{
+                  width: 20,
+                  textAlign: 'center',
+                  fontWeight: 700,
                   color: 'text.secondary',
-                  mr: 1
+                  mr: 1,
                 }}
               >
                 {row}
               </Typography>
 
-              {/* Seats in Row */}
               <Stack direction="row" spacing={{ xs: 0.8, sm: 1.2 }} alignItems="center">
                 {seatsByRow[row]
                   .sort((a, b) => a.col - b.col)
@@ -87,21 +75,20 @@ export const SeatMap = ({ seats = [], selectedSeats = [], onToggleSelectSeat }) 
                     <SeatItem
                       key={seat.id}
                       seat={seat}
-                      isSelected={selectedSeats.some((s) => s.id === seat.id)}
+                      isSelected={selectedSeats.some((selectedSeat) => selectedSeat.id === seat.id)}
                       onToggleSelect={onToggleSelectSeat}
                     />
                   ))}
               </Stack>
 
-              {/* Row Label Right */}
-              <Typography 
-                variant="subtitle2" 
-                sx={{ 
-                  width: 20, 
-                  textAlign: 'center', 
-                  fontWeight: 700, 
+              <Typography
+                variant="subtitle2"
+                sx={{
+                  width: 20,
+                  textAlign: 'center',
+                  fontWeight: 700,
                   color: 'text.secondary',
-                  ml: 1
+                  ml: 1,
                 }}
               >
                 {row}
@@ -111,7 +98,6 @@ export const SeatMap = ({ seats = [], selectedSeats = [], onToggleSelectSeat }) 
         </Stack>
       </Box>
 
-      {/* Color Guide Legend */}
       <Stack
         direction="row"
         spacing={{ xs: 2, sm: 4 }}
@@ -128,41 +114,45 @@ export const SeatMap = ({ seats = [], selectedSeats = [], onToggleSelectSeat }) 
         <Stack direction="row" alignItems="center" spacing={1}>
           <Box sx={{ width: 16, height: 16, border: '1.5px solid rgba(148, 163, 184, 0.3)', borderRadius: '4px' }} />
           <Typography variant="caption" color="text.secondary" fontWeight={600}>
-            Thường (85k)
+            Thường (90k)
           </Typography>
         </Stack>
+
         <Stack direction="row" alignItems="center" spacing={1}>
           <Box sx={{ width: 16, height: 16, border: '1.5px solid #8B5CF6', borderRadius: '4px', bgcolor: 'transparent' }} />
           <Typography variant="caption" color="text.secondary" fontWeight={600}>
-            VIP (115k)
+            VIP (120k)
           </Typography>
         </Stack>
+
         <Stack direction="row" alignItems="center" spacing={1}>
           <Box sx={{ width: 24, height: 16, border: '1.5px solid #EC4899', borderRadius: '6px', bgcolor: 'transparent' }} />
           <Typography variant="caption" color="text.secondary" fontWeight={600}>
             Đôi (220k)
           </Typography>
         </Stack>
+
         <Stack direction="row" alignItems="center" spacing={1}>
           <Box sx={{ width: 16, height: 16, bgcolor: 'primary.main', borderRadius: '4px' }} />
           <Typography variant="caption" color="text.secondary" fontWeight={600}>
             Đang chọn
           </Typography>
         </Stack>
+
         <Stack direction="row" alignItems="center" spacing={1}>
-          <Box 
-            sx={{ 
-              width: 16, 
-              height: 16, 
-              bgcolor: 'rgba(71, 85, 105, 0.2)', 
-              border: '1px dashed rgba(148, 163, 184, 0.2)', 
+          <Box
+            sx={{
+              width: 16,
+              height: 16,
+              bgcolor: 'rgba(71, 85, 105, 0.2)',
+              border: '1px dashed rgba(148, 163, 184, 0.2)',
               borderRadius: '4px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               fontSize: '8px',
               color: 'rgba(148, 163, 184, 0.5)',
-              fontWeight: 800
+              fontWeight: 800,
             }}
           >
             X

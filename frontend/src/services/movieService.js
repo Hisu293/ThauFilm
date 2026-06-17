@@ -1,4 +1,5 @@
 import api from './api';
+import { getMovieTrailerUrl } from '../data/movieTrailers';
 
 const STATUS_NOW = ['NOW_SHOWING', 'SHOWING', 'NOWSHOWING'];
 const STATUS_SOON = ['COMING_SOON', 'UPCOMING', 'COMINGSOON'];
@@ -34,6 +35,7 @@ const mapMovie = (movie) => {
     isNowShowing: STATUS_NOW.includes(status),
     isComingSoon: STATUS_SOON.includes(status),
     status: movie.status ?? 'NOW_SHOWING',
+    trailerUrl: getMovieTrailerUrl(movie),
   };
 };
 

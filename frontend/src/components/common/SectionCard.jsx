@@ -12,9 +12,14 @@ export const SectionCard = ({
   return (
     <Card
       sx={{
-        transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out',
+        borderRadius: 4,
+        border: '1px solid',
+        borderColor: 'divider',
+        bgcolor: 'background.paper',
+        transition: 'transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out, border-color 0.2s ease-in-out',
         '&:hover': {
-          boxShadow: '0 12px 40px -10px rgba(0, 0, 0, 0.7)',
+          borderColor: 'rgba(251, 191, 36, 0.22)',
+          boxShadow: '0 18px 45px rgba(0, 0, 0, 0.32)',
         },
         ...sx,
       }}
@@ -30,12 +35,12 @@ export const SectionCard = ({
               fontWeight: 700,
               color: 'text.primary',
             }}
-            sx={{ px: 3, py: 2 }}
+            sx={{ px: { xs: 2.25, sm: 3 }, py: 2.25 }}
           />
           {divider && <Divider />}
         </>
       )}
-      <CardContent sx={{ px: 3, py: 3, '&:last-child': { pb: 3 }, ...contentSx }}>
+      <CardContent sx={{ px: { xs: 2.25, sm: 3 }, py: 3, '&:last-child': { pb: 3 }, ...contentSx }}>
         {children}
       </CardContent>
     </Card>
