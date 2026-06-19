@@ -1,81 +1,49 @@
 import { Box, Tooltip, Zoom } from '@mui/material';
+import { SEAT_TYPE, enumLabel } from '../constants/enums';
+
+const TYPE_COLOR = {
+  VIP: '#8B5CF6',
+  COUPLE: '#EC4899',
+  STANDARD: '#94A3B8',
+};
+
+const TYPE_GLOW = {
+  VIP: 'rgba(139, 92, 246, 0.45)',
+  COUPLE: 'rgba(236, 72, 153, 0.45)',
+  STANDARD: 'rgba(148, 163, 184, 0.35)',
+};
 
 export const SeatItem = ({ seat, isSelected, onToggleSelect }) => {
   const { id, label, type, price, isSold } = seat;
-  const displayName = label || id; // prefer human-readable label (A1, B2…)
+  const displayName = label || id;
+  const isDouble = type === 'COUPLE';
+  const accent = TYPE_COLOR[type] || TYPE_COLOR.STANDARD;
 
-  const getSeatColor = () => {
-    if (isSold) return 'rgba(148, 163, 184, 0.15)';
-    if (isSelected) return '#FBBF24'; // Gold when selected
-
-    switch (type) {
-      case 'VIP':
-        return '#8B5CF6'; // Violet for VIP
-      case 'DOUBLE':
-        return '#EC4899'; // Pink for Double/Sweetbox
-      case 'STANDARD':
-      default:
-        return 'rgba(148, 163, 184, 0.3)'; // Slate/Gray for Standard
+  const seatStyles = () => {
+    if (isSold) {
+      return {
+        bgcolor: 'rgba(71, 85, 105, 0.18)',
+        border: '1px dashed rgba(148, 163, 184, 0.25)',
+        color: 'rgba(148, 163, 184, 0.5)',
+        cursor: 'not-allowed',
+        boxShadow: 'none',
+      };
     }
-  };
-
-  const getSeatHoverColor = () => {
-    if (isSold) return 'none';
-    if (isSelected) return '#F59E0B'; // Darker gold
-    
-    switch (type) {
-      case 'VIP':
-        return '#A78BFA'; // Lighter violet
-      case 'DOUBLE':
-        return '#F472B6'; // Lighter pink
-      case 'STANDARD':
-      default:
-        return 'rgba(148, 163, 184, 0.5)';
+    if (isSelected) {
+      return {
+        background: 'radial-gradient(circle at 50% 42%, #FFFFFF 0%, #FFFFFF 46%, #FCD34D 58%, #FBBF24 100%)',
+        border: '1.5px solid #FBBF24',
+        color: '#0F172A',
+        cursor: 'pointer',
+        boxShadow: '0 6px 16px rgba(251, 191, 36, 0.5)',
+      };
     }
-  };
-
-  const getSeatStyles = () => {
-    const isDouble = type === 'DOUBLE';
-    const baseColor = getSeatColor();
-    const hoverColor = getSeatHoverColor();
-
     return {
-      width: isDouble ? { xs: 50, sm: 60 } : { xs: 26, sm: 32 },
-      height: { xs: 26, sm: 32 },
-      bgcolor: isSold ? 'rgba(71, 85, 105, 0.2)' : isSelected ? 'primary.main' : 'transparent',
-      color: isSelected ? 'primary.contrastText' : 'text.primary',
-      border: isSold 
-        ? '1px dashed rgba(148, 163, 184, 0.2)' 
-        : `1.5px solid ${baseColor}`,
-      borderRadius: isDouble ? '10px' : '6px',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      fontSize: { xs: '0.65rem', sm: '0.75rem' },
-      fontWeight: 700,
-      cursor: isSold ? 'not-allowed' : 'pointer',
-      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-      userSelect: 'none',
-      position: 'relative',
-      overflow: 'hidden',
-      '&::before': (type === 'VIP' && !isSold && !isSelected) ? {
-        content: '""',
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        height: '4px',
-        bgcolor: '#8B5CF6',
-      } : {},
-      '&:hover': !isSold ? {
-        bgcolor: hoverColor,
-        borderColor: hoverColor,
-        color: isSelected ? 'primary.contrastText' : '#0F172A',
-        transform: 'scale(1.1)',
-        boxShadow: `0 0 10px ${hoverColor}80`,
-        zIndex: 2,
-      } : {},
-      opacity: isSold ? 0.45 : 1,
+      bgcolor: 'rgba(15, 23, 42, 0.35)',
+      border: `1.5px solid ${accent}`,
+      color: 'text.primary',
+      cursor: 'pointer',
+      boxShadow: 'none',
     };
   };
 
@@ -86,20 +54,66 @@ export const SeatItem = ({ seat, isSelected, onToggleSelect }) => {
 
   const tooltipTitle = isSold
     ? `Ghế ${displayName} - Đã bán`
-    : `Ghế ${displayName} (${type}) - ${formattedPrice}`;
+    : `Ghế ${displayName} (${enumLabel(SEAT_TYPE, type)}) - ${formattedPrice}`;
 
   return (
-    <Tooltip 
-      title={tooltipTitle} 
-      TransitionComponent={Zoom} 
-      arrow
-      disableInteractive
-    >
-      <Box 
+    <Tooltip title={tooltipTitle} TransitionComponent={Zoom} arrow disableInteractive>
+      <Box
         onClick={() => !isSold && onToggleSelect(seat)}
-        sx={getSeatStyles()}
+        sx={{
+          position: 'relative',
+          width: isDouble ? { xs: 54, sm: 64 } : { xs: 30, sm: 36 },
+          height: { xs: 30, sm: 36 },
+          // cinema-seat silhouette: rounded top (backrest), flat bottom (base)
+          borderRadius: '10px 10px 5px 5px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: { xs: '0.62rem', sm: '0.72rem' },
+          fontWeight: 800,
+          letterSpacing: '0.02em',
+          userSelect: 'none',
+          transition: 'transform 0.18s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.18s ease, background-color 0.18s ease',
+          ...seatStyles(),
+          // armrests at the base
+          '&::after': isSold
+            ? {}
+            : {
+                content: '""',
+                position: 'absolute',
+                bottom: 1,
+                left: 2,
+                right: 2,
+                height: '3px',
+                borderRadius: '3px',
+                bgcolor: isSelected ? 'rgba(15,23,42,0.35)' : `${accent}55`,
+              },
+          '&:hover': !isSold
+            ? {
+                transform: 'translateY(-2px) scale(1.08)',
+                boxShadow: `0 8px 18px ${isSelected ? 'rgba(251,191,36,0.5)' : TYPE_GLOW[type] || TYPE_GLOW.STANDARD}`,
+                zIndex: 2,
+              }
+            : {},
+        }}
       >
-        {isSold ? 'X' : displayName}
+        {isSold ? (
+          'X'
+        ) : isSelected ? (
+          <Box
+            component="img"
+            src="/logo-removebg-preview.png"
+            alt="ThauFilm"
+            sx={{
+              width: '74%',
+              height: '74%',
+              objectFit: 'contain',
+              pointerEvents: 'none',
+            }}
+          />
+        ) : (
+          displayName
+        )}
       </Box>
     </Tooltip>
   );

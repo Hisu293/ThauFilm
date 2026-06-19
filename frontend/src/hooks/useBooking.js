@@ -16,14 +16,44 @@ export const useBooking = () => {
   const getSeats = useCallback(async (showtimeId) => {
     setLoading(true);
     setError(null);
+    console.groupCollapsed(`%c[USER][getSeats] GET /api/member/booking/showtimes/${showtimeId}/seats`, 'color:#38BDF8;font-weight:bold');
     try {
       const response = await bookingApi.fetchShowtimeSeats(showtimeId);
+      console.log('%c✓ API trả về (raw envelope):', 'color:#22C55E', response);
       const rawSeats = response?.data ?? response ?? [];
-      return bookingService.normalizeSeats(rawSeats);
+      console.log('→ rawSeats (mảng ghế trước normalize):', Array.isArray(rawSeats) ? `${rawSeats.length} ghế` : rawSeats, rawSeats);
+      const normalized = bookingService.normalizeSeats(rawSeats);
+      console.log('→ Sau normalize:', `${normalized.length} ghế`, normalized);
+      if (normalized.length > 0) {
+        console.table(normalized.map((s) => ({ id: s.id, label: s.label, row: s.row, col: s.col, type: s.type, price: s.price, isSold: s.isSold })));
+
+        // Cảnh báo nếu backend trả dữ liệu mẫu/placeholder (mọi ghế trùng label)
+        const uniqueLabels = new Set(normalized.map((s) => s.label));
+        if (uniqueLabels.size === 1 && normalized.length > 1) {
+          console.warn(
+            `⚠ TẤT CẢ ${normalized.length} ghế đều có label "${[...uniqueLabels][0]}". ` +
+            'Frontend normalize ĐÚNG — đây là do BACKEND trả dữ liệu mẫu (rowName/seatNumber giống nhau cho mọi ghế). ' +
+            'Kiểm tra response API: mỗi ghế cần rowName (A,B,C…) + seatNumber (1,2,3…) khác nhau.'
+          );
+        }
+      } else {
+        console.warn('⚠ Mảng ghế rỗng — backend chưa cấu hình sơ đồ ghế cho showtime này, hoặc trả về sai shape.');
+      }
+
+      // Cấu trúc 2 chiều dùng để render sơ đồ (tham khảo nhanh trong console)
+      console.log('→ Gom theo hàng (groupSeatsByRow):', bookingService.groupSeatsByRow(normalized));
+      return normalized;
     } catch (err) {
+      console.error('%c✗ getSeats LỖI:', 'color:#EF4444;font-weight:bold', {
+        message: err.message,
+        status: err.status,
+        details: err.details,
+        raw: err.raw,
+      });
       setError(err.message || 'Không thể tải sơ đồ ghế.');
       throw err;
     } finally {
+      console.groupEnd();
       setLoading(false);
     }
   }, []);
@@ -32,14 +62,26 @@ export const useBooking = () => {
   const create = useCallback(async (showtimeId, seatIds, channel = 'ONLINE') => {
     setLoading(true);
     setError(null);
+    console.groupCollapsed('%c[USER][create] POST /api/member/booking (giữ ghế)', 'color:#FBBF24;font-weight:bold');
+    console.log('→ Payload:', { showtimeId, seatIds, channel });
     try {
       const res = await bookingApi.createBooking(showtimeId, seatIds, channel);
+      console.log('%c✓ API trả về (raw envelope):', 'color:#22C55E', res);
       const rawBooking = res?.data ?? res;
-      return bookingService.normalizeBooking(rawBooking);
+      const normalized = bookingService.normalizeBooking(rawBooking);
+      console.log('→ Booking sau normalize:', normalized);
+      return normalized;
     } catch (err) {
+      console.error('%c✗ create LỖI:', 'color:#EF4444;font-weight:bold', {
+        message: err.message,
+        status: err.status,
+        details: err.details,
+        raw: err.raw,
+      });
       setError(err.message || 'Không thể tạo đơn giữ ghế.');
       throw err;
     } finally {
+      console.groupEnd();
       setLoading(false);
     }
   }, []);

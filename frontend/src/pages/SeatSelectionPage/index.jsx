@@ -169,6 +169,11 @@ export const SeatSelectionPage = () => {
     }
   }, [apiError]);
 
+  const soldSeatIds = useMemo(
+    () => new Set(seats.filter((s) => s.isSold).map((s) => s.id)),
+    [seats],
+  );
+
   const handleToggleSelectSeat = (seat) => {
     setSelectedSeats((prev) => {
       const isAlreadySelected = prev.some((s) => s.id === seat.id);

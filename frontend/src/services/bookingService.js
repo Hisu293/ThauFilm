@@ -1,32 +1,69 @@
+import { normalizeSeatType } from '../constants/enums';
+
 export const bookingService = {
   /**
    * Normalize seat layout array returned by the API
-   * Backend shape: { seatId, rowName, seatNumber, type, available, price }
-   * UI shape: { id, row, col, type, price, isSold, label, rowName, seatNumber }
+   * Backend shape: { seatId, rowName, seatNumber, type, status, available, price }
+   * UI shape: { id, row, col, type, price, isSold, bookingStatus, label, rowName, seatNumber }
    */
   normalizeSeats: (backendSeats = []) => {
     if (!Array.isArray(backendSeats)) return [];
 
-    return backendSeats.map((seat) => {
-      const rowName = seat.rowName || 'A';
-      const seatNumber = typeof seat.seatNumber === 'number' && Number.isFinite(seat.seatNumber)
-        ? seat.seatNumber
-        : parseInt(String(seat.seatNumber || ''), 10) || 0;
-      const col = seatNumber > 0 ? seatNumber : NaN;
-      const normalizedType = String(seat.type || 'STANDARD').toUpperCase();
+    return backendSeats
+      .map((seat) => {
+        // 1. seatId là khóa độc nhất — KHÔNG được bịa/ghi đè. Bỏ ghế không có id.
+        const id = seat.seatId ?? seat.id ?? null;
 
-      return {
-        id: seat.seatId,
-        label: `${rowName}${seatNumber}`,
-        row: rowName,
-        rowName,
-        col,
-        seatNumber,
-        type: normalizedType === 'NORMAL' || normalizedType === 'STANDARD' ? 'STANDARD' : normalizedType,
-        price: Number(seat.price) || 0,
-        isSold: seat.status !== 'AVAILABLE',
-      };
+        // 2. rowName: chỉ fallback khi thực sự thiếu (null/undefined/''), không nuốt 'B','C'...
+        const rawRow = seat.rowName;
+        const rowName = rawRow === null || rawRow === undefined || rawRow === '' ? 'A' : String(rawRow);
+
+        // 3. seatNumber: parse số, GIỮ NGUYÊN số 0 hợp lệ (lỗi cũ: `|| 1` biến 0 thành 1)
+        const parsed = Number(seat.seatNumber);
+        const col = Number.isFinite(parsed) ? parsed : 1;
+
+        const bookingStatus = String(seat.status || (seat.available ? 'AVAILABLE' : 'SOLD')).toUpperCase();
+        const isSold = seat.available === false || ['HOLDING', 'BOOKED', 'SOLD'].includes(bookingStatus);
+
+        return {
+          id,
+          label: `${rowName}${col}`,
+          row: rowName,
+          rowName,
+          col,
+          seatNumber: col,
+          type: normalizeSeatType(seat.type),
+          price: Number(seat.price) || 0,
+          bookingStatus,
+          isSold,
+        };
+      })
+      .filter((seat) => seat.id != null);
+  },
+
+  /**
+   * Gom danh sách ghế phẳng thành cấu trúc 2 chiều theo hàng, đã sort sẵn,
+   * để render lồng .map() trực quan:
+   *   groupSeatsByRow(seats).map(({ rowName, seats }) => (
+   *     <Row>{seats.map(seat => <Seat key={seat.id} .../>)}</Row>
+   *   ))
+   * Trả về: [{ rowName: 'A', seats: [ {…col 1}, {…col 2} ] }, { rowName: 'B', ... }]
+   */
+  groupSeatsByRow: (normalizedSeats = []) => {
+    if (!Array.isArray(normalizedSeats)) return [];
+
+    const byRow = new Map();
+    normalizedSeats.forEach((seat) => {
+      if (!byRow.has(seat.rowName)) byRow.set(seat.rowName, []);
+      byRow.get(seat.rowName).push(seat);
     });
+
+    return [...byRow.entries()]
+      .sort(([a], [b]) => a.localeCompare(b)) // A, B, C... theo thứ tự
+      .map(([rowName, seats]) => ({
+        rowName,
+        seats: seats.slice().sort((s1, s2) => s1.col - s2.col), // 1, 2, 3... trong hàng
+      }));
   },
 
   /**
@@ -55,7 +92,7 @@ export const bookingService = {
         rowName: seat.rowName,
         col: seat.seatNumber,
         seatNumber: seat.seatNumber,
-        type: seat.type === 'NORMAL' ? 'STANDARD' : seat.type,
+        type: normalizeSeatType(seat.type),
         price: Number(seat.price) || 0,
       })),
     };

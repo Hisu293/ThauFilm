@@ -10,12 +10,16 @@ const unwrap = (res) => (res?.data?.data != null ? res.data.data : res?.data ?? 
 export const ROOM_FIELDS = [
   'name',
   'theaterId',
+  'type',
   'rowsCount',
   'seatsPerRow',
   'status',
 ];
 
-/** Chỉ giữ lại các field backend nhận. */
+/**
+ * Chỉ giữ lại các field backend nhận.
+ * status: ACTIVE | INACTIVE | MAINTENANCE — type: STANDARD | VIP | IMAX | FOUR_DX
+ */
 export const toRoomPayload = (form) => {
   const payload = {};
   for (const key of ROOM_FIELDS) {
@@ -23,15 +27,15 @@ export const toRoomPayload = (form) => {
   }
   if (form.rowsCount !== undefined) payload.rowsCount = Number(form.rowsCount);
   if (form.seatsPerRow !== undefined) payload.seatsPerRow = Number(form.seatsPerRow);
-  if (form.status !== undefined) payload.status = Number(form.status);
   return payload;
 };
 
-/** Payload cho PUT /api/admin/rooms/{id} — chỉ name + status */
+/** Payload cho PUT /api/admin/rooms/{id} — name + type + status */
 export const toRoomUpdatePayload = (form) => {
   const payload = {};
   if (form.name !== undefined) payload.name = form.name;
-  if (form.status !== undefined) payload.status = Number(form.status);
+  if (form.type !== undefined && form.type !== '') payload.type = form.type;
+  if (form.status !== undefined) payload.status = form.status;
   return payload;
 };
 

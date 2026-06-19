@@ -161,24 +161,45 @@ export const BookingSuccessPage = () => {
           }} 
         />
 
+        {/* Booking code — full width, perfectly centered */}
+        <Box
+          sx={{
+            position: 'relative',
+            zIndex: 1,
+            mb: 4,
+            py: 3,
+            px: 2,
+            borderRadius: 3,
+            border: '1px dashed rgba(251, 191, 36, 0.35)',
+            bgcolor: 'rgba(251, 191, 36, 0.06)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            textAlign: 'center',
+            gap: 1,
+          }}
+        >
+          <ConfirmationNumberRoundedIcon sx={{ color: 'primary.main', fontSize: 30 }} />
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{ textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.12em' }}
+          >
+            Mã đặt vé (Booking Code)
+          </Typography>
+          <Typography
+            variant="h4"
+            sx={{ fontWeight: 900, color: 'primary.main', letterSpacing: '0.18em', lineHeight: 1, pl: '0.18em' }}
+          >
+            {bookingCode}
+          </Typography>
+        </Box>
+
         <Grid container spacing={4} sx={{ position: 'relative', zIndex: 1 }}>
           {/* Left: summary info */}
           <Grid item xs={12} md={7.5}>
             <Stack spacing={2.5}>
-              <Stack direction="row" alignItems="center" spacing={1.5}>
-                <ConfirmationNumberRoundedIcon sx={{ color: 'primary.main', fontSize: 32 }} />
-                <Box>
-                  <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.1em' }}>
-                    Mã đặt vé (Booking Code)
-                  </Typography>
-                  <Typography variant="h5" sx={{ fontWeight: 900, color: 'primary.main', letterSpacing: '0.05em' }}>
-                    {bookingCode}
-                  </Typography>
-                </Box>
-              </Stack>
-
-              <Divider />
-
               <Stack spacing={1}>
                 <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', fontWeight: 600 }}>
                   Tên Phim

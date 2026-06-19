@@ -66,20 +66,20 @@ select.qb-field__control option { background: #1a1a1e; color: #fff; }
 
 .qb-submit {
   height: 48px;
-  padding: 0 26px;
+  padding: 12px 22px;
   border-radius: 12px;
-  border: none;
+  border: 1px solid transparent;
   background: #e50914;
   color: #fff;
-  font-weight: 800;
+  font-weight: 700;
   font-size: 0.95rem;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   gap: 8px;
   white-space: nowrap;
-  box-shadow: 0 10px 26px rgba(229, 9, 20, 0.4);
-  transition: transform 0.15s ease, background 0.2s ease;
+  box-shadow: 0 10px 30px rgba(229, 9, 20, 0.4);
+  transition: transform 0.15s ease, background 0.2s ease, box-shadow 0.2s ease;
 }
 .qb-submit:hover:not(:disabled) { transform: translateY(-2px); background: #ff111d; }
 .qb-submit:disabled { opacity: 0.6; cursor: not-allowed; }
