@@ -25,6 +25,7 @@ import SectionCard from '../../components/common/SectionCard';
 import CustomButton from '../../components/common/CustomButton';
 import LoadingOverlay from '../../components/common/LoadingOverlay';
 import StatusChip from '../../components/common/StatusChip';
+import { SEAT_TYPE, enumLabel } from '../../constants/enums';
 import { useBooking } from '../../hooks/useBooking';
 import { useHoldCountdown } from '../../hooks/useHoldCountdown';
 import {
@@ -355,20 +356,20 @@ export const BookingSummaryPage = () => {
                             borderColor:
                               seat.type === 'VIP'
                                 ? '#8B5CF6'
-                                : seat.type === 'DOUBLE'
+                                : seat.type === 'COUPLE'
                                   ? '#EC4899'
                                   : 'rgba(148,163,184,0.3)',
                             color:
                               seat.type === 'VIP'
                                 ? '#A78BFA'
-                                : seat.type === 'DOUBLE'
+                                : seat.type === 'COUPLE'
                                   ? '#F472B6'
                                   : 'text.primary',
                             bgcolor: 'rgba(30, 41, 59, 0.3)',
                           }}
                         >
                           {seat.rowName}
-                          {seat.seatNumber} ({seat.type})
+                          {seat.seatNumber} ({enumLabel(SEAT_TYPE, seat.type)})
                         </Paper>
                       ))}
                     </Stack>

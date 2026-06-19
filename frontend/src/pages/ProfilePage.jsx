@@ -23,7 +23,7 @@ import PaletteRoundedIcon from '@mui/icons-material/PaletteRounded';
 import SecurityRoundedIcon from '@mui/icons-material/SecurityRounded';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import { useAuth } from '../context/AuthContext';
-import { profileUser, bookingHistory, upcomingTickets, favoriteMovies } from '../data/profileMock';
+import { profileUser, bookingHistory, favoriteMovies } from '../data/profileMock';
 import { useBooking } from '../hooks/useBooking';
 import { MOCK_MOVIES } from '../mock/bookingData';
 import { CircularProgress } from '@mui/material';
@@ -33,7 +33,6 @@ import './ProfilePage.css';
 const MENU = [
   { key: 'info', label: 'Thông Tin Cá Nhân', Icon: PersonRoundedIcon },
   { key: 'history', label: 'Vé Của Tôi', Icon: ConfirmationNumberRoundedIcon },
-  { key: 'upcoming', label: 'Vé Sắp Chiếu', Icon: EventSeatRoundedIcon },
   { key: 'favorites', label: 'Phim Đã Lưu', Icon: FavoriteRoundedIcon },
   { key: 'password', label: 'Đổi Mật Khẩu', Icon: LockRoundedIcon },
   { key: 'notifications', label: 'Thông Báo', Icon: NotificationsRoundedIcon },
@@ -95,20 +94,22 @@ const TicketCard = ({ ticket, onResume }) => (
             </span>
           )}
         </div>
-        {ticket.canResume && (
+        {(ticket.canResume || ticket.status === 'Chờ thanh toán') ? (
           <button
             type="button"
-            className="pf-btn pf-btn--sm"
+            className="pf-btn pf-btn--sm pf-btn--pay"
             onClick={() => onResume(ticket)}
           >
-            Tiếp tục thanh toán
+            <ConfirmationNumberRoundedIcon sx={{ fontSize: 16 }} />
+            Thanh toán ngay
           </button>
+        ) : (
+          <div className="pf-ticket__barcode">
+            {Array.from({ length: 28 }, (_, i) => (
+              <span key={i} className="pf-ticket__bar" style={{ height: `${10 + (i * 7 + 13) % 18}px` }} />
+            ))}
+          </div>
         )}
-        <div className="pf-ticket__barcode">
-          {Array.from({ length: 28 }, (_, i) => (
-            <span key={i} className="pf-ticket__bar" style={{ height: `${10 + (i * 7 + 13) % 18}px` }} />
-          ))}
-        </div>
       </div>
     </div>
   </article>
@@ -185,10 +186,12 @@ const ProfilePage = () => {
             const remainingText = holdExpiresMs
               ? `${String(Math.floor(remainingTotalSeconds / 60)).padStart(2, '0')}:${String(remainingTotalSeconds % 60).padStart(2, '0')}`
               : '';
+            const normStatus = String(b.status || '').toUpperCase();
+            const isPending = normStatus === 'PENDING';
             let displayStatus = 'Sắp chiếu';
-            if (b.status === 'CANCELLED') displayStatus = 'Đã hủy';
-            else if (b.status === 'CONFIRMED' && isPast) displayStatus = 'Đã xem';
-            else if (b.status === 'PENDING') displayStatus = 'Chờ thanh toán';
+            if (normStatus === 'CANCELLED') displayStatus = 'Đã hủy';
+            else if (normStatus === 'CONFIRMED' && isPast) displayStatus = 'Đã xem';
+            else if (isPending) displayStatus = 'Chờ thanh toán';
 
             // Lookup mock movie details to retrieve the correct image URL
             const mockMovie = MOCK_MOVIES.find((m) =>
@@ -211,14 +214,14 @@ const ProfilePage = () => {
                 minute: '2-digit'
               }),
               seats: b.seats.map((s) => s.label),
-              bookedAt: b.status === 'CONFIRMED' ? 'Đã thanh toán' : 'Chờ thanh toán',
+              bookedAt: normStatus === 'CONFIRMED' ? 'Đã thanh toán' : 'Chờ thanh toán',
               status: displayStatus,
-              rawStatus: b.status,
+              rawStatus: normStatus,
               startTime: date,
               holdExpiresAt: b.holdExpiresAt,
               remainingText,
-              isExpired: b.status === 'PENDING' && holdExpiresMs > 0 && remainingMs <= 0,
-              canResume: b.status === 'PENDING' && holdExpiresMs > nowTs,
+              isExpired: isPending && holdExpiresMs > 0 && remainingMs <= 0,
+              canResume: isPending,
               moviePayload: {
                 title: b.movieTitle,
                 posterUrl: poster,
@@ -252,20 +255,17 @@ const ProfilePage = () => {
         ...ticket,
         remainingText: `${String(Math.floor(remainingTotalSeconds / 60)).padStart(2, '0')}:${String(remainingTotalSeconds % 60).padStart(2, '0')}`,
         isExpired: holdExpiresMs > 0 && remainingMs <= 0,
-        canResume: holdExpiresMs > nowTs,
+        canResume: true,
       };
     }));
   }, [nowTs]);
 
   const filteredHistory = history.filter((t) => {
+    if (subTab === 'pending') return t.status === 'Chờ thanh toán';
     if (subTab === 'done') return t.status === 'Đã xem';
     if (subTab === 'cancel') return t.status === 'Đã hủy';
     return true;
   });
-
-  const upcomingList = history.filter(
-    (t) => t.status === 'Sắp chiếu' || t.status === 'Chờ thanh toán'
-  );
 
   /* settings state */
   const [notifEmail, setNotifEmail] = useState(true);
@@ -385,14 +385,21 @@ const ProfilePage = () => {
               <div className="pf-section-header">
                 <h2 className="pf-section__title">Vé của tôi</h2>
                 <div className="pf-tabs">
-                  <span 
+                  <span
                     className={`pf-tab ${subTab === 'all' ? 'is-active' : ''}`}
                     onClick={() => setSubTab('all')}
                     style={{ cursor: 'pointer' }}
                   >
                     Tất cả ({history.length})
                   </span>
-                  <span 
+                  <span
+                    className={`pf-tab ${subTab === 'pending' ? 'is-active' : ''}`}
+                    onClick={() => setSubTab('pending')}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    {history.filter(t => t.status === 'Chờ thanh toán').length} Chờ thanh toán
+                  </span>
+                  <span
                     className={`pf-tab ${subTab === 'done' ? 'is-active' : ''}`}
                     onClick={() => setSubTab('done')}
                     style={{ cursor: 'pointer' }}
@@ -420,28 +427,6 @@ const ProfilePage = () => {
                 <div className="pf-empty-state" style={{ minHeight: 200 }}>
                   <EventSeatRoundedIcon sx={{ fontSize: 48, color: 'rgba(255,255,255,0.15)' }} />
                   <p>Không tìm thấy lịch sử đặt vé nào phù hợp.</p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* ── VÉ SẮP CHIẾU ── */}
-          {active === 'upcoming' && (
-            <div className="pf-card">
-              <h2 className="pf-section__title">Vé sắp chiếu</h2>
-              {apiLoading ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
-                  <CircularProgress sx={{ color: 'primary.main' }} />
-                </Box>
-              ) : upcomingList.length ? (
-                <div className="pf-tickets">
-                  {upcomingList.map((t) => <TicketCard key={t.id} ticket={t} onResume={resumePayment} />)}
-                </div>
-              ) : (
-                <div className="pf-empty-state">
-                  <EventSeatRoundedIcon sx={{ fontSize: 56, color: 'rgba(255,255,255,0.15)' }} />
-                  <p>Bạn chưa có vé nào sắp chiếu.</p>
-                  <button type="button" className="pf-btn" onClick={() => navigate('/movies')}>Đặt vé ngay</button>
                 </div>
               )}
             </div>

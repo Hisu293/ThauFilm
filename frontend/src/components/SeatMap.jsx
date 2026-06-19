@@ -1,16 +1,10 @@
 import { Box, Stack, Typography } from '@mui/material';
 import SeatItem from './SeatItem';
+import { bookingService } from '../services/bookingService';
 
 export const SeatMap = ({ seats = [], selectedSeats = [], onToggleSelectSeat }) => {
-  const seatsByRow = seats.reduce((acc, seat) => {
-    if (!acc[seat.row]) {
-      acc[seat.row] = [];
-    }
-    acc[seat.row].push(seat);
-    return acc;
-  }, {});
-
-  const rows = Object.keys(seatsByRow).sort();
+  // Cấu trúc 2 chiều đã sort sẵn: [{ rowName, seats: [...] }]
+  const seatRows = bookingService.groupSeatsByRow(seats);
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
@@ -53,8 +47,8 @@ export const SeatMap = ({ seats = [], selectedSeats = [], onToggleSelectSeat }) 
 
       <Box sx={{ overflowX: 'auto', width: '100%', pb: 3, display: 'flex', justifyContent: 'center' }}>
         <Stack spacing={1.5} sx={{ minWidth: 'max-content', px: 2 }}>
-          {rows.map((row) => (
-            <Stack key={row} direction="row" alignItems="center" justifyContent="center" spacing={{ xs: 1, sm: 1.5 }}>
+          {seatRows.map(({ rowName, seats: rowSeats }) => (
+            <Stack key={rowName} direction="row" alignItems="center" justifyContent="center" spacing={{ xs: 1, sm: 1.5 }}>
               <Typography
                 variant="subtitle2"
                 sx={{
@@ -65,20 +59,18 @@ export const SeatMap = ({ seats = [], selectedSeats = [], onToggleSelectSeat }) 
                   mr: 1,
                 }}
               >
-                {row}
+                {rowName}
               </Typography>
 
               <Stack direction="row" spacing={{ xs: 0.8, sm: 1.2 }} alignItems="center">
-                {seatsByRow[row]
-                  .sort((a, b) => a.col - b.col)
-                  .map((seat) => (
-                    <SeatItem
-                      key={seat.id}
-                      seat={seat}
-                      isSelected={selectedSeats.some((selectedSeat) => selectedSeat.id === seat.id)}
-                      onToggleSelect={onToggleSelectSeat}
-                    />
-                  ))}
+                {rowSeats.map((seat) => (
+                  <SeatItem
+                    key={seat.id}
+                    seat={seat}
+                    isSelected={selectedSeats.some((selectedSeat) => selectedSeat.id === seat.id)}
+                    onToggleSelect={onToggleSelectSeat}
+                  />
+                ))}
               </Stack>
 
               <Typography
@@ -91,7 +83,7 @@ export const SeatMap = ({ seats = [], selectedSeats = [], onToggleSelectSeat }) 
                   ml: 1,
                 }}
               >
-                {row}
+                {rowName}
               </Typography>
             </Stack>
           ))}
@@ -112,28 +104,28 @@ export const SeatMap = ({ seats = [], selectedSeats = [], onToggleSelectSeat }) 
         }}
       >
         <Stack direction="row" alignItems="center" spacing={1}>
-          <Box sx={{ width: 16, height: 16, border: '1.5px solid rgba(148, 163, 184, 0.3)', borderRadius: '4px' }} />
+          <Box sx={{ width: 16, height: 16, border: '1.5px solid #94A3B8', bgcolor: 'rgba(15,23,42,0.35)', borderRadius: '6px 6px 3px 3px' }} />
           <Typography variant="caption" color="text.secondary" fontWeight={600}>
-            Thường (90k)
+            Thường
           </Typography>
         </Stack>
 
         <Stack direction="row" alignItems="center" spacing={1}>
-          <Box sx={{ width: 16, height: 16, border: '1.5px solid #8B5CF6', borderRadius: '4px', bgcolor: 'transparent' }} />
+          <Box sx={{ width: 16, height: 16, border: '1.5px solid #8B5CF6', bgcolor: 'rgba(15,23,42,0.35)', borderRadius: '6px 6px 3px 3px' }} />
           <Typography variant="caption" color="text.secondary" fontWeight={600}>
-            VIP (120k)
+            VIP
           </Typography>
         </Stack>
 
         <Stack direction="row" alignItems="center" spacing={1}>
-          <Box sx={{ width: 24, height: 16, border: '1.5px solid #EC4899', borderRadius: '6px', bgcolor: 'transparent' }} />
+          <Box sx={{ width: 26, height: 16, border: '1.5px solid #EC4899', bgcolor: 'rgba(15,23,42,0.35)', borderRadius: '6px 6px 3px 3px' }} />
           <Typography variant="caption" color="text.secondary" fontWeight={600}>
-            Đôi (220k)
+            Đôi
           </Typography>
         </Stack>
 
         <Stack direction="row" alignItems="center" spacing={1}>
-          <Box sx={{ width: 16, height: 16, bgcolor: 'primary.main', borderRadius: '4px' }} />
+          <Box sx={{ width: 16, height: 16, background: 'linear-gradient(135deg, #FCD34D 0%, #FBBF24 100%)', borderRadius: '6px 6px 3px 3px' }} />
           <Typography variant="caption" color="text.secondary" fontWeight={600}>
             Đang chọn
           </Typography>

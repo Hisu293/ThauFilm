@@ -15,13 +15,12 @@ export const THEATER_FIELDS = [
   'status',
 ];
 
-/** Chỉ giữ lại các field backend nhận. */
+/** Chỉ giữ lại các field backend nhận. Status là enum chuỗi: ACTIVE | INACTIVE | MAINTENANCE. */
 export const toTheaterPayload = (form) => {
   const payload = {};
   for (const key of THEATER_FIELDS) {
     if (form[key] !== undefined && form[key] !== '') payload[key] = form[key];
   }
-  if (form.status !== undefined) payload.status = Number(form.status);
   return payload;
 };
 

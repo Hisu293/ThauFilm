@@ -129,7 +129,7 @@ export const getShowtimesForMovieAndDate = (movieId, dateId) => {
       priceConfig: {
         STANDARD: 85000,
         VIP: 115000,
-        DOUBLE: 220000
+        COUPLE: 220000
       }
     };
   });
@@ -162,7 +162,7 @@ export const getSeatsForShowtime = (showtimeId) => {
     let price = 85000;
     
     if (isDouble) {
-      type = 'DOUBLE';
+      type = 'COUPLE';
       price = 220000;
     } else if (isVip) {
       type = 'VIP';

@@ -162,6 +162,12 @@ export const cinemaTheme = createTheme({
             background: `linear-gradient(135deg, ${cinemaTokens.palette.goldSoft} 0%, ${cinemaTokens.palette.gold} 100%)`,
             boxShadow: cinemaTokens.shadow.glow,
           },
+          '&.Mui-disabled': {
+            background: alpha(cinemaTokens.palette.muted, 0.18),
+            color: alpha(cinemaTokens.palette.muted, 0.5),
+            boxShadow: 'none',
+            transform: 'none',
+          },
         },
         containedSecondary: {
           background: `linear-gradient(135deg, ${cinemaTokens.palette.redSoft} 0%, ${cinemaTokens.palette.red} 100%)`,

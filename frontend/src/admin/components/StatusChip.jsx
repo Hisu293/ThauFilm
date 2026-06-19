@@ -1,74 +1,65 @@
 import { Chip } from '@mui/material';
-import { t } from '../../i18n/labels';
+import {
+  FACILITY_STATUS,
+  SEAT_BOOKING_STATUS,
+  SHOWTIME_STATUS,
+} from '../../constants/enums';
 
-const STATUS_KEYS = {
-  // Theater/room status numeric codes
-  0: 'statuses.theater.MAINTENANCE',
-  1: 'statuses.theater.ACTIVE',
-  // Theater/room status strings
-  ACTIVE: 'statuses.theater.ACTIVE',
-  INACTIVE: 'statuses.theater.INACTIVE',
-  MAINTENANCE: 'statuses.theater.MAINTENANCE',
-  // Showtime status strings
-  SCHEDULED: 'statuses.showtime.SCHEDULED',
-  OPEN: 'statuses.showtime.OPEN',
-  RUNNING: 'statuses.showtime.RUNNING',
-  COMPLETED: 'statuses.showtime.COMPLETED',
-  CANCELLED: 'statuses.showtime.CANCELLED',
-  // Seat status strings
-  BROKEN: 'statuses.seatStatus.BROKEN',
-  // Booking status strings
-  AVAILABLE: 'statuses.seatBooking.AVAILABLE',
-  HOLDING: 'statuses.seatBooking.HOLDING',
-  BOOKED: 'statuses.seatBooking.BOOKED',
-  SOLD: 'statuses.seatBooking.SOLD',
-  // Room type strings
-  STANDARD: 'statuses.roomType.STANDARD',
-  VIP: 'statuses.roomType.VIP',
-  IMAX: 'statuses.roomType.IMAX',
-  FOUR_DX: 'statuses.roomType.FOUR_DX',
-  // Seat type strings
-  COUPLE: 'statuses.seatType.COUPLE',
-};
+// Gộp tất cả enum chuẩn của backend thành map { value: { label, color } }
+const fromEnumMaps = (...maps) =>
+  maps.reduce((acc, map) => {
+    Object.values(map).forEach(({ value, label, color }) => {
+      acc[value] = { label, color };
+    });
+    return acc;
+  }, {});
 
 const PRESETS = {
-  // Theater status: 0 = Bảo trì, 1 = Hoạt động
-  0: { color: 'warning' },
-  1: { color: 'success' },
-  ACTIVE: { color: 'success' },
-  MAINTENANCE: { color: 'warning' },
-  INACTIVE: { color: 'error' },
-  SCHEDULED: { color: 'info' },
-  OPEN: { color: 'info' },
-  RUNNING: { color: 'success' },
-  COMPLETED: { color: 'default' },
-  CANCELLED: { color: 'error' },
-  BROKEN: { color: 'error' },
-  AVAILABLE: { color: 'success' },
-  HOLDING: { color: 'warning' },
-  BOOKED: { color: 'info' },
-  SOLD: { color: 'default' },
-  STANDARD: { color: 'default' },
-  VIP: { color: 'warning' },
-  IMAX: { color: 'info' },
-  FOUR_DX: { color: 'secondary' },
-  COUPLE: { color: 'secondary' },
+  // Enum chuẩn backend: trạng thái rạp/phòng/ghế, đặt ghế, suất chiếu
+  ...fromEnumMaps(FACILITY_STATUS, SEAT_BOOKING_STATUS, SHOWTIME_STATUS),
+
+  // Tương thích dữ liệu/khóa cũ
+  0: { label: 'Bảo trì', color: 'warning' },
+  1: { label: 'Hoạt động', color: 'success' },
+  active: { label: 'Hoạt động', color: 'success' },
+  maintenance: { label: 'Bảo trì', color: 'warning' },
+  upcoming: { label: 'Sắp chiếu', color: 'info' },
+  NOW_SHOWING: { label: 'Đang chiếu', color: 'success' },
+  COMING_SOON: { label: 'Sắp chiếu', color: 'info' },
+  STOPPED: { label: 'Ngừng chiếu', color: 'default' },
+  hidden: { label: 'Đã ẩn', color: 'error' },
+  enabled: { label: 'Hoạt động', color: 'success' },
+  disabled: { label: 'Đã khóa', color: 'error' },
+  ADMIN: { label: 'Admin', color: 'error' },
+  STAFF: { label: 'Staff', color: 'info' },
+  MEMBER: { label: 'Member', color: 'default' },
+  locked: { label: 'Đã khóa', color: 'error' },
+  ready: { label: 'Sẵn sàng', color: 'success' },
+  missing: { label: 'Chưa upload', color: 'warning' },
+  confirmed: { label: 'Đã xác nhận', color: 'success' },
+  cancelled: { label: 'Đã hủy', color: 'default' },
+  Customer: { label: 'Customer', color: 'default' },
+  Staff: { label: 'Staff', color: 'info' },
+  Admin: { label: 'Admin', color: 'error' },
 };
 
 const StatusChip = ({ status, label }) => {
-  const translationKey = STATUS_KEYS[status];
-  const displayLabel = label || (translationKey ? t('statuses', translationKey) : status);
-  const cfg = PRESETS[status] || {};
-  const color = cfg.color || 'default';
-  const outlined = status === 'CANCELLED' || status === 'INACTIVE' || status === 'BROKEN' || status === 'SOLD';
-
+  const cfg = PRESETS[status] || { label: label || status, color: 'default' };
+  // Filled success/warning chips have low text contrast on their bright fills;
+  // force a dark, fully-opaque label so the text stays readable.
+  const needsDarkText = cfg.color === 'success' || cfg.color === 'warning';
   return (
     <Chip
       label={displayLabel}
       size="small"
-      color={color}
-      variant={outlined ? 'outlined' : 'filled'}
-      sx={{ fontWeight: 600, fontSize: '0.68rem', height: 22 }}
+      color={cfg.color}
+      variant={status === 'cancelled' || status === 'Customer' ? 'outlined' : 'filled'}
+      sx={{
+        fontWeight: 700,
+        fontSize: '0.68rem',
+        height: 22,
+        ...(needsDarkText && { color: '#0B1120' }),
+      }}
     />
   );
 };

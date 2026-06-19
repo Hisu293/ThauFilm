@@ -27,7 +27,8 @@ export const toShowtimePayload = (form) => {
   // Backend uses LocalDateTime, so send local wall-clock time without timezone.
   if (form.startTime) payload.startTime = toBackendLocalDateTime(form.startTime);
   if (form.endTime) payload.endTime = toBackendLocalDateTime(form.endTime);
-  if (form.status !== undefined) payload.status = Number(form.status);
+  // ShowtimeStatus là enum chuỗi: SCHEDULED | OPEN | RUNNING | COMPLETED | CANCELLED
+  if (form.status !== undefined && form.status !== '') payload.status = form.status;
   return payload;
 };
 
@@ -59,10 +60,10 @@ export const fromUTCToLocal = (iso) => {
   }
 };
 
-/** Payload cho PUT /api/admin/showtimes/{id} — chỉ status (số) */
+/** Payload cho PUT /api/admin/showtimes/{id} — chỉ status (enum chuỗi) */
 export const toShowtimeUpdatePayload = (form) => {
   const payload = {};
-  if (form.status !== undefined) payload.status = Number(form.status);
+  if (form.status !== undefined && form.status !== '') payload.status = form.status;
   return payload;
 };
 

@@ -6,14 +6,11 @@ import {
   CssBaseline,
   Drawer,
   IconButton,
-  InputAdornment,
-  TextField,
   ThemeProvider,
   Toolbar,
   Typography,
 } from '@mui/material';
 import MenuRoundedIcon from '@mui/icons-material/MenuRounded';
-import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
 import NotificationsNoneRoundedIcon from '@mui/icons-material/NotificationsNoneRounded';
 import { ADMIN_VIEWS, VIEW_META } from '../admin/adminNav';
 import { adminTheme, SIDEBAR_WIDTH } from '../admin/adminTheme';
@@ -103,27 +100,6 @@ const AdminPage = () => {
                   {meta.subtitle}
                 </Typography>
               </Box>
-              <TextField
-                size="small"
-                placeholder="Tìm trong panel..."
-                className="admin-search"
-                sx={{
-                  display: { xs: 'none', sm: 'block' },
-                  maxWidth: 240,
-                  '& .MuiOutlinedInput-root': {
-                    backgroundColor: 'rgba(255,255,255,0.05)',
-                    borderRadius: 3,
-                    '& fieldset': { borderColor: 'rgba(255,255,255,0.08)' },
-                  },
-                }}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchRoundedIcon sx={{ color: 'rgba(255,255,255,0.4)', fontSize: 20 }} />
-                    </InputAdornment>
-                  ),
-                }}
-              />
               <IconButton sx={{ color: 'rgba(255,255,255,0.7)' }}>
                 <NotificationsNoneRoundedIcon />
               </IconButton>

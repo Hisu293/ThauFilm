@@ -235,7 +235,7 @@ const QuickBooking = () => {
                 disabled={moviesLoading || theatersLoading || showtimesLoading}
               >
                 <ConfirmationNumberRoundedIcon sx={{ fontSize: 20 }} />
-                Đặt Vé Ngay
+                Đặt vé ngay
               </button>
               <span className="qb-error" />
             </div>
