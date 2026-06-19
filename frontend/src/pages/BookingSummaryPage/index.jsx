@@ -27,6 +27,7 @@ import LoadingOverlay from '../../components/common/LoadingOverlay';
 import StatusChip from '../../components/common/StatusChip';
 import { SEAT_TYPE, enumLabel } from '../../constants/enums';
 import { useBooking } from '../../hooks/useBooking';
+import { useBookingFlow } from '../../context/BookingContext';
 import { useHoldCountdown } from '../../hooks/useHoldCountdown';
 import {
   getPendingBooking,
@@ -61,6 +62,7 @@ export const BookingSummaryPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const { loading: apiLoading, error: apiError, clearError, getDetail } = useBooking();
+  const { updateBookingState } = useBookingFlow();
 
   const [bookingId, setBookingId] = useState(null);
   const [movie, setMovie] = useState(null);
@@ -71,6 +73,7 @@ export const BookingSummaryPage = () => {
   const [holdExpiresAt, setHoldExpiresAt] = useState(null);
 
   const { remainingText, isExpired } = useHoldCountdown(holdExpiresAt);
+  const isHoldExpired = Boolean(holdExpiresAt) && isExpired;
 
   useEffect(() => {
     pruneExpiredPendingBookings();
@@ -80,16 +83,17 @@ export const BookingSummaryPage = () => {
       currentBookingId = sessionStorage.getItem('tf_booking_id');
     }
 
-    if (currentBookingId) {
-      setBookingId(currentBookingId);
-      sessionStorage.setItem('tf_booking_id', currentBookingId);
-    }
-
     const pendingContext = currentBookingId ? getPendingBooking(currentBookingId) : null;
-    setMovie(mergeMovieContext(location.state?.movie, pendingContext?.movie));
-    setShowtime(mergeShowtimeContext(location.state?.showtime, pendingContext?.showtime));
-    setSelectedSeats(location.state?.selectedSeats || pendingContext?.selectedSeats || []);
-    setHoldExpiresAt(location.state?.holdExpiresAt || pendingContext?.holdExpiresAt || null);
+    Promise.resolve().then(() => {
+      if (currentBookingId) {
+        setBookingId(currentBookingId);
+        sessionStorage.setItem('tf_booking_id', currentBookingId);
+      }
+      setMovie(mergeMovieContext(location.state?.movie, pendingContext?.movie));
+      setShowtime(mergeShowtimeContext(location.state?.showtime, pendingContext?.showtime));
+      setSelectedSeats(location.state?.selectedSeats || pendingContext?.selectedSeats || []);
+      setHoldExpiresAt(location.state?.holdExpiresAt || pendingContext?.holdExpiresAt || null);
+    });
   }, [location.state]);
 
   useEffect(() => {
@@ -136,13 +140,6 @@ export const BookingSummaryPage = () => {
       });
   }, [bookingId, getDetail, location.state]);
 
-  useEffect(() => {
-    if (bookingId && isExpired) {
-      removePendingBooking(bookingId);
-      sessionStorage.removeItem('tf_booking_id');
-    }
-  }, [bookingId, isExpired]);
-
   const seatsTotal = selectedSeats.reduce((sum, seat) => sum + (seat.price || 0), 0);
   const totalAmount = seatsTotal;
 
@@ -153,7 +150,15 @@ export const BookingSummaryPage = () => {
     }).format(amount);
 
   const handleProceedToPayment = () => {
-    if (!agreedTerms || apiLoading || isExpired) return;
+    if (!agreedTerms || apiLoading || isHoldExpired) return;
+
+    updateBookingState({
+      selectedMovie: movie,
+      selectedShowtime: showtime,
+      selectedSeats,
+      bookingId,
+      paymentStatus: 'READY_TO_PAY',
+    });
 
     navigate('/booking/payment', {
       state: {
@@ -192,7 +197,7 @@ export const BookingSummaryPage = () => {
     );
   }
 
-  if (isExpired) {
+  if (isHoldExpired) {
     return (
       <Container maxWidth="xl" sx={{ py: 6 }}>
         <Alert severity="warning" sx={{ borderRadius: 3 }}>
@@ -486,11 +491,11 @@ export const BookingSummaryPage = () => {
                 fullWidth
                 variant="primary"
                 size="large"
-                disabled={!agreedTerms || apiLoading || isExpired}
+                disabled={!agreedTerms || apiLoading || isHoldExpired}
                 onClick={handleProceedToPayment}
                 sx={{ py: 1.8, mt: 1 }}
               >
-                {isExpired ? 'Phiên giữ ghế đã hết hạn' : 'Thanh toán'}
+                {isHoldExpired ? 'Phiên giữ ghế đã hết hạn' : 'Thanh toán'}
               </CustomButton>
             </Stack>
           </Paper>

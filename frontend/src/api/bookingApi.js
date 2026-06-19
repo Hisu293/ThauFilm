@@ -67,10 +67,15 @@ export const bookingApi = {
   },
 
   // Confirm payment: POST /api/member/booking/{bookingId}/pay
-  payBooking: (bookingId, paymentMethod = 'VNPAY') => {
-    return axiosClient.post(`/api/member/booking/${bookingId}/pay`, {
-      paymentMethod,
-    });
+  payBooking: (bookingId, paymentMethod = 'VNPAY', discountCode = '') => {
+    const payload = { paymentMethod };
+    if (discountCode) payload.discountCode = discountCode;
+    return axiosClient.post(`/api/member/booking/${bookingId}/pay`, payload);
+  },
+
+  // Cancel a held booking and release seats: POST /api/member/booking/{bookingId}/cancel
+  cancelBooking: (bookingId) => {
+    return axiosClient.post(`/api/member/booking/${bookingId}/cancel`);
   },
 };
 

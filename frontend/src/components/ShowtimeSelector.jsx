@@ -27,13 +27,17 @@ export const ShowtimeSelector = ({ movieId, onSelectShowtime }) => {
   const [showtimes, setShowtimes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [nowTs, setNowTs] = useState(() => Date.now());
 
   useEffect(() => {
     if (!movieId) return;
 
     let cancelled = false;
-    setLoading(true);
-    setError('');
+    Promise.resolve().then(() => {
+      if (cancelled) return;
+      setLoading(true);
+      setError('');
+    });
 
     bookingApi.fetchShowtimesByMovie(movieId)
       .then((res) => {
@@ -58,6 +62,11 @@ export const ShowtimeSelector = ({ movieId, onSelectShowtime }) => {
     return () => { cancelled = true; };
   }, [movieId]);
 
+  useEffect(() => {
+    const timer = window.setInterval(() => setNowTs(Date.now()), 30000);
+    return () => window.clearInterval(timer);
+  }, []);
+
   const dates = useMemo(() => {
     return [...new Set(showtimes.map((s) => s.date).filter(Boolean))].sort();
   }, [showtimes]);
@@ -71,16 +80,17 @@ export const ShowtimeSelector = ({ movieId, onSelectShowtime }) => {
     const grouped = dateShowtimes.reduce((acc, showtime) => {
       if (showtime.startTime) {
         const showtimeMs = new Date(showtime.startTime).getTime();
-        if (!Number.isNaN(showtimeMs) && showtimeMs <= Date.now()) {
+        if (!Number.isNaN(showtimeMs) && showtimeMs <= nowTs) {
           return acc;
         }
       }
 
-      const theaterKey = showtime.theaterId || showtime.theaterName || 'unknown-theater';
+      const theaterName = showtime.theaterName || showtime.cinemaName || 'ThauFilm Cinema';
+      const theaterKey = showtime.theaterId || theaterName || 'default-theater';
       if (!acc[theaterKey]) {
         acc[theaterKey] = {
           id: theaterKey,
-          name: showtime.theaterName || 'Rạp chưa cập nhật',
+          name: theaterName,
           showtimes: [],
         };
       }
@@ -92,7 +102,7 @@ export const ShowtimeSelector = ({ movieId, onSelectShowtime }) => {
       ...group,
       showtimes: group.showtimes.sort((a, b) => String(a.startTime).localeCompare(String(b.startTime))),
     }));
-  }, [dateShowtimes]);
+  }, [dateShowtimes, nowTs]);
 
   const handleTabChange = (_event, newValue) => {
     setSelectedDateIdx(newValue);

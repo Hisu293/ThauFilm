@@ -21,6 +21,8 @@ import SeatSelectionPage from '../pages/SeatSelectionPage';
 import BookingSummaryPage from '../pages/BookingSummaryPage';
 import PaymentPage from '../pages/PaymentPage';
 import BookingSuccessPage from '../pages/BookingSuccessPage';
+import MyBookingsPage from '../pages/MyBookingsPage';
+import MyBookingDetailPage from '../pages/MyBookingDetailPage';
 
 // Staff Pages
 import StaffDashboard from '../pages/staff/StaffDashboard';
@@ -42,9 +44,13 @@ const AppRoutes = () => {
         <Route path="/dashboard" element={<DashboardPage />} />
          
         <Route path="/booking/seats/:showtimeId" element={<SeatSelectionPage />} />
+        <Route path="/booking/showtime/:showtimeId" element={<SeatSelectionPage />} />
         <Route path="/booking/summary" element={<BookingSummaryPage />} />
         <Route path="/booking/payment" element={<PaymentPage />} />
+        <Route path="/payment" element={<PaymentPage />} />
         <Route path="/booking/success" element={<BookingSuccessPage />} />
+        <Route path="/my-bookings" element={<MyBookingsPage />} />
+        <Route path="/my-bookings/:bookingId" element={<MyBookingDetailPage />} />
 
         {/* Trang nội dung tĩnh liên kết từ footer */}
         <Route path="/faq" element={<InfoPage contentKey="faq" />} />

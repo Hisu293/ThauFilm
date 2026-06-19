@@ -2,6 +2,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { CssBaseline, ThemeProvider } from '@mui/material';
 import AppRoutes from './routes/AppRoutes';
 import { AuthProvider } from './context/AuthContext';
+import { BookingProvider } from './context/BookingContext';
 import cinemaTheme from './theme/cinemaTheme';
 
 function App() {
@@ -9,9 +10,11 @@ function App() {
     <ThemeProvider theme={cinemaTheme}>
       <CssBaseline />
       <AuthProvider>
-        <BrowserRouter>
-          <AppRoutes />
-        </BrowserRouter>
+        <BookingProvider>
+          <BrowserRouter>
+            <AppRoutes />
+          </BrowserRouter>
+        </BookingProvider>
       </AuthProvider>
     </ThemeProvider>
   );

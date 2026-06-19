@@ -3,7 +3,6 @@ import { adminMovieService } from '../services/adminMovieService';
 import { adminTheaterService } from '../services/adminTheaterService';
 import { adminRoomService } from '../services/adminRoomService';
 import { adminShowtimeService } from '../services/adminShowtimeService';
-import { adminSeatService } from '../services/adminSeatService';
 import { adminService } from '../services/adminService';
 
 const uid = () => Date.now() + Math.floor(Math.random() * 1000);

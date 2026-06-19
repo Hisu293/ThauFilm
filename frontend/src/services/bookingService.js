@@ -166,6 +166,13 @@ export const bookingService = {
       const timeStr = raw.length > 10 ? raw.slice(11, 16) : showtime.time ?? '';
 
       if (!byDate[dateStr]) byDate[dateStr] = [];
+      const theaterName =
+        showtime.theaterName ??
+        showtime.cinemaName ??
+        showtime.theater?.name ??
+        showtime.cinema?.name ??
+        'ThauFilm Cinema';
+
       byDate[dateStr].push({
         id: String(showtime.id ?? showtime.showtimeId ?? ''),
         movieId: String(showtime.movieId ?? ''),
@@ -174,7 +181,7 @@ export const bookingService = {
         room: showtime.cinemaRoomName ?? showtime.roomName ?? showtime.room ?? '',
         format: showtime.format ?? '2D',
         theaterId: String(showtime.theaterId ?? ''),
-        theaterName: showtime.theaterName ?? '',
+        theaterName,
         startTime: raw,
         endTime: showtime.endTime ?? '',
         date: dateStr,
@@ -193,13 +200,20 @@ export const bookingService = {
     const date = rawStart ? String(rawStart).slice(0, 10) : '';
     const time = rawStart && String(rawStart).length > 10 ? String(rawStart).slice(11, 16) : showtime.time ?? '';
 
+    const theaterName =
+      showtime.theaterName ??
+      showtime.cinemaName ??
+      showtime.theater?.name ??
+      showtime.cinema?.name ??
+      'ThauFilm Cinema';
+
     return {
       id: String(showtime.id ?? showtime.showtimeId ?? ''),
       movieId: String(showtime.movieId ?? ''),
       movieTitle: showtime.movieTitle ?? showtime.movie?.title ?? '',
       cinemaRoomId: String(showtime.cinemaRoomId ?? showtime.roomId ?? ''),
       theaterId: String(showtime.theaterId ?? ''),
-      theaterName: showtime.theaterName ?? '',
+      theaterName,
       date,
       time,
       startTime: rawStart,

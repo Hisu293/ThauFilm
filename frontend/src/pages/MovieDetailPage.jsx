@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link as RouterLink, useParams, useNavigate } from 'react-router-dom';
 import {
   Box, Button, Chip, Container, Divider,
-  Skeleton, Stack, Typography, Dialog, IconButton
+  Stack, Typography, Dialog, IconButton
 } from '@mui/material';
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
 import AccessTimeRoundedIcon from '@mui/icons-material/AccessTimeRounded';
@@ -16,6 +16,7 @@ import MovieRoundedIcon from '@mui/icons-material/MovieRounded';
 import CloseIcon from '@mui/icons-material/Close';
 
 import { fetchMovieById } from '../services/movieService';
+import { useBookingFlow } from '../context/BookingContext';
 import BookingStepper from '../components/BookingStepper';
 import ShowtimeSelector from '../components/ShowtimeSelector';
 import StatusChip from '../components/common/StatusChip';
@@ -86,6 +87,7 @@ const MovieNotFound = ({ message }) => (
 const MovieDetailPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { updateBookingState } = useBookingFlow();
   const [movie, setMovie] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -94,9 +96,12 @@ const MovieDetailPage = () => {
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
-    setLoading(true);
-    setError(null);
-    setMovie(null);
+    Promise.resolve().then(() => {
+      if (cancelled) return;
+      setLoading(true);
+      setError(null);
+      setMovie(null);
+    });
 
     fetchMovieById(id)
       .then((m) => {
@@ -143,6 +148,13 @@ const MovieDetailPage = () => {
   const posterSrc = movie.posterUrl || movie.poster || '/placeholder.svg';
 
   const handleSelectShowtime = (showtime) => {
+    updateBookingState({
+      selectedMovie: movie,
+      selectedShowtime: showtime,
+      selectedSeats: [],
+      bookingId: null,
+      paymentStatus: 'SELECTING_SEATS',
+    });
     navigate(`/booking/seats/${showtime.id}`, {
       state: {
         movie,

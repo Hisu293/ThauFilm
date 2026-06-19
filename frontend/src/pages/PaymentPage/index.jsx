@@ -26,6 +26,8 @@ import LoadingOverlay from '../../components/common/LoadingOverlay';
 import CustomButton from '../../components/common/CustomButton';
 import EmptyState from '../../components/common/EmptyState';
 import { useBooking } from '../../hooks/useBooking';
+import { useBookingFlow } from '../../context/BookingContext';
+import { useHoldCountdown } from '../../hooks/useHoldCountdown';
 import { bookingApi } from '../../api/bookingApi';
 import { bookingService } from '../../services/bookingService';
 import {
@@ -85,7 +87,8 @@ const getDiscountAmount = (discount, subtotal) => {
 export const PaymentPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { loading: apiLoading, error: apiError, clearError, getDetail, pay } = useBooking();
+  const { loading: apiLoading, error: apiError, clearError, getDetail, getTickets, pay } = useBooking();
+  const { updateBookingState, clearBookingState } = useBookingFlow();
 
   const [bookingId, setBookingId] = useState(null);
   const [movie, setMovie] = useState(null);
@@ -99,6 +102,10 @@ export const PaymentPage = () => {
   const [selectedDiscountId, setSelectedDiscountId] = useState('');
   const [loadingPromotions, setLoadingPromotions] = useState(true);
   const [promotionNotice, setPromotionNotice] = useState('');
+  const [bookingStatus, setBookingStatus] = useState('');
+  const [invalidBookingMessage, setInvalidBookingMessage] = useState('');
+  const { isExpired } = useHoldCountdown(holdExpiresAt);
+  const isHoldExpired = Boolean(holdExpiresAt) && isExpired;
 
   useEffect(() => {
     let currentBookingId = location.state?.bookingId;
@@ -106,23 +113,34 @@ export const PaymentPage = () => {
       currentBookingId = sessionStorage.getItem('tf_booking_id');
     }
 
-    if (currentBookingId) {
-      setBookingId(currentBookingId);
-    }
-
     const pendingContext = currentBookingId ? getPendingBooking(currentBookingId) : null;
-    setMovie(mergeMovieContext(location.state?.movie, pendingContext?.movie));
-    setShowtime(mergeShowtimeContext(location.state?.showtime, pendingContext?.showtime));
-    setSelectedSeats(location.state?.selectedSeats || pendingContext?.selectedSeats || []);
-    setHoldExpiresAt(location.state?.holdExpiresAt || pendingContext?.holdExpiresAt || null);
+    Promise.resolve().then(() => {
+      if (currentBookingId) {
+        setBookingId(currentBookingId);
+      }
+      setMovie(mergeMovieContext(location.state?.movie, pendingContext?.movie));
+      setShowtime(mergeShowtimeContext(location.state?.showtime, pendingContext?.showtime));
+      setSelectedSeats(location.state?.selectedSeats || pendingContext?.selectedSeats || []);
+      setHoldExpiresAt(location.state?.holdExpiresAt || pendingContext?.holdExpiresAt || null);
+    });
   }, [location.state]);
 
   useEffect(() => {
-    if (!bookingId || (movie && showtime && selectedSeats.length > 0)) return;
+    if (!bookingId) return;
 
     getDetail(bookingId)
       .then((booking) => {
         if (!booking) return;
+        const normalizedStatus = String(booking.status || '').toUpperCase();
+        setBookingStatus(normalizedStatus);
+
+        if (normalizedStatus === 'CANCELLED' || normalizedStatus === 'EXPIRED') {
+          removePendingBooking(booking.id);
+          sessionStorage.removeItem('tf_booking_id');
+          clearBookingState();
+          setInvalidBookingMessage('Booking này đã bị hủy hoặc hết hạn giữ ghế. Vui lòng đặt vé lại.');
+          return;
+        }
 
         const pendingContext = getPendingBooking(booking.id);
         const mergedMovie = mergeMovieContext(
@@ -139,8 +157,8 @@ export const PaymentPage = () => {
         );
 
         setHoldExpiresAt(booking.holdExpiresAt || null);
-        setMovie(mergedMovie);
-        setShowtime(mergedShowtime);
+        setMovie((current) => current || mergedMovie);
+        setShowtime((current) => current || mergedShowtime);
         setSelectedSeats((current) => (current.length > 0 ? current : booking.seats || []));
 
         savePendingBooking({
@@ -155,7 +173,7 @@ export const PaymentPage = () => {
       .catch(() => {
         setSnackbarOpen(true);
       });
-  }, [bookingId, getDetail, location.state, movie, selectedSeats.length, showtime]);
+  }, [bookingId, clearBookingState, getDetail, location.state]);
 
   useEffect(() => {
     let active = true;
@@ -204,7 +222,7 @@ export const PaymentPage = () => {
 
   useEffect(() => {
     if (apiError) {
-      setSnackbarOpen(true);
+      Promise.resolve().then(() => setSnackbarOpen(true));
     }
   }, [apiError]);
 
@@ -217,8 +235,42 @@ export const PaymentPage = () => {
   const discountAmount = getDiscountAmount(selectedDiscount, seatsTotal);
   const totalAmount = Math.max(seatsTotal - discountAmount, 0);
 
+  const goToSuccess = (paymentResult = {}, overrides = {}) => {
+    const confirmedBooking = paymentResult?.booking || overrides.booking || null;
+    const confirmedTickets = paymentResult?.tickets || overrides.tickets || [];
+    const paidAmount = Number(paymentResult?.finalAmount ?? paymentResult?.payment?.amount ?? totalAmount);
+
+    navigate('/booking/success', {
+      state: {
+        bookingId,
+        movie,
+        showtime,
+      selectedSeats,
+      paymentMethod,
+      selectedDiscount,
+      discountAmount: Number(paymentResult?.discountAmount ?? discountAmount),
+      bookingCode: confirmedBooking?.confirmationCode || paymentResult?.confirmationCode || bookingId,
+        tickets: confirmedTickets,
+        totalAmount: Number.isFinite(paidAmount) ? paidAmount : totalAmount,
+      },
+    });
+
+    updateBookingState({ bookingId, paymentStatus: 'PAID' });
+    sessionStorage.removeItem('tf_booking_id');
+    removePendingBooking(bookingId);
+    clearBookingState();
+  };
+
   const handlePay = async () => {
     if (!bookingId || apiLoading) return;
+    if (bookingStatus && !['HOLD', 'PENDING'].includes(bookingStatus)) {
+      setInvalidBookingMessage('Booking này không còn ở trạng thái chờ thanh toán. Vui lòng kiểm tra lại trong Vé của tôi.');
+      return;
+    }
+    if (isHoldExpired) {
+      setSnackbarOpen(true);
+      return;
+    }
 
     try {
       const paymentMethodMap = {
@@ -227,28 +279,26 @@ export const PaymentPage = () => {
         qr_pay: 'ZALOPAY',
       };
       const backendPaymentMethod = paymentMethodMap[paymentMethod] || 'CASH';
+      const discountCode = selectedDiscount?.code || '';
+      updateBookingState({ bookingId, paymentStatus: 'PAYING' });
 
-      const result = await pay(bookingId, backendPaymentMethod);
+      const result = await pay(bookingId, backendPaymentMethod, discountCode);
+      goToSuccess(result);
+    } catch (err) {
+      if (err?.message === 'Booking is not in HOLD status') {
+        try {
+          const confirmedBooking = await getDetail(bookingId);
+          if (confirmedBooking?.status === 'CONFIRMED') {
+            const confirmedTickets = await getTickets(bookingId).catch(() => []);
+            goToSuccess({}, { booking: confirmedBooking, tickets: confirmedTickets });
+            return;
+          }
+        } catch {
+          // Fall through to the normal error snackbar below.
+        }
+      }
 
-      navigate('/booking/success', {
-        state: {
-          bookingId,
-          movie,
-          showtime,
-          selectedSeats,
-          paymentMethod,
-          selectedDiscount,
-          discountAmount,
-          bookingCode: result?.booking?.confirmationCode || result?.confirmationCode || bookingId,
-          tickets: result?.tickets || [],
-          totalAmount,
-        },
-      });
-
-      sessionStorage.removeItem('tf_booking_id');
-      removePendingBooking(bookingId);
-    } catch {
-      // Error state is handled by useBooking and the snackbar.
+      setSnackbarOpen(true);
     }
   };
 
@@ -262,6 +312,19 @@ export const PaymentPage = () => {
       <Box sx={{ minHeight: '80vh', position: 'relative' }}>
         <LoadingOverlay open={true} message="Đang tải thông tin thanh toán..." blur />
       </Box>
+    );
+  }
+
+  if (invalidBookingMessage) {
+    return (
+      <Container maxWidth="xl" sx={{ py: 6 }}>
+        <Alert severity="warning" sx={{ borderRadius: 3 }}>
+          {invalidBookingMessage}
+        </Alert>
+        <Button variant="contained" color="primary" onClick={() => navigate('/my-bookings')} sx={{ mt: 3 }}>
+          Quay lại vé của tôi
+        </Button>
+      </Container>
     );
   }
 
@@ -591,8 +654,8 @@ export const PaymentPage = () => {
         onClose={handleSnackbarClose}
         anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
       >
-        <Alert onClose={handleSnackbarClose} severity="error" variant="filled" sx={{ borderRadius: 3, fontWeight: 600 }}>
-          {apiError || 'Thanh toán không thành công. Vui lòng thử lại.'}
+        <Alert onClose={handleSnackbarClose} severity={isHoldExpired ? 'warning' : 'error'} variant="filled" sx={{ borderRadius: 3, fontWeight: 600 }}>
+          {isHoldExpired ? 'Phiên giữ ghế đã hết hạn. Hệ thống đã trả ghế về sơ đồ.' : (apiError || 'Thanh toán không thành công. Vui lòng thử lại.')}
         </Alert>
       </Snackbar>
     </Container>

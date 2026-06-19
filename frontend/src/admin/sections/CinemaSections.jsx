@@ -28,6 +28,7 @@ import MeetingRoomRoundedIcon from '@mui/icons-material/MeetingRoomRounded';
 import SectionHeader from '../components/SectionHeader';
 import StatusChip from '../components/StatusChip';
 import { fromUTCToLocal } from '../../services/adminShowtimeService';
+import { t } from '../../i18n/labels';
 import {
   FACILITY_STATUS_OPTIONS,
   ROOM_TYPE,
@@ -259,11 +260,11 @@ export const RoomsSection = ({ crud, theaters, getTheaterName }) => {
                     key={room.id}
                     room={room}
                     crud={crud}
-                    theaterName={getTheaterName(r.theaterId)}
-                    expanded={expandedRoom === r.id}
-                    onToggle={() => setExpandedRoom(expandedRoom === r.id ? null : r.id)}
-                    onEdit={() => { setForm({ ...r, type: r.type ?? 'STANDARD', status: r.status ?? 'ACTIVE' }); setDialog(r.id); }}
-                    onDelete={() => crud.remove(r.id)}
+                    theaterName={getTheaterName(room.theaterId)}
+                    expanded={expandedRoom === room.id}
+                    onToggle={() => setExpandedRoom(expandedRoom === room.id ? null : room.id)}
+                    onEdit={() => { setForm({ ...room, type: room.type ?? 'STANDARD', status: room.status ?? 'ACTIVE' }); setDialog(room.id); }}
+                    onDelete={() => crud.remove(room.id)}
                   />
                 ))
               )}
@@ -280,30 +281,33 @@ export const RoomsSection = ({ crud, theaters, getTheaterName }) => {
                   {theater.name}
                 </MenuItem>
               ))}
-            </TextField>,
-            <TextField key="name" label="Tên phòng" fullWidth value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />,
+            </TextField>
+            <TextField key="name" label="Tên phòng" fullWidth value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             <TextField key="type" select label="Loại phòng" fullWidth value={form.type || 'STANDARD'} onChange={(e) => setForm({ ...form, type: e.target.value })}>
               {ROOM_TYPE_OPTIONS.map((opt) => (
                 <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
               ))}
-            </TextField>,
+            </TextField>
             <Stack key="dims" direction="row" spacing={2}>
               <TextField label="Số hàng ghế" type="number" value={form.rowsCount} onChange={(e) => setForm({ ...form, rowsCount: Number(e.target.value) })} sx={{ flex: 1 }} />
               <TextField label="Ghế mỗi hàng" type="number" value={form.seatsPerRow} onChange={(e) => setForm({ ...form, seatsPerRow: Number(e.target.value) })} sx={{ flex: 1 }} />
-            </Stack>,
-        ] : [
-            <TextField key="name" label="Tên phòng" fullWidth value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />,
+            </Stack>
+          </>
+        ) : (
+          <>
+            <TextField key="name" label="Tên phòng" fullWidth value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             <TextField key="type" select label="Loại phòng" fullWidth value={form.type || 'STANDARD'} onChange={(e) => setForm({ ...form, type: e.target.value })}>
               {ROOM_TYPE_OPTIONS.map((opt) => (
                 <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
               ))}
-            </TextField>,
+            </TextField>
             <TextField key="status" select label="Trạng thái" fullWidth value={form.status || 'ACTIVE'} onChange={(e) => setForm({ ...form, status: e.target.value })}>
               {FACILITY_STATUS_OPTIONS.map((opt) => (
                 <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
               ))}
-            </TextField>,
-        ]}
+            </TextField>
+          </>
+        )}
       </CrudDialog>
     </>
   );
@@ -339,7 +343,7 @@ const RoomRow = ({ room, crud, theaterName, expanded, onToggle, onEdit, onDelete
   };
 
   useEffect(() => {
-    loadSeats();
+    Promise.resolve().then(loadSeats);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [room.id]);
 
@@ -392,7 +396,7 @@ const RoomRow = ({ room, crud, theaterName, expanded, onToggle, onEdit, onDelete
       {expanded && (
         <TableRow>
           <TableCell colSpan={9} sx={{ p: 0, border: 0 }}>
-            <SeatMapInline room={room} crud={crud} seats={seats} loading={loading} onReload={loadSeats} />
+            <SeatMapInline crud={crud} seats={seats} loading={loading} onReload={loadSeats} />
           </TableCell>
         </TableRow>
       )}
@@ -442,7 +446,7 @@ const SEAT_TILE_COLOR = {
   COUPLE: '#ec4899',
 };
 
-const SeatMapInline = ({ room, crud, seats, loading, onReload }) => {
+const SeatMapInline = ({ crud, seats, loading, onReload }) => {
   const [seatDialog, setSeatDialog] = useState(null);
   const [seatForm, setSeatForm] = useState({ type: 'STANDARD', status: 'ACTIVE' });
 
@@ -529,22 +533,22 @@ const SeatMapInline = ({ room, crud, seats, loading, onReload }) => {
                   <Box sx={{ display: 'flex', gap: 0.6 }}>
                     {rowSeats.map((seat) => (
                       <Box
-                        key={s.id}
-                        title={seatTitle(s)}
-                        onClick={() => { setSeatForm({ type: s.type || 'STANDARD', status: s.status || 'ACTIVE' }); setSeatDialog(s.id); }}
+                        key={seat.id}
+                        title={seatTitle(seat)}
+                        onClick={() => { setSeatForm({ type: seat.type || 'STANDARD', status: seat.status || 'ACTIVE' }); setSeatDialog(seat.id); }}
                         sx={{
                           width: 26,
                           height: 24,
                           borderRadius: '6px 6px 3px 3px',
-                          bgcolor: seatColor(s),
-                          color: isSeatLocked(s) ? 'rgba(255,255,255,0.25)' : '#fff',
+                          bgcolor: seatColor(seat),
+                          color: isSeatLocked(seat) ? 'rgba(255,255,255,0.25)' : '#fff',
                           display: 'flex',
                           alignItems: 'center',
                           justifyContent: 'center',
                           fontSize: '0.6rem',
                           fontWeight: 600,
                           cursor: 'pointer',
-                          border: isSeatLocked(s) ? '1px dashed rgba(255,255,255,0.2)' : '1px solid rgba(0,0,0,0.25)',
+                          border: isSeatLocked(seat) ? '1px dashed rgba(255,255,255,0.2)' : '1px solid rgba(0,0,0,0.25)',
                           transition: 'transform 0.12s ease, filter 0.12s ease',
                           '&:hover': { transform: 'translateY(-2px)', filter: 'brightness(1.15)' },
                         }}
@@ -616,23 +620,6 @@ export const ShowtimesSection = ({ crud, movies, theaters, rooms }) => {
     endTime: '',
     status: 'SCHEDULED',
   });
-
-  const toInputValue = (iso) => {
-    if (!iso) return '';
-    try {
-      const [datePart, timePart] = iso.split('T');
-      const [year, month, day] = datePart.split('-').map(Number);
-      const [time] = timePart.split('.');
-      const [hour, minute, second] = time.split(':').map(Number);
-      const vnDate = new Date(Date.UTC(year, month - 1, day, hour - 7, minute, second || 0));
-      const offset = vnDate.getTimezoneOffset();
-      const localDate = new Date(vnDate.getTime() - offset * 60000);
-      const pad = (number) => String(number).padStart(2, '0');
-      return `${localDate.getFullYear()}-${pad(localDate.getMonth() + 1)}-${pad(localDate.getDate())}T${pad(localDate.getHours())}:${pad(localDate.getMinutes())}`;
-    } catch {
-      return '';
-    }
-  };
 
   const save = async () => {
     try {
@@ -706,17 +693,6 @@ export const ShowtimesSection = ({ crud, movies, theaters, rooms }) => {
     } catch {
       return iso;
     }
-  };
-
-  const showtimeStatus = (status) => {
-    const map = {
-      0: 'SCHEDULED',
-      1: 'RUNNING',
-      2: 'COMPLETED',
-      3: 'CANCELLED',
-      4: 'OPEN',
-    };
-    return map[status] ?? String(status ?? 'SCHEDULED');
   };
 
   return (
@@ -802,10 +778,11 @@ export const ShowtimesSection = ({ crud, movies, theaters, rooms }) => {
                   {room.name} — {getTheaterName(room.theaterId)}
                 </MenuItem>
               ))}
-            </TextField>,
-            <TextField key="start" label="Giờ bắt đầu" type="datetime-local" fullWidth InputLabelProps={{ shrink: true }} value={form.startTime || ''} onChange={(e) => setForm({ ...form, startTime: e.target.value })} />,
-            <TextField key="end" label="Giờ kết thúc" type="datetime-local" fullWidth InputLabelProps={{ shrink: true }} value={form.endTime || ''} onChange={(e) => setForm({ ...form, endTime: e.target.value })} />,
-        ] : (
+            </TextField>
+            <TextField key="start" label="Giờ bắt đầu" type="datetime-local" fullWidth InputLabelProps={{ shrink: true }} value={form.startTime || ''} onChange={(e) => setForm({ ...form, startTime: e.target.value })} />
+            <TextField key="end" label="Giờ kết thúc" type="datetime-local" fullWidth InputLabelProps={{ shrink: true }} value={form.endTime || ''} onChange={(e) => setForm({ ...form, endTime: e.target.value })} />
+          </>
+        ) : (
           <TextField select label="Trạng thái" fullWidth value={form.status ?? 'SCHEDULED'} onChange={(e) => setForm({ ...form, status: e.target.value })}>
             {SHOWTIME_STATUS_OPTIONS.map((opt) => (
               <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>

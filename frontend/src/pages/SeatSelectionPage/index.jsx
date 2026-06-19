@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useCallback, useState, useEffect, useMemo } from 'react';
 import { useLocation, useParams, useNavigate } from 'react-router-dom';
 import { Container, Box, Alert, Snackbar, Button } from '@mui/material';
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
@@ -15,6 +15,7 @@ import { useBooking } from '../../hooks/useBooking';
 import { bookingApi } from '../../api/bookingApi';
 import { bookingService } from '../../services/bookingService';
 import { fetchMovieById } from '../../services/movieService';
+import { useBookingFlow } from '../../context/BookingContext';
 import { pruneExpiredPendingBookings, savePendingBooking } from '../../utils/pendingBookingStorage';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -23,18 +24,33 @@ export const SeatSelectionPage = () => {
   const { showtimeId } = useParams();
   const location = useLocation();
   const navigate = useNavigate();
+  const { updateBookingState } = useBookingFlow();
 
-  const { loading: apiLoading, error: apiError, clearError, getSeats, create, getHistory, getDetail } = useBooking();
+  const { loading: apiLoading, error: apiError, clearError, getSeats, create, getHistory, getDetail, cancel } = useBooking();
 
   const [movie, setMovie] = useState(null);
   const [showtime, setShowtime] = useState(null);
   const [seats, setSeats] = useState([]);
   const [selectedSeats, setSelectedSeats] = useState([]);
   const [loadingDetails, setLoadingDetails] = useState(true);
-  const [activeBooking, setActiveBooking] = useState(location.state?.activeBooking || null);
+  const [, setActiveBooking] = useState(location.state?.activeBooking || null);
 
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
+
+  const refreshSeats = useCallback(async (cancelledRef = { current: false }, silent = false) => {
+    if (!showtimeId) return;
+    try {
+      const seatLayout = silent
+        ? bookingService.normalizeSeats((await bookingApi.fetchShowtimeSeats(showtimeId))?.data ?? [])
+        : await getSeats(showtimeId);
+      if (cancelledRef.current) return;
+      setSeats(Array.isArray(seatLayout) ? seatLayout : []);
+    } catch {
+      if (cancelledRef.current) return;
+      setSeats([]);
+    }
+  }, [getSeats, showtimeId]);
 
   const resumePendingBooking = (booking, seatsToUse) => {
     savePendingBooking({
@@ -55,6 +71,13 @@ export const SeatSelectionPage = () => {
         holdExpiresAt: booking.holdExpiresAt,
       },
     });
+    updateBookingState({
+      selectedMovie: movie,
+      selectedShowtime: showtime,
+      selectedSeats: seatsToUse,
+      bookingId: booking.id,
+      paymentStatus: 'HOLD',
+    });
   };
 
   // 1. Resolve movie and showtime configurations on page load/refresh
@@ -67,18 +90,25 @@ export const SeatSelectionPage = () => {
     let currentShowtime = location.state?.showtime;
 
     if (currentMovie && currentShowtime) {
-      setMovie(currentMovie);
-      setShowtime(currentShowtime);
-      setLoadingDetails(false);
+      Promise.resolve().then(() => {
+        if (cancelled) return;
+        setMovie(currentMovie);
+        setShowtime(currentShowtime);
+        setLoadingDetails(false);
+      });
       return () => { cancelled = true; };
     }
 
     if (!showtimeId) {
-      setLoadingDetails(false);
+      Promise.resolve().then(() => {
+        if (!cancelled) setLoadingDetails(false);
+      });
       return () => { cancelled = true; };
     }
 
-    setLoadingDetails(true);
+    Promise.resolve().then(() => {
+      if (!cancelled) setLoadingDetails(true);
+    });
     bookingApi.fetchShowtimes()
       .then((res) => {
         if (cancelled) return null;
@@ -115,24 +145,58 @@ export const SeatSelectionPage = () => {
   // Lấy sơ đồ ghế khi có showtimeId
   useEffect(() => {
     if (!showtimeId) return;
-    let cancelled = false;
+    const cancelledRef = { current: false };
+    Promise.resolve().then(() => refreshSeats(cancelledRef));
+    return () => {
+      cancelledRef.current = true;
+    };
+  }, [showtimeId, refreshSeats]);
 
-    const load = async () => {
+  useEffect(() => {
+    if (!showtimeId) return;
+    const cancelledRef = { current: false };
+
+    const releaseExpiredHolds = async () => {
       try {
-        const seatLayout = await getSeats(showtimeId);
-        if (cancelled) return;
-        setSeats(Array.isArray(seatLayout) ? seatLayout : []);
-      } catch (err) {
-        if (cancelled) return;
-        setSeats([]);
+        const history = await getHistory();
+        if (cancelledRef.current) return;
+
+        const expiredHolds = (Array.isArray(history) ? history : []).filter((booking) => {
+          const status = String(booking.status || '').toUpperCase();
+          const expiresMs = booking.holdExpiresAt ? new Date(booking.holdExpiresAt).getTime() : 0;
+          return (
+            String(booking.showtimeId) === String(showtimeId) &&
+            ['HOLD', 'PENDING'].includes(status) &&
+            Number.isFinite(expiresMs) &&
+            expiresMs <= Date.now()
+          );
+        });
+
+        if (expiredHolds.length === 0) return;
+        await Promise.allSettled(expiredHolds.map((booking) => cancel(booking.id)));
+        if (!cancelledRef.current) await refreshSeats(cancelledRef, true);
+      } catch {
+        // Seat refresh below still keeps the page usable if cleanup fails.
       }
     };
 
-    load();
+    releaseExpiredHolds();
     return () => {
-      cancelled = true;
+      cancelledRef.current = true;
     };
-  }, [showtimeId, getSeats]);
+  }, [cancel, getHistory, refreshSeats, showtimeId]);
+
+  useEffect(() => {
+    if (!showtimeId) return undefined;
+    const cancelledRef = { current: false };
+    const timer = window.setInterval(() => {
+      refreshSeats(cancelledRef, true);
+    }, 30000);
+    return () => {
+      cancelledRef.current = true;
+      window.clearInterval(timer);
+    };
+  }, [showtimeId, refreshSeats]);
 
   // Khi có bookingId từ navigation (từ trang thanh toán), gọi lại detail để recover selectedSeats
   useEffect(() => {
@@ -150,7 +214,7 @@ export const SeatSelectionPage = () => {
           return recoveredSeats;
         });
         setActiveBooking(detail);
-      } catch (err) {
+      } catch {
         // keep current selectedSeats if recovery failed
       }
     };
@@ -164,8 +228,10 @@ export const SeatSelectionPage = () => {
   // Bắt lỗi API và hiển thị snackbar
   useEffect(() => {
     if (apiError) {
-      setSnackbarMessage(apiError);
-      setSnackbarOpen(true);
+      Promise.resolve().then(() => {
+        setSnackbarMessage(apiError);
+        setSnackbarOpen(true);
+      });
     }
   }, [apiError]);
 
@@ -178,7 +244,8 @@ export const SeatSelectionPage = () => {
     setSelectedSeats((prev) => {
       const isAlreadySelected = prev.some((s) => s.id === seat.id);
       if (isAlreadySelected) {
-        return prev.filter((s) => s.id !== seat.id);
+        const next = prev.filter((s) => s.id !== seat.id);
+        return next;
       }
 
       if (prev.length >= 8) {
@@ -194,9 +261,19 @@ export const SeatSelectionPage = () => {
         return prev;
       }
 
-      return [...prev, seat];
+      const next = [...prev, seat];
+      return next;
     });
   };
+
+  useEffect(() => {
+    updateBookingState({
+      selectedMovie: movie,
+      selectedShowtime: showtime,
+      selectedSeats,
+      paymentStatus: 'SELECTING_SEATS',
+    });
+  }, [movie, selectedSeats, showtime, updateBookingState]);
 
   const handleProceed = async () => {
     if (selectedSeats.length === 0 || apiLoading) return;
@@ -252,13 +329,20 @@ export const SeatSelectionPage = () => {
             holdExpiresAt: bookingResult.holdExpiresAt,
           },
         });
+        updateBookingState({
+          selectedMovie: movie,
+          selectedShowtime: showtime,
+          selectedSeats,
+          bookingId: bookingResult.id,
+          paymentStatus: 'HOLD',
+        });
       }
     } catch (err) {
       try {
         const history = await getHistory();
         const selectedIdSet = new Set(seatIds.map(String));
         const matchedPendingBooking = history.find((booking) => {
-          if (booking.status !== 'PENDING') return false;
+          if (!['HOLD', 'PENDING'].includes(String(booking.status || '').toUpperCase())) return false;
           if (String(booking.showtimeId) !== String(showtimeId)) return false;
           if (!booking.holdExpiresAt || new Date(booking.holdExpiresAt).getTime() <= Date.now()) return false;
 

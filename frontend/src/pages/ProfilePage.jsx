@@ -23,9 +23,12 @@ import PaletteRoundedIcon from '@mui/icons-material/PaletteRounded';
 import SecurityRoundedIcon from '@mui/icons-material/SecurityRounded';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import { useAuth } from '../context/AuthContext';
-import { profileUser, bookingHistory, favoriteMovies } from '../data/profileMock';
+import { profileUser, favoriteMovies } from '../data/profileMock';
 import { useBooking } from '../hooks/useBooking';
+import { bookingApi } from '../api/bookingApi';
+import { bookingService } from '../services/bookingService';
 import { MOCK_MOVIES } from '../mock/bookingData';
+import { getPendingBooking, mergeMovieContext, mergeShowtimeContext } from '../utils/pendingBookingStorage';
 import { CircularProgress } from '@mui/material';
 import Box from '@mui/material/Box';
 import './ProfilePage.css';
@@ -54,6 +57,29 @@ const formatDate = (iso) => {
   const [y, m, d] = iso.split('-');
   return `${d}/${m}/${y}`;
 };
+
+const toValidDate = (value) => {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const getHoldRemaining = (holdExpiresAt, nowTs) => {
+  const expiresAt = toValidDate(holdExpiresAt);
+  if (!expiresAt) return { holdExpiresMs: 0, remainingMs: 0, remainingText: '' };
+
+  const holdExpiresMs = expiresAt.getTime();
+  const remainingMs = Math.max(0, holdExpiresMs - nowTs);
+  const remainingTotalSeconds = Math.floor(remainingMs / 1000);
+  const remainingText = `${String(Math.floor(remainingTotalSeconds / 60)).padStart(2, '0')}:${String(remainingTotalSeconds % 60).padStart(2, '0')}`;
+
+  return { holdExpiresMs, remainingMs, remainingText };
+};
+
+const DEFAULT_TICKET_TITLE = 'Vé xem phim';
+const isPendingTicket = (ticket) => (['PENDING', 'HOLD'].includes(ticket.rawStatus) || ticket.canResume) && !ticket.isExpired;
+const isDoneTicket = (ticket) => ticket.rawStatus === 'CONFIRMED';
+const isCancelTicket = (ticket) => ['CANCELLED', 'EXPIRED'].includes(ticket.rawStatus);
 
 /* ─── Premium ticket card ─── */
 const TicketCard = ({ ticket, onResume }) => (
@@ -94,15 +120,17 @@ const TicketCard = ({ ticket, onResume }) => (
             </span>
           )}
         </div>
-        {(ticket.canResume || ticket.status === 'Chờ thanh toán') ? (
+        {ticket.canResume ? (
           <button
             type="button"
             className="pf-btn pf-btn--sm pf-btn--pay"
             onClick={() => onResume(ticket)}
           >
             <ConfirmationNumberRoundedIcon sx={{ fontSize: 16 }} />
-            Thanh toán ngay
+            Tiếp tục thanh toán
           </button>
+        ) : ticket.isExpired ? (
+          <span className="pf-ticket__hold is-expired">Đã hết hạn giữ ghế</span>
         ) : (
           <div className="pf-ticket__barcode">
             {Array.from({ length: 28 }, (_, i) => (
@@ -157,10 +185,14 @@ const ProfilePage = () => {
   const [favorites, setFavorites] = useState(favoriteMovies);
 
   // Dynamic API state and side effects
-  const { loading: apiLoading, getHistory } = useBooking();
+  const { loading: apiLoading, getHistory, cancel } = useBooking();
   const [history, setHistory] = useState([]);
   const [subTab, setSubTab] = useState('all');
-  const [nowTs, setNowTs] = useState(Date.now());
+  const [nowTs, setNowTs] = useState(0);
+
+  useEffect(() => {
+    Promise.resolve().then(() => setNowTs(Date.now()));
+  }, []);
 
   useEffect(() => {
     if (active !== 'history' && active !== 'upcoming') return undefined;
@@ -174,96 +206,132 @@ const ProfilePage = () => {
 
   useEffect(() => {
     if (active === 'history' || active === 'upcoming') {
-      getHistory()
-        .then((data) => {
+      Promise.all([
+        getHistory(),
+        bookingApi.fetchShowtimes().catch(() => []),
+      ])
+        .then(([data, showtimeResponse]) => {
+          const rawShowtimes = showtimeResponse?.data ?? showtimeResponse ?? [];
+          const showtimeMap = new Map(
+            bookingService.normalizeShowtimes(Array.isArray(rawShowtimes) ? rawShowtimes : [])
+              .map((showtime) => [String(showtime.id), showtime]),
+          );
+          const now = Date.now();
           const mapped = data.map((b) => {
-            const date = new Date(b.startTime);
-            const isPast = date < new Date();
-            const holdExpiresAt = b.holdExpiresAt ? new Date(b.holdExpiresAt) : null;
-            const holdExpiresMs = holdExpiresAt ? holdExpiresAt.getTime() : 0;
-            const remainingMs = holdExpiresMs ? Math.max(0, holdExpiresMs - nowTs) : 0;
-            const remainingTotalSeconds = Math.floor(remainingMs / 1000);
-            const remainingText = holdExpiresMs
-              ? `${String(Math.floor(remainingTotalSeconds / 60)).padStart(2, '0')}:${String(remainingTotalSeconds % 60).padStart(2, '0')}`
-              : '';
+            const pendingContext = getPendingBooking(b.id);
+            const showtimeInfo = showtimeMap.get(String(b.showtimeId));
+            const pendingMovie = pendingContext?.movie || null;
+            const pendingShowtime = pendingContext?.showtime || null;
+            const mergedShowtime = mergeShowtimeContext(pendingShowtime, showtimeInfo);
+            const rawStartTime = b.startTime || mergedShowtime?.startTime || '';
+            const rawMovieTitle =
+              b.movieTitle && b.movieTitle !== DEFAULT_TICKET_TITLE
+                ? b.movieTitle
+                : pendingMovie?.title || showtimeInfo?.movieTitle || DEFAULT_TICKET_TITLE;
+            const rawRoomName = b.roomName && b.roomName !== 'Phòng chiếu' ? b.roomName : mergedShowtime?.room || 'Phòng chiếu';
+            const date = toValidDate(rawStartTime);
+            const isPast = date ? date < new Date() : false;
+            const holdExpiresAt = pendingContext?.holdExpiresAt || b.holdExpiresAt;
+            const { holdExpiresMs, remainingMs, remainingText } = getHoldRemaining(holdExpiresAt, now);
             const normStatus = String(b.status || '').toUpperCase();
-            const isPending = normStatus === 'PENDING';
+            const isClosedBooking = normStatus === 'CANCELLED' || normStatus === 'EXPIRED' || normStatus === 'CONFIRMED';
+            const hasPendingContext = Boolean(pendingContext?.bookingId) && !isClosedBooking;
+            const isPending = normStatus === 'PENDING' || normStatus === 'HOLD' || hasPendingContext;
+            const isExpired = isPending && holdExpiresMs > 0 && remainingMs <= 0;
             let displayStatus = 'Sắp chiếu';
-            if (normStatus === 'CANCELLED') displayStatus = 'Đã hủy';
+            if (isPending) displayStatus = 'Chờ thanh toán';
+            else if (normStatus === 'CANCELLED') displayStatus = 'Đã hủy';
             else if (normStatus === 'CONFIRMED' && isPast) displayStatus = 'Đã xem';
-            else if (isPending) displayStatus = 'Chờ thanh toán';
+            else if (normStatus === 'EXPIRED') displayStatus = 'Đã hủy';
 
             // Lookup mock movie details to retrieve the correct image URL
             const mockMovie = MOCK_MOVIES.find((m) =>
-              m.title.toLowerCase().includes(b.movieTitle.toLowerCase())
+              m.title.toLowerCase().includes(rawMovieTitle.toLowerCase())
             );
-            const poster = mockMovie?.posterUrl || '/placeholder.svg';
+            const mergedMovie = mergeMovieContext(
+              { title: rawMovieTitle, posterUrl: mockMovie?.posterUrl || '/placeholder.svg' },
+              pendingMovie,
+            );
+            const poster = mergedMovie?.posterUrl || mergedMovie?.poster || '/placeholder.svg';
+            const selectedSeats = (pendingContext?.selectedSeats?.length ? pendingContext.selectedSeats : b.seats) || [];
 
             return {
               id: b.confirmationCode || b.id,
               bookingId: b.id,
-              movie: b.movieTitle,
+              movie: rawMovieTitle,
               poster,
-              cinema: `ThauFilm Cinema • ${b.roomName}`,
-              showtime: date.toLocaleString('vi-VN', {
-                weekday: 'long',
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-              }),
-              seats: b.seats.map((s) => s.label),
-              bookedAt: normStatus === 'CONFIRMED' ? 'Đã thanh toán' : 'Chờ thanh toán',
-              status: displayStatus,
-              rawStatus: normStatus,
+              cinema: `ThauFilm Cinema • ${rawRoomName}`,
+              showtime: date
+                ? date.toLocaleString('vi-VN', {
+                    weekday: 'long',
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })
+                : 'Đang cập nhật',
+              seats: selectedSeats.map((s) => s.label || s.seatLabel || s.name || s),
+              bookedAt: isExpired ? 'Đã hủy' : (isPending ? 'Chờ thanh toán' : displayStatus),
+              status: isExpired ? 'Đã hủy' : displayStatus,
+              rawStatus: isExpired ? 'EXPIRED' : (isPending ? 'PENDING' : normStatus),
               startTime: date,
-              holdExpiresAt: b.holdExpiresAt,
-              remainingText,
-              isExpired: isPending && holdExpiresMs > 0 && remainingMs <= 0,
-              canResume: isPending,
+              holdExpiresAt,
+              remainingText: isPending && holdExpiresMs > 0 ? remainingText : '',
+              isExpired,
+              canResume: isPending && !isExpired,
               moviePayload: {
-                title: b.movieTitle,
+                ...mergedMovie,
+                title: rawMovieTitle,
                 posterUrl: poster,
               },
               showtimePayload: {
                 id: b.showtimeId,
-                date: b.startTime ? String(b.startTime).slice(0, 10) : '',
-                time: b.startTime ? String(b.startTime).slice(11, 16) : '',
-                room: b.roomName,
-                format: '2D',
-                startTime: b.startTime,
+                date: rawStartTime ? String(rawStartTime).slice(0, 10) : '',
+                time: rawStartTime ? String(rawStartTime).slice(11, 16) : '',
+                room: rawRoomName,
+                format: mergedShowtime?.format || '2D',
+                startTime: rawStartTime,
               },
-              selectedSeats: b.seats || [],
+              selectedSeats,
             };
           });
           setHistory(mapped);
+          mapped
+            .filter((ticket) => ticket.isExpired && ['PENDING', 'HOLD'].includes(ticket.rawStatus))
+            .forEach((ticket) => {
+              cancel(ticket.bookingId).catch(() => {});
+            });
         })
         .catch(() => {});
     }
-  }, [active, getHistory]);
+  }, [active, cancel, getHistory]);
 
   useEffect(() => {
-    setHistory((current) => current.map((ticket) => {
-      if (!ticket.holdExpiresAt || ticket.rawStatus !== 'PENDING') return ticket;
+    Promise.resolve().then(() => {
+      setHistory((current) => current.map((ticket) => {
+        if (!ticket.holdExpiresAt || !['PENDING', 'HOLD'].includes(ticket.rawStatus)) return ticket;
 
-      const holdExpiresMs = new Date(ticket.holdExpiresAt).getTime();
-      const remainingMs = holdExpiresMs ? Math.max(0, holdExpiresMs - nowTs) : 0;
-      const remainingTotalSeconds = Math.floor(remainingMs / 1000);
+        const { holdExpiresMs, remainingMs, remainingText } = getHoldRemaining(ticket.holdExpiresAt, nowTs);
+        const isExpired = holdExpiresMs > 0 && remainingMs <= 0;
 
-      return {
-        ...ticket,
-        remainingText: `${String(Math.floor(remainingTotalSeconds / 60)).padStart(2, '0')}:${String(remainingTotalSeconds % 60).padStart(2, '0')}`,
-        isExpired: holdExpiresMs > 0 && remainingMs <= 0,
-        canResume: true,
-      };
-    }));
+        return {
+          ...ticket,
+          remainingText,
+          isExpired,
+          status: isExpired ? 'Đã hủy' : ticket.status,
+          bookedAt: isExpired ? 'Đã hủy' : ticket.bookedAt,
+          rawStatus: isExpired ? 'EXPIRED' : ticket.rawStatus,
+          canResume: !isExpired,
+        };
+      }));
+    });
   }, [nowTs]);
 
   const filteredHistory = history.filter((t) => {
-    if (subTab === 'pending') return t.status === 'Chờ thanh toán';
-    if (subTab === 'done') return t.status === 'Đã xem';
-    if (subTab === 'cancel') return t.status === 'Đã hủy';
+    if (subTab === 'pending') return isPendingTicket(t);
+    if (subTab === 'done') return isDoneTicket(t);
+    if (subTab === 'cancel') return isCancelTicket(t);
     return true;
   });
 
@@ -294,16 +362,8 @@ const ProfilePage = () => {
   };
 
   const removeFavorite = (id) => setFavorites((list) => list.filter((m) => m.id !== id));
-  const resumePayment = (ticket) => {
-    navigate('/booking/payment', {
-      state: {
-        bookingId: ticket.bookingId,
-        movie: ticket.moviePayload,
-        showtime: ticket.showtimePayload,
-        selectedSeats: ticket.selectedSeats,
-        holdExpiresAt: ticket.holdExpiresAt,
-      },
-    });
+  const resumePayment = () => {
+    navigate('/my-bookings');
   };
 
   const MembershipCard = (
@@ -397,21 +457,21 @@ const ProfilePage = () => {
                     onClick={() => setSubTab('pending')}
                     style={{ cursor: 'pointer' }}
                   >
-                    {history.filter(t => t.status === 'Chờ thanh toán').length} Chờ thanh toán
+                    {history.filter(isPendingTicket).length} Chờ thanh toán
                   </span>
                   <span
                     className={`pf-tab ${subTab === 'done' ? 'is-active' : ''}`}
                     onClick={() => setSubTab('done')}
                     style={{ cursor: 'pointer' }}
                   >
-                    {history.filter(t => t.status === 'Đã xem').length} Đã xem
+                    {history.filter(isDoneTicket).length} Đã xem
                   </span>
                   <span 
                     className={`pf-tab ${subTab === 'cancel' ? 'is-active' : ''}`}
                     onClick={() => setSubTab('cancel')}
                     style={{ cursor: 'pointer' }}
                   >
-                    {history.filter(t => t.status === 'Đã hủy').length} Đã hủy
+                    {history.filter(isCancelTicket).length} Đã hủy
                   </span>
                 </div>
               </div>

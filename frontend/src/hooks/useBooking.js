@@ -163,14 +163,29 @@ export const useBooking = () => {
   }, []);
 
   // Pay and confirm booking: POST /api/member/booking/{bookingId}/pay
-  const pay = useCallback(async (bookingId, paymentMethod = 'VNPAY') => {
+  const pay = useCallback(async (bookingId, paymentMethod = 'VNPAY', discountCode = '') => {
     setLoading(true);
     setError(null);
     try {
-      const response = await bookingApi.payBooking(bookingId, paymentMethod);
+      const response = await bookingApi.payBooking(bookingId, paymentMethod, discountCode);
       return response?.data ?? response ?? {};
     } catch (err) {
       setError(err.message || 'Thanh toán thất bại.');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const cancel = useCallback(async (bookingId) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await bookingApi.cancelBooking(bookingId);
+      const rawBooking = resolveData(response);
+      return rawBooking ? bookingService.normalizeBooking(rawBooking) : null;
+    } catch (err) {
+      setError(err.message || 'Không thể hủy đơn đặt vé.');
       throw err;
     } finally {
       setLoading(false);
@@ -190,6 +205,7 @@ export const useBooking = () => {
     getDiscounts,
     getCombos,
     pay,
+    cancel,
   };
 };
 

@@ -23,10 +23,12 @@ export const BookingSuccessPage = () => {
 
   useEffect(() => {
     if (location.state) {
-      setBookingData(location.state);
-      if (Array.isArray(location.state.tickets)) {
-        setTickets(location.state.tickets);
-      }
+      Promise.resolve().then(() => {
+        setBookingData(location.state);
+        if (Array.isArray(location.state.tickets)) {
+          setTickets(location.state.tickets);
+        }
+      });
     }
   }, [location.state]);
 
@@ -337,7 +339,7 @@ export const BookingSuccessPage = () => {
         </CustomButton>
         <CustomButton 
           variant="primary" 
-          onClick={() => navigate('/profile?tab=history')}
+          onClick={() => navigate('/my-bookings')}
           sx={{ px: 4 }}
         >
           Xem vé của tôi

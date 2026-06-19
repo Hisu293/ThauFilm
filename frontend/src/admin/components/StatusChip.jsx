@@ -45,6 +45,7 @@ const PRESETS = {
 
 const StatusChip = ({ status, label }) => {
   const cfg = PRESETS[status] || { label: label || status, color: 'default' };
+  const displayLabel = label || cfg.label || status;
   // Filled success/warning chips have low text contrast on their bright fills;
   // force a dark, fully-opaque label so the text stays readable.
   const needsDarkText = cfg.color === 'success' || cfg.color === 'warning';
