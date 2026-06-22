@@ -14,6 +14,7 @@ import PersonRoundedIcon from '@mui/icons-material/PersonRounded';
 import GroupRoundedIcon from '@mui/icons-material/GroupRounded';
 import MovieRoundedIcon from '@mui/icons-material/MovieRounded';
 import CloseIcon from '@mui/icons-material/Close';
+import ForumRoundedIcon from '@mui/icons-material/ForumRounded';
 
 import { fetchMovieById } from '../services/movieService';
 import { useBookingFlow } from '../context/BookingContext';
@@ -330,26 +331,27 @@ const MovieDetailPage = () => {
             </Box>
 
             {/* Online movie CTA */}
-            <Button
-              variant="outlined"
-              size="large"
-              startIcon={<PlayArrowRoundedIcon />}
-              onClick={() => setOpenTrailer(true)}
-              sx={{
-                borderColor: 'primary.main',
-                color: 'primary.main',
-                fontWeight: 700,
-                px: 4.5, py: 1.6,
-                borderRadius: 2,
-                fontSize: '0.97rem',
-                '&:hover': {
-                  borderColor: 'primary.light',
-                  bgcolor: 'rgba(251,191,36,0.06)',
-                },
-              }}
-            >
-              Xem phim online
-            </Button>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+              <Button
+                variant="outlined"
+                size="large"
+                startIcon={<PlayArrowRoundedIcon />}
+                onClick={() => setOpenTrailer(true)}
+                sx={{ borderColor: 'primary.main', color: 'primary.main', fontWeight: 700, px: 4.5, py: 1.6, borderRadius: 2 }}
+              >
+                Xem phim online
+              </Button>
+              <Button
+                component={RouterLink}
+                to={`/movies/${movie.id}/community`}
+                variant="text"
+                size="large"
+                startIcon={<ForumRoundedIcon />}
+                sx={{ fontWeight: 700, px: 3 }}
+              >
+                Xem đánh giá cộng đồng
+              </Button>
+            </Stack>
           </Box>
         </Stack>
 
@@ -357,6 +359,7 @@ const MovieDetailPage = () => {
 
         {/* Showtimes Selection Section */}
         <ShowtimeSelector movieId={movie.id} onSelectShowtime={handleSelectShowtime} />
+
 
       </Container>
 

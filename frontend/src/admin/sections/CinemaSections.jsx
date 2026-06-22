@@ -602,7 +602,7 @@ const SeatMapInline = ({ crud, seats, loading, onReload }) => {
             {t('common', 'save')}
           </Button>
           <Button color="error" onClick={() => handleDeleteSeat(seatDialog)}>
-            {t('common', 'cancel')}
+            Xóa
           </Button>
         </DialogActions>
       </Dialog>

@@ -169,6 +169,92 @@
   }
 }
 
+/* ── Chế độ sáng: override các nền/màu tối hard-code ở trên ───────────────── */
+.admin-shell[data-mode='light'] {
+  background: #f4f4f5;
+  color: #111827;
+}
+
+.admin-shell[data-mode='light']::before {
+  background:
+    radial-gradient(ellipse 80% 50% at 10% -10%, rgba(229, 9, 20, 0.08), transparent 55%),
+    radial-gradient(ellipse 60% 40% at 90% 0%, rgba(99, 102, 241, 0.06), transparent 50%);
+}
+
+.admin-shell[data-mode='light'] .admin-sidebar-panel {
+  background: rgba(255, 255, 255, 0.98);
+  border-right: 1px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.06);
+}
+
+.admin-shell[data-mode='light'] .admin-stat-card {
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+.admin-shell[data-mode='light'] .admin-stat-card:hover {
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.1);
+}
+
+.admin-shell[data-mode='light'] .admin-panel {
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+.admin-shell[data-mode='light'] .admin-chart-bar.muted {
+  background: linear-gradient(180deg, rgba(0, 0, 0, 0.18) 0%, rgba(0, 0, 0, 0.05) 100%);
+}
+
+.admin-shell[data-mode='light'] .admin-table-row:hover {
+  background: rgba(0, 0, 0, 0.04) !important;
+}
+
+.admin-shell[data-mode='light'] .admin-nav-group.active-group {
+  background: rgba(229, 9, 20, 0.08);
+}
+
+.admin-shell[data-mode='light'] .admin-sidebar-scroll {
+  scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+}
+
+.admin-shell[data-mode='light'] .admin-sidebar-scroll::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.admin-shell[data-mode='light'] .admin-search input {
+  color: #111827;
+}
+
+/* Sidebar (light): chữ/icon đang hard-code trắng qua inline sx → ép sang tông tối */
+.admin-shell[data-mode='light'] .admin-sidebar-panel .MuiTypography-root,
+.admin-shell[data-mode='light'] .admin-sidebar-panel .MuiListItemText-primary,
+.admin-shell[data-mode='light'] .admin-sidebar-panel .MuiButton-root {
+  color: #1f2937 !important;
+}
+
+.admin-shell[data-mode='light'] .admin-sidebar-panel .MuiListItemButton-root {
+  color: #374151 !important;
+}
+
+/* Icon (không active) trong sidebar light: xám đậm thay vì trắng mờ */
+.admin-shell[data-mode='light'] .admin-sidebar-panel .MuiListItemIcon-root {
+  color: #6b7280 !important;
+}
+
+/* Giữ icon của mục đang chọn theo màu nhấn đỏ */
+.admin-shell[data-mode='light'] .admin-nav-item.active .MuiListItemIcon-root {
+  color: #e50914 !important;
+}
+
+.admin-shell[data-mode='light'] .admin-sidebar-panel .MuiListItemButton-root:hover {
+  background-color: rgba(0, 0, 0, 0.04) !important;
+}
+
+.admin-shell[data-mode='light'] .admin-sidebar-panel hr,
+.admin-shell[data-mode='light'] .admin-sidebar-panel .MuiBox-root[style*='border-top'] {
+  border-color: rgba(0, 0, 0, 0.08) !important;
+}
+
 .admin-animate-in {
   animation: admin-fade-in 0.5s ease forwards;
 }

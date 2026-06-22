@@ -1,5 +1,6 @@
 package com.filmticket.dto;
 
+import com.filmticket.entity.Seat;
 import com.filmticket.entity.SeatAvailability;
 import com.filmticket.model.SeatBookingStatus;
 import lombok.AllArgsConstructor;
@@ -18,6 +19,7 @@ public class ShowtimeSeatResponse {
     private UUID seatId;
     private String rowName;
     private Integer seatNumber;
+    private String label;
     private String type;
     private SeatBookingStatus status;
     private BigDecimal price;
@@ -28,5 +30,15 @@ public class ShowtimeSeatResponse {
                 .status(availability.getStatus())
                 .price(availability.getPrice())
                 .build();
+    }
+
+    public static ShowtimeSeatResponse fromSeatAvailability(SeatAvailability availability, Seat seat) {
+        ShowtimeSeatResponse response = fromSeatAvailability(availability);
+        if (seat != null) {
+            response.setRowName(seat.getRowName());
+            response.setSeatNumber(seat.getSeatNumber());
+            response.setType(seat.getType().toStorageValue());
+        }
+        return response;
     }
 }

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import VisibilityOffRoundedIcon from '@mui/icons-material/VisibilityOffRounded';
 import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded';
@@ -88,7 +88,7 @@ const LoginPage = () => {
   const [success, setSuccess] = useState(false);
   const [serverError, setServerError] = useState('');
 
-  const completeLogin = (body) => {
+  const completeLogin = useCallback((body) => {
     const { user, accessToken, refreshToken } = parseAuthResponse(body);
     if (!accessToken) {
       throw new Error('Phản hồi đăng nhập thiếu accessToken.');
@@ -106,7 +106,7 @@ const LoginPage = () => {
     else if (isStaff) redirectUrl = '/staff/dashboard';
 
     setTimeout(() => navigate(redirectUrl), 1000);
-  };
+  }, [login, navigate]);
 
   useEffect(() => {
     let cancelled = false;
@@ -134,9 +134,7 @@ const LoginPage = () => {
                 throw new Error('Google không trả về response.credential.');
               }
 
-              console.log('Google credential:', response.credential);
               const { data: body } = await authService.googleAuth(response.credential);
-              console.log('Google login API success:', body);
               completeLogin(body);
             } catch (err) {
               setServerError(err.message || 'Google đăng nhập thất bại.');
@@ -166,7 +164,7 @@ const LoginPage = () => {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [completeLogin]);
 
   const emailError = useMemo(() => {
     if (!submitted) return '';

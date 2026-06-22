@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import {
   AppBar,
   Avatar,
@@ -9,9 +9,12 @@ import {
   ThemeProvider,
   Toolbar,
   Typography,
+  createTheme,
 } from '@mui/material';
 import MenuRoundedIcon from '@mui/icons-material/MenuRounded';
 import NotificationsNoneRoundedIcon from '@mui/icons-material/NotificationsNoneRounded';
+import LightModeRoundedIcon from '@mui/icons-material/LightModeRounded';
+import DarkModeRoundedIcon from '@mui/icons-material/DarkModeRounded';
 import { ADMIN_VIEWS, VIEW_META } from '../admin/adminNav';
 import { adminTheme, SIDEBAR_WIDTH } from '../admin/adminTheme';
 import AdminSidebar from '../admin/components/AdminSidebar';
@@ -22,7 +25,34 @@ import './AdminPage.css';
 const AdminPage = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activeView, setActiveView] = useState(ADMIN_VIEWS.DASHBOARD);
+  const [mode, setMode] = useState('dark');
   const store = useAdminStore();
+
+  const toggleTheme = () => setMode((prev) => (prev === 'light' ? 'dark' : 'light'));
+
+  // Dựng theme động sáng/tối trên nền adminTheme (cinemaTheme), giống StaffLayout.
+  const theme = useMemo(
+    () =>
+      createTheme(adminTheme, {
+        palette: {
+          mode,
+          primary: { main: '#e50914' },
+          ...(mode === 'dark'
+            ? {
+                background: { default: '#08080c', paper: '#121218' },
+                text: { primary: '#fafafa', secondary: 'rgba(255,255,255,0.58)' },
+                divider: 'rgba(255,255,255,0.08)',
+              }
+            : {
+                background: { default: '#f4f4f5', paper: '#ffffff' },
+                text: { primary: '#111827', secondary: '#6b7280' },
+                divider: 'rgba(0,0,0,0.08)',
+              }),
+        },
+      }),
+    [mode],
+  );
+  const isDark = mode === 'dark';
   const meta = VIEW_META[activeView] || VIEW_META[ADMIN_VIEWS.DASHBOARD];
   const me = store.me;
   const adminInitials = (me?.fullName || me?.email || 'AD').charAt(0).toUpperCase();
@@ -41,9 +71,9 @@ const AdminPage = () => {
   );
 
   return (
-    <ThemeProvider theme={adminTheme}>
+    <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Box className="admin-shell">
+      <Box className="admin-shell" data-mode={mode}>
         {/* Desktop: sidebar cố định bên trái (không dùng Drawer permanent — tránh lỗi ẩn trên MUI 7) */}
         <Box
           component="aside"
@@ -65,8 +95,8 @@ const AdminPage = () => {
             '& .MuiDrawer-paper': {
               width: SIDEBAR_WIDTH,
               boxSizing: 'border-box',
-              background: '#0c0c10',
-              borderRight: '1px solid rgba(255,255,255,0.08)',
+              background: isDark ? '#0c0c10' : '#ffffff',
+              borderRight: `1px solid ${theme.palette.divider}`,
             },
           }}
         >
@@ -78,16 +108,17 @@ const AdminPage = () => {
             position="sticky"
             elevation={0}
             sx={{
-              background: 'rgba(8, 8, 12, 0.85)',
+              background: isDark ? 'rgba(8, 8, 12, 0.85)' : 'rgba(255, 255, 255, 0.85)',
               backdropFilter: 'blur(16px)',
-              borderBottom: '1px solid rgba(255,255,255,0.06)',
+              borderBottom: `1px solid ${theme.palette.divider}`,
+              color: 'text.primary',
             }}
           >
             <Toolbar sx={{ gap: 2, py: 1 }}>
               <IconButton
                 edge="start"
                 onClick={() => setMobileOpen(true)}
-                sx={{ color: '#fff', display: { md: 'none' } }}
+                sx={{ color: 'text.primary', display: { md: 'none' } }}
                 aria-label="Mở menu"
               >
                 <MenuRoundedIcon />
@@ -96,11 +127,14 @@ const AdminPage = () => {
                 <Typography variant="h6" noWrap sx={{ fontWeight: 700 }}>
                   {meta.title}
                 </Typography>
-                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }} noWrap>
+                <Typography variant="caption" sx={{ color: 'text.secondary' }} noWrap>
                   {meta.subtitle}
                 </Typography>
               </Box>
-              <IconButton sx={{ color: 'rgba(255,255,255,0.7)' }}>
+              <IconButton onClick={toggleTheme} sx={{ color: 'text.secondary' }} aria-label="Đổi giao diện sáng/tối">
+                {isDark ? <LightModeRoundedIcon /> : <DarkModeRoundedIcon />}
+              </IconButton>
+              <IconButton sx={{ color: 'text.secondary' }}>
                 <NotificationsNoneRoundedIcon />
               </IconButton>
               {me && (
@@ -108,7 +142,7 @@ const AdminPage = () => {
                   <Typography variant="body2" fontWeight={700} noWrap>
                     {me.fullName || me.email}
                   </Typography>
-                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }} noWrap>
+                  <Typography variant="caption" sx={{ color: 'text.secondary' }} noWrap>
                     {me.role}
                   </Typography>
                 </Box>

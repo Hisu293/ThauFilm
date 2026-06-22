@@ -16,6 +16,17 @@ public interface ShowtimeRepository extends JpaRepository<Showtime, UUID> {
     List<Showtime> findByCinemaRoomIdAndStartTimeLessThanAndEndTimeGreaterThan(UUID cinemaRoomId, LocalDateTime endTime, LocalDateTime startTime);
     List<Showtime> findByCinemaRoomIdAndStartTimeLessThanAndEndTimeGreaterThanAndIdNot(UUID cinemaRoomId, LocalDateTime endTime, LocalDateTime startTime, UUID id);
 
+    @Query("SELECT s FROM Showtime s WHERE s.cinemaRoomId = :cinemaRoomId AND s.startTime < :newEndTime AND s.endTime > :newStartTime")
+    List<Showtime> findOverlappingShowtimes(@Param("cinemaRoomId") UUID cinemaRoomId,
+            @Param("newStartTime") LocalDateTime newStartTime,
+            @Param("newEndTime") LocalDateTime newEndTime);
+
+    @Query("SELECT s FROM Showtime s WHERE s.cinemaRoomId = :cinemaRoomId AND s.startTime < :newEndTime AND s.endTime > :newStartTime AND s.id != :excludeId")
+    List<Showtime> findOverlappingShowtimesExcluding(@Param("cinemaRoomId") UUID cinemaRoomId,
+            @Param("newStartTime") LocalDateTime newStartTime,
+            @Param("newEndTime") LocalDateTime newEndTime,
+            @Param("excludeId") UUID excludeId);
+
     List<Showtime> findByMovieIdOrderByStartTimeAsc(UUID movieId);
 
     @Query("SELECT s FROM Showtime s WHERE DATE(s.startTime) = :date ORDER BY s.startTime ASC")
