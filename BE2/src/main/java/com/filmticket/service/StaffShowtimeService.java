@@ -3,12 +3,14 @@ package com.filmticket.service;
 import com.filmticket.dto.ShowtimeResponse;
 import com.filmticket.dto.UpsertShowtimeRequest;
 import com.filmticket.dto.ShowtimeSeatResponse;
+import com.filmticket.entity.Seat;
 import com.filmticket.entity.Showtime;
 import com.filmticket.entity.SeatAvailability;
 import com.filmticket.exception.BadRequestException;
 import com.filmticket.model.SeatBookingStatus;
 import com.filmticket.model.ShowtimeStatus;
 import com.filmticket.repository.SeatAvailabilityRepository;
+import com.filmticket.repository.SeatRepository;
 import com.filmticket.repository.ShowtimeRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -17,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -25,6 +28,7 @@ public class StaffShowtimeService {
     private final ShowtimeRepository showtimeRepository;
     private final ShowtimeService showtimeService;
     private final SeatAvailabilityRepository seatAvailabilityRepository;
+    private final SeatRepository seatRepository;
 
     public List<ShowtimeResponse> listShowtimes() {
         return showtimeService.getAllShowtimes();
@@ -48,10 +52,19 @@ public class StaffShowtimeService {
 
     @Transactional(readOnly = true)
     public Map<String, Object> getShowtimeSeats(UUID showtimeId) {
+        if (!showtimeRepository.existsById(showtimeId)) {
+            throw new BadRequestException("Showtime not found");
+        }
         List<SeatAvailability> availabilities = seatAvailabilityRepository.findByShowtimeIdOrderBySeatId(showtimeId);
+
+        List<UUID> seatIds = availabilities.stream().map(SeatAvailability::getSeatId).toList();
+        Map<UUID, Seat> seatById = seatRepository.findAllById(seatIds).stream()
+                .collect(Collectors.toMap(Seat::getId, seat -> seat));
+
         List<ShowtimeSeatResponse> seats = availabilities.stream()
-                .map(ShowtimeSeatResponse::fromSeatAvailability)
+                .map(av -> ShowtimeSeatResponse.fromSeatAvailability(av, seatById.get(av.getSeatId())))
                 .toList();
+
         long sold = availabilities.stream().filter(av -> av.getStatus() != SeatBookingStatus.AVAILABLE).count();
         Map<String, Object> result = new java.util.HashMap<>();
         result.put("showtimeId", showtimeId);

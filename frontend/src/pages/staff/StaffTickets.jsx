@@ -1,0 +1,444 @@
+import { useState, useEffect, useCallback } from 'react';
+import {
+  Box,
+  Card,
+  CardContent,
+  Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Button,
+  IconButton,
+  InputAdornment,
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TextField,
+  Typography,
+  Alert,
+  Snackbar,
+  CircularProgress,
+  Divider,
+  Tooltip,
+} from '@mui/material';
+import QrCodeScannerRoundedIcon from '@mui/icons-material/QrCodeScannerRounded';
+import ConfirmationNumberRoundedIcon from '@mui/icons-material/ConfirmationNumberRounded';
+import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded';
+import PrintRoundedIcon from '@mui/icons-material/PrintRounded';
+import CancelRoundedIcon from '@mui/icons-material/CancelRounded';
+import PaymentRoundedIcon from '@mui/icons-material/PaymentRounded';
+import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
+import { staffTicketService } from '../../services/staffTicketService';
+import QrScannerDialog from '../../components/QrScannerDialog';
+
+// Nhãn + màu cho trạng thái vé
+const STATUS_META = {
+  PAID: { label: 'Đã thanh toán', color: 'info' },
+  CHECKED_IN: { label: 'Đã check-in', color: 'success' },
+  CANCELLED: { label: 'Đã hủy', color: 'error' },
+};
+const statusOf = (t) => {
+  if (t.status) return t.status;
+  return t.checkedIn ? 'CHECKED_IN' : 'PAID';
+};
+
+const formatDateTime = (iso) => {
+  if (!iso) return '—';
+  try {
+    return new Date(iso).toLocaleString('vi-VN', {
+      day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+    });
+  } catch {
+    return iso;
+  }
+};
+const formatCurrency = (n) =>
+  typeof n === 'number' ? new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(n) : '—';
+
+const StaffTickets = () => {
+  const [tickets, setTickets] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [search, setSearch] = useState('');
+
+  // Check-in
+  const [scanCode, setScanCode] = useState('');
+  const [checkingIn, setCheckingIn] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
+
+  // Dialog chi tiết
+  const [detail, setDetail] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [payment, setPayment] = useState(null);
+
+  // Hủy & in lại
+  const [cancelTarget, setCancelTarget] = useState(null);
+  const [reprintData, setReprintData] = useState(null);
+  const [toast, setToast] = useState(null);
+
+  const loadTickets = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const data = await staffTicketService.list();
+      setTickets(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setError(err.message || 'Không thể tải danh sách vé.');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadTickets();
+  }, [loadTickets]);
+
+  // Đồng bộ 1 vé sau khi thao tác (check-in/hủy trả về DTO rút gọn)
+  const patchTicket = (dto) => {
+    setTickets((list) => list.map((t) => (t.id === dto.id ? { ...t, ...dto } : t)));
+  };
+
+  const handleCheckIn = async (codeArg) => {
+    const code = (codeArg ?? scanCode).trim();
+    if (!code) return;
+    setCheckingIn(true);
+    try {
+      const dto = await staffTicketService.checkIn(code);
+      patchTicket(dto);
+      setToast({ severity: 'success', message: `Check-in thành công vé ${dto.ticketCode || code}.` });
+      setScanCode('');
+    } catch (err) {
+      setToast({ severity: 'error', message: err.message || 'Check-in thất bại.' });
+    } finally {
+      setCheckingIn(false);
+    }
+  };
+
+  // Quét QR xong: đóng camera, đổ mã vào ô và check-in luôn
+  const handleScanned = (decodedText) => {
+    const code = (decodedText || '').trim();
+    setScannerOpen(false);
+    if (!code) return;
+    setScanCode(code);
+    handleCheckIn(code);
+  };
+
+  const openDetail = async (ticket) => {
+    setDetail(ticket);
+    setPayment(null);
+    setDetailLoading(true);
+    try {
+      const [fresh, pay] = await Promise.all([
+        staffTicketService.getById(ticket.id),
+        staffTicketService.getPayment(ticket.id).catch(() => null),
+      ]);
+      if (fresh) setDetail(fresh);
+      setPayment(pay);
+    } catch {
+      /* giữ dữ liệu sẵn có */
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const handleCancel = async () => {
+    const target = cancelTarget;
+    setCancelTarget(null);
+    try {
+      const dto = await staffTicketService.cancel(target.id);
+      patchTicket(dto);
+      if (detail?.id === target.id) setDetail((d) => ({ ...d, ...dto, status: 'CANCELLED' }));
+      setToast({ severity: 'success', message: `Đã hủy vé ${target.ticketCode}.` });
+    } catch (err) {
+      setToast({ severity: 'error', message: err.message || 'Hủy vé thất bại.' });
+    }
+  };
+
+  const handleReprint = async (ticket) => {
+    try {
+      const data = await staffTicketService.reprint(ticket.id);
+      setReprintData(data);
+    } catch (err) {
+      setToast({ severity: 'error', message: err.message || 'Không thể in lại vé.' });
+    }
+  };
+
+  const q = search.trim().toLowerCase();
+  const filtered = q
+    ? tickets.filter((t) =>
+        [t.ticketCode, t.bookingId, t.customerName, t.movieTitle, t.seatLabel]
+          .filter(Boolean)
+          .some((v) => String(v).toLowerCase().includes(q)),
+      )
+    : tickets;
+
+  return (
+    <Box>
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="h4" sx={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: 1 }}>
+          <ConfirmationNumberRoundedIcon color="primary" /> Quản lý vé
+        </Typography>
+        <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+          Xem vé đã đặt, thông tin khách, kiểm tra thanh toán, check-in QR, hủy và in lại vé.
+        </Typography>
+      </Box>
+
+      {/* Check-in bằng mã/QR */}
+      <Card sx={{ mb: 3 }}>
+        <CardContent>
+          <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <QrCodeScannerRoundedIcon color="primary" /> Check-in vé
+          </Typography>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} alignItems={{ sm: 'center' }}>
+            <TextField
+              size="small"
+              placeholder="Quét hoặc nhập mã vé (vd: TCK-2001)"
+              value={scanCode}
+              onChange={(e) => setScanCode(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleCheckIn()}
+              sx={{ flex: 1, maxWidth: 360 }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <QrCodeScannerRoundedIcon fontSize="small" sx={{ color: 'text.secondary' }} />
+                  </InputAdornment>
+                ),
+              }}
+            />
+            <Button
+              variant="contained"
+              onClick={() => handleCheckIn()}
+              disabled={checkingIn || !scanCode.trim()}
+              startIcon={checkingIn ? <CircularProgress size={16} color="inherit" /> : <CheckCircleRoundedIcon />}
+            >
+              {checkingIn ? 'Đang xử lý…' : 'Check-in'}
+            </Button>
+            <Button
+              variant="outlined"
+              onClick={() => setScannerOpen(true)}
+              disabled={checkingIn}
+              startIcon={<QrCodeScannerRoundedIcon />}
+            >
+              Quét QR
+            </Button>
+          </Stack>
+        </CardContent>
+      </Card>
+
+      {/* Danh sách vé */}
+      <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={2} sx={{ mb: 2 }}>
+        <Typography variant="h6" fontWeight={700}>Danh sách vé</Typography>
+        <TextField
+          size="small"
+          placeholder="Tìm theo mã vé, khách, phim…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          sx={{ minWidth: 280 }}
+        />
+      </Stack>
+
+      <Card>
+        <CardContent sx={{ p: 0 }}>
+          {loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}><CircularProgress /></Box>
+          ) : error ? (
+            <Box sx={{ textAlign: 'center', py: 5 }}>
+              <Typography color="error" sx={{ mb: 2 }}>{error}</Typography>
+              <Button variant="outlined" onClick={loadTickets}>Thử lại</Button>
+            </Box>
+          ) : filtered.length === 0 ? (
+            <Box sx={{ textAlign: 'center', py: 6, color: 'text.secondary' }}>Không có vé nào khớp.</Box>
+          ) : (
+            <TableContainer>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={{ fontWeight: 700 }}>Mã vé</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Khách hàng</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Phim / Ghế</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Suất chiếu</TableCell>
+                    <TableCell sx={{ fontWeight: 700 }}>Trạng thái</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 700 }}>Thao tác</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {filtered.map((t) => {
+                    const st = statusOf(t);
+                    const meta = STATUS_META[st] || { label: st, color: 'default' };
+                    const cancellable = !t.checkedIn && st !== 'CANCELLED';
+                    return (
+                      <TableRow key={t.id} hover>
+                        <TableCell>
+                          <Typography fontWeight={700}>{t.ticketCode}</Typography>
+                          <Typography variant="caption" color="text.secondary">{t.bookingId}</Typography>
+                        </TableCell>
+                        <TableCell>{t.customerName || '—'}</TableCell>
+                        <TableCell>
+                          <Typography variant="body2">{t.movieTitle || '—'}</Typography>
+                          <Typography variant="caption" color="text.secondary">Ghế {t.seatLabel || '—'}</Typography>
+                        </TableCell>
+                        <TableCell sx={{ color: 'text.secondary' }}>{formatDateTime(t.showtime)}</TableCell>
+                        <TableCell>
+                          <Chip size="small" label={meta.label} color={meta.color} sx={{ fontWeight: 700 }} />
+                        </TableCell>
+                        <TableCell align="right">
+                          <Tooltip title="Chi tiết & thanh toán">
+                            <IconButton size="small" onClick={() => openDetail(t)}>
+                              <VisibilityRoundedIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title="In lại vé">
+                            <span>
+                              <IconButton size="small" onClick={() => handleReprint(t)} disabled={st === 'CANCELLED'}>
+                                <PrintRoundedIcon fontSize="small" />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                          <Tooltip title={cancellable ? 'Hủy vé' : 'Không thể hủy'}>
+                            <span>
+                              <IconButton size="small" sx={{ color: cancellable ? 'error.main' : undefined }} onClick={() => setCancelTarget(t)} disabled={!cancellable}>
+                                <CancelRoundedIcon fontSize="small" />
+                              </IconButton>
+                            </span>
+                          </Tooltip>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Dialog chi tiết vé */}
+      <Dialog open={!!detail} onClose={() => setDetail(null)} maxWidth="sm" fullWidth>
+        {detail && (
+          <>
+            <DialogTitle sx={{ fontWeight: 800 }}>
+              Vé {detail.ticketCode}
+              <Typography variant="caption" display="block" color="text.secondary">Mã đặt vé: {detail.bookingId}</Typography>
+            </DialogTitle>
+            <DialogContent dividers>
+              {detailLoading && <CircularProgress size={20} sx={{ mb: 1 }} />}
+              <Stack spacing={1.2}>
+                <Row label="Trạng thái" value={(STATUS_META[statusOf(detail)] || {}).label || statusOf(detail)} />
+                <Row label="Khách hàng" value={detail.customerName} />
+                <Row label="Email" value={detail.customerEmail} />
+                <Row label="Số điện thoại" value={detail.customerPhone} />
+                <Divider />
+                <Row label="Phim" value={detail.movieTitle} />
+                <Row label="Rạp / Phòng" value={[detail.theaterName, detail.roomName].filter(Boolean).join(' · ')} />
+                <Row label="Ghế" value={detail.seatLabel} />
+                <Row label="Suất chiếu" value={formatDateTime(detail.showtime)} />
+                <Divider />
+                <Typography variant="subtitle2" fontWeight={700} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <PaymentRoundedIcon fontSize="small" /> Thanh toán
+                </Typography>
+                <Row label="Phương thức" value={payment?.method || detail.payment?.method} />
+                <Row label="Số tiền" value={formatCurrency(payment?.amount ?? detail.payment?.amount)} />
+                <Row label="Tình trạng" value={payment?.status || detail.payment?.status} />
+                <Row label="Mã giao dịch" value={payment?.transactionId || detail.payment?.transactionId} />
+                <Row label="Thời gian TT" value={formatDateTime(payment?.paidAt || detail.payment?.paidAt)} />
+              </Stack>
+            </DialogContent>
+            <DialogActions sx={{ px: 3, py: 2 }}>
+              <Button onClick={() => setDetail(null)}>Đóng</Button>
+              <Button
+                startIcon={<PrintRoundedIcon />}
+                onClick={() => handleReprint(detail)}
+                disabled={statusOf(detail) === 'CANCELLED'}
+              >
+                In lại vé
+              </Button>
+              <Button
+                color="error"
+                variant="contained"
+                startIcon={<CancelRoundedIcon />}
+                onClick={() => setCancelTarget(detail)}
+                disabled={detail.checkedIn || statusOf(detail) === 'CANCELLED'}
+              >
+                Hủy vé
+              </Button>
+            </DialogActions>
+          </>
+        )}
+      </Dialog>
+
+      {/* Xác nhận hủy */}
+      <Dialog open={!!cancelTarget} onClose={() => setCancelTarget(null)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 800 }}>Hủy vé?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2">
+            Hủy vé <b>{cancelTarget?.ticketCode}</b> của khách <b>{cancelTarget?.customerName}</b>?
+            Theo chính sách, vé chưa check-in sẽ được hoàn tiền.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button onClick={() => setCancelTarget(null)}>Đóng</Button>
+          <Button color="error" variant="contained" onClick={handleCancel}>Xác nhận hủy</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Dialog in lại vé */}
+      <Dialog open={!!reprintData} onClose={() => setReprintData(null)} maxWidth="xs" fullWidth>
+        <DialogTitle sx={{ fontWeight: 800 }}>In lại vé</DialogTitle>
+        <DialogContent dividers>
+          {reprintData && (
+            <Stack spacing={1.5} alignItems="center" sx={{ textAlign: 'center' }}>
+              <Box sx={{ p: 1.5, bgcolor: '#fff', borderRadius: 2, display: 'inline-flex' }}>
+                <QrCodeScannerRoundedIcon sx={{ fontSize: 96, color: '#0F172A' }} />
+              </Box>
+              <Typography variant="h6" fontWeight={800} color="primary">{reprintData.ticketCode}</Typography>
+              <Box sx={{ width: '100%' }}>
+                <Row label="Phim" value={reprintData.movieTitle} />
+                <Row label="Rạp / Phòng" value={[reprintData.theaterName, reprintData.roomName].filter(Boolean).join(' · ')} />
+                <Row label="Ghế" value={reprintData.seatLabel} />
+                <Row label="Suất chiếu" value={formatDateTime(reprintData.showtime)} />
+              </Box>
+            </Stack>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ px: 3, py: 2 }}>
+          <Button onClick={() => setReprintData(null)}>Đóng</Button>
+          <Button variant="contained" startIcon={<PrintRoundedIcon />} onClick={() => window.print()}>In</Button>
+        </DialogActions>
+      </Dialog>
+
+      <QrScannerDialog
+        open={scannerOpen}
+        onClose={() => setScannerOpen(false)}
+        onScan={handleScanned}
+      />
+
+      <Snackbar
+        open={!!toast}
+        autoHideDuration={3500}
+        onClose={() => setToast(null)}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        {toast ? (
+          <Alert severity={toast.severity} variant="filled" onClose={() => setToast(null)} sx={{ fontWeight: 600 }}>
+            {toast.message}
+          </Alert>
+        ) : null}
+      </Snackbar>
+    </Box>
+  );
+};
+
+const Row = ({ label, value }) => (
+  <Stack direction="row" justifyContent="space-between" spacing={2}>
+    <Typography variant="body2" color="text.secondary">{label}</Typography>
+    <Typography variant="body2" fontWeight={600} sx={{ textAlign: 'right' }}>{value || '—'}</Typography>
+  </Stack>
+);
+
+export default StaffTickets;

@@ -402,7 +402,21 @@ public class BookingService {
                     .price(BigDecimal.ZERO)
                     .build());
         }
-        return BookingResponse.fromBooking(booking, seatResponses);
+
+        String movieTitle = null;
+        String cinemaRoomName = null;
+        if (booking.getShowtimeId() != null) {
+            var optShowtime = showtimeRepository.findById(booking.getShowtimeId());
+            if (optShowtime.isPresent()) {
+                Showtime showtime = optShowtime.get();
+                movieTitle = movieRepository.findById(showtime.getMovieId())
+                        .map(Movie::getTitle).orElse(null);
+                cinemaRoomName = cinemaRoomRepository.findById(showtime.getCinemaRoomId())
+                        .map(CinemaRoom::getName).orElse(null);
+            }
+        }
+
+        return BookingResponse.fromBooking(booking, seatResponses, movieTitle, cinemaRoomName);
     }
 
     private BookingResponse toBookingResponseWithoutSeats(Booking booking) {
@@ -423,7 +437,20 @@ public class BookingService {
             }
         }
 
-        return BookingResponse.fromBooking(booking, seatResponses);
+        String movieTitle = null;
+        String cinemaRoomName = null;
+        if (booking.getShowtimeId() != null) {
+            var optShowtime = showtimeRepository.findById(booking.getShowtimeId());
+            if (optShowtime.isPresent()) {
+                Showtime showtime = optShowtime.get();
+                movieTitle = movieRepository.findById(showtime.getMovieId())
+                        .map(Movie::getTitle).orElse(null);
+                cinemaRoomName = cinemaRoomRepository.findById(showtime.getCinemaRoomId())
+                        .map(CinemaRoom::getName).orElse(null);
+            }
+        }
+
+        return BookingResponse.fromBooking(booking, seatResponses, movieTitle, cinemaRoomName);
     }
 
     private String formatMoney(BigDecimal value) {

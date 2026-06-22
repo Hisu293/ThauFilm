@@ -8,12 +8,10 @@ import {
   List, 
   Typography, 
   Divider, 
-  IconButton, 
-  ListItem, 
-  ListItemButton, 
-  ListItemIcon, 
+  IconButton,
+  ListItemButton,
+  ListItemIcon,
   ListItemText,
-  useTheme,
   useMediaQuery,
   Avatar,
   Menu,
@@ -24,20 +22,22 @@ import {
   Breadcrumbs,
   Link,
   Stack,
-  InputAdornment,
-  TextField
+  Button
 } from '@mui/material';
 import MenuRoundedIcon from '@mui/icons-material/MenuRounded';
-import DashboardRoundedIcon from '@mui/icons-material/DashboardRounded';
-import QrCodeScannerRoundedIcon from '@mui/icons-material/QrCodeScannerRounded';
-import MovieFilterRoundedIcon from '@mui/icons-material/MovieFilterRounded';
-import SupportAgentRoundedIcon from '@mui/icons-material/SupportAgentRounded';
+import LocalMoviesRoundedIcon from '@mui/icons-material/LocalMoviesRounded';
+import ScheduleRoundedIcon from '@mui/icons-material/ScheduleRounded';
+import ConfirmationNumberRoundedIcon from '@mui/icons-material/ConfirmationNumberRounded';
+import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded';
+import PeopleAltRoundedIcon from '@mui/icons-material/PeopleAltRounded';
+import LocalOfferRoundedIcon from '@mui/icons-material/LocalOfferRounded';
+import AssessmentRoundedIcon from '@mui/icons-material/AssessmentRounded';
 import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
 import AccountCircleRoundedIcon from '@mui/icons-material/AccountCircleRounded';
 import LightModeRoundedIcon from '@mui/icons-material/LightModeRounded';
 import DarkModeRoundedIcon from '@mui/icons-material/DarkModeRounded';
 import NotificationsNoneRoundedIcon from '@mui/icons-material/NotificationsNoneRounded';
-import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
+import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import { useAuth } from '../context/AuthContext';
 import cinemaTheme from '../theme/cinemaTheme';
@@ -45,10 +45,13 @@ import cinemaTheme from '../theme/cinemaTheme';
 const drawerWidth = 280;
 
 const menuItems = [
-  { text: 'Tổng quan', icon: <DashboardRoundedIcon />, path: '/staff/dashboard' },
-  { text: 'Soát vé', icon: <QrCodeScannerRoundedIcon />, path: '/staff/check-in' },
-  { text: 'Lịch chiếu', icon: <MovieFilterRoundedIcon />, path: '/staff/showtimes' },
-  { text: 'Hỗ trợ khách hàng', icon: <SupportAgentRoundedIcon />, path: '/staff/support' },
+  { text: 'Quản lý phim', icon: <LocalMoviesRoundedIcon />, path: '/staff/movies' },
+  { text: 'Quản lý suất chiếu', icon: <ScheduleRoundedIcon />, path: '/staff/showtimes-manage' },
+  { text: 'Quản lý vé', icon: <ConfirmationNumberRoundedIcon />, path: '/staff/tickets' },
+  { text: 'Quản lý đơn hàng', icon: <ReceiptLongRoundedIcon />, path: '/staff/bookings' },
+  { text: 'Quản lý khách hàng', icon: <PeopleAltRoundedIcon />, path: '/staff/customers' },
+  { text: 'Quản lý khuyến mãi', icon: <LocalOfferRoundedIcon />, path: '/staff/promotions' },
+  { text: 'Báo cáo', icon: <AssessmentRoundedIcon />, path: '/staff/reports' },
 ];
 
 const StaffLayout = () => {
@@ -189,6 +192,26 @@ const StaffLayout = () => {
           })}
         </List>
       </Box>
+
+      <Box sx={{ p: 2, flexShrink: 0, borderTop: `1px solid ${theme.palette.divider}` }}>
+        <Button
+          component={RouterLink}
+          to="/"
+          startIcon={<ArrowBackRoundedIcon />}
+          fullWidth
+          variant="outlined"
+          size="small"
+          onClick={() => isMobile && setMobileOpen(false)}
+          sx={{
+            borderColor: theme.palette.divider,
+            color: 'text.secondary',
+            fontSize: '0.8rem',
+            '&:hover': { borderColor: '#e50914', bgcolor: 'rgba(229,9,20,0.08)', color: 'primary.main' },
+          }}
+        >
+          Về trang chủ
+        </Button>
+      </Box>
     </Box>
   );
 
@@ -277,29 +300,6 @@ const StaffLayout = () => {
                   </Typography>
                 </Breadcrumbs>
               </Box>
-
-              <TextField
-                size="small"
-                placeholder="Tìm kiếm..."
-                sx={{
-                  display: { xs: 'none', md: 'block' },
-                  maxWidth: 240,
-                  '& .MuiOutlinedInput-root': {
-                    backgroundColor: mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
-                    borderRadius: 3,
-                    '& fieldset': { borderColor: 'transparent' },
-                    '&:hover fieldset': { borderColor: theme.palette.divider },
-                    '&.Mui-focused fieldset': { borderColor: 'primary.main' },
-                  },
-                }}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchRoundedIcon sx={{ color: 'text.secondary', fontSize: 20 }} />
-                    </InputAdornment>
-                  ),
-                }}
-              />
 
               <IconButton onClick={toggleTheme} sx={{ color: 'text.secondary' }}>
                 {mode === 'dark' ? <LightModeRoundedIcon /> : <DarkModeRoundedIcon />}

@@ -276,8 +276,21 @@ export const labels = {
 };
 
 export const DEFAULT_LOCALE = 'vi';
+
+// Đi sâu vào object theo đường dẫn dạng "admin.room" (hỗ trợ section lồng nhau).
+const resolve = (root, section, key) => {
+  const node = String(section)
+    .split('.')
+    .reduce((acc, part) => (acc == null ? acc : acc[part]), root);
+  return node?.[key];
+};
+
 export const t = (section, key, locale = DEFAULT_LOCALE, params = {}) => {
-  const raw = labels[locale]?.[section]?.[key] ?? labels.vi?.[section]?.[key] ?? key;
+  const raw =
+    resolve(labels[locale], section, key) ??
+    resolve(labels.vi, section, key) ??
+    params._default ??
+    key;
   if (typeof raw !== 'string') return raw ?? key;
   return Object.keys(params).reduce((acc, item) => acc.replaceAll(`{${item}}`, String(params[item])), raw);
 };

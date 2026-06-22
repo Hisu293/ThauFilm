@@ -373,8 +373,7 @@ export const BookingSummaryPage = () => {
                             bgcolor: 'rgba(30, 41, 59, 0.3)',
                           }}
                         >
-                          {seat.rowName}
-                          {seat.seatNumber} ({enumLabel(SEAT_TYPE, seat.type)})
+                          {seat.rowName}{seat.seatNumber} ({enumLabel(SEAT_TYPE, seat.type)})
                         </Paper>
                       ))}
                     </Stack>

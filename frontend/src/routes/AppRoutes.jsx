@@ -15,6 +15,10 @@ import AdminPage from '../pages/AdminPage';
 import InfoPage from '../pages/InfoPage';
 import AdminRoute from './AdminRoute';
 import NotFoundPage from '../pages/NotFoundPage';
+import SharedFavoriteListPage from '../pages/SharedFavoriteListPage';
+import MovieCommunityPage from '../pages/MovieCommunityPage';
+import FavoriteListsPage from '../pages/FavoriteListsPage';
+import CommunityConnectionsPage from '../pages/CommunityConnectionsPage';
 
 // Booking Pages
 import SeatSelectionPage from '../pages/SeatSelectionPage';
@@ -26,9 +30,13 @@ import MyBookingDetailPage from '../pages/MyBookingDetailPage';
 
 // Staff Pages
 import StaffDashboard from '../pages/staff/StaffDashboard';
-import TicketCheckIn from '../pages/staff/TicketCheckIn';
-import ShowtimesList from '../pages/staff/ShowtimesList';
-import CustomerSupport from '../pages/staff/CustomerSupport';
+import StaffMovies from '../pages/staff/StaffMovies';
+import StaffShowtimes from '../pages/staff/StaffShowtimes';
+import StaffTickets from '../pages/staff/StaffTickets';
+import StaffBookings from '../pages/staff/StaffBookings';
+import StaffCustomers from '../pages/staff/StaffCustomers';
+import StaffPromotions from '../pages/staff/StaffPromotions';
+import StaffReports from '../pages/staff/StaffReports';
 
 const AppRoutes = () => {
   return (
@@ -41,6 +49,10 @@ const AppRoutes = () => {
         <Route path="/promotions" element={<PromotionsPage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/movies/:id" element={<MovieDetailPage />} />
+        <Route path="/movies/:id/community" element={<MovieCommunityPage />} />
+        <Route path="/lists/:listId" element={<SharedFavoriteListPage />} />
+        <Route path="/favorite-lists" element={<FavoriteListsPage />} />
+        <Route path="/community/connections" element={<CommunityConnectionsPage />} />
         <Route path="/dashboard" element={<DashboardPage />} />
          
         <Route path="/booking/seats/:showtimeId" element={<SeatSelectionPage />} />
@@ -79,9 +91,13 @@ const AppRoutes = () => {
       {/* Staff Module Routes */}
       <Route path="/staff" element={<StaffLayout />}>
         <Route path="dashboard" element={<StaffDashboard />} />
-        <Route path="check-in" element={<TicketCheckIn />} />
-        <Route path="showtimes" element={<ShowtimesList />} />
-        <Route path="support" element={<CustomerSupport />} />
+        <Route path="movies" element={<StaffMovies />} />
+        <Route path="showtimes-manage" element={<StaffShowtimes />} />
+        <Route path="tickets" element={<StaffTickets />} />
+        <Route path="bookings" element={<StaffBookings />} />
+        <Route path="customers" element={<StaffCustomers />} />
+        <Route path="promotions" element={<StaffPromotions />} />
+        <Route path="reports" element={<StaffReports />} />
       </Route>
 
       <Route path="*" element={<NotFoundPage />} />

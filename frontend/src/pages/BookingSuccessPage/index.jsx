@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Container, Box, Typography, Stack, Grid, Divider, Paper, Snackbar, Alert } from '@mui/material';
+import { Container, Box, Typography, Stack, Divider, Paper, Snackbar, Alert } from '@mui/material';
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import ConfirmationNumberRoundedIcon from '@mui/icons-material/ConfirmationNumberRounded';
 
@@ -198,98 +198,87 @@ export const BookingSuccessPage = () => {
           </Typography>
         </Box>
 
-        <Grid container spacing={4} sx={{ position: 'relative', zIndex: 1 }}>
-          {/* Left: summary info */}
-          <Grid item xs={12} md={7.5}>
-            <Stack spacing={2.5}>
-              <Stack spacing={1}>
-                <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', fontWeight: 600 }}>
-                  Tên Phim
+        <Stack spacing={3} sx={{ position: 'relative', zIndex: 1, alignItems: 'center' }}>
+          {/* Tên phim — căn giữa khung, nổi bật */}
+          <Box sx={{ textAlign: 'center', width: '100%' }}>
+            <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.1em' }}>
+              Tên Phim
+            </Typography>
+            <Typography variant="h6" sx={{ fontWeight: 800, mt: 0.5 }}>
+              {movie?.title}
+            </Typography>
+          </Box>
+
+          <Divider sx={{ borderStyle: 'dashed', width: '100%' }} />
+
+          {/* Chi tiết suất chiếu — chia đều, cách đều, căn giữa */}
+          <Box
+            sx={{
+              width: '100%',
+              display: 'grid',
+              gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(5, 1fr)' },
+              gap: 2,
+            }}
+          >
+            {[
+              { label: 'Rạp chiếu', value: theaterName },
+              { label: 'Phòng chiếu', value: showtime?.room, highlight: true },
+              { label: 'Ngày chiếu', value: formattedDate || 'Hôm nay', capitalize: true },
+              { label: 'Suất chiếu', value: `${showtime?.time ?? ''} (${showtime?.format ?? ''})` },
+              { label: 'Danh sách ghế', value: selectedSeats.map((s) => s.label || s.id).join(', '), highlight: true },
+            ].map((field) => (
+              <Box key={field.label} sx={{ textAlign: 'center' }}>
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.75 }}>
+                  {field.label}
                 </Typography>
-                <Typography variant="h6" sx={{ fontWeight: 800 }}>
-                  {movie?.title}
+                <Typography
+                  variant="body2"
+                  sx={{
+                    fontWeight: field.highlight ? 800 : 700,
+                    color: field.highlight ? 'primary.main' : 'text.primary',
+                    textTransform: field.capitalize ? 'capitalize' : 'none',
+                  }}
+                >
+                  {field.value}
                 </Typography>
-              </Stack>
+              </Box>
+            ))}
+          </Box>
 
-              <Grid container spacing={2}>
-                <Grid item xs={6}>
-                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-                    Rạp chiếu
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                    {theaterName}
-                  </Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-                    Phòng chiếu
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 700, color: 'primary.main' }}>
-                    {showtime?.room}
-                  </Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-                    Ngày chiếu
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 700, textTransform: 'capitalize' }}>
-                    {formattedDate || 'Hôm nay'}
-                  </Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-                    Suất chiếu
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                    {showtime?.time} ({showtime?.format})
-                  </Typography>
-                </Grid>
-                <Grid item xs={12}>
-                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>
-                    Danh sách ghế
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 800, color: 'primary.main' }}>
-                    {selectedSeats.map((s) => s.label || s.id).join(', ')}
-                  </Typography>
-                </Grid>
-              </Grid>
+          <Divider sx={{ borderStyle: 'dashed', width: '100%' }} />
 
-              <Divider sx={{ borderStyle: 'dashed' }} />
+          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ width: '100%' }}>
+            <Box>
+              <Typography variant="caption" color="text.secondary">Phương thức</Typography>
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>{getMethodName(paymentMethod)}</Typography>
+            </Box>
+            <Box sx={{ textAlign: 'right' }}>
+              <Typography variant="caption" color="text.secondary">Tổng cộng</Typography>
+              <Typography variant="h6" sx={{ fontWeight: 800, color: 'primary.main' }}>
+                {formatCurrency(totalAmount)}
+              </Typography>
+            </Box>
+          </Stack>
 
-              <Stack direction="row" justifyContent="space-between" alignItems="center">
-                <Box>
-                  <Typography variant="caption" color="text.secondary">Phương thức</Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>{getMethodName(paymentMethod)}</Typography>
-                </Box>
-                <Box sx={{ textAlign: 'right' }}>
-                  <Typography variant="caption" color="text.secondary">Tổng cộng</Typography>
-                  <Typography variant="h6" sx={{ fontWeight: 800, color: 'primary.main' }}>
-                    {formatCurrency(totalAmount)}
-                  </Typography>
-                </Box>
-              </Stack>
-            </Stack>
-          </Grid>
+          <Divider sx={{ borderStyle: 'dashed', width: '100%' }} />
 
-          {/* Right: barcode scanner verification */}
-          <Grid item xs={12} md={4.5} sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-            <Box sx={{ borderLeft: { md: '1px dashed rgba(148, 163, 184, 0.12)' }, pl: { md: 4 }, width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              
-              <Paper 
-                variant="outlined"
-                sx={{ 
-                  p: 2, 
-                  bgcolor: '#FFF', 
-                  borderRadius: 3, 
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  mb: 2,
-                  boxShadow: '0 8px 25px rgba(0,0,0,0.3)'
-                }}
-              >
-                {/* SVG QR layout */}
-                <svg width="140" height="140" viewBox="0 0 140 140" fill="none" xmlns="http://www.w3.org/2000/svg">
+          {/* Mã QR — căn giữa khung vé */}
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
+            <Paper
+              variant="outlined"
+              sx={{
+                p: 2,
+                bgcolor: '#FFF',
+                borderRadius: 3,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                mb: 2,
+                boxShadow: '0 8px 25px rgba(0,0,0,0.3)'
+              }}
+            >
+              {/* SVG QR layout */}
+              <svg width="140" height="140" viewBox="0 0 140 140" fill="none" xmlns="http://www.w3.org/2000/svg">
                   <rect x="10" y="10" width="30" height="30" stroke="#0F172A" strokeWidth="6" />
                   <rect x="20" y="20" width="10" height="10" fill="#0F172A" />
                   
@@ -319,13 +308,12 @@ export const BookingSuccessPage = () => {
                   <rect x="100" y="120" width="10" height="10" fill="#0F172A" />
                 </svg>
               </Paper>
-              
-              <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center', display: 'block', px: 2 }}>
+
+              <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center', display: 'block', px: 2, maxWidth: 360 }}>
                 Đưa mã QR này cho nhân viên tại quầy vé hoặc quét tại máy soát vé để in vé cứng của bạn.
               </Typography>
             </Box>
-          </Grid>
-        </Grid>
+        </Stack>
       </SectionCard>
 
       {/* Home / ticket list navigation */}

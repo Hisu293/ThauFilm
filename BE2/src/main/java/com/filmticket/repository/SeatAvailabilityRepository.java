@@ -15,4 +15,7 @@ public interface SeatAvailabilityRepository extends JpaRepository<SeatAvailabili
     List<SeatAvailability> findByShowtimeIdOrderBySeatId(UUID showtimeId);
     
     Optional<SeatAvailability> findByShowtimeIdAndSeatId(UUID showtimeId, UUID seatId);
+
+    @Query("SELECT sa FROM SeatAvailability sa WHERE sa.showtimeId IN :showtimeIds AND sa.seatId IN :seatIds")
+    List<SeatAvailability> findAllByShowtimeIdInAndSeatIdIn(java.util.Set<UUID> showtimeIds, java.util.Set<UUID> seatIds);
 }
