@@ -1,9 +1,14 @@
 export const MOVIE_TRAILERS_BY_ID = {
-  
-  '156feb6d-3697-44d4-b627-139e685c75e7': 'https://www.youtube.com/watch?v=Wt0y8IH63jg', '4097ee2f-0079-4b15-bd76-d68d8ad498a5': 'https://www.youtube.com/watch?v=geHK0BSKnXU', '50b6820f-e9ce-4db4-9fe6-d74c00995b09': 'https://www.youtube.com/watch?v=5R5ewCiqgXo',
-  '601bc965-6d33-457b-a0ad-e1e0646134f2': 'https://www.youtube.com/watch?v=tCrdzzpk6qg','6f020096-247e-4ec1-8d91-cfea72334278': 'https://www.youtube.com/watch?v=9wVj8AxpT8A&t=1s','aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa': 'https://www.youtube.com/watch?v=JsTxPRKo5Bw',
-  'abd72274-df7e-4dce-829f-ab346d628788': 'https://www.youtube.com/watch?v=hktzirCnJmQ','adbd9114-4fd1-43d4-9867-9d87d7f87490': 'https://www.youtube.com/watch?v=7Ma1uab-bQM','c117df1d-0ae0-40d3-946a-434db395c3fc': 'https://www.youtube.com/watch?v=E7_YI4z6SLM',
-  'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb': 'https://www.youtube.com/watch?v=AfOlW2OrzqE', 'cc34cdd0-e613-4849-8073-371b3efa12bf': 'https://www.youtube.com/watch?v=HNYOQ9ADPno', 'd905a96d-d403-4254-a1c2-a2e3241f2eac': 'https://www.youtube.com/watch?v=ITlQ0oU7tDA'
+  '1d09ff4b-0ce1-406c-9138-9d3ef80748db': 'https://www.youtube.com/watch?v=E7_YI4z6SLM', // The Flash
+  '2ce8bb73-c29c-43f5-969e-43f90ed5fd89': 'https://www.youtube.com/watch?v=7Ma1uab-bQM', // One Piece Film: Red
+  '34b10241-3528-4970-accc-82972e74be5c': 'https://www.youtube.com/watch?v=tCrdzzpk6qg', // Bí Kíp Luyện Rồng Live Action
+  '3eb25820-ad43-4627-9f4f-54e345698c3a': 'https://www.youtube.com/watch?v=9wVj8AxpT8A&t=1s', // Vùng Đất Câm Lặng: Ngày 1
+  '6321d8d3-0781-463a-b63b-87ff099a50c7': 'https://www.youtube.com/watch?v=Wt0y8IH63jg', // Người Nhện: Beyond The Spider-Verse
+  'bb37ffaf-d784-41ad-9c27-7d61543f0eb4': 'https://www.youtube.com/watch?v=hktzirCnJmQ', // Đất Rừng Phương Nam
+  'd41a7b9f-8f3c-47b4-98a9-6bfb9af5c634': 'https://www.youtube.com/watch?v=HNYOQ9ADPno', // Zootopia 2
+  'da873771-9ec1-481f-b595-7c5b7f84b5a4': 'https://www.youtube.com/watch?v=5R5ewCiqgXo', // Bố Già
+  'efcfab51-d71a-46b3-ac5e-b90a926967ec': 'https://www.youtube.com/watch?v=ITlQ0oU7tDA', // Mắt Biếc
+  'ffab6bb4-a063-4a1f-a9d8-9b4fbb764076': 'https://www.youtube.com/watch?v=geHK0BSKnXU', // Thiên Long Bát Bộ: Kiều Phong Truyện
 };
 
 export const MOVIE_TRAILERS_BY_TITLE = {

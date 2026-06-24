@@ -21,6 +21,8 @@ import { useBookingFlow } from '../context/BookingContext';
 import BookingStepper from '../components/BookingStepper';
 import ShowtimeSelector from '../components/ShowtimeSelector';
 import StatusChip from '../components/common/StatusChip';
+import HlsVideoPlayer from '../components/HlsVideoPlayer';
+import { getMovieStreamUrl } from '../data/movieStreams';
 import './MovieDetailPage.css';
 
 /* ---------- helpers ---------- */
@@ -92,7 +94,7 @@ const MovieDetailPage = () => {
   const [movie, setMovie] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [openTrailer, setOpenTrailer] = useState(false);
+  const [openOnlineMovie, setOpenOnlineMovie] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -147,6 +149,7 @@ const MovieDetailPage = () => {
     .split(',').map((a) => a.trim()).filter(Boolean);
 
   const posterSrc = movie.posterUrl || movie.poster || '/placeholder.svg';
+  const streamUrl = getMovieStreamUrl(movie);
 
   const handleSelectShowtime = (showtime) => {
     updateBookingState({
@@ -336,7 +339,7 @@ const MovieDetailPage = () => {
                 variant="outlined"
                 size="large"
                 startIcon={<PlayArrowRoundedIcon />}
-                onClick={() => setOpenTrailer(true)}
+                onClick={() => setOpenOnlineMovie(true)}
                 sx={{ borderColor: 'primary.main', color: 'primary.main', fontWeight: 700, px: 4.5, py: 1.6, borderRadius: 2 }}
               >
                 Xem phim online
@@ -363,11 +366,11 @@ const MovieDetailPage = () => {
 
       </Container>
 
-      {/* Trailer Dialog Modal */}
+      {/* Online movie player */}
       <Dialog
-        open={openTrailer}
-        onClose={() => setOpenTrailer(false)}
-        maxWidth="md"
+        open={openOnlineMovie}
+        onClose={() => setOpenOnlineMovie(false)}
+        maxWidth="lg"
         fullWidth
         PaperProps={{
           sx: {
@@ -379,9 +382,9 @@ const MovieDetailPage = () => {
           }
         }}
       >
-        <Box sx={{ position: 'relative', pt: '56.25%' /* 16:9 Aspect Ratio */ }}>
+        <Box sx={{ position: 'relative', p: { xs: 1, sm: 2 }, pt: { xs: 6, sm: 6 } }}>
           <IconButton
-            onClick={() => setOpenTrailer(false)}
+            onClick={() => setOpenOnlineMovie(false)}
             sx={{
               position: 'absolute',
               top: 8,
@@ -394,19 +397,11 @@ const MovieDetailPage = () => {
           >
             <CloseIcon />
           </IconButton>
-          <iframe
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              height: '100%',
-              border: 0
-            }}
-            src={movie.trailerUrl || "https://www.youtube.com/embed/dQw4w9WgXcQ"}
+          <HlsVideoPlayer
+            key={streamUrl}
+            src={streamUrl}
             title={`${movie.title} Online`}
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
+            poster={posterSrc}
           />
         </Box>
       </Dialog>

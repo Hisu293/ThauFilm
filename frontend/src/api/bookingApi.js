@@ -33,11 +33,12 @@ export const bookingApi = {
   },
 
   // Create booking and temporarily hold seats: POST /api/member/booking
-  createBooking: (showtimeId, seatIds, channel = DEFAULT_BOOKING_CHANNEL) => {
+  createBooking: (showtimeId, seatIds, channel = DEFAULT_BOOKING_CHANNEL, comboIds = []) => {
     return axiosClient.post('/api/member/booking', {
       showtimeId,
       seatIds,
       channel,
+      comboIds,
     });
   },
 

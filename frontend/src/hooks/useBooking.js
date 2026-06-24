@@ -59,13 +59,13 @@ export const useBooking = () => {
   }, []);
 
   // Create booking (hold seats): POST /api/member/booking
-  const create = useCallback(async (showtimeId, seatIds, channel = 'ONLINE') => {
+  const create = useCallback(async (showtimeId, seatIds, channel = 'ONLINE', comboIds = []) => {
     setLoading(true);
     setError(null);
     console.groupCollapsed('%c[USER][create] POST /api/member/booking (giữ ghế)', 'color:#FBBF24;font-weight:bold');
-    console.log('→ Payload:', { showtimeId, seatIds, channel });
+    console.log('→ Payload:', { showtimeId, seatIds, channel, comboIds });
     try {
-      const res = await bookingApi.createBooking(showtimeId, seatIds, channel);
+      const res = await bookingApi.createBooking(showtimeId, seatIds, channel, comboIds);
       console.log('%c✓ API trả về (raw envelope):', 'color:#22C55E', res);
       const rawBooking = res?.data ?? res;
       const normalized = bookingService.normalizeBooking(rawBooking);

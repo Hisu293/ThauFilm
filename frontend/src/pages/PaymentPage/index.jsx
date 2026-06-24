@@ -6,6 +6,7 @@ import {
   Button,
   Card,
   CardContent,
+  Checkbox,
   Chip,
   Container,
   Divider,
@@ -37,6 +38,12 @@ import {
   removePendingBooking,
   savePendingBooking,
 } from '../../utils/pendingBookingStorage';
+import {
+  getSavedDiscountCodes,
+  markDiscountCodeUnavailable,
+  saveBookingReplacement,
+  savePaidBookingSummary,
+} from '../../utils/paidBookingStorage';
 
 const buildFallbackMovie = (booking) => ({
   title: booking.movieTitle,
@@ -67,10 +74,22 @@ const formatDiscountLabel = (discount) => {
   return formatCurrency(discount.value);
 };
 
-const isDiscountApplicable = (discount, subtotal) => subtotal >= (discount?.minPurchaseAmount || 0);
+const isDiscountApplicable = (discount, subtotal, usedCodes = new Set()) => {
+  if (!discount || discount.active === false || subtotal < (discount.minPurchaseAmount || 0)) return false;
+  if (!['FIXED', 'PERCENTAGE'].includes(discount.type) || discount.value <= 0) return false;
+  if (discount.usageLimit > 0 && discount.usageCount >= discount.usageLimit) return false;
+  if (usedCodes.has(String(discount.code || '').trim().toUpperCase())) return false;
+
+  const now = Date.now();
+  const validFrom = discount.validFrom ? new Date(discount.validFrom).getTime() : null;
+  const validTo = discount.validTo ? new Date(discount.validTo).getTime() : null;
+  if (Number.isFinite(validFrom) && now < validFrom) return false;
+  if (Number.isFinite(validTo) && now > validTo) return false;
+  return true;
+};
 
 const getDiscountAmount = (discount, subtotal) => {
-  if (!discount || !isDiscountApplicable(discount, subtotal)) return 0;
+  if (!discount) return 0;
 
   const rawDiscount =
     discount.type === 'PERCENTAGE'
@@ -87,7 +106,7 @@ const getDiscountAmount = (discount, subtotal) => {
 export const PaymentPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { loading: apiLoading, error: apiError, clearError, getDetail, getTickets, pay } = useBooking();
+  const { loading: apiLoading, error: apiError, clearError, getDetail, getTickets, create, pay, cancel } = useBooking();
   const { updateBookingState, clearBookingState } = useBookingFlow();
 
   const [bookingId, setBookingId] = useState(null);
@@ -99,6 +118,7 @@ export const PaymentPage = () => {
   const [holdExpiresAt, setHoldExpiresAt] = useState(null);
   const [discounts, setDiscounts] = useState([]);
   const [combos, setCombos] = useState([]);
+  const [selectedComboIds, setSelectedComboIds] = useState([]);
   const [selectedDiscountId, setSelectedDiscountId] = useState('');
   const [loadingPromotions, setLoadingPromotions] = useState(true);
   const [promotionNotice, setPromotionNotice] = useState('');
@@ -228,6 +248,24 @@ export const PaymentPage = () => {
     }
   }, [apiError]);
 
+
+  const seatsTotal = selectedSeats.reduce((sum, seat) => sum + (seat.price || 0), 0);
+  const availableCombos = useMemo(
+    () => combos.filter((combo) => combo.active !== false && combo.id && combo.price > 0),
+    [combos],
+  );
+  const selectedCombos = useMemo(
+    () => availableCombos.filter((combo) => selectedComboIds.includes(combo.id)),
+    [availableCombos, selectedComboIds],
+  );
+  const comboTotal = selectedCombos.reduce((sum, combo) => sum + combo.price, 0);
+  const subtotal = seatsTotal + comboTotal;
+  const usedDiscountCodes = getSavedDiscountCodes();
+  const availableDiscounts = discounts.filter((discount) => isDiscountApplicable(discount, subtotal, usedDiscountCodes));
+  const selectedDiscount = availableDiscounts.find((discount) => discount.id === selectedDiscountId) || null;
+  const discountAmount = getDiscountAmount(selectedDiscount, subtotal);
+  const totalAmount = Math.max(subtotal - discountAmount, 0);
+
   const selectedDiscount = useMemo(
     () => discounts.find((discount) => discount.id === selectedDiscountId) || null,
     [discounts, selectedDiscountId],
@@ -238,29 +276,47 @@ export const PaymentPage = () => {
   const discountAmount = getDiscountAmount(selectedDiscount, seatsTotal);
   const totalAmount = Math.max(seatsTotal - discountAmount, 0);
 
-  const goToSuccess = (paymentResult = {}, overrides = {}) => {
+
+  const toggleCombo = (comboId) => {
+    setSelectedComboIds((current) =>
+      current.includes(comboId) ? current.filter((id) => id !== comboId) : [...current, comboId],
+    );
+  };
+
+  const goToSuccess = (paymentResult = {}, overrides = {}, paidBookingId = bookingId) => {
     const confirmedBooking = paymentResult?.booking || overrides.booking || null;
     const confirmedTickets = paymentResult?.tickets || overrides.tickets || [];
     const paidAmount = Number(paymentResult?.finalAmount ?? paymentResult?.payment?.amount ?? totalAmount);
+    const paidOriginalAmount = Number(paymentResult?.originalAmount ?? subtotal);
+    const paidDiscountAmount = Number(paymentResult?.discountAmount ?? discountAmount);
+
+    savePaidBookingSummary(paidBookingId, {
+      originalAmount: paidOriginalAmount,
+      discountAmount: paidDiscountAmount,
+      finalAmount: Number.isFinite(paidAmount) ? paidAmount : totalAmount,
+      discountCode: paymentResult?.discountCode || selectedDiscount?.code || '',
+      paymentMethod,
+    });
 
     navigate('/booking/success', {
       state: {
-        bookingId,
+        bookingId: paidBookingId,
         movie,
         showtime,
       selectedSeats,
       paymentMethod,
       selectedDiscount,
-      discountAmount: Number(paymentResult?.discountAmount ?? discountAmount),
+      originalAmount: paidOriginalAmount,
+      discountAmount: paidDiscountAmount,
       bookingCode: confirmedBooking?.confirmationCode || paymentResult?.confirmationCode || bookingId,
         tickets: confirmedTickets,
         totalAmount: Number.isFinite(paidAmount) ? paidAmount : totalAmount,
       },
     });
 
-    updateBookingState({ bookingId, paymentStatus: 'PAID' });
+    updateBookingState({ bookingId: paidBookingId, paymentStatus: 'PAID' });
     sessionStorage.removeItem('tf_booking_id');
-    removePendingBooking(bookingId);
+    removePendingBooking(paidBookingId);
     clearBookingState();
   };
 
@@ -275,6 +331,8 @@ export const PaymentPage = () => {
       return;
     }
 
+    let payableBookingId = bookingId;
+
     try {
       const paymentMethodMap = {
         bank_card: 'VNPAY',
@@ -285,15 +343,49 @@ export const PaymentPage = () => {
       const discountCode = selectedDiscount?.code || '';
       updateBookingState({ bookingId, paymentStatus: 'PAYING' });
 
-      const result = await pay(bookingId, backendPaymentMethod, discountCode);
-      goToSuccess(result);
+      if (selectedComboIds.length > 0) {
+        const seatIds = selectedSeats.map((seat) => seat.id).filter(Boolean);
+        const showtimeId = showtime?.id;
+        if (!showtimeId || seatIds.length === 0) {
+          throw new Error('Không đủ thông tin để thêm combo vào booking.');
+        }
+
+        await cancel(bookingId);
+        removePendingBooking(bookingId);
+
+        const replacementBooking = await create(showtimeId, seatIds, 'ONLINE', selectedComboIds);
+        payableBookingId = replacementBooking.id;
+        saveBookingReplacement(bookingId, payableBookingId);
+        setBookingId(payableBookingId);
+        sessionStorage.setItem('tf_booking_id', payableBookingId);
+        updateBookingState({ bookingId: payableBookingId, paymentStatus: 'PAYING' });
+        savePendingBooking({
+          id: payableBookingId,
+          movie,
+          showtime,
+          selectedSeats,
+          holdExpiresAt: replacementBooking.holdExpiresAt,
+          confirmationCode: replacementBooking.confirmationCode,
+        });
+      }
+
+      const result = await pay(payableBookingId, backendPaymentMethod, discountCode);
+      goToSuccess(result, {}, payableBookingId);
     } catch (err) {
+      const discountRejected = /discount|already used|usage limit|expired|inactive|minimum requirement/i.test(err?.message || '');
+      if (selectedDiscount && discountRejected) {
+        markDiscountCodeUnavailable(selectedDiscount.code, err?.message || 'Rejected by payment API');
+        setDiscounts((current) => current.filter((discount) => discount.id !== selectedDiscount.id));
+        setSelectedDiscountId('');
+        setPromotionNotice(`Mã ${selectedDiscount.code} không còn sử dụng được và đã được ẩn.`);
+      }
+
       if (err?.message === 'Booking is not in HOLD status') {
         try {
-          const confirmedBooking = await getDetail(bookingId);
+          const confirmedBooking = await getDetail(payableBookingId);
           if (confirmedBooking?.status === 'CONFIRMED') {
-            const confirmedTickets = await getTickets(bookingId).catch(() => []);
-            goToSuccess({}, { booking: confirmedBooking, tickets: confirmedTickets });
+            const confirmedTickets = await getTickets(payableBookingId).catch(() => []);
+            goToSuccess({}, { booking: confirmedBooking, tickets: confirmedTickets }, payableBookingId);
             return;
           }
         } catch {
@@ -389,7 +481,7 @@ export const PaymentPage = () => {
 
                 {loadingPromotions ? (
                   <LoadingOverlay open={true} message="Đang tải ưu đãi..." />
-                ) : discounts.length === 0 && combos.length === 0 ? (
+                ) : availableDiscounts.length === 0 && availableCombos.length === 0 ? (
                   <EmptyState
                     title="Chưa có ưu đãi khả dụng"
                     description="Tài khoản của bạn hiện chưa có khuyến mãi hoặc combo nào đang hoạt động."
@@ -428,17 +520,15 @@ export const PaymentPage = () => {
                           </CardContent>
                         </Card>
 
-                        {discounts.map((discount) => {
-                          const applicable = isDiscountApplicable(discount, seatsTotal);
-                          const previewDiscount = getDiscountAmount(discount, seatsTotal);
+                        {availableDiscounts.map((discount) => {
+                          const previewDiscount = getDiscountAmount(discount, subtotal);
 
                           return (
                             <Card
                               key={discount.id}
-                              onClick={() => applicable && setSelectedDiscountId(discount.id)}
+                              onClick={() => setSelectedDiscountId(discount.id)}
                               sx={{
-                                cursor: applicable ? 'pointer' : 'not-allowed',
-                                opacity: applicable ? 1 : 0.55,
+                                cursor: 'pointer',
                                 border:
                                   selectedDiscountId === discount.id
                                     ? '2px solid #FBBF24'
@@ -451,8 +541,7 @@ export const PaymentPage = () => {
                                 <Stack direction="row" spacing={2} alignItems="flex-start">
                                   <Radio
                                     checked={selectedDiscountId === discount.id}
-                                    onChange={() => applicable && setSelectedDiscountId(discount.id)}
-                                    disabled={!applicable}
+                                    onChange={() => setSelectedDiscountId(discount.id)}
                                   />
                                   <Stack spacing={1} sx={{ flex: 1 }}>
                                     <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1}>
@@ -470,10 +559,8 @@ export const PaymentPage = () => {
                                       Đơn tối thiểu {formatCurrency(discount.minPurchaseAmount)}
                                       {discount.maxDiscountAmount > 0 ? ` • Giảm tối đa ${formatCurrency(discount.maxDiscountAmount)}` : ''}
                                     </Typography>
-                                    <Typography variant="body2" color={applicable ? 'primary.main' : 'warning.main'} sx={{ fontWeight: 600 }}>
-                                      {applicable
-                                        ? `Tạm giảm ${formatCurrency(previewDiscount)} cho đơn này`
-                                        : 'Đơn hiện tại chưa đủ điều kiện áp dụng'}
+                                    <Typography variant="body2" color="primary.main" sx={{ fontWeight: 600 }}>
+                                      Tạm giảm {formatCurrency(previewDiscount)} cho đơn này
                                     </Typography>
                                   </Stack>
                                 </Stack>
@@ -492,23 +579,34 @@ export const PaymentPage = () => {
                         </Typography>
                       </Stack>
 
-                      {combos.length === 0 ? (
+                      {availableCombos.length === 0 ? (
                         <Alert severity="info" sx={{ borderRadius: 3 }}>
                           Hiện tại chưa có combo nào đang mở bán cho tài khoản của bạn.
                         </Alert>
                       ) : (
                         <Stack spacing={1.5}>
-                          {combos.map((combo) => (
+                          {availableCombos.map((combo) => (
                             <Card
                               key={combo.id}
+                              onClick={() => toggleCombo(combo.id)}
                               sx={{
-                                border: '1px solid rgba(148, 163, 184, 0.1)',
-                                bgcolor: 'background.default',
+                                cursor: 'pointer',
+                                border: selectedComboIds.includes(combo.id)
+                                  ? '2px solid #FBBF24'
+                                  : '1px solid rgba(148, 163, 184, 0.1)',
+                                bgcolor: selectedComboIds.includes(combo.id)
+                                  ? 'rgba(251, 191, 36, 0.04)'
+                                  : 'background.default',
                               }}
                             >
                               <CardContent sx={{ p: 2.25, '&:last-child': { pb: 2.25 } }}>
-                                <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1}>
-                                  <Box>
+                                <Stack direction="row" alignItems="center" spacing={1.5}>
+                                  <Checkbox
+                                    checked={selectedComboIds.includes(combo.id)}
+                                    onChange={() => toggleCombo(combo.id)}
+                                    onClick={(event) => event.stopPropagation()}
+                                  />
+                                  <Box sx={{ flex: 1 }}>
                                     <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
                                       {combo.name}
                                     </Typography>
@@ -518,7 +616,7 @@ export const PaymentPage = () => {
                                   </Box>
                                   <Chip
                                     label={combo.price > 0 ? formatCurrency(combo.price) : 'Đang cập nhật'}
-                                    sx={{ alignSelf: { xs: 'flex-start', sm: 'center' } }}
+                                    color={selectedComboIds.includes(combo.id) ? 'primary' : 'default'}
                                   />
                                 </Stack>
                               </CardContent>
@@ -603,6 +701,27 @@ export const PaymentPage = () => {
                     {formatCurrency(seatsTotal)}
                   </Typography>
                 </Box>
+
+                {selectedCombos.length > 0 && (
+                  <>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        Combo đã chọn:
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 700, textAlign: 'right' }}>
+                        {selectedCombos.map((combo) => combo.name).join(', ')}
+                      </Typography>
+                    </Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        Tổng tiền combo:
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                        {formatCurrency(comboTotal)}
+                      </Typography>
+                    </Box>
+                  </>
+                )}
 
                 {selectedDiscount ? (
                   <>
