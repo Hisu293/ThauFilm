@@ -68,6 +68,10 @@ public class GlobalExceptionHandler {
         // Bẫy đúng tên constraint ngoại khóa của bảng bookings khi xóa showtime
         if (message != null && message.contains("bookings_showtime_id_fkey")) {
             returnMessage = "Không thể xóa suất chiếu này vì đã có khách đặt vé!";
+        } else if (message != null && message.contains("chk_movie_match_order")) {
+            returnMessage = "Không thể tạo match do thứ tự định danh người dùng không hợp lệ.";
+        } else if (message != null && message.contains("uk_movie_match_pair")) {
+            returnMessage = "Hai người dùng đã match trước đó.";
         }
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
