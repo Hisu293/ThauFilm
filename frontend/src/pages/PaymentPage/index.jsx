@@ -247,9 +247,13 @@ export const PaymentPage = () => {
       Promise.resolve().then(() => setSnackbarOpen(true));
     }
   }, [apiError]);
-
-
-  const seatsTotal = selectedSeats.reduce((sum, seat) => sum + (seat.price || 0), 0);
+  const selectedSeatsTotal = selectedSeats.reduce(
+    (sum, seat) => sum + (Number(seat.price) || 0),
+    0,
+  );
+  const seatsTotal = bookingOriginalAmount !== null
+    ? Number(bookingOriginalAmount)
+    : selectedSeatsTotal;
   const availableCombos = useMemo(
     () => combos.filter((combo) => combo.active !== false && combo.id && combo.price > 0),
     [combos],
@@ -258,24 +262,13 @@ export const PaymentPage = () => {
     () => availableCombos.filter((combo) => selectedComboIds.includes(combo.id)),
     [availableCombos, selectedComboIds],
   );
-  const comboTotal = selectedCombos.reduce((sum, combo) => sum + combo.price, 0);
+  const comboTotal = selectedCombos.reduce((sum, combo) => sum + (Number(combo.price) || 0), 0);
   const subtotal = seatsTotal + comboTotal;
   const usedDiscountCodes = getSavedDiscountCodes();
   const availableDiscounts = discounts.filter((discount) => isDiscountApplicable(discount, subtotal, usedDiscountCodes));
   const selectedDiscount = availableDiscounts.find((discount) => discount.id === selectedDiscountId) || null;
   const discountAmount = getDiscountAmount(selectedDiscount, subtotal);
   const totalAmount = Math.max(subtotal - discountAmount, 0);
-
-  const selectedDiscount = useMemo(
-    () => discounts.find((discount) => discount.id === selectedDiscountId) || null,
-    [discounts, selectedDiscountId],
-  );
-
-  const selectedSeatsTotal = selectedSeats.reduce((sum, seat) => sum + (Number(seat.price) || 0), 0);
-  const seatsTotal = bookingOriginalAmount !== null ? bookingOriginalAmount : selectedSeatsTotal;
-  const discountAmount = getDiscountAmount(selectedDiscount, seatsTotal);
-  const totalAmount = Math.max(seatsTotal - discountAmount, 0);
-
 
   const toggleCombo = (comboId) => {
     setSelectedComboIds((current) =>
