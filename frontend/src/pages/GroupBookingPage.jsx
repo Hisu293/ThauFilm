@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Box, Button, Chip, CircularProgress, Container, FormControl, InputLabel, MenuItem, Paper, Select, Stack, Typography } from '@mui/material';
 import { useNavigate, useParams } from 'react-router-dom';
 import SeatMap from '../components/SeatMap';
 import { bookingApi } from '../api/bookingApi';
 import { bookingService } from '../services/bookingService';
+import { connectGroupBooking } from '../services/realtimeService';
 
 const unwrap = (response) => response?.data?.data ?? response?.data ?? response;
 const money = (value) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(value) || 0);
@@ -21,11 +22,13 @@ export default function GroupBookingPage() {
   const navigate = useNavigate();
   const [group, setGroup] = useState(null);
   const [seats, setSeats] = useState([]);
-  const [selectedSeats, setSelectedSeats] = useState([]);
+  const [selectedSeatIds, setSelectedSeatIds] = useState([]);
+  const [realtimeStatus, setRealtimeStatus] = useState('disconnected');
   const [paymentMethod, setPaymentMethod] = useState('VNPAY');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const realtime = useRef(null);
 
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
@@ -47,9 +50,32 @@ export default function GroupBookingPage() {
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
     if (!group || ['CONFIRMED', 'EXPIRED', 'CANCELLED'].includes(group.status)) return undefined;
-    const timer = window.setInterval(() => load(true), 5000);
+    const timer = window.setInterval(() => load(true), 30000);
     return () => window.clearInterval(timer);
   }, [group, load]);
+
+  useEffect(() => {
+    const connection = connectGroupBooking({
+      groupId,
+      onStatus: setRealtimeStatus,
+      onEvent: (event) => {
+        if (['GROUP_SUBSCRIBED', 'GROUP_SEAT_PREVIEW'].includes(event.type)) {
+          setSelectedSeatIds((event.data?.selectedSeatIds || []).map(String));
+        } else if (event.type === 'GROUP_BOOKING_UPDATED') {
+          window.setTimeout(() => load(true), 120);
+        } else if (event.type === 'REALTIME_ERROR') {
+          setError(event.data?.message || 'Không thể đồng bộ phòng đặt vé.');
+        }
+      },
+    });
+    realtime.current = connection;
+    return () => { connection.disconnect(); realtime.current = null; };
+  }, [groupId, load]);
+
+  const selectedSeats = useMemo(
+    () => selectedSeatIds.map((id) => seats.find((seat) => String(seat.id) === id)).filter(Boolean),
+    [selectedSeatIds, seats]
+  );
 
   const adjacent = useMemo(() => {
     if (selectedSeats.length !== 2) return false;
@@ -58,10 +84,9 @@ export default function GroupBookingPage() {
   }, [selectedSeats]);
 
   const toggleSeat = (seat) => {
-    setSelectedSeats((current) => {
-      if (current.some((item) => item.id === seat.id)) return current.filter((item) => item.id !== seat.id);
-      return current.length >= 2 ? [current[1], seat] : [...current, seat];
-    });
+    if (!realtime.current?.toggleSeat(seat.id)) {
+      setError('Kết nối realtime đang gián đoạn. Vui lòng chờ kết nối lại.');
+    }
   };
 
   const selectSeats = async () => {
@@ -69,7 +94,7 @@ export default function GroupBookingPage() {
     setBusy(true); setError('');
     try {
       setGroup(unwrap(await bookingApi.selectGroupSeats(groupId, selectedSeats.map((seat) => seat.id))));
-      setSelectedSeats([]);
+      setSelectedSeatIds([]);
     } catch (err) { setError(err.message || 'Không thể giữ cặp ghế.'); }
     finally { setBusy(false); }
   };
@@ -95,6 +120,7 @@ export default function GroupBookingPage() {
           <Stack direction="row" spacing={1} alignItems="center" mt={1}>
             <Chip label={statusLabel[group.status] || group.status} color={group.status === 'CONFIRMED' ? 'success' : terminal ? 'error' : 'warning'} />
             {group.expiresAt && <Typography variant="body2" color="text.secondary">Hạn thanh toán: {new Date(group.expiresAt).toLocaleString('vi-VN')}</Typography>}
+            <Chip size="small" variant="outlined" color={realtimeStatus === 'connected' ? 'success' : 'warning'} label={realtimeStatus === 'connected' ? 'Realtime' : 'Đang kết nối lại'} />
           </Stack>
         </Box>
 

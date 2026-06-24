@@ -88,3 +88,46 @@ export const connectMatchChat = ({ matchId, onEvent, onStatus }) => {
     },
   };
 };
+
+export const connectGroupBooking = ({ groupId, onEvent, onStatus }) => {
+  let socket;
+  let reconnectTimer;
+  let stopped = false;
+  let attempts = 0;
+
+  const connect = () => {
+    if (stopped) return;
+    socket = new WebSocket(buildWebSocketUrl());
+    onStatus?.('connecting');
+    socket.onopen = () => {
+      attempts = 0;
+      socket.send(JSON.stringify({ type: 'GROUP_SUBSCRIBE', data: { groupId } }));
+      onStatus?.('connected');
+    };
+    socket.onmessage = (message) => {
+      try { onEvent?.(JSON.parse(message.data)); } catch { /* Ignore malformed events. */ }
+    };
+    socket.onerror = () => onStatus?.('error');
+    socket.onclose = () => {
+      onStatus?.('disconnected');
+      if (!stopped) {
+        attempts += 1;
+        reconnectTimer = window.setTimeout(connect, Math.min(1000 * (2 ** attempts), 15000));
+      }
+    };
+  };
+
+  connect();
+  return {
+    toggleSeat: (seatId) => {
+      if (socket?.readyState !== WebSocket.OPEN) return false;
+      socket.send(JSON.stringify({ type: 'GROUP_SEAT_TOGGLE', data: { groupId, seatId } }));
+      return true;
+    },
+    disconnect: () => {
+      stopped = true;
+      window.clearTimeout(reconnectTimer);
+      socket?.close();
+    },
+  };
+};

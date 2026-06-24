@@ -3,6 +3,7 @@ package com.filmticket.websocket;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.filmticket.service.MovieMatchInteractionService;
+import com.filmticket.service.GroupBookingRealtimeService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
@@ -18,6 +19,7 @@ import java.util.UUID;
 public class RealtimeWebSocketHandler extends TextWebSocketHandler {
     private final RealtimeEventService realtimeEventService;
     private final MovieMatchInteractionService movieMatchInteractionService;
+    private final GroupBookingRealtimeService groupBookingRealtimeService;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -47,6 +49,24 @@ public class RealtimeWebSocketHandler extends TextWebSocketHandler {
                 send(session, Map.of("type", "MATCH_SUBSCRIBED", "data", Map.of("matchId", matchId)));
                 return;
             }
+            if ("GROUP_SUBSCRIBE".equals(type)) {
+                UUID groupId = UUID.fromString(data.path("groupId").asText());
+                var selectedSeatIds = groupBookingRealtimeService.subscribe(groupId, userId);
+                session.getAttributes().put("groupBookingId", groupId);
+                send(session, Map.of("type", "GROUP_SUBSCRIBED", "data", Map.of(
+                        "groupId", groupId, "selectedSeatIds", selectedSeatIds)));
+                return;
+            }
+            if ("GROUP_SEAT_TOGGLE".equals(type)) {
+                UUID groupId = UUID.fromString(data.path("groupId").asText());
+                if (!groupId.equals(session.getAttributes().get("groupBookingId"))) {
+                    sendError(session, "NOT_SUBSCRIBED", "Bạn chưa tham gia phòng đặt vé nhóm này");
+                    return;
+                }
+                groupBookingRealtimeService.toggleSeat(
+                        groupId, userId, UUID.fromString(data.path("seatId").asText()));
+                return;
+            }
             if (!"MATCH_SEND_MESSAGE".equals(type)) {
                 sendError(session, "UNSUPPORTED_EVENT", "Loại sự kiện không được hỗ trợ");
                 return;
@@ -66,7 +86,7 @@ public class RealtimeWebSocketHandler extends TextWebSocketHandler {
     }
 
     private void sendError(WebSocketSession session, String code, String message) throws Exception {
-        send(session, Map.of("type", "MATCH_MESSAGE_ERROR", "data", Map.of("code", code, "message", message)));
+        send(session, Map.of("type", "REALTIME_ERROR", "data", Map.of("code", code, "message", message)));
     }
 
     private void send(WebSocketSession session, Object payload) throws Exception {
