@@ -44,6 +44,7 @@ public class StaffPromotionService {
         discount.setUsageLimit(request.getUsageLimit());
         discount.setUsageCount(0);
         discount.setActive(Boolean.TRUE.equals(request.getActive()));
+        discount.setApplicableSeatTypes(request.getApplicableSeatTypes());
         Discount saved = discountRepository.save(discount);
         return DiscountResponse.fromDiscount(saved);
     }
@@ -61,6 +62,7 @@ public class StaffPromotionService {
         discount.setValidTo(request.getValidTo());
         discount.setUsageLimit(request.getUsageLimit());
         discount.setActive(Boolean.TRUE.equals(request.getActive()));
+        discount.setApplicableSeatTypes(request.getApplicableSeatTypes());
         Discount saved = discountRepository.save(discount);
         return DiscountResponse.fromDiscount(saved);
     }

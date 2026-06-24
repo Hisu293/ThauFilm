@@ -31,6 +31,11 @@ public class DiscountService {
 
     @Transactional
     public BigDecimal calculateDiscount(String code, BigDecimal totalAmount, UUID userId) {
+        return calculateDiscount(code, totalAmount, userId, null);
+    }
+
+    @Transactional
+    public BigDecimal calculateDiscount(String code, BigDecimal totalAmount, UUID userId, List<String> seatTypes) {
         String normalizedCode = code.trim().toUpperCase();
         Discount discount = discountRepository.findByCodeAndActiveTrue(normalizedCode)
                 .orElseThrow(() -> new BadRequestException("Invalid discount code"));
@@ -46,6 +51,19 @@ public class DiscountService {
         }
         if (totalAmount.compareTo(discount.getMinPurchaseAmount()) < 0) {
             throw new BadRequestException("Purchase amount does not meet minimum requirement");
+        }
+
+        // Validate seat type restriction
+        if (discount.getApplicableSeatTypes() != null && !discount.getApplicableSeatTypes().isBlank()) {
+            if (seatTypes == null || seatTypes.isEmpty()) {
+                throw new BadRequestException("This discount code is only applicable to seat types: " + discount.getApplicableSeatTypes());
+            }
+            List<String> allowedTypes = java.util.Arrays.stream(discount.getApplicableSeatTypes().toUpperCase().split(","))
+                    .map(String::trim).toList();
+            boolean hasMatch = seatTypes.stream().anyMatch(t -> allowedTypes.contains(t.toUpperCase()));
+            if (!hasMatch) {
+                throw new BadRequestException("This discount code is only applicable to seat types: " + discount.getApplicableSeatTypes());
+            }
         }
 
         BigDecimal discountAmount;
