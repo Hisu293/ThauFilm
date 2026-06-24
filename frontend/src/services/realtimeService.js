@@ -43,7 +43,7 @@ export const connectRealtime = ({ movieId, onEvent, onStatus }) => {
   };
 };
 
-export const connectMatchChat = ({ onEvent, onStatus }) => {
+export const connectMatchChat = ({ matchId, onEvent, onStatus }) => {
   let socket;
   let reconnectTimer;
   let stopped = false;
@@ -53,7 +53,11 @@ export const connectMatchChat = ({ onEvent, onStatus }) => {
     if (stopped) return;
     socket = new WebSocket(buildWebSocketUrl());
     onStatus?.('connecting');
-    socket.onopen = () => { attempts = 0; onStatus?.('connected'); };
+    socket.onopen = () => {
+      attempts = 0;
+      socket.send(JSON.stringify({ type: 'MATCH_SUBSCRIBE', data: { matchId } }));
+      onStatus?.('connected');
+    };
     socket.onmessage = (message) => {
       try { onEvent?.(JSON.parse(message.data)); } catch { /* Ignore malformed events. */ }
     };

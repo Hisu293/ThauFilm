@@ -54,6 +54,7 @@ export default function MatchRoomDialog({ match, open, onClose, onMatchEnded }) 
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadRoom();
     const connection = connectMatchChat({
+      matchId: match.matchId,
       onStatus: setChatStatus,
       onEvent: (event) => {
         if (event.type === 'MATCH_MESSAGE' && String(event.data?.matchId) === String(match?.matchId) && event.data?.message) {

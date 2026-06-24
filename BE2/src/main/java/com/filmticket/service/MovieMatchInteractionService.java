@@ -38,6 +38,11 @@ public class MovieMatchInteractionService {
                 .map(message -> toMessage(message, users.get(message.getSenderId()))).toList();
     }
 
+    @Transactional(readOnly = true)
+    public void authorizeMatchRoom(UUID userId, UUID matchId) {
+        requireActiveMember(matchId, userId);
+    }
+
     @Transactional
     public MovieMatchingDto.MessageResponse sendMessage(UUID userId, UUID matchId, String rawContent) {
         MovieMatch match = requireActiveMember(matchId, userId);
@@ -48,7 +53,7 @@ public class MovieMatchInteractionService {
         User sender = requireUser(userId);
         UUID recipient = other(match, userId);
         MovieMatchingDto.MessageResponse response = toMessage(saved, sender);
-        realtimeEventService.sendUserEvent(recipient, "MATCH_MESSAGE", Map.of("matchId", matchId, "message", response));
+        realtimeEventService.sendMatchEvent(matchId, "MATCH_MESSAGE", Map.of("matchId", matchId, "message", response));
         realtimeEventService.notifyUser(recipient, "MATCH_MESSAGE", displayName(sender), content, "/intelligence");
         return response;
     }

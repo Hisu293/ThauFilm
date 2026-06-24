@@ -34,24 +34,31 @@ public class RealtimeWebSocketHandler extends TextWebSocketHandler {
         }
         try {
             JsonNode payload = objectMapper.readTree(message.getPayload());
-            if (!"MATCH_SEND_MESSAGE".equals(payload.path("type").asText())) {
-                sendError(session, "UNSUPPORTED_EVENT", "Loại sự kiện không được hỗ trợ");
-                return;
-            }
+            String type = payload.path("type").asText();
             UUID userId = (UUID) session.getAttributes().get("userId");
             if (userId == null) {
                 sendError(session, "UNAUTHORIZED", "Phiên WebSocket chưa được xác thực");
                 return;
             }
             JsonNode data = payload.path("data");
+            if ("MATCH_SUBSCRIBE".equals(type)) {
+                UUID matchId = UUID.fromString(data.path("matchId").asText());
+                movieMatchInteractionService.authorizeMatchRoom(userId, matchId);
+                session.getAttributes().put("matchId", matchId);
+                send(session, Map.of("type", "MATCH_SUBSCRIBED", "data", Map.of("matchId", matchId)));
+                return;
+            }
+            if (!"MATCH_SEND_MESSAGE".equals(type)) {
+                sendError(session, "UNSUPPORTED_EVENT", "Loại sự kiện không được hỗ trợ");
+                return;
+            }
             UUID matchId = UUID.fromString(data.path("matchId").asText());
+            if (!matchId.equals(session.getAttributes().get("matchId"))) {
+                sendError(session, "NOT_SUBSCRIBED", "Bạn chưa tham gia phòng chat này");
+                return;
+            }
             MovieMatchingDto.MessageResponse saved = movieMatchInteractionService.sendMessage(
                     userId, matchId, data.path("content").asText(""));
-            send(session, Map.of("type", "MATCH_MESSAGE", "data", Map.of(
-                    "matchId", matchId,
-                    "message", saved,
-                    "clientMessageId", data.path("clientMessageId").asText("")
-            )));
         } catch (IllegalArgumentException exception) {
             sendError(session, "INVALID_MESSAGE", "Dữ liệu tin nhắn không hợp lệ");
         } catch (Exception exception) {
