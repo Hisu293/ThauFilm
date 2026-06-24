@@ -1,6 +1,7 @@
 package com.filmticket.dto;
 
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.*;
 
@@ -51,5 +52,35 @@ public final class MovieMatchingDto {
         private UUID matchId;
         private LocalDateTime matchedAt;
         private ProfileResponse person;
+    }
+
+    @Data
+    public static class MessageRequest { @NotBlank @Size(max = 1000) private String content; }
+
+    @Data @Builder
+    public static class MessageResponse {
+        private UUID id; private UUID matchId; private UUID senderId; private String senderName;
+        private String content; private LocalDateTime createdAt;
+    }
+
+    @Data
+    public static class InvitationRequest { @NotNull private UUID showtimeId; }
+
+    @Data
+    public static class InvitationDecisionRequest { @NotNull private InvitationDecision decision; }
+    public enum InvitationDecision { ACCEPT, DECLINE }
+
+    @Data @Builder
+    public static class InvitationResponse {
+        private UUID id; private UUID matchId; private UUID senderId; private UUID recipientId;
+        private UUID showtimeId; private String movieTitle; private String theaterName; private String roomName;
+        private LocalDateTime startTime; private String status; private LocalDateTime createdAt;
+        private LocalDateTime respondedAt; private String bookingPath;
+    }
+
+    @Data
+    public static class ReportRequest {
+        @NotBlank @Size(max = 100) private String reason;
+        @Size(max = 1000) private String details;
     }
 }

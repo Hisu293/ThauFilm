@@ -46,6 +46,13 @@ public class RealtimeEventService {
         ));
     }
 
+    public void sendUserEvent(UUID userId, String type, Object data) {
+        sendMatching(session -> userId.equals(session.getAttributes().get("userId")), Map.of(
+                "type", type,
+                "data", data
+        ));
+    }
+
     private void sendMatching(java.util.function.Predicate<WebSocketSession> predicate, Object event) {
         try {
             String payload = objectMapper.writeValueAsString(event);

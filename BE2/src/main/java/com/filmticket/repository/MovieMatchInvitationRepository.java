@@ -1,0 +1,8 @@
+package com.filmticket.repository;
+import com.filmticket.entity.MovieMatchInvitation;
+import org.springframework.data.jpa.repository.JpaRepository;
+import java.util.List;
+import java.util.UUID;
+public interface MovieMatchInvitationRepository extends JpaRepository<MovieMatchInvitation, UUID> {
+    List<MovieMatchInvitation> findByMatchIdOrderByCreatedAtDesc(UUID matchId);
+}

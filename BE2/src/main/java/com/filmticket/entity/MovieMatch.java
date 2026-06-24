@@ -25,6 +25,19 @@ public class MovieMatch {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private Status status = Status.ACTIVE;
+
+    @Column(name = "ended_at")
+    private LocalDateTime endedAt;
+
+    @Column(name = "ended_by")
+    private UUID endedBy;
+
     @PrePersist
     void prePersist() { if (id == null) id = UUID.randomUUID(); }
+
+    public enum Status { ACTIVE, CANCELLED, BLOCKED }
 }

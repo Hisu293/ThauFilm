@@ -3,6 +3,7 @@ package com.filmticket.controller;
 import com.filmticket.dto.ApiResponse;
 import com.filmticket.dto.MovieMatchingDto;
 import com.filmticket.service.CurrentUserService;
+import com.filmticket.service.MovieMatchInteractionService;
 import com.filmticket.service.MovieMatchingService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +23,7 @@ import java.util.UUID;
 public class MovieMatchingController {
     private final MovieMatchingService matchingService;
     private final CurrentUserService currentUserService;
+    private final MovieMatchInteractionService interactionService;
 
     @GetMapping("/profile")
     public ResponseEntity<ApiResponse<MovieMatchingDto.ProfileResponse>> profile(@AuthenticationPrincipal UserDetails principal) {
@@ -49,6 +51,46 @@ public class MovieMatchingController {
     @GetMapping("/matches")
     public ResponseEntity<ApiResponse<List<MovieMatchingDto.MatchResponse>>> matches(@AuthenticationPrincipal UserDetails principal) {
         return ok("Đã tải danh sách match", matchingService.getMatches(userId(principal)));
+    }
+
+    @GetMapping("/matches/{matchId}/messages")
+    public ResponseEntity<ApiResponse<List<MovieMatchingDto.MessageResponse>>> messages(@AuthenticationPrincipal UserDetails principal, @PathVariable UUID matchId) {
+        return ok("Đã tải tin nhắn", interactionService.messages(userId(principal), matchId));
+    }
+
+    @PostMapping("/matches/{matchId}/messages")
+    public ResponseEntity<ApiResponse<MovieMatchingDto.MessageResponse>> sendMessage(@AuthenticationPrincipal UserDetails principal, @PathVariable UUID matchId, @Valid @RequestBody MovieMatchingDto.MessageRequest request) {
+        return ok("Đã gửi tin nhắn", interactionService.sendMessage(userId(principal), matchId, request.getContent()));
+    }
+
+    @GetMapping("/matches/{matchId}/invitations")
+    public ResponseEntity<ApiResponse<List<MovieMatchingDto.InvitationResponse>>> invitations(@AuthenticationPrincipal UserDetails principal, @PathVariable UUID matchId) {
+        return ok("Đã tải lời mời", interactionService.invitations(userId(principal), matchId));
+    }
+
+    @PostMapping("/matches/{matchId}/invitations")
+    public ResponseEntity<ApiResponse<MovieMatchingDto.InvitationResponse>> invite(@AuthenticationPrincipal UserDetails principal, @PathVariable UUID matchId, @Valid @RequestBody MovieMatchingDto.InvitationRequest request) {
+        return ok("Đã gửi lời mời", interactionService.invite(userId(principal), matchId, request.getShowtimeId()));
+    }
+
+    @PutMapping("/invitations/{invitationId}")
+    public ResponseEntity<ApiResponse<MovieMatchingDto.InvitationResponse>> respond(@AuthenticationPrincipal UserDetails principal, @PathVariable UUID invitationId, @Valid @RequestBody MovieMatchingDto.InvitationDecisionRequest request) {
+        return ok("Đã phản hồi lời mời", interactionService.respond(userId(principal), invitationId, request.getDecision()));
+    }
+
+    @DeleteMapping("/matches/{matchId}")
+    public ResponseEntity<ApiResponse<Void>> cancelMatch(@AuthenticationPrincipal UserDetails principal, @PathVariable UUID matchId) {
+        interactionService.cancelMatch(userId(principal), matchId); return ok("Đã hủy match", null);
+    }
+
+    @PostMapping("/matches/{matchId}/block")
+    public ResponseEntity<ApiResponse<Void>> block(@AuthenticationPrincipal UserDetails principal, @PathVariable UUID matchId) {
+        interactionService.block(userId(principal), matchId); return ok("Đã chặn thành viên", null);
+    }
+
+    @PostMapping("/matches/{matchId}/report")
+    public ResponseEntity<ApiResponse<Void>> report(@AuthenticationPrincipal UserDetails principal, @PathVariable UUID matchId, @Valid @RequestBody MovieMatchingDto.ReportRequest request) {
+        interactionService.report(userId(principal), matchId, request); return ok("Đã gửi báo cáo", null);
     }
 
     private UUID userId(UserDetails principal) { return currentUserService.requireUserId(principal); }
