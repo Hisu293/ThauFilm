@@ -6,6 +6,7 @@ const buildWebSocketUrl = (movieId) => {
   base.pathname = '/ws';
   base.search = '';
   const token = localStorage.getItem('cinema_token');
+  console.debug('[WS] buildWebSocketUrl - token exists:', !!token, token ? `(${token.substring(0, 20)}...)` : '');
   if (token) base.searchParams.set('token', token);
   if (movieId) base.searchParams.set('movieId', movieId);
   return base.toString();
@@ -27,23 +28,38 @@ const createSharedConnection = (movieId) => {
   const emitStatus = (status) => connection.statusListeners.forEach((listener) => listener?.(status));
   const connect = () => {
     if (connection.listeners.size === 0 || connection.socket?.readyState === WebSocket.CONNECTING || connection.socket?.readyState === WebSocket.OPEN) return;
-    const socket = new WebSocket(buildWebSocketUrl(movieId));
+    const url = buildWebSocketUrl(movieId);
+    console.debug('[WS] Connecting to:', url.replace(/token=[^&]+/, 'token=***'));
+    const socket = new WebSocket(url);
     connection.socket = socket;
     emitStatus('connecting');
-    socket.onopen = () => { connection.attempts = 0; emitStatus('connected'); };
+    socket.onopen = () => {
+      console.info('[WS] Connected successfully');
+      connection.attempts = 0;
+      emitStatus('connected');
+    };
     socket.onmessage = (message) => {
       try {
         const event = JSON.parse(message.data);
+        console.debug('[WS] Received event:', event.type);
         connection.listeners.forEach((listener) => listener?.(event));
-      } catch { /* Ignore malformed events. */ }
+      } catch (e) {
+        console.warn('[WS] Failed to parse message:', e);
+      }
     };
-    socket.onerror = () => emitStatus('error');
-    socket.onclose = () => {
+    socket.onerror = (error) => {
+      console.error('[WS] Connection error:', error);
+      emitStatus('error');
+    };
+    socket.onclose = (event) => {
+      console.info('[WS] Connection closed, code:', event.code, 'reason:', event.reason);
       if (connection.socket === socket) connection.socket = null;
       emitStatus('disconnected');
       if (connection.listeners.size > 0) {
         connection.attempts += 1;
-        connection.reconnectTimer = window.setTimeout(connect, Math.min(1000 * (2 ** connection.attempts), 15000));
+        const delay = Math.min(1000 * (2 ** connection.attempts), 15000);
+        console.info('[WS] Reconnecting in', delay, 'ms, attempt:', connection.attempts);
+        connection.reconnectTimer = window.setTimeout(connect, delay);
       }
     };
   };
@@ -83,22 +99,37 @@ export const connectMatchChat = ({ matchId, onEvent, onStatus }) => {
 
   const connect = () => {
     if (stopped) return;
-    socket = new WebSocket(buildWebSocketUrl());
+    const url = buildWebSocketUrl();
+    console.debug('[WS Match] Connecting to:', url.replace(/token=[^&]+/, 'token=***'));
+    socket = new WebSocket(url);
     onStatus?.('connecting');
     socket.onopen = () => {
+      console.info('[WS Match] Connected, subscribing to match:', matchId);
       attempts = 0;
       socket.send(JSON.stringify({ type: 'MATCH_SUBSCRIBE', data: { matchId } }));
       onStatus?.('connected');
     };
     socket.onmessage = (message) => {
-      try { onEvent?.(JSON.parse(message.data)); } catch { /* Ignore malformed events. */ }
+      try {
+        const event = JSON.parse(message.data);
+        console.debug('[WS Match] Received event:', event.type);
+        onEvent?.(event);
+      } catch (e) {
+        console.warn('[WS Match] Failed to parse message:', e);
+      }
     };
-    socket.onerror = () => onStatus?.('error');
-    socket.onclose = () => {
+    socket.onerror = (error) => {
+      console.error('[WS Match] Connection error:', error);
+      onStatus?.('error');
+    };
+    socket.onclose = (event) => {
+      console.info('[WS Match] Connection closed, code:', event.code);
       onStatus?.('disconnected');
       if (!stopped) {
         attempts += 1;
-        reconnectTimer = window.setTimeout(connect, Math.min(1000 * (2 ** attempts), 15000));
+        const delay = Math.min(1000 * (2 ** attempts), 15000);
+        console.info('[WS Match] Reconnecting in', delay, 'ms');
+        reconnectTimer = window.setTimeout(connect, delay);
       }
     };
   };
@@ -106,7 +137,11 @@ export const connectMatchChat = ({ matchId, onEvent, onStatus }) => {
   reconnectTimer = window.setTimeout(connect, 0);
   return {
     sendMessage: (matchId, content) => {
-      if (socket?.readyState !== WebSocket.OPEN) return false;
+      if (socket?.readyState !== WebSocket.OPEN) {
+        console.warn('[WS Match] Cannot send, socket not open:', socket?.readyState);
+        return false;
+      }
+      console.debug('[WS Match] Sending message to match:', matchId);
       socket.send(JSON.stringify({
         type: 'MATCH_SEND_MESSAGE',
         data: { matchId, content, clientMessageId: crypto.randomUUID() },
@@ -129,22 +164,37 @@ export const connectGroupBooking = ({ groupId, onEvent, onStatus }) => {
 
   const connect = () => {
     if (stopped) return;
-    socket = new WebSocket(buildWebSocketUrl());
+    const url = buildWebSocketUrl();
+    console.debug('[WS Group] Connecting to:', url.replace(/token=[^&]+/, 'token=***'));
+    socket = new WebSocket(url);
     onStatus?.('connecting');
     socket.onopen = () => {
+      console.info('[WS Group] Connected, subscribing to group:', groupId);
       attempts = 0;
       socket.send(JSON.stringify({ type: 'GROUP_SUBSCRIBE', data: { groupId } }));
       onStatus?.('connected');
     };
     socket.onmessage = (message) => {
-      try { onEvent?.(JSON.parse(message.data)); } catch { /* Ignore malformed events. */ }
+      try {
+        const event = JSON.parse(message.data);
+        console.debug('[WS Group] Received event:', event.type);
+        onEvent?.(event);
+      } catch (e) {
+        console.warn('[WS Group] Failed to parse message:', e);
+      }
     };
-    socket.onerror = () => onStatus?.('error');
-    socket.onclose = () => {
+    socket.onerror = (error) => {
+      console.error('[WS Group] Connection error:', error);
+      onStatus?.('error');
+    };
+    socket.onclose = (event) => {
+      console.info('[WS Group] Connection closed, code:', event.code);
       onStatus?.('disconnected');
       if (!stopped) {
         attempts += 1;
-        reconnectTimer = window.setTimeout(connect, Math.min(1000 * (2 ** attempts), 15000));
+        const delay = Math.min(1000 * (2 ** attempts), 15000);
+        console.info('[WS Group] Reconnecting in', delay, 'ms');
+        reconnectTimer = window.setTimeout(connect, delay);
       }
     };
   };
@@ -152,7 +202,11 @@ export const connectGroupBooking = ({ groupId, onEvent, onStatus }) => {
   reconnectTimer = window.setTimeout(connect, 0);
   return {
     toggleSeat: (seatId) => {
-      if (socket?.readyState !== WebSocket.OPEN) return false;
+      if (socket?.readyState !== WebSocket.OPEN) {
+        console.warn('[WS Group] Cannot toggle, socket not open:', socket?.readyState);
+        return false;
+      }
+      console.debug('[WS Group] Toggling seat:', seatId);
       socket.send(JSON.stringify({ type: 'GROUP_SEAT_TOGGLE', data: { groupId, seatId } }));
       return true;
     },

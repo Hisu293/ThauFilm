@@ -2,4 +2,4 @@
 .vscode/
 __MACOSX/
 target2/
-echo "node_modules/" >> .gitignore
+node_modules/
