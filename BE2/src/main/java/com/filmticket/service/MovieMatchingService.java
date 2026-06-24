@@ -19,6 +19,7 @@ public class MovieMatchingService {
     private final MovieMatchingProfileRepository profileRepository;
     private final MovieMatchingActionRepository actionRepository;
     private final MovieMatchRepository matchRepository;
+    private final MovieMatchingBlockRepository blockRepository;
     private final UserRepository userRepository;
     private final RealtimeEventService realtimeEventService;
 
@@ -58,6 +59,9 @@ public class MovieMatchingService {
 
         Set<UUID> handled = actionRepository.findByActorId(userId).stream()
                 .map(MovieMatchingAction::getTargetId).collect(Collectors.toSet());
+        Set<UUID> blocked = blockRepository.findByBlockerIdOrBlockedId(userId, userId).stream()
+                .map(item -> item.getBlockerId().equals(userId) ? item.getBlockedId() : item.getBlockerId())
+                .collect(Collectors.toSet());
         Map<UUID, User> users = userRepository.findAllById(
                 profileRepository.findByActiveTrueAndUserIdNot(userId).stream()
                         .map(MovieMatchingProfile::getUserId).toList()
@@ -65,6 +69,7 @@ public class MovieMatchingService {
 
         return profileRepository.findByActiveTrueAndUserIdNot(userId).stream()
                 .filter(profile -> !handled.contains(profile.getUserId()))
+                .filter(profile -> !blocked.contains(profile.getUserId()))
                 .filter(profile -> users.containsKey(profile.getUserId()))
                 .map(profile -> toProfile(profile, users.get(profile.getUserId()), compatibility(mine, profile)))
                 .sorted(Comparator.comparingInt(MovieMatchingDto.ProfileResponse::getCompatibilityPercent).reversed())
@@ -74,6 +79,9 @@ public class MovieMatchingService {
     @Transactional
     public MovieMatchingDto.ActionResponse act(UUID actorId, UUID targetId, MovieMatchingDto.Decision requestedDecision) {
         if (actorId.equals(targetId)) throw new BadRequestException("Bạn không thể tự chọn chính mình");
+        if (blockRepository.existsByBlockerIdAndBlockedId(actorId, targetId) || blockRepository.existsByBlockerIdAndBlockedId(targetId, actorId)) {
+            throw new BadRequestException("Không thể tương tác với thành viên này");
+        }
         MovieMatchingProfile mine = profileRepository.findById(actorId)
                 .orElseThrow(() -> new BadRequestException("Hãy tạo hồ sơ Movie Dating trước"));
         if (!mine.isActive()) throw new BadRequestException("Hồ sơ tìm bạn của bạn đang tắt");
@@ -104,7 +112,7 @@ public class MovieMatchingService {
 
     @Transactional(readOnly = true)
     public List<MovieMatchingDto.MatchResponse> getMatches(UUID userId) {
-        List<MovieMatch> matches = matchRepository.findAllForUser(userId);
+        List<MovieMatch> matches = matchRepository.findAllForUser(userId, MovieMatch.Status.ACTIVE);
         Set<UUID> otherIds = matches.stream().map(match -> match.getUserOneId().equals(userId)
                 ? match.getUserTwoId() : match.getUserOneId()).collect(Collectors.toSet());
         Map<UUID, User> users = userRepository.findAllById(otherIds).stream()

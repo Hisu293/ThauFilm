@@ -12,6 +12,6 @@ import java.util.UUID;
 public interface MovieMatchRepository extends JpaRepository<MovieMatch, UUID> {
     Optional<MovieMatch> findByUserOneIdAndUserTwoId(UUID userOneId, UUID userTwoId);
 
-    @Query("select m from MovieMatch m where m.userOneId = :userId or m.userTwoId = :userId order by m.createdAt desc")
-    List<MovieMatch> findAllForUser(@Param("userId") UUID userId);
+    @Query("select m from MovieMatch m where (m.userOneId = :userId or m.userTwoId = :userId) and m.status = :status order by m.createdAt desc")
+    List<MovieMatch> findAllForUser(@Param("userId") UUID userId, @Param("status") MovieMatch.Status status);
 }

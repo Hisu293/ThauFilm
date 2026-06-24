@@ -18,4 +18,12 @@ export const memberIntelligenceService = {
   matchingCandidates: () => api.get('/api/member/matching/candidates').then(unwrap),
   matchingAction: (targetId, decision) => api.post(`/api/member/matching/candidates/${targetId}/action`, { decision }).then(unwrap),
   matches: () => api.get('/api/member/matching/matches').then(unwrap),
+  matchMessages: (matchId) => api.get(`/api/member/matching/matches/${matchId}/messages`).then(unwrap),
+  sendMatchMessage: (matchId, content) => api.post(`/api/member/matching/matches/${matchId}/messages`, { content }).then(unwrap),
+  matchInvitations: (matchId) => api.get(`/api/member/matching/matches/${matchId}/invitations`).then(unwrap),
+  sendMatchInvitation: (matchId, showtimeId) => api.post(`/api/member/matching/matches/${matchId}/invitations`, { showtimeId }).then(unwrap),
+  respondMatchInvitation: (invitationId, decision) => api.put(`/api/member/matching/invitations/${invitationId}`, { decision }).then(unwrap),
+  cancelMatch: (matchId) => api.delete(`/api/member/matching/matches/${matchId}`).then(unwrap),
+  blockMatch: (matchId) => api.post(`/api/member/matching/matches/${matchId}/block`).then(unwrap),
+  reportMatch: (matchId, payload) => api.post(`/api/member/matching/matches/${matchId}/report`, payload).then(unwrap),
 };

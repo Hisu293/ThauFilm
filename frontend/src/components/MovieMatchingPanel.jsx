@@ -4,6 +4,7 @@ import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import FavoriteRoundedIcon from '@mui/icons-material/FavoriteRounded';
 import SaveRoundedIcon from '@mui/icons-material/SaveRounded';
 import { memberIntelligenceService } from '../services/intelligenceService';
+import MatchRoomDialog from './MatchRoomDialog';
 
 const emptyForm = { bio: '', favoriteGenres: '', preferredTheater: '', availableTimes: '', active: false };
 const toForm = (profile) => ({
@@ -31,6 +32,7 @@ export default function MovieMatchingPanel() {
   const [busyId, setBusyId] = useState(null);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [selectedMatch, setSelectedMatch] = useState(null);
 
   const loadProfile = useCallback(async () => {
     setLoading(true); setError('');
@@ -76,7 +78,8 @@ export default function MovieMatchingPanel() {
     {loading ? <Box textAlign="center" py={6}><CircularProgress /></Box> : <>
       {tab === 0 && <Card><CardContent><Typography variant="h5" fontWeight={900} mb={2}>Hồ sơ tìm bạn xem phim</Typography><Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}><TextField label="Giới thiệu" multiline minRows={3} value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} inputProps={{ maxLength: 500 }} /><TextField label="Thể loại yêu thích" helperText="Ngăn cách bằng dấu phẩy, ví dụ: Marvel, Anime" value={form.favoriteGenres} onChange={(e) => setForm({ ...form, favoriteGenres: e.target.value })} /><TextField label="Rạp ưu tiên" value={form.preferredTheater} onChange={(e) => setForm({ ...form, preferredTheater: e.target.value })} /><TextField label="Thời gian rảnh" placeholder="Ví dụ: Tối thứ 7, Chủ nhật" value={form.availableTimes} onChange={(e) => setForm({ ...form, availableTimes: e.target.value })} /></Box><Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} mt={3} gap={2}><FormControlLabel control={<Switch checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} />} label="Đang tìm bạn xem phim" /><Button variant="contained" startIcon={<SaveRoundedIcon />} onClick={save}>Lưu hồ sơ</Button></Stack></CardContent></Card>}
       {tab === 1 && (!profile?.active ? <Alert severity="warning" action={<Button onClick={() => setTab(0)}>Mở hồ sơ</Button>}>Bạn cần bật “Đang tìm bạn xem phim” trong hồ sơ.</Alert> : candidates.length === 0 ? <Alert severity="info" action={<Button onClick={loadCandidates}>Tải lại</Button>}>Hiện chưa còn hồ sơ phù hợp để khám phá.</Alert> : <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>{candidates.map((person) => <Box key={person.userId} sx={{ opacity: busyId === person.userId ? 0.55 : 1, pointerEvents: busyId ? 'none' : 'auto' }}><PersonCard person={person} actions={{ pass: () => act(person, 'PASS'), like: () => act(person, 'LIKE') }} /></Box>)}</Box>)}
-      {tab === 2 && (matches.length === 0 ? <Alert severity="info">Bạn chưa có match nào. Khi hai người cùng thích nhau, match sẽ xuất hiện tại đây.</Alert> : <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>{matches.map((match) => <Box key={match.matchId}><PersonCard person={match.person} /><Typography variant="caption" color="text.secondary" display="block" mt={0.5}>Match ngày {new Date(match.matchedAt).toLocaleDateString('vi-VN')}</Typography></Box>)}</Box>)}
+      {tab === 2 && (matches.length === 0 ? <Alert severity="info">Bạn chưa có match nào. Khi hai người cùng thích nhau, match sẽ xuất hiện tại đây.</Alert> : <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>{matches.map((match) => <Box key={match.matchId}><PersonCard person={match.person} /><Button fullWidth variant="contained" sx={{ mt: 1 }} onClick={() => setSelectedMatch(match)}>Mở phòng chat</Button><Typography variant="caption" color="text.secondary" display="block" mt={0.5}>Match ngày {new Date(match.matchedAt).toLocaleDateString('vi-VN')}</Typography></Box>)}</Box>)}
     </>}
+    <MatchRoomDialog match={selectedMatch} open={Boolean(selectedMatch)} onClose={() => setSelectedMatch(null)} onMatchEnded={loadMatches} />
   </Stack>;
 }
