@@ -85,7 +85,7 @@ public class MovieMatchingService {
         MovieMatchingProfile mine = profileRepository.findById(actorId)
                 .orElseThrow(() -> new BadRequestException("Hãy tạo hồ sơ Movie Dating trước"));
         if (!mine.isActive()) throw new BadRequestException("Hồ sơ tìm bạn của bạn đang tắt");
-        MovieMatchingProfile target = profileRepository.findById(targetId)
+        profileRepository.findById(targetId)
                 .filter(MovieMatchingProfile::isActive)
                 .orElseThrow(() -> new BadRequestException("Thành viên này hiện không tìm bạn xem phim"));
 

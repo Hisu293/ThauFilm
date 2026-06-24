@@ -70,6 +70,12 @@ export default function MovieMatchingPanel() {
       setNotice(result?.matched ? `Bạn và ${person.fullName} đã match!` : decision === 'LIKE' ? 'Đã gửi lượt thích.' : 'Đã bỏ qua.');
     } catch (err) { setError(err.message); } finally { setBusyId(null); }
   };
+  const handleMatchEnded = useCallback(async () => {
+    await loadMatches();
+    if (tab === 1 && profile?.active) {
+      await loadCandidates();
+    }
+  }, [loadMatches, loadCandidates, profile?.active, tab]);
 
   return <Stack spacing={2.5}>
     <Alert severity="info">Movie Dating online chỉ tạo match khi cả hai người cùng bấm Thích.</Alert>
@@ -80,6 +86,6 @@ export default function MovieMatchingPanel() {
       {tab === 1 && (!profile?.active ? <Alert severity="warning" action={<Button onClick={() => setTab(0)}>Mở hồ sơ</Button>}>Bạn cần bật “Đang tìm bạn xem phim” trong hồ sơ.</Alert> : candidates.length === 0 ? <Alert severity="info" action={<Button onClick={loadCandidates}>Tải lại</Button>}>Hiện chưa còn hồ sơ phù hợp để khám phá.</Alert> : <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>{candidates.map((person) => <Box key={person.userId} sx={{ opacity: busyId === person.userId ? 0.55 : 1, pointerEvents: busyId ? 'none' : 'auto' }}><PersonCard person={person} actions={{ pass: () => act(person, 'PASS'), like: () => act(person, 'LIKE') }} /></Box>)}</Box>)}
       {tab === 2 && (matches.length === 0 ? <Alert severity="info">Bạn chưa có match nào. Khi hai người cùng thích nhau, match sẽ xuất hiện tại đây.</Alert> : <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>{matches.map((match) => <Box key={match.matchId}><PersonCard person={match.person} /><Button fullWidth variant="contained" sx={{ mt: 1 }} onClick={() => setSelectedMatch(match)}>Mở phòng chat</Button><Typography variant="caption" color="text.secondary" display="block" mt={0.5}>Match ngày {new Date(match.matchedAt).toLocaleDateString('vi-VN')}</Typography></Box>)}</Box>)}
     </>}
-    <MatchRoomDialog match={selectedMatch} open={Boolean(selectedMatch)} onClose={() => setSelectedMatch(null)} onMatchEnded={loadMatches} />
+    <MatchRoomDialog match={selectedMatch} open={Boolean(selectedMatch)} onClose={() => setSelectedMatch(null)} onMatchEnded={handleMatchEnded} />
   </Stack>;
 }
