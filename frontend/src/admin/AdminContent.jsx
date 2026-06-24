@@ -4,6 +4,7 @@ import { MoviesSection, GenresSection, ActorsSection, TrailersSection } from './
 import { TheatersSection, RoomsSection, ShowtimesSection } from './sections/CinemaSections';
 import { UserAccountsSection, UserRolesSection } from './sections/UserSections';
 import { RevenueReportSection, TicketsReportSection, CustomersReportSection } from './sections/ReportSections';
+import IntelligenceSection from './sections/IntelligenceSection';
 
 const AdminContent = ({ view, store }) => {
   const { crud, dashboard, getTheaterName, movieList } = store;
@@ -42,6 +43,8 @@ const AdminContent = ({ view, store }) => {
       return <TicketsReportSection />;
     case ADMIN_VIEWS.REPORT_CUSTOMERS:
       return <CustomersReportSection />;
+    case ADMIN_VIEWS.INTELLIGENCE:
+      return <IntelligenceSection rooms={crud.rooms.list} movies={movieList} onShowtimesChanged={crud.showtimes.reload} />;
     default:
       return <DashboardSection dashboard={dashboard} users={crud.users} />;
   }

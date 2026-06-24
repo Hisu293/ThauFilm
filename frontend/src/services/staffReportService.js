@@ -16,11 +16,13 @@ import api from './api';
 const unwrap = (res) => (res?.data?.data !== undefined ? res.data.data : res?.data);
 
 export const staffReportService = {
-  revenue: () => api.get('/api/staff/reports/revenue').then(unwrap),
-  ticketSales: () => api.get('/api/staff/reports/ticket-sales').then(unwrap),
-  onlineMovieSales: () => api.get('/api/staff/reports/online-movie-sales').then(unwrap),
-  topMovies: () => api.get('/api/staff/reports/top-movies').then(unwrap),
-  topShowtimes: () => api.get('/api/staff/reports/top-showtimes').then(unwrap),
+  dashboard: () => api.get('/api/staff/reports/dashboard').then(unwrap),
+  customers: () => api.get('/api/staff/reports/customers').then(unwrap),
+  revenue: (from, to) => api.get('/api/staff/reports/revenue', { params: { from, to } }).then(unwrap),
+  ticketSales: (from, to) => api.get('/api/staff/reports/ticket-sales', { params: { from, to } }).then(unwrap),
+  onlineMovieSales: (from, to) => api.get('/api/staff/reports/online-movie-sales', { params: { from, to } }).then(unwrap),
+  topMovies: (limit = 10) => api.get('/api/staff/reports/top-movies', { params: { limit } }).then(unwrap),
+  topShowtimes: (limit = 10) => api.get('/api/staff/reports/top-showtimes', { params: { limit } }).then(unwrap),
 };
 
 export default staffReportService;

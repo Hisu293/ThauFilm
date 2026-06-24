@@ -80,6 +80,11 @@ public class DemandPredictionService {
 
     @Transactional(readOnly = true)
     public List<ShowtimeSuggestion> suggest(UUID movieId, LocalDate fromDate) {
+        return suggest(movieId, fromDate, 3);
+    }
+
+    @Transactional(readOnly = true)
+    public List<ShowtimeSuggestion> suggest(UUID movieId, LocalDate fromDate, int limit) {
         Movie movie = movieRepository.findById(movieId)
                 .orElseThrow(() -> new BadRequestException("Movie not found"));
         if (!movie.isActive() || movie.getStatus() != Movie.Status.NOW_SHOWING) {
@@ -127,8 +132,13 @@ public class DemandPredictionService {
         return candidates.stream()
                 .sorted(Comparator.comparingInt(ShowtimeSuggestion::getPredictedOccupancyPercent).reversed()
                         .thenComparing(ShowtimeSuggestion::getStartTime))
-                .limit(3)
+                .limit(Math.max(1, limit))
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public int predictOccupancy(UUID movieId, LocalDateTime startTime, RoomType roomType) {
+        return (int) Math.round(predict(buildModel(), movieId, startTime, roomType) * 100);
     }
 
     private Model buildModel() {

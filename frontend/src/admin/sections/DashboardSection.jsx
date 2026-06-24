@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import {
   Avatar,
   Box,
@@ -19,16 +18,6 @@ import InsightsRoundedIcon from '@mui/icons-material/InsightsRounded';
 import SectionState from '../components/SectionState';
 import StatusChip from '../components/StatusChip';
 
-const WEEKLY = [
-  { day: 'T2', value: 62 },
-  { day: 'T3', value: 78 },
-  { day: 'T4', value: 55 },
-  { day: 'T5', value: 91 },
-  { day: 'T6', value: 100 },
-  { day: 'T7', value: 88 },
-  { day: 'CN', value: 72 },
-];
-
 const displayName = (u) => u.fullName || u.email || 'Người dùng';
 const isEnabled = (u) => u.enabled !== false;
 
@@ -48,8 +37,9 @@ const StatCard = ({ icon: Icon, label, value, accent }) => (
 );
 
 const DashboardSection = ({ dashboard, users }) => {
-  const max = useMemo(() => Math.max(...WEEKLY.map((d) => d.value)), []);
   const d = dashboard.data;
+  const weekly = d?.bookingTrend?.daily || [];
+  const max = Math.max(...weekly.map((item) => item.tickets), 1);
 
   const cards = d
     ? [
@@ -99,17 +89,18 @@ const DashboardSection = ({ dashboard, users }) => {
               Đặt vé theo tuần
             </Typography>
             <Stack direction="row" alignItems="flex-end" sx={{ height: 120, gap: 1 }}>
-              {WEEKLY.map((w, i) => (
-                <Stack key={w.day} alignItems="center" sx={{ flex: 1, height: '100%', justifyContent: 'flex-end' }}>
-                  <Box className={`admin-chart-bar ${i === 4 ? '' : 'muted'}`} sx={{ width: '100%', maxWidth: 32, height: `${(w.value / max) * 100}%` }} />
+              {weekly.map((w, i) => (
+                <Stack key={w.date} alignItems="center" sx={{ flex: 1, height: '100%', justifyContent: 'flex-end' }}>
+                  <Typography variant="caption" sx={{ mb: 0.5, opacity: 0.75 }}>{w.tickets}</Typography>
+                  <Box className={`admin-chart-bar ${i === weekly.length - 1 ? '' : 'muted'}`} sx={{ width: '100%', maxWidth: 32, minHeight: 2, height: `${(w.tickets / max) * 90}%` }} />
                   <Typography variant="caption" sx={{ mt: 0.5, opacity: 0.5 }}>
-                    {w.day}
+                    {new Date(`${w.date}T00:00:00`).toLocaleDateString('vi-VN', { weekday: 'short' })}
                   </Typography>
                 </Stack>
               ))}
             </Stack>
             <Typography variant="caption" sx={{ mt: 1, display: 'block', opacity: 0.35 }}>
-              * Dữ liệu demo — chưa có API thống kê đặt vé
+              Dữ liệu vé đã thanh toán trong 7 ngày gần nhất
             </Typography>
           </Box>
           <Box className="admin-panel" sx={{ p: 3 }}>

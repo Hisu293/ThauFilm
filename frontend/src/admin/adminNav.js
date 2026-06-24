@@ -11,6 +11,7 @@ import AdminPanelSettingsRoundedIcon from '@mui/icons-material/AdminPanelSetting
 import PaidRoundedIcon from '@mui/icons-material/PaidRounded';
 import ConfirmationNumberRoundedIcon from '@mui/icons-material/ConfirmationNumberRounded';
 import LoyaltyRoundedIcon from '@mui/icons-material/LoyaltyRounded';
+import PsychologyRoundedIcon from '@mui/icons-material/PsychologyRounded';
 
 export const ADMIN_VIEWS = {
   DASHBOARD: 'dashboard',
@@ -26,9 +27,16 @@ export const ADMIN_VIEWS = {
   REPORT_REVENUE: 'report-revenue',
   REPORT_TICKETS: 'report-tickets',
   REPORT_CUSTOMERS: 'report-customers',
+  INTELLIGENCE: 'intelligence',
 };
 
 export const ADMIN_NAV_GROUPS = [
+  {
+    id: 'intelligence',
+    label: 'AI vận hành',
+    defaultOpen: true,
+    items: [{ id: ADMIN_VIEWS.INTELLIGENCE, label: 'Cinema Intelligence', icon: PsychologyRoundedIcon }],
+  },
   {
     id: 'overview',
     label: null,
@@ -90,4 +98,5 @@ export const VIEW_META = {
   [ADMIN_VIEWS.REPORT_REVENUE]: { title: 'Báo cáo doanh thu', subtitle: 'Theo ngày, tháng và phim' },
   [ADMIN_VIEWS.REPORT_TICKETS]: { title: 'Thống kê vé', subtitle: 'Vé bán ra và vé hủy' },
   [ADMIN_VIEWS.REPORT_CUSTOMERS]: { title: 'Thống kê khách hàng', subtitle: 'Khách mới và khách thân thiết' },
+  [ADMIN_VIEWS.INTELLIGENCE]: { title: 'AI Cinema Intelligence', subtitle: 'Tối ưu ghế, giá vé và lịch chiếu' },
 };

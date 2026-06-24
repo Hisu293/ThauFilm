@@ -9,6 +9,7 @@ import com.filmticket.exception.BadRequestException;
 import com.filmticket.repository.UserRepository;
 import com.filmticket.service.MovieService;
 import com.filmticket.service.DemandPredictionService;
+import com.filmticket.service.StaffReportService;
 import com.filmticket.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -48,6 +49,7 @@ public class AdminController {
     private final UserService userService;
     private final MovieService movieService;
     private final DemandPredictionService demandPredictionService;
+    private final StaffReportService staffReportService;
 
     @Operation(summary = "Admin test endpoint")
     @GetMapping("/ping")
@@ -145,6 +147,7 @@ public class AdminController {
                 .enabledUsers(enabledUsers)
                 .disabledUsers(disabledUsers)
                 .demandPrediction(demandPredictionService.predictTonight())
+                .bookingTrend(staffReportService.ticketSales(null, null))
                 .build();
 
         return ResponseEntity.ok(ApiResponse.success("Dashboard fetched successfully", dashboard));
@@ -270,6 +273,7 @@ public class AdminController {
         private long enabledUsers;
         private long disabledUsers;
         private DemandPredictionResponse demandPrediction;
+        private java.util.Map<String, Object> bookingTrend;
     }
 
     @Data

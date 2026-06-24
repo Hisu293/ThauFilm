@@ -35,6 +35,9 @@ public class Ticket {
     @Builder.Default
     private boolean checkedIn = false;
 
+    @Column(name = "checked_in_at")
+    private java.time.LocalDateTime checkedInAt;
+
     @Column(nullable = false, updatable = false)
     private java.time.LocalDateTime createdAt;
 

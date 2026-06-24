@@ -19,6 +19,7 @@ import SharedFavoriteListPage from '../pages/SharedFavoriteListPage';
 import MovieCommunityPage from '../pages/MovieCommunityPage';
 import FavoriteListsPage from '../pages/FavoriteListsPage';
 import CommunityConnectionsPage from '../pages/CommunityConnectionsPage';
+import CinemaIntelligencePage from '../pages/CinemaIntelligencePage';
 
 // Booking Pages
 import SeatSelectionPage from '../pages/SeatSelectionPage';
@@ -53,6 +54,7 @@ const AppRoutes = () => {
         <Route path="/lists/:listId" element={<SharedFavoriteListPage />} />
         <Route path="/favorite-lists" element={<FavoriteListsPage />} />
         <Route path="/community/connections" element={<CommunityConnectionsPage />} />
+        <Route path="/intelligence" element={<CinemaIntelligencePage />} />
         <Route path="/dashboard" element={<DashboardPage />} />
          
         <Route path="/booking/seats/:showtimeId" element={<SeatSelectionPage />} />
