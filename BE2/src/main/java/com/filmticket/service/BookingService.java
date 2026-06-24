@@ -265,6 +265,7 @@ public class BookingService {
         }
 
         ticket.setCheckedIn(true);
+        ticket.setCheckedInAt(java.time.LocalDateTime.now());
         ticket = ticketRepository.save(ticket);
         return TicketResponse.fromTicket(ticket);
     }

@@ -1,202 +1,128 @@
-import { useState } from 'react';
-import { Box, Chip, Stack, Tab, Tabs, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from '@mui/material';
+import { useCallback, useEffect, useState } from 'react';
+import { Alert, Box, Button, Chip, CircularProgress, Stack, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from '@mui/material';
 import SectionHeader from '../components/SectionHeader';
+import { staffReportService } from '../../services/staffReportService';
 
 const thSx = { color: 'rgba(255,255,255,0.45)', fontWeight: 600 };
+const money = (value) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(Number(value || 0));
+const shortDate = (date) => new Date(`${date}T00:00:00`).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
 
-const REVENUE_DAY = [
-  { label: '01/06', value: 42 },
-  { label: '02/06', value: 58 },
-  { label: '03/06', value: 45 },
-  { label: '04/06', value: 72 },
-  { label: '05/06', value: 91 },
-];
+const useReport = (loader) => {
+  const [state, setState] = useState({ loading: true, error: '', data: null });
+  const load = useCallback(async () => {
+    setState({ loading: true, error: '', data: null });
+    try {
+      setState({ loading: false, error: '', data: await loader() });
+    } catch (error) {
+      setState({ loading: false, error: error.message || 'Không thể tải báo cáo.', data: null });
+    }
+  }, [loader]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    load();
+  }, [load]);
+  return { ...state, reload: load };
+};
 
-const REVENUE_MONTH = [
-  { label: 'T1', amount: '₫1.2B' },
-  { label: 'T2', amount: '₫1.5B' },
-  { label: 'T3', amount: '₫1.8B' },
-  { label: 'T4', amount: '₫2.1B' },
-  { label: 'T5', amount: '₫2.4B' },
-];
+const ReportState = ({ report, children }) => {
+  if (report.loading) return <Box sx={{ display: 'grid', placeItems: 'center', py: 8 }}><CircularProgress /></Box>;
+  if (report.error) return <Alert severity="error" action={<Button onClick={report.reload}>Thử lại</Button>}>{report.error}</Alert>;
+  return children;
+};
 
-const REVENUE_MOVIE = [
-  { movie: 'Spider-Verse', amount: '₫840M', pct: 35 },
-  { movie: 'Dune: Part Two', amount: '₫620M', pct: 26 },
-  { movie: 'Inception', amount: '₫480M', pct: 20 },
-];
-
+const revenueLoader = () => Promise.all([staffReportService.revenue(), staffReportService.topMovies(10)]);
 export const RevenueReportSection = () => {
-  const [tab, setTab] = useState(0);
-  const max = Math.max(...REVENUE_DAY.map((d) => d.value));
-
+  const report = useReport(revenueLoader);
+  const [revenue, topMovies] = report.data || [];
+  const daily = revenue?.daily || [];
+  const max = Math.max(...daily.map((item) => Number(item.total)), 1);
   return (
     <>
-      <SectionHeader title="Báo cáo doanh thu" subtitle="Theo ngày · tháng · phim" />
-      <Tabs value={tab} onChange={(_, v) => setTab(v)} sx={{ mb: 2, '& .MuiTab-root': { fontWeight: 600 } }}>
-        <Tab label="Theo ngày" />
-        <Tab label="Theo tháng" />
-        <Tab label="Theo phim" />
-      </Tabs>
-      {tab === 0 && (
-        <Box className="admin-panel" sx={{ p: 3 }}>
-          <Stack direction="row" alignItems="flex-end" sx={{ height: 140, gap: 1.5 }}>
-            {REVENUE_DAY.map((d) => (
-              <Stack key={d.label} alignItems="center" sx={{ flex: 1, height: '100%', justifyContent: 'flex-end' }}>
-                <Box className="admin-chart-bar" sx={{ width: '100%', maxWidth: 40, height: `${(d.value / max) * 100}%` }} />
-                <Typography variant="caption" sx={{ mt: 1, opacity: 0.5 }}>
-                  {d.label}
-                </Typography>
-              </Stack>
-            ))}
-          </Stack>
-          <Typography variant="body2" color="text.secondary" sx={{ mt: 2, textAlign: 'center' }}>
-            Tổng tuần: <strong style={{ color: '#4ade80' }}>₫308M</strong>
-          </Typography>
+      <SectionHeader title="Báo cáo doanh thu" subtitle="Dữ liệu thanh toán thành công trong 7 ngày gần nhất" />
+      <ReportState report={report}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1.4fr 1fr' }, gap: 2 }}>
+          <Box className="admin-panel" sx={{ p: 3 }}>
+            <Typography variant="h5" fontWeight={800} color="#4ade80">{money(revenue?.totalRevenue)}</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>Tổng doanh thu vé</Typography>
+            <Stack direction="row" alignItems="flex-end" sx={{ height: 170, gap: 1.5 }}>
+              {daily.map((item) => (
+                <Stack key={item.date} alignItems="center" justifyContent="flex-end" sx={{ flex: 1, height: '100%' }}>
+                  <Typography variant="caption">{money(item.total)}</Typography>
+                  <Box className="admin-chart-bar" sx={{ minHeight: 2, width: '100%', maxWidth: 40, height: `${Number(item.total) / max * 85}%` }} />
+                  <Typography variant="caption" color="text.secondary">{shortDate(item.date)}</Typography>
+                </Stack>
+              ))}
+            </Stack>
+          </Box>
+          <Box className="admin-panel" sx={{ p: 2.5 }}>
+            <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>Top phim bán chạy</Typography>
+            <Stack spacing={1.5}>
+              {(topMovies?.items || []).map((item, index) => (
+                <Stack key={item.movieId} direction="row" justifyContent="space-between">
+                  <Typography variant="body2">#{index + 1} {item.movieTitle}</Typography>
+                  <Typography variant="body2" fontWeight={700}>{item.tickets} vé · {money(item.revenue)}</Typography>
+                </Stack>
+              ))}
+              {!topMovies?.items?.length && <Typography color="text.secondary">Chưa có giao dịch.</Typography>}
+            </Stack>
+          </Box>
         </Box>
-      )}
-      {tab === 1 && (
-        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(5, 1fr)' }, gap: 1.5 }}>
-          {REVENUE_MONTH.map((m) => (
-            <Box key={m.label} className="admin-panel admin-stat-card" sx={{ p: 2, textAlign: 'center', '--accent': '#f59e0b' }}>
-              <Typography variant="caption" color="text.secondary">
-                {m.label}
-              </Typography>
-              <Typography variant="h6" fontWeight={800} sx={{ mt: 0.5 }}>
-                {m.amount}
-              </Typography>
-            </Box>
-          ))}
-        </Box>
-      )}
-      {tab === 2 && (
-        <Box className="admin-panel" sx={{ overflow: 'hidden' }}>
-          <TableContainer>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell sx={thSx}>Phim</TableCell>
-                  <TableCell sx={thSx}>Doanh thu</TableCell>
-                  <TableCell sx={thSx}>Tỷ trọng</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {REVENUE_MOVIE.map((r) => (
-                  <TableRow key={r.movie} className="admin-table-row">
-                    <TableCell>
-                      <Typography fontWeight={600}>{r.movie}</Typography>
-                    </TableCell>
-                    <TableCell sx={{ color: '#4ade80', fontWeight: 700 }}>{r.amount}</TableCell>
-                    <TableCell>
-                      <Chip label={`${r.pct}%`} size="small" sx={{ fontWeight: 700 }} />
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Box>
-      )}
+      </ReportState>
     </>
   );
 };
 
-export const TicketsReportSection = () => (
-  <>
-    <SectionHeader title="Thống kê vé" subtitle="Vé bán ra và vé hủy" />
-    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>
-      <Box className="admin-panel admin-stat-card" sx={{ p: 3, '--accent': '#22c55e' }}>
-        <Typography color="text.secondary">Vé bán ra</Typography>
-        <Typography variant="h3" fontWeight={800} sx={{ mt: 1 }}>
-          12,480
-        </Typography>
-        <Chip label="+15% tháng này" size="small" sx={{ mt: 2, bgcolor: 'rgba(34,197,94,0.15)', color: '#4ade80', fontWeight: 700 }} />
-      </Box>
-      <Box className="admin-panel admin-stat-card" sx={{ p: 3, '--accent': '#ef4444' }}>
-        <Typography color="text.secondary">Vé hủy</Typography>
-        <Typography variant="h3" fontWeight={800} sx={{ mt: 1 }}>
-          342
-        </Typography>
-        <Chip label="2.7% tỷ lệ hủy" size="small" sx={{ mt: 2, bgcolor: 'rgba(239,68,68,0.15)', color: '#f87171', fontWeight: 700 }} />
-      </Box>
-    </Box>
-    <Box className="admin-panel" sx={{ p: 3, mt: 2 }}>
-      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-        Xu hướng 7 ngày
-      </Typography>
-      <Stack spacing={1.5}>
-        {[
-          { day: 'T2', sold: 420, cancelled: 12 },
-          { day: 'T3', sold: 510, cancelled: 18 },
-          { day: 'T4', sold: 380, cancelled: 9 },
-          { day: 'T5', sold: 620, cancelled: 22 },
-        ].map((d) => (
-          <Stack key={d.day} direction="row" alignItems="center" spacing={2}>
-            <Typography sx={{ width: 28, opacity: 0.5 }}>{d.day}</Typography>
-            <Box sx={{ flex: 1, height: 8, borderRadius: 4, bgcolor: 'rgba(255,255,255,0.06)', overflow: 'hidden', display: 'flex' }}>
-              <Box sx={{ width: `${(d.sold / 650) * 100}%`, bgcolor: '#22c55e' }} />
-              <Box sx={{ width: `${(d.cancelled / 650) * 100}%`, bgcolor: '#ef4444' }} />
-            </Box>
-            <Typography variant="caption" sx={{ minWidth: 80 }}>
-              {d.sold} / <span style={{ color: '#f87171' }}>{d.cancelled}</span>
-            </Typography>
-          </Stack>
-        ))}
-      </Stack>
-    </Box>
-  </>
-);
+const ticketsLoader = () => Promise.all([staffReportService.ticketSales(), staffReportService.topShowtimes(10)]);
+export const TicketsReportSection = () => {
+  const report = useReport(ticketsLoader);
+  const [tickets, topShowtimes] = report.data || [];
+  return (
+    <>
+      <SectionHeader title="Thống kê vé" subtitle="Vé thuộc đơn hàng đã thanh toán trong 7 ngày gần nhất" />
+      <ReportState report={report}>
+        <Box className="admin-panel admin-stat-card" sx={{ p: 3, mb: 2, '--accent': '#22c55e' }}>
+          <Typography color="text.secondary">Vé đã bán</Typography>
+          <Typography variant="h3" fontWeight={800}>{tickets?.totalTickets || 0}</Typography>
+          <Typography variant="body2" color="text.secondary">Doanh thu: {money(tickets?.totalAmount)}</Typography>
+        </Box>
+        <Box className="admin-panel" sx={{ overflow: 'hidden' }}>
+          <TableContainer><Table size="small"><TableHead><TableRow>
+            <TableCell sx={thSx}>Phim</TableCell><TableCell sx={thSx}>Phòng</TableCell><TableCell sx={thSx}>Thời gian</TableCell><TableCell sx={thSx}>Lấp đầy</TableCell>
+          </TableRow></TableHead><TableBody>
+            {(topShowtimes?.items || []).map((item) => {
+              const percent = item.capacity ? Math.round(item.sold / item.capacity * 100) : 0;
+              return <TableRow key={item.showtimeId}><TableCell>{item.movieTitle}</TableCell><TableCell>{item.room}</TableCell>
+                <TableCell>{new Date(item.startTime).toLocaleString('vi-VN')}</TableCell>
+                <TableCell><Chip size="small" label={`${item.sold}/${item.capacity} · ${percent}%`} /></TableCell></TableRow>;
+            })}
+          </TableBody></Table></TableContainer>
+        </Box>
+      </ReportState>
+    </>
+  );
+};
 
-export const CustomersReportSection = () => (
-  <>
-    <SectionHeader title="Thống kê khách hàng" subtitle="Khách mới và khách thân thiết" />
-    <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2, mb: 2 }}>
-      <Box className="admin-panel admin-stat-card" sx={{ p: 3, '--accent': '#6366f1' }}>
-        <Typography color="text.secondary">Khách hàng mới (tháng)</Typography>
-        <Typography variant="h3" fontWeight={800} sx={{ mt: 1 }}>
-          186
-        </Typography>
-        <Typography variant="caption" color="text.secondary">
-          +24 so với tháng trước
-        </Typography>
-      </Box>
-      <Box className="admin-panel admin-stat-card" sx={{ p: 3, '--accent': '#e50914' }}>
-        <Typography color="text.secondary">Khách thân thiết</Typography>
-        <Typography variant="h3" fontWeight={800} sx={{ mt: 1 }}>
-          412
-        </Typography>
-        <Typography variant="caption" color="text.secondary">
-          ≥ 5 lượt đặt trong 6 tháng
-        </Typography>
-      </Box>
-    </Box>
-    <Box className="admin-panel" sx={{ overflow: 'hidden' }}>
-      <TableContainer>
-        <Table size="small">
-          <TableHead>
-            <TableRow>
-              <TableCell sx={thSx}>Hạng</TableCell>
-              <TableCell sx={thSx}>Số khách</TableCell>
-              <TableCell sx={thSx}>Chi tiêu TB</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {[
-              { tier: 'Bạc', count: 280, spend: '₫450K' },
-              { tier: 'Vàng', count: 98, spend: '₫1.2M' },
-              { tier: 'Bạch kim', count: 34, spend: '₫2.8M' },
-            ].map((row) => (
-              <TableRow key={row.tier} className="admin-table-row">
-                <TableCell>
-                  <Typography fontWeight={700}>{row.tier}</Typography>
-                </TableCell>
-                <TableCell>{row.count}</TableCell>
-                <TableCell sx={{ color: '#4ade80' }}>{row.spend}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
-    </Box>
-  </>
-);
+const customerLoader = () => staffReportService.customers();
+export const CustomersReportSection = () => {
+  const report = useReport(customerLoader);
+  const data = report.data;
+  const cards = [
+    ['Tổng thành viên', data?.totalMembers || 0, '#6366f1'],
+    ['Khách trung thành (≥5 đơn)', data?.loyalCustomers || 0, '#e50914'],
+    ['Khách đã mua vé', data?.activeCustomers || 0, '#22c55e'],
+    ['Chưa mua vé', data?.customersWithoutPurchase || 0, '#f59e0b'],
+  ];
+  return (
+    <>
+      <SectionHeader title="Thống kê khách hàng" subtitle="Phân nhóm từ lịch sử đơn hàng đã thanh toán" />
+      <ReportState report={report}>
+        <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', lg: 'repeat(4, 1fr)' }, gap: 2 }}>
+          {cards.map(([label, value, color]) => <Box key={label} className="admin-panel admin-stat-card" sx={{ p: 3, '--accent': color }}>
+            <Typography color="text.secondary">{label}</Typography><Typography variant="h3" fontWeight={800}>{value}</Typography>
+          </Box>)}
+        </Box>
+        <Box className="admin-panel" sx={{ p: 3, mt: 2 }}><Typography color="text.secondary">Chi tiêu trung bình mỗi thành viên</Typography><Typography variant="h4" fontWeight={800} color="#4ade80">{money(data?.averageSpend)}</Typography></Box>
+      </ReportState>
+    </>
+  );
+};

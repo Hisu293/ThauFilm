@@ -22,6 +22,18 @@ public class StaffReportController {
 
     private final StaffReportService staffReportService;
 
+    @Operation(summary = "Staff dashboard statistics")
+    @GetMapping("/dashboard")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> dashboard() {
+        return ResponseEntity.ok(ApiResponse.success("Staff dashboard fetched", staffReportService.dashboard()));
+    }
+
+    @Operation(summary = "Customer statistics")
+    @GetMapping("/customers")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> customers() {
+        return ResponseEntity.ok(ApiResponse.success("Customer statistics fetched", staffReportService.customers()));
+    }
+
     @Operation(summary = "Revenue report by date")
     @GetMapping("/revenue")
     public ResponseEntity<ApiResponse<Map<String, Object>>> revenue(
