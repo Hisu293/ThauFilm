@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Avatar, Box, Button, Card, CardContent, Chip, CircularProgress, FormControlLabel, Stack, Switch, Tab, Tabs, TextField, Typography } from '@mui/material';
+import { Alert, Avatar, Box, Button, Card, CardContent, Chip, CircularProgress, Divider, FormControlLabel, Stack, Switch, Tab, Tabs, TextField, Typography } from '@mui/material';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import FavoriteRoundedIcon from '@mui/icons-material/FavoriteRounded';
 import SaveRoundedIcon from '@mui/icons-material/SaveRounded';
+import ChatBubbleRoundedIcon from '@mui/icons-material/ChatBubbleRounded';
 import { memberIntelligenceService } from '../services/intelligenceService';
 import MatchRoomDialog from './MatchRoomDialog';
 import { connectRealtime } from '../services/realtimeService';
@@ -22,6 +23,48 @@ const PersonCard = ({ person, actions }) => <Card sx={{ height: '100%' }}><CardC
   {person.availableTimes && <Typography variant="body2"><b>Thời gian rảnh:</b> {person.availableTimes}</Typography>}
   {actions && <Stack direction="row" spacing={1.5} mt={3}><Button fullWidth variant="outlined" color="inherit" startIcon={<CloseRoundedIcon />} onClick={actions.pass}>Bỏ qua</Button><Button fullWidth variant="contained" startIcon={<FavoriteRoundedIcon />} onClick={actions.like}>Thích</Button></Stack>}
 </CardContent></Card>;
+
+const MatchCard = ({ match, onOpen }) => {
+  const person = match.person || {};
+  const genres = (person.favoriteGenres || []).slice(0, 3);
+  return (
+    <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <CardContent sx={{ p: 2.5, flex: 1 }}>
+        <Stack direction="row" spacing={1.75} alignItems="center">
+          <Avatar src={person.avatarUrl} sx={{ width: 54, height: 54, bgcolor: 'secondary.main' }}>
+            {(person.fullName || 'T')[0]}
+          </Avatar>
+          <Box minWidth={0} flex={1}>
+            <Typography variant="h6" fontWeight={900} noWrap>{person.fullName || 'Thành viên'}</Typography>
+            <Chip color="success" size="small" label={`${person.compatibilityPercent || 0}% hợp gu`} />
+          </Box>
+        </Stack>
+
+        <Typography
+          color="text.secondary"
+          sx={{ mt: 2, minHeight: 44, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}
+        >
+          {person.bio || 'Chưa có lời giới thiệu.'}
+        </Typography>
+
+        {genres.length > 0 && <Stack direction="row" gap={0.75} flexWrap="wrap" mt={1.5}>{genres.map((genre) => <Chip key={genre} label={genre} size="small" variant="outlined" />)}</Stack>}
+
+        <Stack spacing={0.5} mt={2}>
+          {person.preferredTheater && <Typography variant="body2" noWrap><b>Rạp:</b> {person.preferredTheater}</Typography>}
+          {person.availableTimes && <Typography variant="body2" noWrap><b>Thời gian:</b> {person.availableTimes}</Typography>}
+        </Stack>
+      </CardContent>
+
+      <Divider />
+      <Box sx={{ px: 2.5, py: 1.75 }}>
+        <Button fullWidth variant="contained" startIcon={<ChatBubbleRoundedIcon />} onClick={onOpen}>Mở phòng chat</Button>
+        <Typography variant="caption" color="text.secondary" display="block" textAlign="center" mt={1}>
+          Match ngày {new Date(match.matchedAt).toLocaleDateString('vi-VN')}
+        </Typography>
+      </Box>
+    </Card>
+  );
+};
 
 export default function MovieMatchingPanel() {
   const [tab, setTab] = useState(0);
@@ -107,7 +150,7 @@ export default function MovieMatchingPanel() {
     {loading ? <Box textAlign="center" py={6}><CircularProgress /></Box> : <>
       {tab === 0 && <Card><CardContent><Typography variant="h5" fontWeight={900} mb={2}>Hồ sơ tìm bạn xem phim</Typography><Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}><TextField label="Giới thiệu" multiline minRows={3} value={form.bio} onChange={(e) => setForm({ ...form, bio: e.target.value })} inputProps={{ maxLength: 500 }} /><TextField label="Thể loại yêu thích" helperText="Ngăn cách bằng dấu phẩy, ví dụ: Marvel, Anime" value={form.favoriteGenres} onChange={(e) => setForm({ ...form, favoriteGenres: e.target.value })} /><TextField label="Rạp ưu tiên" value={form.preferredTheater} onChange={(e) => setForm({ ...form, preferredTheater: e.target.value })} /><TextField label="Thời gian rảnh" placeholder="Ví dụ: Tối thứ 7, Chủ nhật" value={form.availableTimes} onChange={(e) => setForm({ ...form, availableTimes: e.target.value })} /></Box><Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} mt={3} gap={2}><FormControlLabel control={<Switch checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} />} label="Đang tìm bạn xem phim" /><Button variant="contained" startIcon={<SaveRoundedIcon />} onClick={save}>Lưu hồ sơ</Button></Stack></CardContent></Card>}
       {tab === 1 && (!profile?.active ? <Alert severity="warning" action={<Button onClick={() => setTab(0)}>Mở hồ sơ</Button>}>Bạn cần bật “Đang tìm bạn xem phim” trong hồ sơ.</Alert> : candidates.length === 0 ? <Alert severity="info" action={<Button onClick={loadCandidates}>Tải lại</Button>}>Hiện chưa còn hồ sơ phù hợp để khám phá.</Alert> : <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>{candidates.map((person) => <Box key={person.userId} sx={{ opacity: busyId === person.userId ? 0.55 : 1, pointerEvents: busyId ? 'none' : 'auto' }}><PersonCard person={person} actions={{ pass: () => act(person, 'PASS'), like: () => act(person, 'LIKE') }} /></Box>)}</Box>)}
-      {tab === 2 && (matches.length === 0 ? <Alert severity="info">Bạn chưa có match nào. Khi hai người cùng thích nhau, match sẽ xuất hiện tại đây.</Alert> : <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 2 }}>{matches.map((match) => <Box key={match.matchId}><PersonCard person={match.person} /><Button fullWidth variant="contained" sx={{ mt: 1 }} onClick={() => setSelectedMatch(match)}>Mở phòng chat</Button><Typography variant="caption" color="text.secondary" display="block" mt={0.5}>Match ngày {new Date(match.matchedAt).toLocaleDateString('vi-VN')}</Typography></Box>)}</Box>)}
+      {tab === 2 && (matches.length === 0 ? <Alert severity="info">Bạn chưa có match nào. Khi hai người cùng thích nhau, match sẽ xuất hiện tại đây.</Alert> : <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))', lg: 'repeat(3, minmax(0, 1fr))' }, gap: 2, alignItems: 'stretch' }}>{matches.map((match) => <MatchCard key={match.matchId} match={match} onOpen={() => setSelectedMatch(match)} />)}</Box>)}
     </>}
     <MatchRoomDialog match={selectedMatch} open={Boolean(selectedMatch)} onClose={() => setSelectedMatch(null)} onMatchEnded={handleMatchEnded} />
   </Stack>;
