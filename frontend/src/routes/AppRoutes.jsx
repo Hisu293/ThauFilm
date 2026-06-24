@@ -28,6 +28,7 @@ import PaymentPage from '../pages/PaymentPage';
 import BookingSuccessPage from '../pages/BookingSuccessPage';
 import MyBookingsPage from '../pages/MyBookingsPage';
 import MyBookingDetailPage from '../pages/MyBookingDetailPage';
+import GroupBookingPage from '../pages/GroupBookingPage';
 
 // Staff Pages
 import StaffDashboard from '../pages/staff/StaffDashboard';
@@ -63,6 +64,7 @@ const AppRoutes = () => {
         <Route path="/booking/payment" element={<PaymentPage />} />
         <Route path="/payment" element={<PaymentPage />} />
         <Route path="/booking/success" element={<BookingSuccessPage />} />
+        <Route path="/booking/group/:groupId" element={<GroupBookingPage />} />
         <Route path="/my-bookings" element={<MyBookingsPage />} />
         <Route path="/my-bookings/:bookingId" element={<MyBookingDetailPage />} />
 
