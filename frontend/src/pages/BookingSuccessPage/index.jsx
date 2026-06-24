@@ -10,6 +10,7 @@ import CustomButton from '../../components/common/CustomButton';
 import LoadingOverlay from '../../components/common/LoadingOverlay';
 
 import { useBooking } from '../../hooks/useBooking';
+import { savePaidBookingSummary } from '../../utils/paidBookingStorage';
 
 export const BookingSuccessPage = () => {
   const location = useLocation();
@@ -44,6 +45,18 @@ export const BookingSuccessPage = () => {
         });
     }
   }, [bookingData?.bookingId, getTickets, tickets.length]);
+
+  useEffect(() => {
+    if (!bookingData?.bookingId) return;
+
+    savePaidBookingSummary(bookingData.bookingId, {
+      originalAmount: bookingData.originalAmount ?? bookingData.totalAmount,
+      discountAmount: bookingData.discountAmount,
+      finalAmount: bookingData.totalAmount,
+      discountCode: bookingData.selectedDiscount?.code || '',
+      paymentMethod: bookingData.paymentMethod,
+    });
+  }, [bookingData]);
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('vi-VN', {
@@ -96,6 +109,8 @@ export const BookingSuccessPage = () => {
   }
 
   const { movie, showtime, selectedSeats, bookingCode, totalAmount, paymentMethod } = bookingData;
+  const originalAmount = Number(bookingData.originalAmount ?? totalAmount) || 0;
+  const discountAmount = Number(bookingData.discountAmount) || 0;
   const theaterName = showtime?.theaterName || showtime?.cinemaName || 'ThauFilm Cinema';
 
   const showDate = showtime?.date || (showtime?.startTime ? String(showtime.startTime).slice(0, 10) : '');
@@ -253,7 +268,17 @@ export const BookingSuccessPage = () => {
               <Typography variant="body2" sx={{ fontWeight: 600 }}>{getMethodName(paymentMethod)}</Typography>
             </Box>
             <Box sx={{ textAlign: 'right' }}>
-              <Typography variant="caption" color="text.secondary">Tổng cộng</Typography>
+              {discountAmount > 0 && (
+                <>
+                  <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                    Tổng giá vé: {formatCurrency(originalAmount)}
+                  </Typography>
+                  <Typography variant="caption" color="success.main" sx={{ display: 'block', fontWeight: 700 }}>
+                    Giảm giá: -{formatCurrency(discountAmount)}
+                  </Typography>
+                </>
+              )}
+              <Typography variant="caption" color="text.secondary">Số tiền đã thanh toán</Typography>
               <Typography variant="h6" sx={{ fontWeight: 800, color: 'primary.main' }}>
                 {formatCurrency(totalAmount)}
               </Typography>

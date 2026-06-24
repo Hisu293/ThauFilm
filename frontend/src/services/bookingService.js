@@ -1,4 +1,5 @@
 import { normalizeSeatType } from '../constants/enums';
+import { getPaidBookingSummary } from '../utils/paidBookingStorage';
 
 export const bookingService = {
   /**
@@ -73,6 +74,13 @@ export const bookingService = {
   normalizeBooking: (backendBooking = {}) => {
     if (!backendBooking) return null;
 
+    const savedPayment = getPaidBookingSummary(backendBooking.id);
+    const originalAmount = Number(savedPayment?.originalAmount ?? backendBooking.totalAmount) || 0;
+    const rawPaymentAmount = backendBooking.paymentAmount ?? savedPayment?.finalAmount;
+    const hasPaymentAmount = rawPaymentAmount !== null && rawPaymentAmount !== undefined && rawPaymentAmount !== '';
+    const paymentAmount = hasPaymentAmount ? Number(rawPaymentAmount) : null;
+    const paidAmount = Number.isFinite(paymentAmount) ? paymentAmount : originalAmount;
+
     return {
       id: backendBooking.id,
       userId: backendBooking.userId,
@@ -80,7 +88,12 @@ export const bookingService = {
       movieTitle: backendBooking.movieTitle || 'Vé xem phim',
       roomName: backendBooking.cinemaRoomName || 'Phòng chiếu',
       startTime: backendBooking.startTime,
-      totalAmount: Number(backendBooking.totalAmount) || 0,
+      originalAmount,
+      discountAmount: Number(savedPayment?.discountAmount) || Math.max(originalAmount - paidAmount, 0),
+      paymentAmount: Number.isFinite(paymentAmount) ? paymentAmount : null,
+      totalAmount: paidAmount,
+      paymentMethod: backendBooking.paymentMethod || savedPayment?.paymentMethod || null,
+      paymentStatus: backendBooking.paymentStatus || null,
       status: backendBooking.status,
       confirmationCode: backendBooking.confirmationCode || '—',
       holdExpiresAt: backendBooking.holdExpiresAt || null,
@@ -116,6 +129,8 @@ export const bookingService = {
       value: Number(discount.value) || 0,
       minPurchaseAmount: Number(discount.minPurchaseAmount) || 0,
       maxDiscountAmount: Number(discount.maxDiscountAmount) || 0,
+      usageLimit: Number(discount.usageLimit) || 0,
+      usageCount: Number(discount.usageCount) || 0,
       validFrom: discount.validFrom ?? '',
       validTo: discount.validTo ?? '',
       active: Boolean(discount.active),

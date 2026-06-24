@@ -19,6 +19,7 @@ import ConfirmationDialog from '../components/common/ConfirmationDialog';
 import { getPendingBooking, mergeMovieContext, mergeShowtimeContext } from '../utils/pendingBookingStorage';
 import { bookingApi } from '../api/bookingApi';
 import { bookingService } from '../services/bookingService';
+import { getSupersededBookingIds } from '../utils/paidBookingStorage';
 
 const formatCurrency = (amount) =>
   new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(amount || 0);
@@ -57,6 +58,30 @@ const statusLabel = (status) => {
 };
 
 const isHoldBooking = (booking) => ['HOLD', 'PENDING'].includes(String(booking?.status || '').toUpperCase());
+
+const bookingSeatKey = (booking) => {
+  const seatIds = (booking?.seats || [])
+    .map((seat) => String(seat.id || seat.label || ''))
+    .filter(Boolean)
+    .sort()
+    .join(',');
+  return `${booking?.showtimeId || ''}|${seatIds}`;
+};
+
+const hideReplacementBookings = (bookings) => {
+  const supersededIds = getSupersededBookingIds();
+  const confirmedKeys = new Set(
+    bookings
+      .filter((booking) => String(booking.status || '').toUpperCase() === 'CONFIRMED')
+      .map(bookingSeatKey),
+  );
+
+  return bookings.filter((booking) => {
+    if (supersededIds.has(String(booking.id))) return false;
+    const isCancelled = String(booking.status || '').toUpperCase() === 'CANCELLED';
+    return !(isCancelled && confirmedKeys.has(bookingSeatKey(booking)));
+  });
+};
 
 const getPendingContext = (booking) => getPendingBooking(booking?.id);
 
@@ -152,7 +177,9 @@ const MyBookingsPage = () => {
           bookingService.normalizeShowtimes(Array.isArray(rawShowtimes) ? rawShowtimes : [])
             .map((showtime) => [String(showtime.id), showtime]),
         );
-        const list = (Array.isArray(data) ? data : []).map((booking) => enrichBooking(booking, showtimeMap));
+        const list = hideReplacementBookings(
+          (Array.isArray(data) ? data : []).map((booking) => enrichBooking(booking, showtimeMap)),
+        );
         setBookings(list);
 
         list.filter(isHoldExpired).forEach((booking) => {

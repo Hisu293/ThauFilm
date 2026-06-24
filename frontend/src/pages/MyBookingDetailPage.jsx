@@ -165,8 +165,19 @@ const MyBookingDetailPage = () => {
               <b>Ghế:</b> {seatLabels || 'Đang cập nhật'}
             </Typography>
             <Typography>
-              <b>Tổng tiền:</b> {formatCurrency(booking.totalAmount)}
+              <b>{booking.discountAmount > 0 ? 'Giá gốc:' : 'Tổng tiền:'}</b>{' '}
+              {formatCurrency(booking.originalAmount)}
             </Typography>
+            {booking.discountAmount > 0 && (
+              <>
+                <Typography sx={{ color: 'success.main' }}>
+                  <b>Giảm giá:</b> -{formatCurrency(booking.discountAmount)}
+                </Typography>
+                <Typography>
+                  <b>Số tiền đã thanh toán:</b> {formatCurrency(booking.totalAmount)}
+                </Typography>
+              </>
+            )}
           </Stack>
 
           <Paper
@@ -214,8 +225,10 @@ const MyBookingDetailPage = () => {
                       selectedSeats: booking.seats || [],
                       bookingCode: booking.confirmationCode,
                       tickets,
+                      originalAmount: booking.originalAmount,
+                      discountAmount: booking.discountAmount,
                       totalAmount: booking.totalAmount,
-                      paymentMethod: 'paid',
+                      paymentMethod: booking.paymentMethod || 'paid',
                     },
                   })
                 }
