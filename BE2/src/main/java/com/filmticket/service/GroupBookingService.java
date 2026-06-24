@@ -32,6 +32,7 @@ public class GroupBookingService {
     private final UserRepository userRepository;
     private final RealtimeEventService realtimeEventService;
     private final BookingService bookingService;
+    private final GroupBookingRealtimeService groupBookingRealtimeService;
 
     @Transactional
     public GroupBooking createForAcceptedInvitation(MovieMatchInvitation invitation) {
@@ -115,6 +116,8 @@ public class GroupBookingService {
         group.setExpiresAt(expiresAt);
         group.setStatus(GroupBookingStatus.WAITING_PAYMENTS);
         groupBookingRepository.save(group);
+        groupBookingRealtimeService.clear(groupId);
+        broadcastUpdate(group);
         notifyMembers(groupId, "GROUP_SEATS_SELECTED", "Đã chọn ghế", "Cặp ghế đã được giữ. Hãy thanh toán phần của bạn.");
         return toResponse(group, userId);
     }
@@ -149,6 +152,7 @@ public class GroupBookingService {
         } else {
             group.setStatus(GroupBookingStatus.PARTIALLY_PAID);
             groupBookingRepository.save(group);
+            broadcastUpdate(group);
             notifyMembers(groupId, "GROUP_PARTIALLY_PAID", "Đã nhận một khoản thanh toán", "Đang chờ người còn lại thanh toán.");
         }
         return toResponse(group, userId);
@@ -179,6 +183,7 @@ public class GroupBookingService {
         group.setStatus(GroupBookingStatus.CONFIRMED);
         group.setConfirmedAt(now);
         groupBookingRepository.save(group);
+        broadcastUpdate(group);
         notifyMembers(group.getId(), "GROUP_BOOKING_CONFIRMED", "Đặt vé nhóm thành công", "Cả hai đã thanh toán. Vé đã được phát hành.");
         confirmedBookings.forEach(bookingService::sendConfirmedBookingEmail);
     }
@@ -209,6 +214,8 @@ public class GroupBookingService {
         }
         group.setStatus(GroupBookingStatus.EXPIRED);
         groupBookingRepository.save(group);
+        groupBookingRealtimeService.clear(group.getId());
+        broadcastUpdate(group);
         notifyMembers(group.getId(), "GROUP_BOOKING_EXPIRED", "Đặt vé nhóm đã hết hạn", "Ghế đã được giải phóng; khoản đã trả được hoàn lại.");
     }
 
@@ -254,6 +261,11 @@ public class GroupBookingService {
         for (GroupBookingMember member : memberRepository.findByGroupBookingIdOrderByCreatedAtAsc(groupId)) {
             realtimeEventService.notifyUser(member.getUserId(), type, title, body, "/booking/group/" + groupId);
         }
+    }
+
+    private void broadcastUpdate(GroupBooking group) {
+        realtimeEventService.sendGroupEvent(group.getId(), "GROUP_BOOKING_UPDATED", Map.of(
+                "groupId", group.getId(), "status", group.getStatus().name()));
     }
 
     private String generateCode(String prefix) {

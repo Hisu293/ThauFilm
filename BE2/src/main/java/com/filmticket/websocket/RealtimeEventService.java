@@ -60,6 +60,13 @@ public class RealtimeEventService {
         ));
     }
 
+    public void sendGroupEvent(UUID groupBookingId, String type, Object data) {
+        sendMatching(session -> groupBookingId.equals(session.getAttributes().get("groupBookingId")), Map.of(
+                "type", type,
+                "data", data
+        ));
+    }
+
     private void sendMatching(java.util.function.Predicate<WebSocketSession> predicate, Object event) {
         try {
             String payload = objectMapper.writeValueAsString(event);

@@ -107,6 +107,8 @@ public class MovieMatchingService {
         User actor = requireUser(actorId);
         realtimeEventService.notifyUser(targetId, "MOVIE_MATCH", "Bạn có match mới",
                 displayName(actor) + " cũng muốn xem phim cùng bạn", "/intelligence");
+        realtimeEventService.sendUserEvent(targetId, "MOVIE_MATCH", Map.of("matchId", match.getId()));
+        realtimeEventService.sendUserEvent(actorId, "MOVIE_MATCH", Map.of("matchId", match.getId()));
         return MovieMatchingDto.ActionResponse.builder().matched(true).matchId(match.getId()).build();
     }
 

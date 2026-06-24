@@ -77,6 +77,8 @@ public class MovieMatchInteractionService {
                 .matchId(matchId).senderId(userId).recipientId(recipient).showtimeId(showtimeId).build());
         String movieTitle = movieRepository.findById(showtime.getMovieId()).map(Movie::getTitle).orElse("Phim");
         realtimeEventService.sendUserEvent(recipient, "MATCH_INVITATION", Map.of("matchId", matchId, "invitationId", saved.getId()));
+        realtimeEventService.sendMatchEvent(matchId, "MATCH_INVITATION", Map.of(
+                "matchId", matchId, "invitation", toInvitation(saved)));
         realtimeEventService.notifyUser(recipient, "MATCH_INVITATION", "Lời mời xem phim",
                 displayName(requireUser(userId)) + " mời bạn xem " + movieTitle, "/intelligence");
         return toInvitation(saved);
@@ -104,6 +106,8 @@ public class MovieMatchInteractionService {
         }
         UUID sender = invitation.getSenderId();
         realtimeEventService.sendUserEvent(sender, "MATCH_INVITATION_UPDATED", Map.of("matchId", match.getId(), "invitationId", saved.getId()));
+        realtimeEventService.sendMatchEvent(match.getId(), "MATCH_INVITATION_UPDATED", Map.of(
+                "matchId", match.getId(), "invitation", toInvitation(saved)));
         realtimeEventService.notifyUser(sender, "MATCH_INVITATION_UPDATED", "Phản hồi lời mời",
                 displayName(requireUser(userId)) + (saved.getStatus() == MovieMatchInvitation.Status.ACCEPTED ? " đã chấp nhận lời mời" : " đã từ chối lời mời"), "/intelligence");
         return toInvitation(saved);

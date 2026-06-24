@@ -62,8 +62,12 @@ export default function MatchRoomDialog({ match, open, onClose, onMatchEnded }) 
         } else if (event.type === 'MATCH_MESSAGE' && String(event.data?.matchId) === String(match?.matchId)) {
           loadRoom();
         } else if (['MATCH_INVITATION', 'MATCH_INVITATION_UPDATED'].includes(event.type) && String(event.data?.matchId) === String(match?.matchId)) {
-          loadRoom();
-        } else if (event.type === 'MATCH_MESSAGE_ERROR') {
+          if (event.data?.invitation) {
+            setInvitations((items) => [event.data.invitation, ...items.filter((item) => item.id !== event.data.invitation.id)]);
+          } else {
+            loadRoom();
+          }
+        } else if (event.type === 'REALTIME_ERROR') {
           setError(event.data?.message || 'Không thể gửi tin nhắn');
         }
       },
@@ -83,7 +87,7 @@ export default function MatchRoomDialog({ match, open, onClose, onMatchEnded }) 
   };
   const invite = async () => {
     if (!showtimeId) return;
-    try { const invitation = await memberIntelligenceService.sendMatchInvitation(match.matchId, showtimeId); setInvitations((items) => [invitation, ...items]); setShowtimeId(''); }
+    try { const invitation = await memberIntelligenceService.sendMatchInvitation(match.matchId, showtimeId); setInvitations((items) => [invitation, ...items.filter((item) => item.id !== invitation.id)]); setShowtimeId(''); }
     catch (err) { setError(err.message); }
   };
   const respond = async (invitation, decision) => {

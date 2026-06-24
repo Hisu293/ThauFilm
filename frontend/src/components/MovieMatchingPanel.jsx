@@ -5,6 +5,7 @@ import FavoriteRoundedIcon from '@mui/icons-material/FavoriteRounded';
 import SaveRoundedIcon from '@mui/icons-material/SaveRounded';
 import { memberIntelligenceService } from '../services/intelligenceService';
 import MatchRoomDialog from './MatchRoomDialog';
+import { connectRealtime } from '../services/realtimeService';
 
 const emptyForm = { bio: '', favoriteGenres: '', preferredTheater: '', availableTimes: '', active: false };
 const toForm = (profile) => ({
@@ -58,8 +59,24 @@ export default function MovieMatchingPanel() {
   }, []);
   const loadMatches = useCallback(async () => {
     setLoading(true); setError(''); setNotice('');
-    try { setMatches(await memberIntelligenceService.matches() || []); }
+    try { const items = await memberIntelligenceService.matches() || []; setMatches(items); return items; }
     catch (err) { setError(err.message); } finally { setLoading(false); }
+  }, []);
+  useEffect(() => {
+    const disconnect = connectRealtime({
+      onEvent: async (event) => {
+        const isMatchEvent = event.type === 'MOVIE_MATCH'
+          || (event.type === 'NOTIFICATION' && event.data?.notificationType === 'MOVIE_MATCH');
+        if (!isMatchEvent) return;
+        const items = await memberIntelligenceService.matches().catch(() => []);
+        setMatches(items);
+        setTab(2);
+        const matched = items.find((item) => String(item.matchId) === String(event.data?.matchId));
+        if (matched) setSelectedMatch(matched);
+        setNotice('Bạn có match mới. Phòng chat đã sẵn sàng.');
+      },
+    });
+    return disconnect;
   }, []);
   const changeTab = (_, value) => { setTab(value); if (value === 1 && profile?.active) loadCandidates(); if (value === 2) loadMatches(); };
   const act = async (person, decision) => {
@@ -68,6 +85,12 @@ export default function MovieMatchingPanel() {
       const result = await memberIntelligenceService.matchingAction(person.userId, decision);
       setCandidates((items) => items.filter((item) => item.userId !== person.userId));
       setNotice(result?.matched ? `Bạn và ${person.fullName} đã match!` : decision === 'LIKE' ? 'Đã gửi lượt thích.' : 'Đã bỏ qua.');
+      if (result?.matched) {
+        const items = await loadMatches();
+        setTab(2);
+        const matched = (items || []).find((item) => String(item.matchId) === String(result.matchId));
+        if (matched) setSelectedMatch(matched);
+      }
     } catch (err) { setError(err.message); } finally { setBusyId(null); }
   };
   const handleMatchEnded = useCallback(async () => {
