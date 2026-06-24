@@ -1,5 +1,5 @@
 CREATE TABLE movie_matching_profiles (
-    user_id UUID PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    user_id UUID PRIMARY KEY,
     bio VARCHAR(500),
     favorite_genres VARCHAR(500) NOT NULL DEFAULT '',
     preferred_theater VARCHAR(255),
@@ -11,8 +11,8 @@ CREATE TABLE movie_matching_profiles (
 
 CREATE TABLE movie_matching_actions (
     id UUID PRIMARY KEY,
-    actor_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    target_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    actor_id UUID NOT NULL,
+    target_id UUID NOT NULL,
     decision VARCHAR(10) NOT NULL CHECK (decision IN ('LIKE', 'PASS')),
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -25,8 +25,8 @@ CREATE INDEX idx_movie_matching_action_target ON movie_matching_actions(target_i
 
 CREATE TABLE movie_matches (
     id UUID PRIMARY KEY,
-    user_one_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    user_two_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    user_one_id UUID NOT NULL,
+    user_two_id UUID NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT uk_movie_match_pair UNIQUE (user_one_id, user_two_id),
     CONSTRAINT chk_movie_match_order CHECK (user_one_id < user_two_id)
