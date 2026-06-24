@@ -21,6 +21,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.NumberFormat;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.*;
 
 @Service
@@ -44,7 +45,12 @@ public class BookingService {
     private final TicketPdfGenerator ticketPdfGenerator;
     private final RealtimeEventService realtimeEventService;
 
-    private static final int HOLD_MINUTES = 5;
+    private static final int HOLD_MINUTES = 10;
+    private static final ZoneId VIETNAM_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
+
+    private LocalDateTime now() {
+        return LocalDateTime.now(VIETNAM_ZONE);
+    }
 
     @Transactional(readOnly = true)
     public List<ShowtimeSeatResponse> getAvailableSeats(UUID showtimeId) {
@@ -92,7 +98,7 @@ public class BookingService {
         Showtime showtime = showtimeRepository.findById(request.getShowtimeId())
                 .orElseThrow(() -> new BadRequestException("Showtime not found"));
 
-        if (showtime.getStartTime().isBefore(LocalDateTime.now())) {
+        if (showtime.getStartTime().isBefore(now())) {
             throw new BadRequestException("Cannot book a past showtime");
         }
 
@@ -143,7 +149,7 @@ public class BookingService {
                 .totalAmount(total)
                 .status(BookingStatus.HOLD)
                 .confirmationCode(generateConfirmationCode())
-                .holdExpiresAt(LocalDateTime.now().plusMinutes(HOLD_MINUTES))
+                .holdExpiresAt(now().plusMinutes(HOLD_MINUTES))
                 .build();
 
         booking = bookingRepository.save(booking);
@@ -168,7 +174,7 @@ public class BookingService {
         if (booking.getStatus() != BookingStatus.HOLD) {
             throw new BadRequestException("Booking is not in HOLD status");
         }
-        if (booking.getHoldExpiresAt().isBefore(LocalDateTime.now())) {
+        if (booking.getHoldExpiresAt().isBefore(now())) {
             releaseSeats(booking);
             booking.setStatus(BookingStatus.EXPIRED);
             bookingRepository.save(booking);
@@ -199,12 +205,12 @@ public class BookingService {
                 .paymentMethod(request.getPaymentMethod())
                 .status(PaymentStatus.PAID)
                 .transactionId(UUID.randomUUID().toString())
-                .paidAt(LocalDateTime.now())
+                .paidAt(now())
                 .build();
         paymentRepository.save(payment);
 
         booking.setStatus(BookingStatus.CONFIRMED);
-        booking.setConfirmedAt(LocalDateTime.now());
+        booking.setConfirmedAt(now());
         booking = bookingRepository.save(booking);
 
         List<BookingSeat> bookingSeats = bookingSeatRepository.findByBookingId(bookingId);
@@ -272,7 +278,7 @@ public class BookingService {
         }
 
         ticket.setCheckedIn(true);
-        ticket.setCheckedInAt(java.time.LocalDateTime.now());
+        ticket.setCheckedInAt(now());
         ticket = ticketRepository.save(ticket);
         return TicketResponse.fromTicket(ticket);
     }
