@@ -18,6 +18,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 
 @Component
@@ -26,6 +27,7 @@ import java.util.List;
 public class BookingExpiredScheduler {
 
     private static final Logger log = LoggerFactory.getLogger(BookingExpiredScheduler.class);
+    private static final ZoneId VIETNAM_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
 
     private final BookingRepository bookingRepository;
     private final BookingSeatRepository bookingSeatRepository;
@@ -37,7 +39,7 @@ public class BookingExpiredScheduler {
     @Transactional
     public void releaseExpiredBookings() {
         groupBookingService.expireDue();
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now(VIETNAM_ZONE);
         List<Booking> expiredBookings = bookingRepository.findExpiredHolds(BookingStatus.HOLD, now);
 
         if (expiredBookings.isEmpty()) {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Alert,
@@ -125,6 +125,7 @@ export const PaymentPage = () => {
   const [bookingStatus, setBookingStatus] = useState('');
   const [bookingOriginalAmount, setBookingOriginalAmount] = useState(null);
   const [invalidBookingMessage, setInvalidBookingMessage] = useState('');
+  const paymentInFlight = useRef(false);
   const { isExpired } = useHoldCountdown(holdExpiresAt);
   const isHoldExpired = Boolean(holdExpiresAt) && isExpired;
 
@@ -314,7 +315,7 @@ export const PaymentPage = () => {
   };
 
   const handlePay = async () => {
-    if (!bookingId || apiLoading) return;
+    if (!bookingId || apiLoading || paymentInFlight.current) return;
     if (bookingStatus && !['HOLD', 'PENDING'].includes(bookingStatus)) {
       setInvalidBookingMessage('Booking này không còn ở trạng thái chờ thanh toán. Vui lòng kiểm tra lại trong Vé của tôi.');
       return;
@@ -325,6 +326,7 @@ export const PaymentPage = () => {
     }
 
     let payableBookingId = bookingId;
+    paymentInFlight.current = true;
 
     try {
       const paymentMethodMap = {
@@ -387,6 +389,8 @@ export const PaymentPage = () => {
       }
 
       setSnackbarOpen(true);
+    } finally {
+      paymentInFlight.current = false;
     }
   };
 

@@ -116,7 +116,9 @@ public class AdminIntelligenceService {
 
     @Transactional(readOnly = true)
     public List<Map<String, Object>> weeklyPlan(LocalDate startDate) {
-        LocalDate start = startDate == null ? LocalDate.now().plusWeeks(1).with(java.time.DayOfWeek.MONDAY) : startDate;
+        LocalDate requestedStart = startDate == null ? LocalDate.now().plusWeeks(1) : startDate;
+        LocalDate start = requestedStart.with(
+                java.time.temporal.TemporalAdjusters.nextOrSame(java.time.DayOfWeek.MONDAY));
         List<Movie> movies = movieRepository.findAll().stream().filter(Movie::isActive)
                 .filter(movie -> movie.getStatus() == Movie.Status.NOW_SHOWING).toList();
         Map<UUID, List<ShowtimeSuggestion>> byMovie = new LinkedHashMap<>();

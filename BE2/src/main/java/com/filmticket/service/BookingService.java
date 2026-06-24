@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
@@ -44,6 +45,7 @@ public class BookingService {
     private final JavaMailSender mailSender;
     private final TicketPdfGenerator ticketPdfGenerator;
     private final RealtimeEventService realtimeEventService;
+    private final ApplicationEventPublisher eventPublisher;
 
     private static final int HOLD_MINUTES = 10;
     private static final ZoneId VIETNAM_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
@@ -171,6 +173,23 @@ public class BookingService {
         Booking booking = bookingRepository.findByIdAndUserId(bookingId, userId)
                 .orElseThrow(() -> new BadRequestException("Booking not found"));
 
+        // A client can legitimately retry when the first response is lost or times out.
+        // Return the completed payment instead of turning that retry into a false failure.
+        if (booking.getStatus() == BookingStatus.CONFIRMED) {
+            Payment existingPayment = paymentRepository.findByBookingId(bookingId)
+                    .filter(payment -> payment.getStatus() == PaymentStatus.PAID)
+                    .orElse(null);
+            if (existingPayment != null) {
+                List<TicketResponse> existingTickets = ticketRepository.findByBookingId(bookingId).stream()
+                        .map(TicketResponse::fromTicket)
+                        .toList();
+                BigDecimal originalAmount = booking.getTotalAmount();
+                BigDecimal discountAmount = originalAmount.subtract(existingPayment.getAmount()).max(BigDecimal.ZERO);
+                return BookingPaymentResponse.fromPaymentResult(
+                        booking, existingPayment, existingTickets, originalAmount, discountAmount, null);
+            }
+        }
+
         if (booking.getStatus() != BookingStatus.HOLD) {
             throw new BadRequestException("Booking is not in HOLD status");
         }
@@ -237,12 +256,8 @@ public class BookingService {
         realtimeEventService.notifyUser(userId, "BOOKING_CONFIRMED", "Đặt vé thành công",
                 "Vé " + booking.getConfirmationCode() + " đã được xác nhận", "/my-bookings/" + booking.getId());
 
-        try {
-            if (user != null) {
-                sendTicketEmail(user.getEmail(), booking, tickets, payment, discountAmount, finalAmount);
-            }
-        } catch (Exception ex) {
-            log.error("Failed to send ticket email for booking {}", booking.getId(), ex);
+        if (user != null && user.getEmail() != null && !user.getEmail().isBlank()) {
+            eventPublisher.publishEvent(new BookingConfirmedEvent(booking.getId(), discountAmount, finalAmount));
         }
 
         return response;
@@ -384,6 +399,27 @@ public class BookingService {
         } catch (Exception ex) {
             // Payment and ticket issuance must remain successful if SMTP is temporarily unavailable.
             log.error("Failed to send group ticket email for booking {}", booking.getId(), ex);
+        }
+    }
+
+    @Transactional(readOnly = true)
+    public void sendConfirmedBookingEmail(UUID bookingId, BigDecimal discountAmount, BigDecimal finalAmount) {
+        Booking booking = bookingRepository.findById(bookingId).orElse(null);
+        if (booking == null || booking.getStatus() != BookingStatus.CONFIRMED) return;
+
+        User user = userRepository.findById(booking.getUserId()).orElse(null);
+        Payment payment = paymentRepository.findByBookingId(bookingId).orElse(null);
+        List<Ticket> tickets = ticketRepository.findByBookingId(bookingId);
+        if (user == null || user.getEmail() == null || user.getEmail().isBlank()
+                || payment == null || tickets.isEmpty()) {
+            log.warn("Skip ticket email for booking {} because user, payment, email or ticket is missing", bookingId);
+            return;
+        }
+
+        try {
+            sendTicketEmail(user.getEmail(), booking, tickets, payment, discountAmount, finalAmount);
+        } catch (Exception ex) {
+            log.error("Failed to send ticket email for booking {}", bookingId, ex);
         }
     }
 
