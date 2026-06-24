@@ -5,7 +5,6 @@ import com.filmticket.dto.ShowtimeResponse;
 import com.filmticket.dto.UpsertShowtimeRequest;
 import com.filmticket.entity.*;
 import com.filmticket.exception.BadRequestException;
-import com.filmticket.model.RoomStatus;
 import com.filmticket.model.ShowtimeStatus;
 import com.filmticket.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -151,7 +150,7 @@ public class AdminIntelligenceService {
         Map<UUID, UUID> bookingShowtime = bookingRepository.findAll().stream().filter(b -> b.getStatus() == BookingStatus.CONFIRMED)
                 .collect(Collectors.toMap(Booking::getId, Booking::getShowtimeId));
         Map<UUID, Long> result = new HashMap<>();
-        bookingSeatRepository.findAll().forEach(item -> { UUID showtime = bookingShowtime.get(item.getBookingId()); if (showtime != null) result.merge(showtime, 1L, Long::sum); });
+        bookingSeatRepository.findAll().forEach(item -> { UUID showtime = bookingShowtime.get(item.getBookingId()); if (showtime != null) result.put(showtime, result.getOrDefault(showtime, 0L) + 1); });
         return result;
     }
     private boolean isCentral(Seat seat, int max) { double center = (max + 1) / 2.0; return Math.abs(seat.getSeatNumber() - center) <= Math.max(1, max * .25); }
