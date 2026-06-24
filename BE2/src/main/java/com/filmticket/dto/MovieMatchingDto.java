@@ -73,6 +73,7 @@ public final class MovieMatchingDto {
     @Data @Builder
     public static class InvitationResponse {
         private UUID id; private UUID matchId; private UUID senderId; private UUID recipientId;
+        private UUID groupBookingId;
         private UUID showtimeId; private String movieTitle; private String theaterName; private String roomName;
         private LocalDateTime startTime; private String status; private LocalDateTime createdAt;
         private LocalDateTime respondedAt; private String bookingPath;

@@ -78,6 +78,18 @@ export const bookingApi = {
   cancelBooking: (bookingId) => {
     return axiosClient.post(`/api/member/booking/${bookingId}/cancel`);
   },
+
+  fetchGroupBooking: (groupId) => {
+    return axiosClient.get(`/api/member/group-bookings/${groupId}`);
+  },
+
+  selectGroupSeats: (groupId, seatIds) => {
+    return axiosClient.post(`/api/member/group-bookings/${groupId}/seats`, { seatIds });
+  },
+
+  payGroupBooking: (groupId, paymentMethod = 'VNPAY') => {
+    return axiosClient.post(`/api/member/group-bookings/${groupId}/pay`, { paymentMethod });
+  },
 };
 
 export default bookingApi;

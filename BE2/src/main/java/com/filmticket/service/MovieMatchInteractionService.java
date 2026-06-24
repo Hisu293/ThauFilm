@@ -29,6 +29,7 @@ public class MovieMatchInteractionService {
     private final CinemaRoomRepository roomRepository;
     private final TheaterRepository theaterRepository;
     private final RealtimeEventService realtimeEventService;
+    private final GroupBookingService groupBookingService;
 
     @Transactional(readOnly = true)
     public List<MovieMatchingDto.MessageResponse> messages(UUID userId, UUID matchId) {
@@ -98,6 +99,9 @@ public class MovieMatchInteractionService {
         }
         invitation.setRespondedAt(LocalDateTime.now());
         MovieMatchInvitation saved = invitationRepository.save(invitation);
+        if (saved.getStatus() == MovieMatchInvitation.Status.ACCEPTED) {
+            groupBookingService.createForAcceptedInvitation(saved);
+        }
         UUID sender = invitation.getSenderId();
         realtimeEventService.sendUserEvent(sender, "MATCH_INVITATION_UPDATED", Map.of("matchId", match.getId(), "invitationId", saved.getId()));
         realtimeEventService.notifyUser(sender, "MATCH_INVITATION_UPDATED", "Phản hồi lời mời",
@@ -164,11 +168,15 @@ public class MovieMatchInteractionService {
         Movie movie = showtime == null ? null : movieRepository.findById(showtime.getMovieId()).orElse(null);
         CinemaRoom room = showtime == null ? null : roomRepository.findById(showtime.getCinemaRoomId()).orElse(null);
         Theater theater = room == null || room.getTheaterId() == null ? null : theaterRepository.findById(room.getTheaterId()).orElse(null);
+        UUID groupBookingId = invitation.getStatus() == MovieMatchInvitation.Status.ACCEPTED
+                ? groupBookingService.findByInvitationId(invitation.getId()).map(GroupBooking::getId).orElse(null)
+                : null;
         return MovieMatchingDto.InvitationResponse.builder().id(invitation.getId()).matchId(invitation.getMatchId())
                 .senderId(invitation.getSenderId()).recipientId(invitation.getRecipientId()).showtimeId(invitation.getShowtimeId())
                 .movieTitle(movie == null ? "Phim" : movie.getTitle()).theaterName(theater == null ? null : theater.getName())
                 .roomName(room == null ? null : room.getName()).startTime(showtime == null ? null : showtime.getStartTime())
                 .status(invitation.getStatus().name()).createdAt(invitation.getCreatedAt()).respondedAt(invitation.getRespondedAt())
-                .bookingPath(invitation.getStatus() == MovieMatchInvitation.Status.ACCEPTED ? "/booking/seats/" + invitation.getShowtimeId() : null).build();
+                .groupBookingId(groupBookingId)
+                .bookingPath(groupBookingId == null ? null : "/booking/group/" + groupBookingId).build();
     }
 }

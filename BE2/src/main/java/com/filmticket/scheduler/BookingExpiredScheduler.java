@@ -7,6 +7,8 @@ import com.filmticket.model.SeatBookingStatus;
 import com.filmticket.repository.BookingRepository;
 import com.filmticket.repository.BookingSeatRepository;
 import com.filmticket.repository.SeatAvailabilityRepository;
+import com.filmticket.repository.GroupBookingMemberRepository;
+import com.filmticket.service.GroupBookingService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,10 +30,13 @@ public class BookingExpiredScheduler {
     private final BookingRepository bookingRepository;
     private final BookingSeatRepository bookingSeatRepository;
     private final SeatAvailabilityRepository seatAvailabilityRepository;
+    private final GroupBookingMemberRepository groupBookingMemberRepository;
+    private final GroupBookingService groupBookingService;
 
     @Scheduled(fixedRate = 60000, initialDelay = 30000)
     @Transactional
     public void releaseExpiredBookings() {
+        groupBookingService.expireDue();
         LocalDateTime now = LocalDateTime.now();
         List<Booking> expiredBookings = bookingRepository.findExpiredHolds(BookingStatus.HOLD, now);
 
@@ -43,6 +48,9 @@ public class BookingExpiredScheduler {
 
         for (Booking booking : expiredBookings) {
             try {
+                if (groupBookingMemberRepository.existsByBookingId(booking.getId())) {
+                    continue;
+                }
                 releaseSeats(booking);
                 booking.setStatus(BookingStatus.EXPIRED);
                 bookingRepository.save(booking);

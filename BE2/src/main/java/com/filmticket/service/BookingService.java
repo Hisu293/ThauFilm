@@ -357,6 +357,30 @@ public class BookingService {
         mailSender.send(message);
     }
 
+    /**
+     * Sends the same ticket email used by the individual booking flow for a
+     * booking that was confirmed by another flow (for example group booking).
+     */
+    public void sendConfirmedBookingEmail(Booking booking) {
+        if (booking == null || booking.getStatus() != BookingStatus.CONFIRMED) return;
+
+        User user = userRepository.findById(booking.getUserId()).orElse(null);
+        Payment payment = paymentRepository.findByBookingId(booking.getId()).orElse(null);
+        List<Ticket> tickets = ticketRepository.findByBookingId(booking.getId());
+        if (user == null || user.getEmail() == null || user.getEmail().isBlank()
+                || payment == null || tickets.isEmpty()) {
+            log.warn("Skip ticket email for booking {} because user, payment, email or ticket is missing", booking.getId());
+            return;
+        }
+
+        try {
+            sendTicketEmail(user.getEmail(), booking, tickets, payment, BigDecimal.ZERO, payment.getAmount());
+        } catch (Exception ex) {
+            // Payment and ticket issuance must remain successful if SMTP is temporarily unavailable.
+            log.error("Failed to send group ticket email for booking {}", booking.getId(), ex);
+        }
+    }
+
     private String buildHtmlBody(Booking booking, List<Ticket> tickets, Payment payment,
                                  BigDecimal discountAmount, BigDecimal finalAmount, String movieTitle) {
         String cinema = "Rap";
