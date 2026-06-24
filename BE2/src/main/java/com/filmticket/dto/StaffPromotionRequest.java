@@ -54,4 +54,7 @@ public class StaffPromotionRequest {
 
     @Builder.Default
     private Boolean active = true;
+
+    // Comma-separated seat types e.g. "STANDARD,VIP,COUPLE". Leave null to apply to all seat types.
+    private String applicableSeatTypes;
 }

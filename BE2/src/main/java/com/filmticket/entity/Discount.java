@@ -55,6 +55,10 @@ public class Discount {
     @Builder.Default
     private boolean active = true;
 
+    // Comma-separated seat types e.g. "STANDARD,VIP,COUPLE". NULL = applies to all seat types.
+    @Column(length = 100)
+    private String applicableSeatTypes;
+
     @PrePersist
     public void prePersist() {
         if (id == null) {

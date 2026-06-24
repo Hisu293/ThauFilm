@@ -180,7 +180,14 @@ public class BookingService {
         String discountCode = null;
 
         if (request.getDiscountCode() != null && !request.getDiscountCode().isBlank()) {
-            discountAmount = discountService.calculateDiscount(request.getDiscountCode(), originalAmount, userId);
+            List<BookingSeat> bsForDiscount = bookingSeatRepository.findByBookingId(bookingId);
+            List<String> seatTypes = bsForDiscount.stream()
+                    .map(bs -> seatRepository.findById(bs.getSeatId()).orElse(null))
+                    .filter(s -> s != null)
+                    .map(s -> s.getType().toStorageValue())
+                    .distinct()
+                    .toList();
+            discountAmount = discountService.calculateDiscount(request.getDiscountCode(), originalAmount, userId, seatTypes);
             discountCode = request.getDiscountCode();
         }
 

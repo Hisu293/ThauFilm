@@ -25,6 +25,7 @@ public class DiscountResponse {
     private LocalDateTime validFrom;
     private LocalDateTime validTo;
     private boolean active;
+    private String applicableSeatTypes;
 
     public static DiscountResponse fromDiscount(Discount discount) {
         return DiscountResponse.builder()
@@ -38,6 +39,7 @@ public class DiscountResponse {
                 .validFrom(discount.getValidFrom())
                 .validTo(discount.getValidTo())
                 .active(discount.isActive())
+                .applicableSeatTypes(discount.getApplicableSeatTypes())
                 .build();
     }
 }
