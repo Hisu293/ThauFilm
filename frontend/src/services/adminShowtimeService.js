@@ -68,6 +68,12 @@ export const toShowtimeUpdatePayload = (form) => {
 };
 
 export const adminShowtimeService = {
+  /** Gợi ý 3 suất chiếu có nhu cầu dự kiến cao nhất trong 7 ngày tới. */
+  suggestions: (movieId, fromDate) =>
+    api.get('/api/admin/showtimes/suggestions', {
+      params: { movieId, ...(fromDate ? { fromDate } : {}) },
+    }).then(unwrap),
+
   /** GET /api/admin/showtimes — danh sách tất cả suất chiếu */
   list: () => api.get('/api/admin/showtimes').then(unwrap),
 

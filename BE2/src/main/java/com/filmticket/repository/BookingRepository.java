@@ -29,6 +29,10 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
     @Query("SELECT b FROM Booking b WHERE b.status = 'HOLD'")
     List<Booking> findAllActiveHolds();
 
+    @Query("SELECT b.showtimeId, COUNT(bs.id) FROM Booking b, BookingSeat bs " +
+            "WHERE bs.bookingId = b.id AND b.status = :status GROUP BY b.showtimeId")
+    List<Object[]> countSeatsByShowtimeAndStatus(@Param("status") BookingStatus status);
+
     @Query("SELECT CASE WHEN COUNT(b) > 0 THEN true ELSE false END " +
             "FROM Booking b, Showtime s WHERE b.showtimeId = s.id " +
             "AND b.userId = :userId AND b.status = :status " +

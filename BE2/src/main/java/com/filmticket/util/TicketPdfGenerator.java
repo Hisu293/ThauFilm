@@ -39,6 +39,8 @@ public class TicketPdfGenerator {
     private final ShowtimeRepository showtimeRepository;
     private final MovieRepository movieRepository;
     private final CinemaRoomRepository cinemaRoomRepository;
+    private final SeatRepository seatRepository;
+    private final PaymentRepository paymentRepository;
 
     public byte[] generateTicketPdf(Booking booking, List<Ticket> tickets) throws Exception {
         Document document = new Document(PageSize.A4, 40, 40, 40, 40);
@@ -173,12 +175,16 @@ public class TicketPdfGenerator {
 
         for (int i = 0; i < tickets.size(); i++) {
             Ticket ticket = tickets.get(i);
-            String seatInfo = ticket.getSeatId().toString();
+            Seat seat = seatRepository.findById(ticket.getSeatId()).orElse(null);
+            String seatInfo = seat != null
+                    ? seat.getRowName() + seat.getSeatNumber()
+                    : ticket.getSeatId().toString();
+            String seatType = seat != null ? getSeatTypeLabel(seat.getType()) : "Khong ro";
 
             table.addCell(createDataCell(String.valueOf(i + 1)));
             table.addCell(createDataCell(seatInfo));
             table.addCell(createDataCell(ticket.getTicketCode()));
-            table.addCell(createDataCell("Thuong"));
+            table.addCell(createDataCell(seatType));
 
             if (i == 0) {
                 table.setHeaderRows(1);
@@ -189,8 +195,10 @@ public class TicketPdfGenerator {
     }
 
     private void addAmountTable(Document document, Booking booking) throws Exception {
-        BigDecimal discountAmount = BigDecimal.ZERO;
-        BigDecimal finalAmount = booking.getTotalAmount();
+        BigDecimal finalAmount = paymentRepository.findByBookingId(booking.getId())
+                .map(Payment::getAmount)
+                .orElse(booking.getTotalAmount());
+        BigDecimal discountAmount = booking.getTotalAmount().subtract(finalAmount).max(BigDecimal.ZERO);
 
         PdfPTable table = new PdfPTable(2);
         table.setWidthPercentage(100);
@@ -251,12 +259,23 @@ public class TicketPdfGenerator {
         for (int i = 0; i < tickets.size(); i++) {
             Ticket ticket = tickets.get(i);
             builder.append(ticket.getTicketCode()).append("=");
-            builder.append(ticket.getSeatId().toString());
+            builder.append(seatRepository.findById(ticket.getSeatId())
+                    .map(seat -> seat.getRowName() + seat.getSeatNumber())
+                    .orElse(ticket.getSeatId().toString()));
             if (i < tickets.size() - 1) {
                 builder.append(";");
             }
         }
         return builder.toString();
+    }
+
+    private String getSeatTypeLabel(Seat.Type type) {
+        if (type == null) return "Thuong";
+        return switch (type) {
+            case VIP -> "VIP";
+            case COUPLE -> "Doi";
+            case STANDARD -> "Thuong";
+        };
     }
 
     private String formatMoney(BigDecimal value) {

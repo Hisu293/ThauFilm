@@ -5,6 +5,7 @@ import com.filmticket.entity.Follow;
 import com.filmticket.exception.BadRequestException;
 import com.filmticket.repository.FollowRepository;
 import com.filmticket.repository.UserRepository;
+import com.filmticket.websocket.RealtimeEventService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,6 +20,7 @@ public class FollowService {
 
     private final FollowRepository followRepository;
     private final UserRepository userRepository;
+    private final RealtimeEventService realtimeEventService;
 
     @Transactional
     public void follow(UUID followerId, UUID followingId) {
@@ -40,6 +42,10 @@ public class FollowService {
                 .build();
 
         followRepository.save(follow);
+        String followerName = userRepository.findById(followerId)
+                .map(user -> user.getFullName()).orElse("Một thành viên");
+        realtimeEventService.notifyUser(followingId, "NEW_FOLLOWER", "Người theo dõi mới",
+                followerName + " đã theo dõi bạn", "/community/connections");
     }
 
     @Transactional

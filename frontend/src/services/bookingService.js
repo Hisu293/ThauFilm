@@ -106,18 +106,21 @@ export const bookingService = {
   normalizeDiscounts: (backendDiscounts = []) => {
     if (!Array.isArray(backendDiscounts)) return [];
 
-    return backendDiscounts.map((discount) => ({
+    return backendDiscounts.map((discount) => {
+      const rawType = String(discount.type ?? 'FIXED').toUpperCase();
+      return ({
       id: String(discount.id ?? ''),
       code: discount.code ?? '',
       name: discount.name ?? 'Ưu đãi thành viên',
-      type: String(discount.type ?? 'FIXED').toUpperCase(),
+      type: rawType === 'PERCENT' ? 'PERCENTAGE' : rawType,
       value: Number(discount.value) || 0,
       minPurchaseAmount: Number(discount.minPurchaseAmount) || 0,
       maxDiscountAmount: Number(discount.maxDiscountAmount) || 0,
       validFrom: discount.validFrom ?? '',
       validTo: discount.validTo ?? '',
       active: Boolean(discount.active),
-    }));
+      });
+    });
   },
 
   normalizeCombos: (backendCombos = []) => {

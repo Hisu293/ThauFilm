@@ -103,6 +103,7 @@ export const PaymentPage = () => {
   const [loadingPromotions, setLoadingPromotions] = useState(true);
   const [promotionNotice, setPromotionNotice] = useState('');
   const [bookingStatus, setBookingStatus] = useState('');
+  const [bookingOriginalAmount, setBookingOriginalAmount] = useState(null);
   const [invalidBookingMessage, setInvalidBookingMessage] = useState('');
   const { isExpired } = useHoldCountdown(holdExpiresAt);
   const isHoldExpired = Boolean(holdExpiresAt) && isExpired;
@@ -133,6 +134,7 @@ export const PaymentPage = () => {
         if (!booking) return;
         const normalizedStatus = String(booking.status || '').toUpperCase();
         setBookingStatus(normalizedStatus);
+        setBookingOriginalAmount(Number(booking.totalAmount) || 0);
 
         if (normalizedStatus === 'CANCELLED' || normalizedStatus === 'EXPIRED') {
           removePendingBooking(booking.id);
@@ -231,7 +233,8 @@ export const PaymentPage = () => {
     [discounts, selectedDiscountId],
   );
 
-  const seatsTotal = selectedSeats.reduce((sum, seat) => sum + (seat.price || 0), 0);
+  const selectedSeatsTotal = selectedSeats.reduce((sum, seat) => sum + (Number(seat.price) || 0), 0);
+  const seatsTotal = bookingOriginalAmount !== null ? bookingOriginalAmount : selectedSeatsTotal;
   const discountAmount = getDiscountAmount(selectedDiscount, seatsTotal);
   const totalAmount = Math.max(seatsTotal - discountAmount, 0);
 

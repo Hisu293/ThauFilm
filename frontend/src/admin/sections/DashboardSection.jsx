@@ -15,6 +15,7 @@ import GroupRoundedIcon from '@mui/icons-material/GroupRounded';
 import VerifiedUserRoundedIcon from '@mui/icons-material/VerifiedUserRounded';
 import LockRoundedIcon from '@mui/icons-material/LockRounded';
 import AdminPanelSettingsRoundedIcon from '@mui/icons-material/AdminPanelSettingsRounded';
+import InsightsRoundedIcon from '@mui/icons-material/InsightsRounded';
 import SectionState from '../components/SectionState';
 import StatusChip from '../components/StatusChip';
 
@@ -66,6 +67,30 @@ const DashboardSection = ({ dashboard, users }) => {
           {cards.map((c) => (
             <StatCard key={c.label} {...c} value={c.value ?? 0} />
           ))}
+        </Box>
+
+        <Box className="admin-panel" sx={{ p: 3, mb: 3, border: '1px solid rgba(99,102,241,0.35)', background: 'linear-gradient(135deg, rgba(99,102,241,0.16), rgba(229,9,20,0.08))' }}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ sm: 'center' }} justifyContent="space-between" spacing={2}>
+            <Stack direction="row" spacing={2} alignItems="center">
+              <Box sx={{ width: 48, height: 48, borderRadius: 2.5, display: 'grid', placeItems: 'center', bgcolor: 'rgba(99,102,241,0.22)', color: '#a5b4fc' }}>
+                <InsightsRoundedIcon />
+              </Box>
+              <Box>
+                <Typography variant="overline" sx={{ color: '#a5b4fc', fontWeight: 700 }}>AI DEMAND PREDICTION</Typography>
+                <Typography variant="h6" fontWeight={800}>
+                  {d?.demandPrediction?.message || 'Chưa có dữ liệu dự đoán'}
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  {d?.demandPrediction?.showtimeCount
+                    ? `${d.demandPrediction.predictedSeats}/${d.demandPrediction.totalSeats} ghế · ${d.demandPrediction.historicalSampleSize} suất lịch sử · độ tin cậy ${d.demandPrediction.confidence}`
+                    : 'Hãy tạo suất chiếu sau 17:00 để nhận dự đoán tối nay.'}
+                </Typography>
+              </Box>
+            </Stack>
+            <Typography variant="h2" sx={{ fontWeight: 900, color: '#a5b4fc', lineHeight: 1 }}>
+              {d?.demandPrediction?.showtimeCount ? `${d.demandPrediction.occupancyPercent}%` : '—'}
+            </Typography>
+          </Stack>
         </Box>
 
         <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1.2fr 1fr' }, gap: 2, mb: 3 }}>

@@ -25,6 +25,7 @@ import DeleteRoundedIcon from '@mui/icons-material/DeleteRounded';
 import ExpandMoreRoundedIcon from '@mui/icons-material/ExpandMoreRounded';
 import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
 import MeetingRoomRoundedIcon from '@mui/icons-material/MeetingRoomRounded';
+import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 import SectionHeader from '../components/SectionHeader';
 import StatusChip from '../components/StatusChip';
 import { fromUTCToLocal } from '../../services/adminShowtimeService';
@@ -613,6 +614,9 @@ const SeatMapInline = ({ crud, seats, loading, onReload }) => {
 export const ShowtimesSection = ({ crud, movies, theaters, rooms }) => {
   const [dialog, setDialog] = useState(null);
   const [formError, setFormError] = useState('');
+  const [suggestions, setSuggestions] = useState([]);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const [suggestionsError, setSuggestionsError] = useState('');
   const [form, setForm] = useState({
     movieId: '',
     cinemaRoomId: '',
@@ -650,6 +654,35 @@ export const ShowtimesSection = ({ crud, movies, theaters, rooms }) => {
       setFormError(err.message || 'Không thể lưu suất chiếu.');
       console.error('Lỗi khi lưu suất chiếu:', err);
     }
+  };
+
+  const loadSuggestions = async () => {
+    if (!form.movieId) {
+      setSuggestionsError('Vui lòng chọn phim trước.');
+      return;
+    }
+    setSuggestionsLoading(true);
+    setSuggestionsError('');
+    try {
+      const data = await crud.suggestions(form.movieId);
+      setSuggestions(Array.isArray(data) ? data : []);
+      if (!data?.length) setSuggestionsError('Không tìm thấy phòng trống phù hợp trong 7 ngày tới.');
+    } catch (err) {
+      setSuggestions([]);
+      setSuggestionsError(err.message || 'Không thể tạo gợi ý lúc này.');
+    } finally {
+      setSuggestionsLoading(false);
+    }
+  };
+
+  const applySuggestion = (suggestion) => {
+    setForm((current) => ({
+      ...current,
+      movieId: String(suggestion.movieId),
+      cinemaRoomId: String(suggestion.cinemaRoomId),
+      startTime: String(suggestion.startTime).slice(0, 16),
+      endTime: String(suggestion.endTime).slice(0, 16),
+    }));
   };
 
   // Chỉ hiện rạp đang hoạt động (status === 'ACTIVE')
@@ -765,13 +798,40 @@ export const ShowtimesSection = ({ crud, movies, theaters, rooms }) => {
                 {formError}
               </Alert>
             )}
-            <TextField select label={t('admin.showtime', 'movie')} fullWidth value={form.movieId || ''} onChange={(event) => { setFormError(''); setForm({ ...form, movieId: String(event.target.value) }); }}>
+            <TextField select label={t('admin.showtime', 'movie')} fullWidth value={form.movieId || ''} onChange={(event) => { setFormError(''); setSuggestions([]); setSuggestionsError(''); setForm({ ...form, movieId: String(event.target.value) }); }}>
               {movies.map((movie) => (
                 <MenuItem key={movie.id} value={movie.id}>
                   {movie.title}
                 </MenuItem>
               ))}
             </TextField>
+            <Button
+              variant="outlined"
+              startIcon={<AutoAwesomeRoundedIcon />}
+              onClick={loadSuggestions}
+              disabled={!form.movieId || suggestionsLoading}
+              sx={{ alignSelf: 'flex-start' }}
+            >
+              {suggestionsLoading ? 'Đang phân tích...' : 'AI gợi ý suất chiếu'}
+            </Button>
+            {suggestionsError && <Alert severity="info">{suggestionsError}</Alert>}
+            {suggestions.length > 0 && (
+              <Stack spacing={1}>
+                {suggestions.map((suggestion, index) => (
+                  <Box key={`${suggestion.cinemaRoomId}-${suggestion.startTime}`} sx={{ p: 1.5, border: '1px solid rgba(99,102,241,.35)', borderRadius: 2, bgcolor: 'rgba(99,102,241,.08)' }}>
+                    <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1}>
+                      <Box>
+                        <Typography fontWeight={700}>
+                          #{index + 1} · {new Date(suggestion.startTime).toLocaleString('vi-VN', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} · {suggestion.roomName}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">{suggestion.reason}</Typography>
+                      </Box>
+                      <Button size="small" variant="contained" onClick={() => applySuggestion(suggestion)}>Áp dụng</Button>
+                    </Stack>
+                  </Box>
+                ))}
+              </Stack>
+            )}
             <TextField select label={t('admin.showtime', 'room')} fullWidth value={form.cinemaRoomId || ''} onChange={(event) => setForm({ ...form, cinemaRoomId: String(event.target.value) })}>
               {activeRooms.map((room) => (
                 <MenuItem key={room.id} value={room.cinemaRoomId || room.id}>
