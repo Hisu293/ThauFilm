@@ -1,4 +1,4 @@
-CREATE TABLE group_bookings (
+CREATE TABLE IF NOT EXISTS group_bookings (
     id UUID PRIMARY KEY,
     invitation_id UUID NOT NULL,
     showtime_id UUID NOT NULL,
@@ -6,19 +6,15 @@ CREATE TABLE group_bookings (
     status VARCHAR(30) NOT NULL,
     expires_at TIMESTAMP,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    confirmed_at TIMESTAMP,
-    CONSTRAINT uk_group_booking_invitation UNIQUE (invitation_id),
-    CONSTRAINT chk_group_booking_status CHECK (status IN (
-        'WAITING_SELECTION', 'WAITING_PAYMENTS', 'PARTIALLY_PAID',
-        'CONFIRMED', 'EXPIRED', 'CANCELLED'
-    ))
+    confirmed_at TIMESTAMP
 );
 
-CREATE INDEX idx_group_booking_showtime ON group_bookings(showtime_id);
-CREATE INDEX idx_group_booking_selector ON group_bookings(selector_id);
-CREATE INDEX idx_group_booking_status_expiry ON group_bookings(status, expires_at);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_group_booking_invitation ON group_bookings(invitation_id);
+CREATE INDEX IF NOT EXISTS idx_group_booking_showtime ON group_bookings(showtime_id);
+CREATE INDEX IF NOT EXISTS idx_group_booking_selector ON group_bookings(selector_id);
+CREATE INDEX IF NOT EXISTS idx_group_booking_status_expiry ON group_bookings(status, expires_at);
 
-CREATE TABLE group_booking_members (
+CREATE TABLE IF NOT EXISTS group_booking_members (
     id UUID PRIMARY KEY,
     group_booking_id UUID NOT NULL,
     user_id UUID NOT NULL,
@@ -27,17 +23,16 @@ CREATE TABLE group_booking_members (
     amount NUMERIC(10,2),
     payment_status VARCHAR(20) NOT NULL DEFAULT 'PENDING',
     paid_at TIMESTAMP,
-    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT uk_group_booking_member UNIQUE (group_booking_id, user_id),
-    CONSTRAINT uk_group_booking_seat UNIQUE (group_booking_id, seat_id),
-    CONSTRAINT uk_group_booking_member_booking UNIQUE (booking_id),
-    CONSTRAINT chk_group_member_payment_status CHECK (payment_status IN ('PENDING', 'PAID', 'REFUNDED'))
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE INDEX idx_group_member_group ON group_booking_members(group_booking_id);
-CREATE INDEX idx_group_member_user ON group_booking_members(user_id);
-CREATE INDEX idx_group_member_seat ON group_booking_members(seat_id);
-CREATE INDEX idx_group_member_booking ON group_booking_members(booking_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_group_booking_member ON group_booking_members(group_booking_id, user_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_group_booking_seat ON group_booking_members(group_booking_id, seat_id);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_group_booking_member_booking ON group_booking_members(booking_id);
+CREATE INDEX IF NOT EXISTS idx_group_member_group ON group_booking_members(group_booking_id);
+CREATE INDEX IF NOT EXISTS idx_group_member_user ON group_booking_members(user_id);
+CREATE INDEX IF NOT EXISTS idx_group_member_seat ON group_booking_members(seat_id);
+CREATE INDEX IF NOT EXISTS idx_group_member_booking ON group_booking_members(booking_id);
 
 -- UUID columns intentionally have indexes/unique constraints only. No foreign keys.
 
