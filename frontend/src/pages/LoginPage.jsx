@@ -25,6 +25,8 @@ import { authService, parseAuthResponse } from '../services/authService';
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_RE = /^[0-9]{9,11}$/;
 const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+let googleIdentityInitialized = false;
+let activeGoogleCredentialHandler = null;
 
 // Nhãn nằm trên ô nhập (kiểu form mới)
 const fieldLabelSx = {
@@ -76,7 +78,6 @@ const LoginPage = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
   const googleButtonRef = useRef(null);
-  const googleInitializedRef = useRef(false);
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -119,30 +120,32 @@ const LoginPage = () => {
 
       try {
         await loadGoogleScript();
-        if (cancelled || !googleButtonRef.current || googleInitializedRef.current) {
+        if (cancelled || !googleButtonRef.current) {
           return;
         }
 
-        window.google.accounts.id.initialize({
-          client_id: googleClientId,
-          callback: async (response) => {
-            try {
-              setServerError('');
-              setGoogleLoading(true);
+        const credentialHandler = async (response) => {
+          try {
+            setServerError('');
+            setGoogleLoading(true);
+            if (!response.credential) throw new Error('Google không trả về response.credential.');
+            const { data: body } = await authService.googleAuth(response.credential);
+            completeLogin(body);
+          } catch (err) {
+            setServerError(err.message || 'Google đăng nhập thất bại.');
+          } finally {
+            setGoogleLoading(false);
+          }
+        };
+        activeGoogleCredentialHandler = credentialHandler;
 
-              if (!response.credential) {
-                throw new Error('Google không trả về response.credential.');
-              }
-
-              const { data: body } = await authService.googleAuth(response.credential);
-              completeLogin(body);
-            } catch (err) {
-              setServerError(err.message || 'Google đăng nhập thất bại.');
-            } finally {
-              setGoogleLoading(false);
-            }
-          },
-        });
+        if (!googleIdentityInitialized) {
+          window.google.accounts.id.initialize({
+            client_id: googleClientId,
+            callback: (response) => activeGoogleCredentialHandler?.(response),
+          });
+          googleIdentityInitialized = true;
+        }
 
         googleButtonRef.current.innerHTML = '';
         window.google.accounts.id.renderButton(googleButtonRef.current, {
@@ -153,7 +156,6 @@ const LoginPage = () => {
           shape: 'rectangular',
         });
 
-        googleInitializedRef.current = true;
       } catch (err) {
         setServerError(err.message || 'Không thể khởi tạo Google Sign-In.');
       }
@@ -163,6 +165,7 @@ const LoginPage = () => {
 
     return () => {
       cancelled = true;
+      activeGoogleCredentialHandler = null;
     };
   }, [completeLogin]);
 

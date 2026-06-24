@@ -100,8 +100,12 @@ public class MovieMatchingService {
             return MovieMatchingDto.ActionResponse.builder().matched(false).build();
         }
 
-        UUID first = actorId.compareTo(targetId) < 0 ? actorId : targetId;
-        UUID second = actorId.compareTo(targetId) < 0 ? targetId : actorId;
+        // PostgreSQL orders UUID values by their unsigned byte representation.
+        // UUID.compareTo compares signed long fields and can produce the opposite
+        // order, violating chk_movie_match_order for otherwise valid pairs.
+        boolean actorFirst = actorId.toString().compareTo(targetId.toString()) < 0;
+        UUID first = actorFirst ? actorId : targetId;
+        UUID second = actorFirst ? targetId : actorId;
         MovieMatch match = matchRepository.findByUserOneIdAndUserTwoId(first, second)
                 .orElseGet(() -> matchRepository.save(MovieMatch.builder().userOneId(first).userTwoId(second).build()));
         User actor = requireUser(actorId);
