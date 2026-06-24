@@ -31,7 +31,8 @@ public class DiscountService {
 
     @Transactional
     public BigDecimal calculateDiscount(String code, BigDecimal totalAmount, UUID userId) {
-        Discount discount = discountRepository.findByCodeAndActiveTrue(code)
+        String normalizedCode = code.trim().toUpperCase();
+        Discount discount = discountRepository.findByCodeAndActiveTrue(normalizedCode)
                 .orElseThrow(() -> new BadRequestException("Invalid discount code"));
 
         if (!isActive(discount)) {
@@ -48,7 +49,7 @@ public class DiscountService {
         }
 
         BigDecimal discountAmount;
-        if ("PERCENTAGE".equalsIgnoreCase(discount.getType())) {
+        if ("PERCENTAGE".equalsIgnoreCase(discount.getType()) || "PERCENT".equalsIgnoreCase(discount.getType())) {
             discountAmount = totalAmount.multiply(discount.getValue())
                     .divide(BigDecimal.valueOf(100));
         } else if ("FIXED".equalsIgnoreCase(discount.getType())) {
@@ -57,9 +58,12 @@ public class DiscountService {
             throw new BadRequestException("Unsupported discount type: " + discount.getType());
         }
 
-        if (discountAmount.compareTo(discount.getMaxDiscountAmount()) > 0) {
+        if (discount.getMaxDiscountAmount() != null
+                && discount.getMaxDiscountAmount().compareTo(BigDecimal.ZERO) > 0
+                && discountAmount.compareTo(discount.getMaxDiscountAmount()) > 0) {
             discountAmount = discount.getMaxDiscountAmount();
         }
+        discountAmount = discountAmount.min(totalAmount).max(BigDecimal.ZERO);
 
         discount.setUsageCount(discount.getUsageCount() + 1);
         discountRepository.save(discount);

@@ -302,9 +302,11 @@ export function useAdminStore() {
       error: showtimesError,
       reload: loadShowtimes,
       getById: (id) => adminShowtimeService.getById(id),
+      suggestions: (movieId, fromDate) => adminShowtimeService.suggestions(movieId, fromDate),
       add: async (row) => {
         await adminShowtimeService.create(row);
         await loadShowtimes();
+        await loadDashboard();
       },
       update: async (id, row) => {
         await adminShowtimeService.update(id, row);
@@ -318,6 +320,7 @@ export function useAdminStore() {
       remove: async (id) => {
         await adminShowtimeService.remove(id);
         await loadShowtimes();
+        await loadDashboard();
       },
     },
     users: {

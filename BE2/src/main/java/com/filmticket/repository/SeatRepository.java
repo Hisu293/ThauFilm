@@ -10,6 +10,7 @@ import java.util.UUID;
 @Repository
 public interface SeatRepository extends JpaRepository<Seat, UUID> {
     List<Seat> findAllByCinemaRoomIdOrderByRowNameAscSeatNumberAsc(UUID cinemaRoomId);
+    long countByCinemaRoomId(UUID cinemaRoomId);
     boolean existsByCinemaRoomIdAndRowNameIgnoreCaseAndSeatNumberAndIdNot(UUID cinemaRoomId, String rowName, Integer seatNumber, UUID id);
     boolean existsByCinemaRoomIdAndRowNameIgnoreCaseAndSeatNumber(UUID cinemaRoomId, String rowName, Integer seatNumber);
 }

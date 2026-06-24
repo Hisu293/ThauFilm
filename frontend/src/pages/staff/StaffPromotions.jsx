@@ -35,16 +35,17 @@ import { staffPromotionService } from '../../services/staffPromotionService';
 import { fromUTCToLocal, toBackendLocalDateTime } from '../../services/adminShowtimeService';
 
 const TYPE_META = {
+  PERCENTAGE: { label: 'Giảm %', color: 'info' },
   PERCENT: { label: 'Giảm %', color: 'info' },
   FIXED: { label: 'Giảm tiền', color: 'secondary' },
 };
 const TYPE_OPTIONS = [
-  { value: 'PERCENT', label: 'Giảm theo phần trăm (%)' },
+  { value: 'PERCENTAGE', label: 'Giảm theo phần trăm (%)' },
   { value: 'FIXED', label: 'Giảm số tiền cố định (đ)' },
 ];
 
 const emptyForm = {
-  code: '', name: '', type: 'PERCENT', value: '',
+  code: '', name: '', type: 'PERCENTAGE', value: '',
   minPurchaseAmount: '', maxDiscountAmount: '',
   validFrom: '', validTo: '', usageLimit: '', active: true,
 };
@@ -61,7 +62,7 @@ const formatCurrency = (n) =>
   typeof n === 'number' ? new Intl.NumberFormat('vi-VN').format(n) + 'đ' : '—';
 
 const discountText = (p) =>
-  p.type === 'PERCENT' ? `${p.value}%` : formatCurrency(p.value);
+  ['PERCENT', 'PERCENTAGE'].includes(p.type) ? `${p.value}%` : formatCurrency(p.value);
 
 const StaffPromotions = () => {
   const [promos, setPromos] = useState([]);

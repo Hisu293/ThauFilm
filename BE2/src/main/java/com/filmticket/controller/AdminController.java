@@ -1,12 +1,14 @@
 package com.filmticket.controller;
 
 import com.filmticket.dto.ApiResponse;
+import com.filmticket.dto.DemandPredictionResponse;
 import com.filmticket.dto.MovieResponse;
 import com.filmticket.dto.UserResponse;
 import com.filmticket.entity.User;
 import com.filmticket.exception.BadRequestException;
 import com.filmticket.repository.UserRepository;
 import com.filmticket.service.MovieService;
+import com.filmticket.service.DemandPredictionService;
 import com.filmticket.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -45,6 +47,7 @@ public class AdminController {
     private final UserRepository userRepository;
     private final UserService userService;
     private final MovieService movieService;
+    private final DemandPredictionService demandPredictionService;
 
     @Operation(summary = "Admin test endpoint")
     @GetMapping("/ping")
@@ -141,6 +144,7 @@ public class AdminController {
                 .totalMembers(totalMembers)
                 .enabledUsers(enabledUsers)
                 .disabledUsers(disabledUsers)
+                .demandPrediction(demandPredictionService.predictTonight())
                 .build();
 
         return ResponseEntity.ok(ApiResponse.success("Dashboard fetched successfully", dashboard));
@@ -265,6 +269,7 @@ public class AdminController {
         private long totalMembers;
         private long enabledUsers;
         private long disabledUsers;
+        private DemandPredictionResponse demandPrediction;
     }
 
     @Data

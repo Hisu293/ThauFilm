@@ -16,6 +16,7 @@ import ShareRoundedIcon from '@mui/icons-material/ShareRounded';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { socialService } from '../../services/socialService';
+import { connectRealtime } from '../../services/realtimeService';
 
 const formatDate = (value) => value
   ? new Date(value).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
@@ -144,6 +145,14 @@ export default function MovieCommunity({ movieId }) {
     const request = window.setTimeout(loadCommunity, 0);
     return () => window.clearTimeout(request);
   }, [loadCommunity]);
+
+  useEffect(() => connectRealtime({
+    movieId,
+    onEvent: (event) => {
+      if (!String(event.type || '').startsWith('COMMENT_')) return;
+      socialService.getComments(movieId).then((items) => setComments(items || [])).catch(() => {});
+    },
+  }), [movieId]);
 
   const requireLogin = () => {
     if (isLoggedIn) return true;

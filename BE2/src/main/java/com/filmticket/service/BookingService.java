@@ -6,6 +6,7 @@ import com.filmticket.exception.BadRequestException;
 import com.filmticket.model.SeatBookingStatus;
 import com.filmticket.repository.*;
 import com.filmticket.util.TicketPdfGenerator;
+import com.filmticket.websocket.RealtimeEventService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,6 +42,7 @@ public class BookingService {
     private final DiscountService discountService;
     private final JavaMailSender mailSender;
     private final TicketPdfGenerator ticketPdfGenerator;
+    private final RealtimeEventService realtimeEventService;
 
     private static final int HOLD_MINUTES = 5;
 
@@ -219,6 +221,9 @@ public class BookingService {
         BookingPaymentResponse response = BookingPaymentResponse.fromPaymentResult(
                 booking, payment, ticketResponses, originalAmount, discountAmount, discountCode);
 
+        realtimeEventService.notifyUser(userId, "BOOKING_CONFIRMED", "Đặt vé thành công",
+                "Vé " + booking.getConfirmationCode() + " đã được xác nhận", "/my-bookings/" + booking.getId());
+
         try {
             if (user != null) {
                 sendTicketEmail(user.getEmail(), booking, tickets, payment, discountAmount, finalAmount);
@@ -363,7 +368,18 @@ public class BookingService {
 
         StringBuilder ticketListHtml = new StringBuilder();
         for (Ticket ticket : tickets) {
-            ticketListHtml.append("<li>").append(ticket.getTicketCode()).append("</li>");
+            Seat seat = seatRepository.findById(ticket.getSeatId()).orElse(null);
+            String seatLabel = seat != null ? seat.getRowName() + seat.getSeatNumber() : ticket.getSeatId().toString();
+            String seatType = seat != null ? switch (seat.getType()) {
+                case VIP -> "VIP";
+                case COUPLE -> "Doi";
+                case STANDARD -> "Thuong";
+            } : "Khong ro";
+            ticketListHtml.append("<li>")
+                    .append(escape(ticket.getTicketCode()))
+                    .append(" - Ghe ").append(escape(seatLabel))
+                    .append(" - Loai ").append(escape(seatType))
+                    .append("</li>");
         }
 
         StringBuilder builder = new StringBuilder();

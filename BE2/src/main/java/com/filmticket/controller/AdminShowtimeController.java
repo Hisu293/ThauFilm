@@ -1,9 +1,11 @@
 package com.filmticket.controller;
 
 import com.filmticket.dto.ApiResponse;
+import com.filmticket.dto.DemandPredictionResponse.ShowtimeSuggestion;
 import com.filmticket.dto.ShowtimeResponse;
 import com.filmticket.dto.UpsertShowtimeRequest;
 import com.filmticket.service.ShowtimeService;
+import com.filmticket.service.DemandPredictionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
@@ -14,6 +16,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.time.LocalDate;
 import java.util.UUID;
 
 @RestController
@@ -24,6 +27,17 @@ import java.util.UUID;
 public class AdminShowtimeController {
 
     private final ShowtimeService showtimeService;
+    private final DemandPredictionService demandPredictionService;
+
+    @Operation(summary = "Suggest the three highest-demand available showtimes")
+    @GetMapping("/suggestions")
+    public ResponseEntity<ApiResponse<List<ShowtimeSuggestion>>> suggestions(
+            @RequestParam UUID movieId,
+            @RequestParam(required = false) LocalDate fromDate
+    ) {
+        return ResponseEntity.ok(ApiResponse.success("Showtime suggestions generated",
+                demandPredictionService.suggest(movieId, fromDate)));
+    }
 
     @Operation(summary = "List all showtimes")
     @GetMapping

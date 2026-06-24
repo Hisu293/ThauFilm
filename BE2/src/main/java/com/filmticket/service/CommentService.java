@@ -6,6 +6,7 @@ import com.filmticket.exception.BadRequestException;
 import com.filmticket.repository.CommentRepository;
 import com.filmticket.repository.MovieRepository;
 import com.filmticket.repository.UserRepository;
+import com.filmticket.websocket.RealtimeEventService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,6 +22,7 @@ public class CommentService {
     private final CommentRepository commentRepository;
     private final UserRepository userRepository;
     private final MovieRepository movieRepository;
+    private final RealtimeEventService realtimeEventService;
 
     @Transactional(readOnly = true)
     public List<CommentResponse> getCommentsByMovie(UUID movieId) {
@@ -36,9 +38,12 @@ public class CommentService {
             throw new BadRequestException("Movie not found");
         }
 
+        Comment parent = null;
         if (request.getParentId() != null) {
-            if (!commentRepository.existsById(request.getParentId())) {
-                throw new BadRequestException("Parent comment not found");
+            parent = commentRepository.findById(request.getParentId())
+                    .orElseThrow(() -> new BadRequestException("Parent comment not found"));
+            if (!parent.getMovieId().equals(request.getMovieId())) {
+                throw new BadRequestException("Parent comment belongs to another movie");
             }
         }
 
@@ -49,7 +54,14 @@ public class CommentService {
                 .content(request.getContent())
                 .build();
 
-        return enrichWithUser(commentRepository.save(comment));
+        CommentResponse response = enrichWithUser(commentRepository.save(comment));
+        realtimeEventService.broadcastComment(request.getMovieId(), "CREATED", response);
+        if (parent != null && !parent.getUserId().equals(userId)) {
+            String actor = userRepository.findById(userId).map(user -> user.getFullName()).orElse("Một thành viên");
+            realtimeEventService.notifyUser(parent.getUserId(), "COMMENT_REPLY", "Phản hồi mới",
+                    actor + " đã trả lời bình luận của bạn", "/movies/" + request.getMovieId() + "/community");
+        }
+        return response;
     }
 
     @Transactional
@@ -60,8 +72,11 @@ public class CommentService {
             throw new BadRequestException("You can only update your own comment");
         }
 
-        comment.setContent(content);
-        return enrichWithUser(commentRepository.save(comment));
+        if (content == null || content.isBlank()) throw new BadRequestException("Comment content is required");
+        comment.setContent(content.trim());
+        CommentResponse response = enrichWithUser(commentRepository.save(comment));
+        realtimeEventService.broadcastComment(comment.getMovieId(), "UPDATED", response);
+        return response;
     }
 
     @Transactional
@@ -72,7 +87,9 @@ public class CommentService {
             throw new BadRequestException("You can only delete your own comment");
         }
 
+        UUID movieId = comment.getMovieId();
         commentRepository.delete(comment);
+        realtimeEventService.broadcastComment(movieId, "DELETED", java.util.Map.of("id", commentId));
     }
 
     @Transactional(readOnly = true)

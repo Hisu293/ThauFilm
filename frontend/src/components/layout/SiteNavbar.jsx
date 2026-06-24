@@ -19,6 +19,7 @@ import MenuRoundedIcon from '@mui/icons-material/MenuRounded';
 import UserMenu, { AuthButtons } from '../UserMenu';
 import { useAuth } from '../../context/AuthContext';
 import { NAV_LINKS } from '../../theme/theme';
+import NotificationBell from '../NotificationBell';
 
 const SiteNavbar = () => {
   const { isLoggedIn } = useAuth();
@@ -90,6 +91,7 @@ const SiteNavbar = () => {
 
             <Box sx={{ flexGrow: { xs: 1, md: 0 } }} />
             <Stack direction="row" spacing={1.5} alignItems="center">
+              {isLoggedIn && <NotificationBell />}
               {isLoggedIn && <UserMenu />}
               <AuthButtons />
             </Stack>

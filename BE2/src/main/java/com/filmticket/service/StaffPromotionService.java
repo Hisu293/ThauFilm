@@ -33,9 +33,9 @@ public class StaffPromotionService {
     @Transactional
     public DiscountResponse createPromotion(StaffPromotionRequest request) {
         Discount discount = new Discount();
-        discount.setCode(request.getCode());
+        discount.setCode(request.getCode().trim().toUpperCase());
         discount.setName(request.getName());
-        discount.setType(request.getType());
+        discount.setType(normalizeType(request.getType()));
         discount.setValue(request.getValue());
         discount.setMinPurchaseAmount(request.getMinPurchaseAmount());
         discount.setMaxDiscountAmount(request.getMaxDiscountAmount());
@@ -53,7 +53,7 @@ public class StaffPromotionService {
         Discount discount = discountRepository.findById(promotionId)
                 .orElseThrow(() -> new BadRequestException("Promotion not found"));
         discount.setName(request.getName());
-        discount.setType(request.getType());
+        discount.setType(normalizeType(request.getType()));
         discount.setValue(request.getValue());
         discount.setMinPurchaseAmount(request.getMinPurchaseAmount());
         discount.setMaxDiscountAmount(request.getMaxDiscountAmount());
@@ -92,5 +92,9 @@ public class StaffPromotionService {
                 "usageCount", discount.getUsageCount(),
                 "usageLimit", discount.getUsageLimit()
         );
+    }
+
+    private String normalizeType(String type) {
+        return "PERCENT".equalsIgnoreCase(type) ? "PERCENTAGE" : type.trim().toUpperCase();
     }
 }
