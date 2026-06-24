@@ -38,11 +38,16 @@ export default function MatchRoomDialog({ match, open, onClose, onMatchEnded }) 
         memberIntelligenceService.matchInvitations(match.matchId),
         bookingApi.fetchShowtimes(),
       ]);
-      setMessages(messageData || []); setInvitations(invitationData || []);
+      setMessages((current) => {
+        const merged = new Map(current.map((message) => [message.id, message]));
+        (messageData || []).forEach((message) => merged.set(message.id, message));
+        return [...merged.values()].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+      });
+      setInvitations(invitationData || []);
       const raw = showtimeResponse?.data?.data ?? showtimeResponse?.data ?? [];
       setShowtimes(bookingService.normalizeShowtimes(raw).filter((item) => new Date(item.startTime).getTime() > Date.now() && !['CANCELLED', 'COMPLETED'].includes(item.status)));
     } catch (err) { setError(err.message); } finally { setLoading(false); }
-  }, [match]);
+  }, [match?.matchId]);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -53,6 +58,8 @@ export default function MatchRoomDialog({ match, open, onClose, onMatchEnded }) 
       onEvent: (event) => {
         if (event.type === 'MATCH_MESSAGE' && String(event.data?.matchId) === String(match?.matchId) && event.data?.message) {
           setMessages((items) => items.some((item) => item.id === event.data.message.id) ? items : [...items, event.data.message]);
+        } else if (event.type === 'MATCH_MESSAGE' && String(event.data?.matchId) === String(match?.matchId)) {
+          loadRoom();
         } else if (['MATCH_INVITATION', 'MATCH_INVITATION_UPDATED'].includes(event.type) && String(event.data?.matchId) === String(match?.matchId)) {
           loadRoom();
         } else if (event.type === 'MATCH_MESSAGE_ERROR') {
