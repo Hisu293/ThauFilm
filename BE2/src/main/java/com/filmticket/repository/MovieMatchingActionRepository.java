@@ -11,4 +11,5 @@ public interface MovieMatchingActionRepository extends JpaRepository<MovieMatchi
     Optional<MovieMatchingAction> findByActorIdAndTargetId(UUID actorId, UUID targetId);
     List<MovieMatchingAction> findByActorId(UUID actorId);
     boolean existsByActorIdAndTargetIdAndDecision(UUID actorId, UUID targetId, MovieMatchingAction.Decision decision);
+    void deleteByActorIdAndTargetIdOrActorIdAndTargetId(UUID actorId, UUID targetId, UUID targetActorId, UUID targetTargetId);
 }

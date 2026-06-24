@@ -22,6 +22,7 @@ public class MovieMatchInteractionService {
     private final MovieMatchInvitationRepository invitationRepository;
     private final MovieMatchingBlockRepository blockRepository;
     private final MovieMatchingReportRepository reportRepository;
+    private final MovieMatchingActionRepository actionRepository;
     private final UserRepository userRepository;
     private final ShowtimeRepository showtimeRepository;
     private final MovieRepository movieRepository;
@@ -107,9 +108,11 @@ public class MovieMatchInteractionService {
     @Transactional
     public void cancelMatch(UUID userId, UUID matchId) {
         MovieMatch match = requireActiveMember(matchId, userId);
+        UUID otherId = other(match, userId);
+        actionRepository.deleteByActorIdAndTargetIdOrActorIdAndTargetId(userId, otherId, otherId, userId);
         match.setStatus(MovieMatch.Status.CANCELLED); match.setEndedAt(LocalDateTime.now()); match.setEndedBy(userId);
         matchRepository.save(match);
-        realtimeEventService.notifyUser(other(match, userId), "MATCH_CANCELLED", "Match đã kết thúc",
+        realtimeEventService.notifyUser(otherId, "MATCH_CANCELLED", "Match đã kết thúc",
                 displayName(requireUser(userId)) + " đã hủy match", "/intelligence");
     }
 
@@ -120,6 +123,7 @@ public class MovieMatchInteractionService {
         if (!blockRepository.existsByBlockerIdAndBlockedId(userId, blockedId)) {
             blockRepository.save(MovieMatchingBlock.builder().blockerId(userId).blockedId(blockedId).build());
         }
+        actionRepository.deleteByActorIdAndTargetIdOrActorIdAndTargetId(userId, blockedId, blockedId, userId);
         match.setStatus(MovieMatch.Status.BLOCKED); match.setEndedAt(LocalDateTime.now()); match.setEndedBy(userId);
         matchRepository.save(match);
     }

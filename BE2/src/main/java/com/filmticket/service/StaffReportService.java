@@ -74,7 +74,7 @@ public class StaffReportService {
                     Booking booking = bookings.get(ticket.getBookingId());
                     return booking != null && booking.getStatus() == BookingStatus.CONFIRMED;
                 })
-                .forEach(ticket -> byDate.merge(ticket.getCreatedAt().toLocalDate(), 1L, Long::sum));
+                .forEach(ticket -> byDate.merge(ticket.getCreatedAt().toLocalDate(), 1L, (a, b) -> a + b));
         List<Map<String, Object>> daily = byDate.entrySet().stream()
                 .map(entry -> row("date", entry.getKey(), "tickets", entry.getValue())).toList();
         long totalTickets = byDate.values().stream().mapToLong(Long::longValue).sum();
@@ -127,7 +127,7 @@ public class StaffReportService {
         context.tickets.forEach(ticket -> {
             Booking booking = context.bookings.get(ticket.getBookingId());
             if (booking != null && booking.getStatus() == BookingStatus.CONFIRMED) {
-                soldByShowtime.merge(booking.getShowtimeId(), 1L, Long::sum);
+                soldByShowtime.merge(booking.getShowtimeId(), 1L, (a, b) -> a + b);
             }
         });
         List<Map<String, Object>> items = soldByShowtime.entrySet().stream()

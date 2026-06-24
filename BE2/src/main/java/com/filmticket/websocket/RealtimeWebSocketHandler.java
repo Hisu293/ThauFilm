@@ -2,7 +2,6 @@ package com.filmticket.websocket;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.filmticket.dto.MovieMatchingDto;
 import com.filmticket.service.MovieMatchInteractionService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -57,7 +56,7 @@ public class RealtimeWebSocketHandler extends TextWebSocketHandler {
                 sendError(session, "NOT_SUBSCRIBED", "Bạn chưa tham gia phòng chat này");
                 return;
             }
-            MovieMatchingDto.MessageResponse saved = movieMatchInteractionService.sendMessage(
+            movieMatchInteractionService.sendMessage(
                     userId, matchId, data.path("content").asText(""));
         } catch (IllegalArgumentException exception) {
             sendError(session, "INVALID_MESSAGE", "Dữ liệu tin nhắn không hợp lệ");
