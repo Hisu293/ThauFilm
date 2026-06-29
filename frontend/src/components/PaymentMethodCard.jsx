@@ -1,27 +1,11 @@
 import { Card, CardContent, Typography, Box, Stack, Radio } from '@mui/material';
-import CreditCardRoundedIcon from '@mui/icons-material/CreditCardRounded';
-import AccountBalanceWalletRoundedIcon from '@mui/icons-material/AccountBalanceWalletRounded';
 import QrCode2RoundedIcon from '@mui/icons-material/QrCode2Rounded';
 
 const METHODS = [
   {
-    id: 'bank_card',
-    title: 'Thẻ ngân hàng (ATM / Visa / Mastercard)',
-    description: 'Thanh toán qua cổng thẻ nội địa hoặc quốc tế',
-    icon: CreditCardRoundedIcon,
-    color: '#3B82F6'
-  },
-  {
-    id: 'e_wallet',
-    title: 'Ví điện tử (Momo / ZaloPay / ShopeePay)',
-    description: 'Mở ứng dụng ví điện tử quét mã thanh toán tiện lợi',
-    icon: AccountBalanceWalletRoundedIcon,
-    color: '#EC4899'
-  },
-  {
     id: 'qr_pay',
-    title: 'Quét mã QR (VNPAY-QR / VietQR)',
-    description: 'Sử dụng ứng dụng Mobile Banking quét mã chuyển khoản nhanh',
+    title: 'Quet ma QR VietQR (PayOS)',
+    description: 'Thanh toan chuyen khoan nhanh qua PayOS / VietQR',
     icon: QrCode2RoundedIcon,
     color: '#10B981'
   }

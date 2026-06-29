@@ -42,6 +42,27 @@ const STATUS_META = {
   CHECKED_IN: { label: 'Đã check-in', color: 'success' },
   CANCELLED: { label: 'Đã hủy', color: 'error' },
 };
+
+const extractTicketCodeFromQr = (value = '') => {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+
+  // Ticket PDF QR payload format from backend:
+  // TICKET|bookingCode|movie|showtime|room|TK123456=E5;TK654321=E6
+  if (raw.startsWith('TICKET|')) {
+    const parts = raw.split('|');
+    const ticketPart = parts[parts.length - 1] || '';
+    const firstTicket = ticketPart.split(';')[0] || '';
+    const code = firstTicket.split('=')[0] || '';
+    return code.trim();
+  }
+
+  // Backward-compatible mock/old payloads can include the code between pipes.
+  const ticketCodeMatch = raw.match(/\b(?:TK|TCK)-?\d{4,}\b/i);
+  if (ticketCodeMatch) return ticketCodeMatch[0].toUpperCase();
+
+  return raw;
+};
 const statusOf = (t) => {
   if (t.status) return t.status;
   return t.checkedIn ? 'CHECKED_IN' : 'PAID';
@@ -58,7 +79,7 @@ const formatDateTime = (iso) => {
   }
 };
 const formatCurrency = (n) =>
-  typeof n === 'number' ? new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(n) : '—';
+  Number.isFinite(Number(n)) ? new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(n)) : '—';
 
 const StaffTickets = () => {
   const [tickets, setTickets] = useState([]);
@@ -99,19 +120,27 @@ const StaffTickets = () => {
     loadTickets();
   }, [loadTickets]);
 
-  // Đồng bộ 1 vé sau khi thao tác (check-in/hủy trả về DTO rút gọn)
+  // Đồng bộ 1 vé sau khi thao tác. Nếu vé chưa có trong list hiện tại thì thêm vào đầu list.
   const patchTicket = (dto) => {
-    setTickets((list) => list.map((t) => (t.id === dto.id ? { ...t, ...dto } : t)));
+    if (!dto?.id) return;
+    setTickets((list) => {
+      const exists = list.some((t) => t.id === dto.id);
+      if (!exists) return [dto, ...list];
+      return list.map((t) => (t.id === dto.id ? { ...t, ...dto } : t));
+    });
+    setDetail((current) => (current?.id === dto.id ? { ...current, ...dto } : current));
   };
 
   const handleCheckIn = async (codeArg) => {
-    const code = (codeArg ?? scanCode).trim();
+    const code = extractTicketCodeFromQr(codeArg ?? scanCode);
     if (!code) return;
     setCheckingIn(true);
     try {
       const dto = await staffTicketService.checkIn(code);
-      patchTicket(dto);
-      setToast({ severity: 'success', message: `Check-in thành công vé ${dto.ticketCode || code}.` });
+      const fresh = dto?.id ? await staffTicketService.getById(dto.id).catch(() => null) : null;
+      const merged = { ...(dto || {}), ...(fresh || {}) };
+      patchTicket(merged);
+      setToast({ severity: 'success', message: `Check-in thành công vé ${merged.ticketCode || code}.` });
       setScanCode('');
     } catch (err) {
       setToast({ severity: 'error', message: err.message || 'Check-in thất bại.' });
@@ -122,7 +151,7 @@ const StaffTickets = () => {
 
   // Quét QR xong: đóng camera, đổ mã vào ô và check-in luôn
   const handleScanned = (decodedText) => {
-    const code = (decodedText || '').trim();
+    const code = extractTicketCodeFromQr(decodedText);
     setScannerOpen(false);
     if (!code) return;
     setScanCode(code);
@@ -172,10 +201,10 @@ const StaffTickets = () => {
   const q = search.trim().toLowerCase();
   const filtered = q
     ? tickets.filter((t) =>
-        [t.ticketCode, t.bookingId, t.customerName, t.movieTitle, t.seatLabel]
-          .filter(Boolean)
-          .some((v) => String(v).toLowerCase().includes(q)),
-      )
+      [t.ticketCode, t.bookingId, t.customerName, t.movieTitle, t.seatLabel]
+        .filter(Boolean)
+        .some((v) => String(v).toLowerCase().includes(q)),
+    )
     : tickets;
 
   return (
@@ -262,7 +291,6 @@ const StaffTickets = () => {
                     <TableCell sx={{ fontWeight: 700 }}>Mã vé</TableCell>
                     <TableCell sx={{ fontWeight: 700 }}>Khách hàng</TableCell>
                     <TableCell sx={{ fontWeight: 700 }}>Phim / Ghế</TableCell>
-                    <TableCell sx={{ fontWeight: 700 }}>Suất chiếu</TableCell>
                     <TableCell sx={{ fontWeight: 700 }}>Trạng thái</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 700 }}>Thao tác</TableCell>
                   </TableRow>
@@ -283,7 +311,6 @@ const StaffTickets = () => {
                           <Typography variant="body2">{t.movieTitle || '—'}</Typography>
                           <Typography variant="caption" color="text.secondary">Ghế {t.seatLabel || '—'}</Typography>
                         </TableCell>
-                        <TableCell sx={{ color: 'text.secondary' }}>{formatDateTime(t.showtime)}</TableCell>
                         <TableCell>
                           <Chip size="small" label={meta.label} color={meta.color} sx={{ fontWeight: 700 }} />
                         </TableCell>
@@ -335,18 +362,18 @@ const StaffTickets = () => {
                 <Row label="Số điện thoại" value={detail.customerPhone} />
                 <Divider />
                 <Row label="Phim" value={detail.movieTitle} />
-                <Row label="Rạp / Phòng" value={[detail.theaterName, detail.roomName].filter(Boolean).join(' · ')} />
+                <Row label="Rạp / Phòng" value={[detail.theaterName, detail.cinemaRoomName || detail.roomName].filter(Boolean).join(' · ')} />
                 <Row label="Ghế" value={detail.seatLabel} />
-                <Row label="Suất chiếu" value={formatDateTime(detail.showtime)} />
+                <Row label="Suất chiếu" value={formatDateTime(detail.startTime || detail.showtime)} />
                 <Divider />
                 <Typography variant="subtitle2" fontWeight={700} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                   <PaymentRoundedIcon fontSize="small" /> Thanh toán
                 </Typography>
-                <Row label="Phương thức" value={payment?.method || detail.payment?.method} />
-                <Row label="Số tiền" value={formatCurrency(payment?.amount ?? detail.payment?.amount)} />
-                <Row label="Tình trạng" value={payment?.status || detail.payment?.status} />
-                <Row label="Mã giao dịch" value={payment?.transactionId || detail.payment?.transactionId} />
-                <Row label="Thời gian TT" value={formatDateTime(payment?.paidAt || detail.payment?.paidAt)} />
+                <Row label="Phương thức" value={payment?.paymentMethod || payment?.method || detail.paymentMethod || detail.payment?.method} />
+                <Row label="Số tiền" value={formatCurrency(payment?.amount ?? detail.paymentAmount ?? detail.payment?.amount)} />
+                <Row label="Tình trạng" value={payment?.status || detail.paymentStatus || detail.payment?.status} />
+                <Row label="Mã giao dịch" value={payment?.transactionId || detail.transactionId || detail.payment?.transactionId || payment?.id} />
+                <Row label="Thời gian TT" value={formatDateTime(payment?.paidAt || detail.paidAt || detail.payment?.paidAt || payment?.createdAt)} />
               </Stack>
             </DialogContent>
             <DialogActions sx={{ px: 3, py: 2 }}>
@@ -399,9 +426,9 @@ const StaffTickets = () => {
               <Typography variant="h6" fontWeight={800} color="primary">{reprintData.ticketCode}</Typography>
               <Box sx={{ width: '100%' }}>
                 <Row label="Phim" value={reprintData.movieTitle} />
-                <Row label="Rạp / Phòng" value={[reprintData.theaterName, reprintData.roomName].filter(Boolean).join(' · ')} />
+                <Row label="Rạp / Phòng" value={[reprintData.theaterName, reprintData.cinemaRoomName || reprintData.roomName].filter(Boolean).join(' · ')} />
                 <Row label="Ghế" value={reprintData.seatLabel} />
-                <Row label="Suất chiếu" value={formatDateTime(reprintData.showtime)} />
+                <Row label="Suất chiếu" value={formatDateTime(reprintData.startTime || reprintData.showtime)} />
               </Box>
             </Stack>
           )}

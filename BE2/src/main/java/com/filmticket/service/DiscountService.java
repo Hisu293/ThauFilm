@@ -46,7 +46,9 @@ public class DiscountService {
         if (discountUsageRepository.existsByDiscountIdAndUserId(discount.getId(), userId)) {
             throw new BadRequestException("You have already used this discount code");
         }
-        if (discount.getUsageCount() >= discount.getUsageLimit()) {
+        Integer usageLimit = discount.getUsageLimit();
+        Integer usageCount = discount.getUsageCount() == null ? 0 : discount.getUsageCount();
+        if (usageLimit != null && usageLimit > 0 && usageCount >= usageLimit) {
             throw new BadRequestException("Discount code usage limit reached");
         }
         if (totalAmount.compareTo(discount.getMinPurchaseAmount()) < 0) {
@@ -83,7 +85,7 @@ public class DiscountService {
         }
         discountAmount = discountAmount.min(totalAmount).max(BigDecimal.ZERO);
 
-        discount.setUsageCount(discount.getUsageCount() + 1);
+        discount.setUsageCount(usageCount + 1);
         discountRepository.save(discount);
 
         DiscountUsage usage = DiscountUsage.builder()

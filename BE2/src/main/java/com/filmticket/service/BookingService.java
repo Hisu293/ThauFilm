@@ -11,6 +11,8 @@ import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
@@ -21,6 +23,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.NumberFormat;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.*;
 
 @Service
@@ -43,8 +46,18 @@ public class BookingService {
     private final JavaMailSender mailSender;
     private final TicketPdfGenerator ticketPdfGenerator;
     private final RealtimeEventService realtimeEventService;
+    private final ApplicationEventPublisher eventPublisher;
+    private final PaymentGatewayService paymentGatewayService;
 
-    private static final int HOLD_MINUTES = 5;
+    @Value("${app.mail.from:onboarding@resend.dev}")
+    private String mailFrom;
+
+    private static final int HOLD_MINUTES = 10;
+    private static final ZoneId VIETNAM_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
+
+    private LocalDateTime now() {
+        return LocalDateTime.now(VIETNAM_ZONE);
+    }
 
     @Transactional(readOnly = true)
     public List<ShowtimeSeatResponse> getAvailableSeats(UUID showtimeId) {
@@ -92,7 +105,7 @@ public class BookingService {
         Showtime showtime = showtimeRepository.findById(request.getShowtimeId())
                 .orElseThrow(() -> new BadRequestException("Showtime not found"));
 
-        if (showtime.getStartTime().isBefore(LocalDateTime.now())) {
+        if (showtime.getStartTime().isBefore(now())) {
             throw new BadRequestException("Cannot book a past showtime");
         }
 
@@ -143,7 +156,7 @@ public class BookingService {
                 .totalAmount(total)
                 .status(BookingStatus.HOLD)
                 .confirmationCode(generateConfirmationCode())
-                .holdExpiresAt(LocalDateTime.now().plusMinutes(HOLD_MINUTES))
+                .holdExpiresAt(now().plusMinutes(HOLD_MINUTES))
                 .build();
 
         booking = bookingRepository.save(booking);
@@ -165,16 +178,45 @@ public class BookingService {
         Booking booking = bookingRepository.findByIdAndUserId(bookingId, userId)
                 .orElseThrow(() -> new BadRequestException("Booking not found"));
 
+        // A client can legitimately retry when the first response is lost or times out.
+        // Return the completed payment instead of turning that retry into a false failure.
+        if (booking.getStatus() == BookingStatus.CONFIRMED) {
+            Payment existingPayment = paymentRepository.findByBookingId(bookingId)
+                    .filter(payment -> payment.getStatus() == PaymentStatus.PAID)
+                    .orElse(null);
+            if (existingPayment != null) {
+                List<TicketResponse> existingTickets = ticketRepository.findByBookingId(bookingId).stream()
+                        .map(TicketResponse::fromTicket)
+                        .toList();
+                BigDecimal originalAmount = booking.getTotalAmount();
+                BigDecimal discountAmount = originalAmount.subtract(existingPayment.getAmount()).max(BigDecimal.ZERO);
+                return BookingPaymentResponse.fromPaymentResult(
+                        booking, existingPayment, existingTickets, originalAmount, discountAmount, null);
+            }
+        }
+
+        if (booking.getStatus() == BookingStatus.HOLD) {
+            if (booking.getHoldExpiresAt().isBefore(now())) {
+                releaseSeats(booking);
+                booking.setStatus(BookingStatus.EXPIRED);
+                bookingRepository.save(booking);
+                throw new BadRequestException("Booking hold has expired");
+            }
+            Payment pendingPayment = paymentRepository.findByBookingId(bookingId)
+                    .filter(payment -> payment.getStatus() == PaymentStatus.PENDING
+                            && payment.getCheckoutUrl() != null
+                            && !payment.getCheckoutUrl().isBlank())
+                    .orElse(null);
+            if (pendingPayment != null) {
+                BigDecimal discountAmount = booking.getTotalAmount().subtract(pendingPayment.getAmount()).max(BigDecimal.ZERO);
+                return BookingPaymentResponse.fromPaymentResult(
+                        booking, pendingPayment, List.of(), booking.getTotalAmount(), discountAmount, null);
+            }
+        }
+
         if (booking.getStatus() != BookingStatus.HOLD) {
             throw new BadRequestException("Booking is not in HOLD status");
         }
-        if (booking.getHoldExpiresAt().isBefore(LocalDateTime.now())) {
-            releaseSeats(booking);
-            booking.setStatus(BookingStatus.EXPIRED);
-            bookingRepository.save(booking);
-            throw new BadRequestException("Booking hold has expired");
-        }
-
         BigDecimal originalAmount = booking.getTotalAmount();
         BigDecimal discountAmount = BigDecimal.ZERO;
         String discountCode = null;
@@ -193,32 +235,87 @@ public class BookingService {
 
         BigDecimal finalAmount = originalAmount.subtract(discountAmount);
 
+        String paymentMethod = request.getPaymentMethod().trim().toUpperCase();
         Payment payment = Payment.builder()
                 .bookingId(booking.getId())
                 .amount(finalAmount)
-                .paymentMethod(request.getPaymentMethod())
-                .status(PaymentStatus.PAID)
+                .paymentMethod(paymentMethod)
+                .provider(resolveProvider(paymentMethod))
+                .status(isExternalProvider(paymentMethod) ? PaymentStatus.PENDING : PaymentStatus.PAID)
                 .transactionId(UUID.randomUUID().toString())
-                .paidAt(LocalDateTime.now())
+                .paidAt(isExternalProvider(paymentMethod) ? null : now())
                 .build();
+        payment = paymentRepository.save(payment);
+
+        if (isExternalProvider(paymentMethod)) {
+            PaymentGatewayService.GatewayPayment gatewayPayment = paymentGatewayService.createGatewayPayment(
+                    paymentMethod,
+                    payment,
+                    "ThauFilm " + booking.getConfirmationCode()
+            );
+            payment.setProvider(gatewayPayment.provider());
+            payment.setProviderCheckoutId(gatewayPayment.checkoutId());
+            payment.setProviderPaymentId(gatewayPayment.paymentId());
+            payment.setCheckoutUrl(gatewayPayment.checkoutUrl());
+            payment.setQrCode(gatewayPayment.qrCode());
+            payment.setTransactionId(gatewayPayment.checkoutId());
+            payment = paymentRepository.save(payment);
+            return BookingPaymentResponse.fromPaymentResult(booking, payment, List.of(), originalAmount, discountAmount, discountCode);
+        }
+
+        return confirmPaidBooking(booking, payment, originalAmount, discountAmount, discountCode);
+    }
+
+    @Transactional
+    public void confirmPayosPayment(String orderCode, String paymentId) {
+        Payment payment = paymentRepository.findByProviderCheckoutId(orderCode)
+                .orElseGet(() -> paymentRepository.findByProviderPaymentId(paymentId)
+                        .orElseThrow(() -> new BadRequestException("Payment not found for PayOS order")));
+        payment.setProviderPaymentId(paymentId);
+        payment.setTransactionId(orderCode);
+        confirmExternalPayment(payment);
+    }
+
+    private void confirmExternalPayment(Payment payment) {
+        if (payment.getStatus() == PaymentStatus.PAID) {
+            return;
+        }
+        Booking booking = bookingRepository.findById(payment.getBookingId())
+                .orElseThrow(() -> new BadRequestException("Booking not found"));
+        if (booking.getStatus() != BookingStatus.HOLD) {
+            throw new BadRequestException("Booking is not in HOLD status");
+        }
+        BigDecimal originalAmount = booking.getTotalAmount();
+        BigDecimal discountAmount = originalAmount.subtract(payment.getAmount()).max(BigDecimal.ZERO);
+        payment.setStatus(PaymentStatus.PAID);
+        payment.setPaidAt(now());
         paymentRepository.save(payment);
+        confirmPaidBooking(booking, payment, originalAmount, discountAmount, null);
+    }
+
+    private BookingPaymentResponse confirmPaidBooking(Booking booking, Payment payment,
+                                                       BigDecimal originalAmount, BigDecimal discountAmount,
+                                                       String discountCode) {
 
         booking.setStatus(BookingStatus.CONFIRMED);
-        booking.setConfirmedAt(LocalDateTime.now());
+        booking.setConfirmedAt(now());
         booking = bookingRepository.save(booking);
 
-        List<BookingSeat> bookingSeats = bookingSeatRepository.findByBookingId(bookingId);
-        User user = userRepository.findById(userId).orElse(null);
+        List<BookingSeat> bookingSeats = bookingSeatRepository.findByBookingId(booking.getId());
+        User user = userRepository.findById(booking.getUserId()).orElse(null);
 
-        List<Ticket> tickets = new ArrayList<>();
-        for (BookingSeat bs : bookingSeats) {
-            Ticket ticket = Ticket.builder()
-                    .bookingId(booking.getId())
-                    .seatId(bs.getSeatId())
-                    .ticketCode(generateTicketCode())
-                    .checkedIn(false)
-                    .build();
-            tickets.add(ticketRepository.save(ticket));
+        List<Ticket> tickets = ticketRepository.findByBookingId(booking.getId());
+        if (tickets.isEmpty()) {
+            tickets = new ArrayList<>();
+            for (BookingSeat bs : bookingSeats) {
+                Ticket ticket = Ticket.builder()
+                        .bookingId(booking.getId())
+                        .seatId(bs.getSeatId())
+                        .ticketCode(generateTicketCode())
+                        .checkedIn(false)
+                        .build();
+                tickets.add(ticketRepository.save(ticket));
+            }
         }
 
         List<TicketResponse> ticketResponses = tickets.stream()
@@ -228,15 +325,11 @@ public class BookingService {
         BookingPaymentResponse response = BookingPaymentResponse.fromPaymentResult(
                 booking, payment, ticketResponses, originalAmount, discountAmount, discountCode);
 
-        realtimeEventService.notifyUser(userId, "BOOKING_CONFIRMED", "Đặt vé thành công",
+        realtimeEventService.notifyUser(booking.getUserId(), "BOOKING_CONFIRMED", "Đặt vé thành công",
                 "Vé " + booking.getConfirmationCode() + " đã được xác nhận", "/my-bookings/" + booking.getId());
 
-        try {
-            if (user != null) {
-                sendTicketEmail(user.getEmail(), booking, tickets, payment, discountAmount, finalAmount);
-            }
-        } catch (Exception ex) {
-            log.error("Failed to send ticket email for booking {}", booking.getId(), ex);
+        if (user != null && user.getEmail() != null && !user.getEmail().isBlank()) {
+            eventPublisher.publishEvent(new BookingConfirmedEvent(booking.getId(), discountAmount, payment.getAmount()));
         }
 
         return response;
@@ -272,7 +365,7 @@ public class BookingService {
         }
 
         ticket.setCheckedIn(true);
-        ticket.setCheckedInAt(java.time.LocalDateTime.now());
+        ticket.setCheckedInAt(now());
         ticket = ticketRepository.save(ticket);
         return TicketResponse.fromTicket(ticket);
     }
@@ -347,6 +440,9 @@ public class BookingService {
 
         MimeMessage message = mailSender.createMimeMessage();
         MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+        if (mailFrom != null && !mailFrom.isBlank()) {
+            helper.setFrom(mailFrom);
+        }
         helper.setTo(to);
         helper.setSubject(subject);
         helper.setText(html, true);
@@ -355,6 +451,7 @@ public class BookingService {
         helper.addAttachment("ticket.pdf", new ByteArrayResource(pdfBytes));
 
         mailSender.send(message);
+        log.info("Ticket email sent to {} for booking {}", to, booking.getId());
     }
 
     /**
@@ -381,10 +478,40 @@ public class BookingService {
         }
     }
 
+    @Transactional(readOnly = true)
+    public void sendConfirmedBookingEmail(UUID bookingId, BigDecimal discountAmount, BigDecimal finalAmount) {
+        Booking booking = bookingRepository.findById(bookingId).orElse(null);
+        if (booking == null || booking.getStatus() != BookingStatus.CONFIRMED) return;
+
+        User user = userRepository.findById(booking.getUserId()).orElse(null);
+        Payment payment = paymentRepository.findByBookingId(bookingId).orElse(null);
+        List<Ticket> tickets = ticketRepository.findByBookingId(bookingId);
+        if (user == null || user.getEmail() == null || user.getEmail().isBlank()
+                || payment == null || tickets.isEmpty()) {
+            log.warn("Skip ticket email for booking {} because user, payment, email or ticket is missing", bookingId);
+            return;
+        }
+
+        try {
+            sendTicketEmail(user.getEmail(), booking, tickets, payment, discountAmount, finalAmount);
+        } catch (Exception ex) {
+            log.error("Failed to send ticket email for booking {}", bookingId, ex);
+        }
+    }
+
     private String buildHtmlBody(Booking booking, List<Ticket> tickets, Payment payment,
                                  BigDecimal discountAmount, BigDecimal finalAmount, String movieTitle) {
         String cinema = "Rap";
         String showtime = "";
+        List<BookingSeat> bookingSeats = bookingSeatRepository.findByBookingId(booking.getId());
+        Map<UUID, BigDecimal> seatPriceById = new HashMap<>();
+        BigDecimal seatTotal = BigDecimal.ZERO;
+        for (BookingSeat bookingSeat : bookingSeats) {
+            BigDecimal price = bookingSeat.getPriceAtBooking() != null ? bookingSeat.getPriceAtBooking() : BigDecimal.ZERO;
+            seatPriceById.put(bookingSeat.getSeatId(), price);
+            seatTotal = seatTotal.add(price);
+        }
+        BigDecimal comboTotal = booking.getTotalAmount().subtract(seatTotal).max(BigDecimal.ZERO);
 
         Showtime s = showtimeRepository.findById(booking.getShowtimeId()).orElse(null);
         if (s != null) {
@@ -407,10 +534,12 @@ public class BookingService {
                 case COUPLE -> "Doi";
                 case STANDARD -> "Thuong";
             } : "Khong ro";
+            BigDecimal seatPrice = seatPriceById.getOrDefault(ticket.getSeatId(), BigDecimal.ZERO);
             ticketListHtml.append("<li>")
                     .append(escape(ticket.getTicketCode()))
                     .append(" - Ghe ").append(escape(seatLabel))
                     .append(" - Loai ").append(escape(seatType))
+                    .append(" - Gia ").append(formatMoney(seatPrice)).append(" VND")
                     .append("</li>");
         }
 
@@ -425,7 +554,11 @@ public class BookingService {
         builder.append("<tr><td style='padding:6px 8px;color:#666'>Ma dat ve</td><td style='padding:6px 8px'>").append(escape(booking.getConfirmationCode())).append("</td></tr>");
         builder.append("</table>");
         builder.append("<p>Danh sach ve:</p><ul>").append(ticketListHtml).append("</ul>");
-        builder.append("<p>Tong tien: <b>").append(formatMoney(booking.getTotalAmount())).append(" VND</b></p>");
+        builder.append("<p>Tien ghe: <b>").append(formatMoney(seatTotal)).append(" VND</b></p>");
+        if (comboTotal.compareTo(BigDecimal.ZERO) > 0) {
+            builder.append("<p>Combo bap nuoc: <b>").append(formatMoney(comboTotal)).append(" VND</b></p>");
+        }
+        builder.append("<p>Tong tien truoc giam: <b>").append(formatMoney(booking.getTotalAmount())).append(" VND</b></p>");
         if (discountAmount.compareTo(BigDecimal.ZERO) > 0) {
             builder.append("<p>Giam gia: <b>-").append(formatMoney(discountAmount)).append(" VND</b></p>");
         }
@@ -518,6 +651,17 @@ public class BookingService {
 
     private String generateConfirmationCode() {
         return "BK" + String.format("%06d", new Random().nextInt(999999));
+    }
+
+    private boolean isExternalProvider(String paymentMethod) {
+        String normalized = String.valueOf(paymentMethod).trim().toUpperCase(Locale.ROOT);
+        return "PAYOS".equals(normalized) || "VIETQR".equals(normalized);
+    }
+
+    private String resolveProvider(String paymentMethod) {
+        String normalized = String.valueOf(paymentMethod).trim().toUpperCase(Locale.ROOT);
+        if ("PAYOS".equals(normalized) || "VIETQR".equals(normalized)) return "PAYOS";
+        return "MOCK";
     }
 
     private String generateTicketCode() {

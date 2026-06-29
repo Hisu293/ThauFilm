@@ -131,6 +131,7 @@ export const bookingService = {
       maxDiscountAmount: Number(discount.maxDiscountAmount) || 0,
       usageLimit: Number(discount.usageLimit) || 0,
       usageCount: Number(discount.usageCount) || 0,
+      applicableSeatTypes: discount.applicableSeatTypes ?? '',
       validFrom: discount.validFrom ?? '',
       validTo: discount.validTo ?? '',
       active: Boolean(discount.active),

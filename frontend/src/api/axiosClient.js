@@ -28,7 +28,7 @@ axiosClient.interceptors.response.use(
   (error) => {
     if (!error.response) {
       return Promise.reject(
-        new Error(`KhÃ´ng thá»ƒ káº¿t ná»‘i Ä‘áº¿n server táº¡i ${API_BASE_URL}. Vui lÃ²ng kiá»ƒm tra káº¿t ná»‘i máº¡ng hoáº·c server backend.`)
+        new Error(`Không thể kết nối đến server tại ${API_BASE_URL}. Vui lòng kiểm tra kết nối mạng hoặc server backend.`)
       );
     }
 
@@ -36,7 +36,7 @@ axiosClient.interceptors.response.use(
       error.response?.data?.message ||
       error.response?.data?.error ||
       error.message ||
-      'ÄÃ£ xáº£y ra lá»—i há»‡ thá»‘ng. Vui lÃ²ng thá»­ láº¡i sau.';
+      'Đã xảy ra lỗi hệ thống. Vui lòng thử lại sau.';
 
     const normalizedError = new Error(message);
     normalizedError.status = error.response?.status;
