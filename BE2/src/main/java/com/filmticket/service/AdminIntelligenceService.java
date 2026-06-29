@@ -143,9 +143,43 @@ public class AdminIntelligenceService {
 
     @Transactional
     public List<ShowtimeResponse> applyWeeklyPlan(List<WeeklyShowtimeRequest> plan) {
-        return plan.stream().map(item -> showtimeService.createShowtime(UpsertShowtimeRequest.builder()
-                .movieId(item.movieId()).cinemaRoomId(item.cinemaRoomId()).startTime(item.startTime())
-                .endTime(item.endTime()).status(ShowtimeStatus.SCHEDULED).build())).toList();
+        List<ShowtimeResponse> created = new ArrayList<>();
+        for (WeeklyShowtimeRequest item : plan) {
+            if (item == null || item.movieId() == null || item.cinemaRoomId() == null || item.startTime() == null) {
+                continue;
+            }
+
+            LocalDateTime endTime = item.endTime();
+            if (endTime == null || !endTime.isAfter(item.startTime())) {
+                Movie movie = movieRepository.findById(item.movieId()).orElse(null);
+                if (movie == null || movie.getDurationMinutes() == null) {
+                    continue;
+                }
+                endTime = item.startTime().plusMinutes(movie.getDurationMinutes()).plusMinutes(15);
+            }
+
+            boolean overlapsExisting = !showtimeRepository
+                    .findOverlappingShowtimes(item.cinemaRoomId(), item.startTime(), endTime)
+                    .isEmpty();
+            if (overlapsExisting) {
+                continue;
+            }
+
+            try {
+                created.add(showtimeService.createShowtime(UpsertShowtimeRequest.builder()
+                        .movieId(item.movieId())
+                        .cinemaRoomId(item.cinemaRoomId())
+                        .startTime(item.startTime())
+                        .endTime(endTime)
+                        .status(ShowtimeStatus.SCHEDULED)
+                        .build()));
+            } catch (BadRequestException ex) {
+                if (ex.getMessage() == null || !ex.getMessage().toLowerCase(Locale.ROOT).contains("overlap")) {
+                    throw ex;
+                }
+            }
+        }
+        return created;
     }
 
     private Map<UUID, Long> confirmedSeatsByShowtime() {
