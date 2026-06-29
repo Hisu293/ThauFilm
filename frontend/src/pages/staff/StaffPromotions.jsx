@@ -27,6 +27,8 @@ import {
   LinearProgress,
   Tooltip,
   InputAdornment,
+  Checkbox,
+  FormControlLabel,
 } from '@mui/material';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import EditRoundedIcon from '@mui/icons-material/EditRounded';
@@ -44,10 +46,17 @@ const TYPE_OPTIONS = [
   { value: 'FIXED', label: 'Giảm số tiền cố định (đ)' },
 ];
 
+const SEAT_TYPE_OPTIONS = [
+  { value: 'STANDARD', label: 'Ghế thường' },
+  { value: 'VIP', label: 'Ghế VIP' },
+  { value: 'COUPLE', label: 'Ghế đôi' },
+];
+
 const emptyForm = {
   code: '', name: '', type: 'PERCENTAGE', value: '',
   minPurchaseAmount: '', maxDiscountAmount: '',
   validFrom: '', validTo: '', usageLimit: '', active: true,
+  applicableSeatTypes: '',
 };
 
 const formatDate = (iso) => {
@@ -58,11 +67,34 @@ const formatDate = (iso) => {
     return iso;
   }
 };
-const formatCurrency = (n) =>
-  typeof n === 'number' ? new Intl.NumberFormat('vi-VN').format(n) + 'đ' : '—';
+const formatCurrency = (n) => {
+  const value = Number(n);
+  return Number.isFinite(value) ? `${new Intl.NumberFormat('vi-VN').format(value)} VND` : '-';
+};
 
 const discountText = (p) =>
-  ['PERCENT', 'PERCENTAGE'].includes(p.type) ? `${p.value}%` : formatCurrency(p.value);
+  ['PERCENT', 'PERCENTAGE'].includes(String(p.type).toUpperCase()) ? `${p.value}%` : formatCurrency(p.value);
+
+const parseSeatTypes = (value) => {
+  if (Array.isArray(value)) return value;
+  return String(value || '')
+    .split(',')
+    .map((item) => item.trim().toUpperCase())
+    .filter(Boolean);
+};
+
+const serializeSeatTypes = (values) => parseSeatTypes(values).join(',');
+
+const seatTypeLabelText = (value) => {
+  const selected = parseSeatTypes(value);
+  if (selected.length === 0 || SEAT_TYPE_OPTIONS.every((option) => selected.includes(option.value))) {
+    return 'Tat ca ghe';
+  }
+  return SEAT_TYPE_OPTIONS
+    .filter((option) => selected.includes(option.value))
+    .map((option) => option.label)
+    .join(', ');
+};
 
 const StaffPromotions = () => {
   const [promos, setPromos] = useState([]);
@@ -168,6 +200,14 @@ const StaffPromotions = () => {
     }
   };
 
+  const toggleSeatType = (seatType) => {
+    const current = parseSeatTypes(form.applicableSeatTypes);
+    const next = current.includes(seatType)
+      ? current.filter((item) => item !== seatType)
+      : [...current, seatType];
+    setForm({ ...form, applicableSeatTypes: serializeSeatTypes(next) });
+  };
+
   const q = search.trim().toLowerCase();
   const filtered = q
     ? promos.filter((p) => [p.code, p.name].filter(Boolean).some((v) => String(v).toLowerCase().includes(q)))
@@ -228,7 +268,7 @@ const StaffPromotions = () => {
                   {filtered.map((p) => {
                     const tm = TYPE_META[p.type] || { label: p.type, color: 'default' };
                     const limit = p.usageLimit;
-                    const used = p.usedCount ?? 0;
+                    const used = p.usageCount ?? p.usedCount ?? 0;
                     const pct = limit ? Math.min(100, Math.round((used / limit) * 100)) : 0;
                     return (
                       <TableRow key={p.id} hover>
@@ -239,6 +279,9 @@ const StaffPromotions = () => {
                         <TableCell>
                           <Chip size="small" label={tm.label} color={tm.color} sx={{ fontWeight: 700, mr: 0.5 }} />
                           <Typography component="span" fontWeight={700}>{discountText(p)}</Typography>
+                          <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
+                            {seatTypeLabelText(p.applicableSeatTypes)}
+                          </Typography>
                         </TableCell>
                         <TableCell sx={{ color: 'text.secondary' }}>
                           <Typography variant="caption" display="block">Đơn từ {formatCurrency(p.minPurchaseAmount)}</Typography>
@@ -300,12 +343,12 @@ const StaffPromotions = () => {
             <TextField label="Tên chương trình" fullWidth value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
               <TextField
-                label={form.type === 'PERCENT' ? 'Giá trị giảm (%)' : 'Giá trị giảm (đ)'}
+                label={['PERCENT', 'PERCENTAGE'].includes(form.type) ? 'Gia tri giam (%)' : 'Gia tri giam (VND)'}
                 type="number"
                 fullWidth
                 value={form.value}
                 onChange={(e) => setForm({ ...form, value: e.target.value })}
-                InputProps={{ endAdornment: <InputAdornment position="end">{form.type === 'PERCENT' ? '%' : 'đ'}</InputAdornment> }}
+                InputProps={{ endAdornment: <InputAdornment position="end">{['PERCENT', 'PERCENTAGE'].includes(form.type) ? '%' : 'VND'}</InputAdornment> }}
               />
               <TextField label="Giảm tối đa (đ)" type="number" fullWidth value={form.maxDiscountAmount} onChange={(e) => setForm({ ...form, maxDiscountAmount: e.target.value })} />
             </Stack>
@@ -313,6 +356,28 @@ const StaffPromotions = () => {
               <TextField label="Đơn tối thiểu (đ)" type="number" fullWidth value={form.minPurchaseAmount} onChange={(e) => setForm({ ...form, minPurchaseAmount: e.target.value })} />
               <TextField label="Giới hạn lượt dùng" type="number" fullWidth value={form.usageLimit} onChange={(e) => setForm({ ...form, usageLimit: e.target.value })} />
             </Stack>
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>
+                Ap dung cho loai ghe
+              </Typography>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+                {SEAT_TYPE_OPTIONS.map((option) => (
+                  <FormControlLabel
+                    key={option.value}
+                    control={
+                      <Checkbox
+                        checked={parseSeatTypes(form.applicableSeatTypes).includes(option.value)}
+                        onChange={() => toggleSeatType(option.value)}
+                      />
+                    }
+                    label={option.label}
+                  />
+                ))}
+              </Stack>
+              <Typography variant="caption" color="text.secondary">
+                Khong chon loai ghe nao thi ma giam gia ap dung cho ca ghe thuong, VIP va ghe doi.
+              </Typography>
+            </Box>
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
               <TextField label="Bắt đầu" type="datetime-local" fullWidth InputLabelProps={{ shrink: true }} value={form.validFrom} onChange={(e) => setForm({ ...form, validFrom: e.target.value })} />
               <TextField label="Kết thúc" type="datetime-local" fullWidth InputLabelProps={{ shrink: true }} value={form.validTo} onChange={(e) => setForm({ ...form, validTo: e.target.value })} />

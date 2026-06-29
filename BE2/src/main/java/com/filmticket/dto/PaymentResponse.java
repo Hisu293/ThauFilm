@@ -19,9 +19,16 @@ public class PaymentResponse {
     private UUID bookingId;
     private BigDecimal amount;
     private String paymentMethod;
+    private String provider;
     private String status;
     private String transactionId;
+    private String checkoutUrl;
+    private String qrCode;
+    private String providerRefundId;
+    private String refundReason;
+    private String refundFailedReason;
     private LocalDateTime paidAt;
+    private LocalDateTime refundedAt;
 
     public static PaymentResponse fromPayment(Payment payment) {
         return PaymentResponse.builder()
@@ -29,9 +36,16 @@ public class PaymentResponse {
                 .bookingId(payment.getBookingId())
                 .amount(payment.getAmount())
                 .paymentMethod(payment.getPaymentMethod())
+                .provider(payment.getProvider())
                 .status(payment.getStatus().name())
                 .transactionId(payment.getTransactionId())
+                .checkoutUrl(payment.getCheckoutUrl())
+                .qrCode(payment.getQrCode())
+                .providerRefundId(payment.getProviderRefundId())
+                .refundReason(payment.getRefundReason())
+                .refundFailedReason(payment.getRefundFailedReason())
                 .paidAt(payment.getPaidAt())
+                .refundedAt(payment.getRefundedAt())
                 .build();
     }
 }

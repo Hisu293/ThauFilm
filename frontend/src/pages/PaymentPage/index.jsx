@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Alert,
@@ -74,11 +74,30 @@ const formatDiscountLabel = (discount) => {
   return formatCurrency(discount.value);
 };
 
-const isDiscountApplicable = (discount, subtotal, usedCodes = new Set()) => {
+const parseApplicableSeatTypes = (value) =>
+  String(value || '')
+    .split(',')
+    .map((item) => item.trim().toUpperCase())
+    .filter(Boolean);
+
+const seatMatchesDiscount = (discount, selectedSeats = []) => {
+  const allowedTypes = parseApplicableSeatTypes(discount.applicableSeatTypes);
+  if (allowedTypes.length === 0) return true;
+
+  const selectedTypes = selectedSeats
+    .map((seat) => String(seat.type || '').trim().toUpperCase())
+    .filter(Boolean);
+  if (selectedTypes.length === 0) return false;
+
+  return selectedTypes.some((type) => allowedTypes.includes(type));
+};
+
+const isDiscountApplicable = (discount, subtotal, usedCodes = new Set(), selectedSeats = []) => {
   if (!discount || discount.active === false || subtotal < (discount.minPurchaseAmount || 0)) return false;
   if (!['FIXED', 'PERCENTAGE'].includes(discount.type) || discount.value <= 0) return false;
   if (discount.usageLimit > 0 && discount.usageCount >= discount.usageLimit) return false;
   if (usedCodes.has(String(discount.code || '').trim().toUpperCase())) return false;
+  if (!seatMatchesDiscount(discount, selectedSeats)) return false;
 
   const now = Date.now();
   const validFrom = discount.validFrom ? new Date(discount.validFrom).getTime() : null;
@@ -113,7 +132,7 @@ export const PaymentPage = () => {
   const [movie, setMovie] = useState(null);
   const [showtime, setShowtime] = useState(null);
   const [selectedSeats, setSelectedSeats] = useState([]);
-  const [paymentMethod, setPaymentMethod] = useState('bank_card');
+  const [paymentMethod, setPaymentMethod] = useState('qr_pay');
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [holdExpiresAt, setHoldExpiresAt] = useState(null);
   const [discounts, setDiscounts] = useState([]);
@@ -125,6 +144,7 @@ export const PaymentPage = () => {
   const [bookingStatus, setBookingStatus] = useState('');
   const [bookingOriginalAmount, setBookingOriginalAmount] = useState(null);
   const [invalidBookingMessage, setInvalidBookingMessage] = useState('');
+  const paymentInFlight = useRef(false);
   const { isExpired } = useHoldCountdown(holdExpiresAt);
   const isHoldExpired = Boolean(holdExpiresAt) && isExpired;
 
@@ -265,7 +285,7 @@ export const PaymentPage = () => {
   const comboTotal = selectedCombos.reduce((sum, combo) => sum + (Number(combo.price) || 0), 0);
   const subtotal = seatsTotal + comboTotal;
   const usedDiscountCodes = getSavedDiscountCodes();
-  const availableDiscounts = discounts.filter((discount) => isDiscountApplicable(discount, subtotal, usedDiscountCodes));
+  const availableDiscounts = discounts.filter((discount) => isDiscountApplicable(discount, subtotal, usedDiscountCodes, selectedSeats));
   const selectedDiscount = availableDiscounts.find((discount) => discount.id === selectedDiscountId) || null;
   const discountAmount = getDiscountAmount(selectedDiscount, subtotal);
   const totalAmount = Math.max(subtotal - discountAmount, 0);
@@ -314,7 +334,7 @@ export const PaymentPage = () => {
   };
 
   const handlePay = async () => {
-    if (!bookingId || apiLoading) return;
+    if (!bookingId || apiLoading || paymentInFlight.current) return;
     if (bookingStatus && !['HOLD', 'PENDING'].includes(bookingStatus)) {
       setInvalidBookingMessage('Booking này không còn ở trạng thái chờ thanh toán. Vui lòng kiểm tra lại trong Vé của tôi.');
       return;
@@ -325,12 +345,13 @@ export const PaymentPage = () => {
     }
 
     let payableBookingId = bookingId;
+    paymentInFlight.current = true;
 
     try {
       const paymentMethodMap = {
-        bank_card: 'VNPAY',
-        e_wallet: 'MOMO',
-        qr_pay: 'ZALOPAY',
+        bank_card: 'PAYOS',
+        e_wallet: 'PAYOS',
+        qr_pay: 'PAYOS',
       };
       const backendPaymentMethod = paymentMethodMap[paymentMethod] || 'CASH';
       const discountCode = selectedDiscount?.code || '';
@@ -348,6 +369,7 @@ export const PaymentPage = () => {
 
         const replacementBooking = await create(showtimeId, seatIds, 'ONLINE', selectedComboIds);
         payableBookingId = replacementBooking.id;
+        setBookingOriginalAmount(Number(replacementBooking.totalAmount) || subtotal);
         saveBookingReplacement(bookingId, payableBookingId);
         setBookingId(payableBookingId);
         sessionStorage.setItem('tf_booking_id', payableBookingId);
@@ -363,6 +385,18 @@ export const PaymentPage = () => {
       }
 
       const result = await pay(payableBookingId, backendPaymentMethod, discountCode);
+      const checkoutUrl = result?.checkoutUrl || result?.payment?.checkoutUrl;
+      if (checkoutUrl) {
+        savePaidBookingSummary(payableBookingId, {
+          originalAmount: subtotal,
+          discountAmount,
+          finalAmount: totalAmount,
+          discountCode: selectedDiscount?.code || '',
+          paymentMethod,
+        });
+        window.location.href = checkoutUrl;
+        return;
+      }
       goToSuccess(result, {}, payableBookingId);
     } catch (err) {
       const discountRejected = /discount|already used|usage limit|expired|inactive|minimum requirement/i.test(err?.message || '');
@@ -387,6 +421,8 @@ export const PaymentPage = () => {
       }
 
       setSnackbarOpen(true);
+    } finally {
+      paymentInFlight.current = false;
     }
   };
 

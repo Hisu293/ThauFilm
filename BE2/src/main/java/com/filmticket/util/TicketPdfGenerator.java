@@ -41,6 +41,7 @@ public class TicketPdfGenerator {
     private final CinemaRoomRepository cinemaRoomRepository;
     private final SeatRepository seatRepository;
     private final PaymentRepository paymentRepository;
+    private final BookingSeatRepository bookingSeatRepository;
 
     public byte[] generateTicketPdf(Booking booking, List<Ticket> tickets) throws Exception {
         Document document = new Document(PageSize.A4, 40, 40, 40, 40);
@@ -162,9 +163,9 @@ public class TicketPdfGenerator {
     }
 
     private void addTicketTable(Document document, Booking booking, List<Ticket> tickets) throws Exception {
-        PdfPTable table = new PdfPTable(4);
+        PdfPTable table = new PdfPTable(5);
         table.setWidthPercentage(100);
-        table.setWidths(new float[] { 0.8f, 1.2f, 1.8f, 1.2f });
+        table.setWidths(new float[] { 0.7f, 1.1f, 1.7f, 1.1f, 1.4f });
         table.setSpacingBefore(4);
         table.setSpacingAfter(10);
 
@@ -172,6 +173,15 @@ public class TicketPdfGenerator {
         table.addCell(createHeaderCell("GHE"));
         table.addCell(createHeaderCell("MA VE"));
         table.addCell(createHeaderCell("LOAI"));
+        table.addCell(createHeaderCell("GIA"));
+
+        java.util.Map<java.util.UUID, BigDecimal> seatPriceById = bookingSeatRepository
+                .findByBookingId(booking.getId())
+                .stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        BookingSeat::getSeatId,
+                        bs -> bs.getPriceAtBooking() != null ? bs.getPriceAtBooking() : BigDecimal.ZERO,
+                        (a, b) -> a));
 
         for (int i = 0; i < tickets.size(); i++) {
             Ticket ticket = tickets.get(i);
@@ -185,6 +195,7 @@ public class TicketPdfGenerator {
             table.addCell(createDataCell(seatInfo));
             table.addCell(createDataCell(ticket.getTicketCode()));
             table.addCell(createDataCell(seatType));
+            table.addCell(createDataCell(formatMoney(seatPriceById.getOrDefault(ticket.getSeatId(), BigDecimal.ZERO)) + " VND"));
 
             if (i == 0) {
                 table.setHeaderRows(1);
@@ -199,6 +210,11 @@ public class TicketPdfGenerator {
                 .map(Payment::getAmount)
                 .orElse(booking.getTotalAmount());
         BigDecimal discountAmount = booking.getTotalAmount().subtract(finalAmount).max(BigDecimal.ZERO);
+        BigDecimal seatTotal = bookingSeatRepository.findByBookingId(booking.getId())
+                .stream()
+                .map(bs -> bs.getPriceAtBooking() != null ? bs.getPriceAtBooking() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal comboTotal = booking.getTotalAmount().subtract(seatTotal).max(BigDecimal.ZERO);
 
         PdfPTable table = new PdfPTable(2);
         table.setWidthPercentage(100);
@@ -208,7 +224,15 @@ public class TicketPdfGenerator {
         table.getDefaultCell().setBorder(Rectangle.NO_BORDER);
         table.getDefaultCell().setPadding(5);
 
-        table.addCell(createLabelCell("TONG TIEN"));
+        table.addCell(createLabelCell("TIEN GHE"));
+        table.addCell(createValueCell(formatMoney(seatTotal) + " VND"));
+
+        if (comboTotal.compareTo(BigDecimal.ZERO) > 0) {
+            table.addCell(createLabelCell("COMBO BAP NUOC"));
+            table.addCell(createValueCell(formatMoney(comboTotal) + " VND"));
+        }
+
+        table.addCell(createLabelCell("TONG TRUOC GIAM"));
         table.addCell(createValueCell(formatMoney(booking.getTotalAmount()) + " VND"));
 
         if (discountAmount.compareTo(BigDecimal.ZERO) > 0) {

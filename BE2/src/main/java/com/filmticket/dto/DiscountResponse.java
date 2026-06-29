@@ -24,6 +24,8 @@ public class DiscountResponse {
     private BigDecimal maxDiscountAmount;
     private LocalDateTime validFrom;
     private LocalDateTime validTo;
+    private Integer usageLimit;
+    private Integer usageCount;
     private boolean active;
     private String applicableSeatTypes;
 
@@ -38,6 +40,8 @@ public class DiscountResponse {
                 .maxDiscountAmount(discount.getMaxDiscountAmount())
                 .validFrom(discount.getValidFrom())
                 .validTo(discount.getValidTo())
+                .usageLimit(discount.getUsageLimit())
+                .usageCount(discount.getUsageCount())
                 .active(discount.isActive())
                 .applicableSeatTypes(discount.getApplicableSeatTypes())
                 .build();

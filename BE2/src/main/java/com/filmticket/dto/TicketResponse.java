@@ -55,6 +55,9 @@ public class TicketResponse {
     // Payment info
     private String paymentMethod;
     private String paymentStatus;
+    private BigDecimal paymentAmount;
+    private String transactionId;
+    private LocalDateTime paidAt;
 
     public static TicketResponse fromTicket(Ticket ticket) {
         return TicketResponse.builder()
