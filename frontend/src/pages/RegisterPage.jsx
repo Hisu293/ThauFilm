@@ -35,11 +35,11 @@ function getPasswordStrength(pw) {
   if (/[0-9]/.test(pw))        score++;
   if (/[^A-Za-z0-9]/.test(pw)) score++;
   const map = [
-    { label: 'Very Weak',   color: '#e50914' },
-    { label: 'Weak',        color: '#ff6b35' },
-    { label: 'Fair',        color: '#ffc107' },
-    { label: 'Strong',      color: '#4caf50' },
-    { label: 'Very Strong', color: '#00e676' },
+    { label: 'Rất yếu',    color: '#e50914' },
+    { label: 'Yếu',        color: '#ff6b35' },
+    { label: 'Trung bình', color: '#ffc107' },
+    { label: 'Mạnh',       color: '#4caf50' },
+    { label: 'Rất mạnh',   color: '#00e676' },
   ];
   return { score, ...map[score] };
 }
@@ -88,26 +88,26 @@ const RegisterPage = () => {
     if (!submitted) return {};
     const e = {};
     if (!form.fullName.trim())
-      e.fullName = 'Full name is required.';
+      e.fullName = 'Vui lòng nhập họ và tên.';
   // username not required by backend, removed from form
     if (!form.email.trim())
-      e.email = 'Email is required.';
+      e.email = 'Vui lòng nhập địa chỉ email.';
     else if (!EMAIL_RE.test(form.email.trim()))
-      e.email = 'Enter a valid email address.';
+      e.email = 'Vui lòng nhập địa chỉ Gmail hợp lệ.';
     if (!form.phone.trim())
-      e.phone = 'Phone number is required.';
+      e.phone = 'Vui lòng nhập số điện thoại.';
     else if (!PHONE_RE.test(form.phone.trim()))
-      e.phone = 'Enter a valid phone number (9–15 digits).';
+      e.phone = 'Số điện thoại phải gồm đúng 10 chữ số.';
     if (!form.password)
-      e.password = 'Password is required.';
+      e.password = 'Vui lòng nhập mật khẩu.';
     else if (form.password.length < 6)
-      e.password = 'Password must be at least 6 characters.';
+      e.password = 'Mật khẩu phải có ít nhất 6 ký tự.';
     if (!form.confirmPassword)
-      e.confirmPassword = 'Please confirm your password.';
+      e.confirmPassword = 'Vui lòng xác nhận mật khẩu.';
     else if (form.password !== form.confirmPassword)
-      e.confirmPassword = 'Passwords do not match.';
+      e.confirmPassword = 'Mật khẩu xác nhận không khớp.';
     if (!acceptTerms)
-      e.terms = 'You must accept the Terms & Conditions.';
+      e.terms = 'Bạn phải đồng ý với Điều khoản và Điều kiện.';
     return e;
   }, [submitted, form, acceptTerms]);
 
@@ -182,10 +182,10 @@ const RegisterPage = () => {
       {/* ── Heading ── */}
       <Stack spacing={0.5} sx={{ mb: 3 }}>
         <Typography variant="h4" sx={{ fontWeight: 800, color: '#fff' }}>
-          Create Account
+          Tạo tài khoản
         </Typography>
         <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.70)' }}>
-          Join us and start booking movie tickets today.
+          Tham gia cùng chúng tôi và bắt đầu đặt vé xem phim ngay hôm nay.
         </Typography>
       </Stack>
 
@@ -200,7 +200,7 @@ const RegisterPage = () => {
             border: '1px solid rgba(76,175,80,0.35)',
           }}
         >
-          Account created! Redirecting to login…
+          Tạo tài khoản thành công! Đang chuyển đến trang đăng nhập…
         </Alert>
       </Collapse>
 
@@ -215,7 +215,7 @@ const RegisterPage = () => {
             border: '1px solid rgba(229,9,20,0.35)',
           }}
         >
-          Please fix the errors below before continuing.
+          Vui lòng kiểm tra và sửa các lỗi bên dưới trước khi tiếp tục.
         </Alert>
       </Collapse>
 
@@ -240,7 +240,7 @@ const RegisterPage = () => {
 
           {/* Full Name */}
           <TextField
-            label="Full Name"
+            label="Họ và tên"
             name="fullName"
             id="reg-fullname"
             type="text"
@@ -257,7 +257,7 @@ const RegisterPage = () => {
 
           {/* Email */}
           <TextField
-            label="Email Address"
+            label="Địa chỉ email"
             name="email"
             id="reg-email"
             type="email"
@@ -272,7 +272,7 @@ const RegisterPage = () => {
 
           {/* Phone */}
           <TextField
-            label="Phone Number"
+            label="Số điện thoại"
             name="phone"
             id="reg-phone"
             type="tel"
@@ -288,7 +288,7 @@ const RegisterPage = () => {
           {/* Password + strength bar */}
           <Box>
             <TextField
-              label="Password"
+              label="Mật khẩu"
               name="password"
               id="reg-password"
               type={showPw ? 'text' : 'password'}
@@ -303,7 +303,7 @@ const RegisterPage = () => {
                 endAdornment: (
                   <InputAdornment position="end">
                     <IconButton
-                      aria-label={showPw ? 'Hide password' : 'Show password'}
+                      aria-label={showPw ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
                       onClick={() => setShowPw((v) => !v)}
                       edge="end"
                       sx={{ color: 'rgba(255,255,255,0.7)' }}
@@ -338,7 +338,7 @@ const RegisterPage = () => {
 
           {/* Confirm Password */}
           <TextField
-            label="Confirm Password"
+            label="Xác nhận mật khẩu"
             name="confirmPassword"
             id="reg-confirm-password"
             type={showCpw ? 'text' : 'password'}
@@ -349,7 +349,7 @@ const RegisterPage = () => {
               errors.confirmPassword
                 ? errors.confirmPassword
                 : liveMismatch
-                ? 'Passwords do not match.'
+                ? 'Mật khẩu xác nhận không khớp.'
                 : ' '
             }
             autoComplete="new-password"
@@ -359,7 +359,7 @@ const RegisterPage = () => {
               endAdornment: (
                 <InputAdornment position="end">
                   <IconButton
-                    aria-label={showCpw ? 'Hide confirm password' : 'Show confirm password'}
+                    aria-label={showCpw ? 'Ẩn mật khẩu xác nhận' : 'Hiện mật khẩu xác nhận'}
                     onClick={() => setShowCpw((v) => !v)}
                     edge="end"
                     sx={{ color: 'rgba(255,255,255,0.7)' }}
@@ -388,21 +388,21 @@ const RegisterPage = () => {
                   variant="body2"
                   sx={{ color: errors.terms ? '#ff8a80' : 'rgba(255,255,255,0.82)' }}
                 >
-                  I accept the{' '}
+                  Tôi đồng ý với{' '}
                   <Button
                     variant="text"
                     color="primary"
                     sx={{ textTransform: 'none', p: 0, minWidth: 'unset', fontWeight: 700, fontSize: 'inherit' }}
                   >
-                    Terms &amp; Conditions
+                    Điều khoản và Điều kiện
                   </Button>
-                  {' '}and{' '}
+                  {' '}và{' '}
                   <Button
                     variant="text"
                     color="primary"
                     sx={{ textTransform: 'none', p: 0, minWidth: 'unset', fontWeight: 700, fontSize: 'inherit' }}
                   >
-                    Privacy Policy
+                    Chính sách bảo mật
                   </Button>
                 </Typography>
               }
@@ -419,7 +419,7 @@ const RegisterPage = () => {
               }
               label={
                 <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.72)' }}>
-                  Subscribe to exclusive promotions &amp; offers
+                  Đăng ký nhận khuyến mãi và ưu đãi độc quyền
                 </Typography>
               }
             />
@@ -447,10 +447,10 @@ const RegisterPage = () => {
               },
             }}
           >
-            {loading ? <CircularProgress size={22} color="inherit" /> : 'Create Account'}
+            {loading ? <CircularProgress size={22} color="inherit" /> : 'Tạo tài khoản'}
           </Button>
 
-          <Divider sx={{ color: 'rgba(255,255,255,0.42)', fontSize: '0.8rem' }}>or</Divider>
+          <Divider sx={{ color: 'rgba(255,255,255,0.42)', fontSize: '0.8rem' }}>hoặc</Divider>
 
           {/* Google */}
           <Button
@@ -474,7 +474,7 @@ const RegisterPage = () => {
               },
             }}
           >
-            Continue with Google
+            Tiếp tục với Google
           </Button>
 
           {/* Login link */}
@@ -482,7 +482,7 @@ const RegisterPage = () => {
             variant="body2"
             sx={{ color: 'rgba(255,255,255,0.75)', textAlign: 'center', mt: 0.5 }}
           >
-            Already have an account?{' '}
+            Bạn đã có tài khoản?{' '}
             <Button
               id="reg-login-link"
               component={RouterLink}
@@ -491,7 +491,7 @@ const RegisterPage = () => {
               color="primary"
               sx={{ textTransform: 'none', fontWeight: 800, px: 0.5, minWidth: 'unset' }}
             >
-              Sign in
+              Đăng nhập
             </Button>
           </Typography>
 
