@@ -48,7 +48,7 @@ public class BookingService {
     private final RealtimeEventService realtimeEventService;
     private final ApplicationEventPublisher eventPublisher;
 
-    @Value("${spring.mail.username:noreply@filmticket.com}")
+    @Value("${app.mail.from:onboarding@resend.dev}")
     private String mailFrom;
 
     private static final int HOLD_MINUTES = 10;
