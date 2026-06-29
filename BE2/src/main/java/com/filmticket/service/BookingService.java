@@ -12,6 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
@@ -46,6 +47,9 @@ public class BookingService {
     private final TicketPdfGenerator ticketPdfGenerator;
     private final RealtimeEventService realtimeEventService;
     private final ApplicationEventPublisher eventPublisher;
+
+    @Value("${spring.mail.username:noreply@filmticket.com}")
+    private String mailFrom;
 
     private static final int HOLD_MINUTES = 10;
     private static final ZoneId VIETNAM_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
@@ -368,6 +372,9 @@ public class BookingService {
 
         MimeMessage message = mailSender.createMimeMessage();
         MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
+        if (mailFrom != null && !mailFrom.isBlank()) {
+            helper.setFrom(mailFrom);
+        }
         helper.setTo(to);
         helper.setSubject(subject);
         helper.setText(html, true);
@@ -376,6 +383,7 @@ public class BookingService {
         helper.addAttachment("ticket.pdf", new ByteArrayResource(pdfBytes));
 
         mailSender.send(message);
+        log.info("Ticket email sent to {} for booking {}", to, booking.getId());
     }
 
     /**
