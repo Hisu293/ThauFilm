@@ -9,7 +9,11 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Arrays;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -44,7 +48,7 @@ public class StaffPromotionService {
         discount.setUsageLimit(request.getUsageLimit());
         discount.setUsageCount(0);
         discount.setActive(Boolean.TRUE.equals(request.getActive()));
-        discount.setApplicableSeatTypes(request.getApplicableSeatTypes());
+        discount.setApplicableSeatTypes(normalizeApplicableSeatTypes(request.getApplicableSeatTypes()));
         Discount saved = discountRepository.save(discount);
         return DiscountResponse.fromDiscount(saved);
     }
@@ -62,7 +66,7 @@ public class StaffPromotionService {
         discount.setValidTo(request.getValidTo());
         discount.setUsageLimit(request.getUsageLimit());
         discount.setActive(Boolean.TRUE.equals(request.getActive()));
-        discount.setApplicableSeatTypes(request.getApplicableSeatTypes());
+        discount.setApplicableSeatTypes(normalizeApplicableSeatTypes(request.getApplicableSeatTypes()));
         Discount saved = discountRepository.save(discount);
         return DiscountResponse.fromDiscount(saved);
     }
@@ -97,6 +101,38 @@ public class StaffPromotionService {
     }
 
     private String normalizeType(String type) {
-        return "PERCENT".equalsIgnoreCase(type) ? "PERCENTAGE" : type.trim().toUpperCase();
+        String normalized = "PERCENT".equalsIgnoreCase(type) ? "PERCENTAGE" : type.trim().toUpperCase();
+        if (!Set.of("PERCENTAGE", "FIXED").contains(normalized)) {
+            throw new BadRequestException("Unsupported promotion type: " + type);
+        }
+        return normalized;
+    }
+
+    private String normalizeApplicableSeatTypes(String applicableSeatTypes) {
+        if (applicableSeatTypes == null || applicableSeatTypes.isBlank()) {
+            return "STANDARD,VIP,COUPLE";
+        }
+
+        Set<String> normalized = new LinkedHashSet<>();
+        Arrays.stream(applicableSeatTypes.split(","))
+                .map(String::trim)
+                .filter(value -> !value.isBlank())
+                .map(this::normalizeSeatType)
+                .forEach(normalized::add);
+
+        if (normalized.isEmpty()) {
+            return "STANDARD,VIP,COUPLE";
+        }
+        return String.join(",", normalized);
+    }
+
+    private String normalizeSeatType(String rawSeatType) {
+        String value = rawSeatType.trim().toUpperCase(Locale.ROOT);
+        return switch (value) {
+            case "STANDARD", "NORMAL", "REGULAR", "THUONG", "THƯỜNG" -> "STANDARD";
+            case "VIP" -> "VIP";
+            case "COUPLE", "DOUBLE", "DOI", "ĐÔI" -> "COUPLE";
+            default -> throw new BadRequestException("Unsupported seat type: " + rawSeatType);
+        };
     }
 }

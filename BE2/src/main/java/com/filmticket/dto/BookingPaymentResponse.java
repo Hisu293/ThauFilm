@@ -22,6 +22,9 @@ public class BookingPaymentResponse {
     private BigDecimal discountAmount;
     private BigDecimal finalAmount;
     private String discountCode;
+    private String checkoutUrl;
+    private String qrCode;
+    private boolean requiresRedirect;
 
     public static BookingPaymentResponse fromPaymentResult(Booking booking, Payment payment, List<TicketResponse> tickets,
                                                            BigDecimal originalAmount, BigDecimal discountAmount, String discountCode) {
@@ -33,6 +36,9 @@ public class BookingPaymentResponse {
                 .discountAmount(discountAmount)
                 .finalAmount(originalAmount.subtract(discountAmount))
                 .discountCode(discountCode)
+                .checkoutUrl(payment.getCheckoutUrl())
+                .qrCode(payment.getQrCode())
+                .requiresRedirect(payment.getCheckoutUrl() != null && !payment.getCheckoutUrl().isBlank())
                 .build();
     }
 }

@@ -12,6 +12,7 @@ export const STAFF_PROMOTION_FIELDS = [
   'validTo',
   'usageLimit',
   'active',
+  'applicableSeatTypes',
 ];
 
 /**

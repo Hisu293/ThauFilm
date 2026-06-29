@@ -55,6 +55,7 @@ public class SecurityConfig {
                     "/api/auth/google",
                     "/api/auth/refresh",
                     "/api/auth/logout",
+                    "/api/payments/webhooks/**",
                     "/api/showtimes/**",
                     "/api/events/movies",
                     "/swagger-ui/**",

@@ -29,6 +29,7 @@ public class StaffBookingService {
     private final TicketRepository ticketRepository;
     private final BookingService bookingService;
     private final TheaterRepository theaterRepository;
+    private final PaymentGatewayService paymentGatewayService;
 
     public List<BookingResponse> listBookings() {
         List<Booking> bookings = bookingRepository.findAll();
@@ -223,12 +224,28 @@ public class StaffBookingService {
             throw new BadRequestException("Can only refund CONFIRMED bookings");
         }
 
-        paymentRepository.findByBookingId(bookingId).ifPresent(payment -> {
-            payment.setStatus(com.filmticket.entity.PaymentStatus.REFUNDED);
-            paymentRepository.save(payment);
-        });
+        Payment payment = paymentRepository.findByBookingId(bookingId)
+                .orElseThrow(() -> new BadRequestException("Payment not found"));
+        if (payment.getStatus() != PaymentStatus.PAID) {
+            throw new BadRequestException("Can only refund PAID payments");
+        }
+
+        PaymentGatewayService.GatewayRefund refund = paymentGatewayService.refund(payment, "Staff cancelled booking");
+        payment.setStatus(refund.status());
+        payment.setProviderRefundId(refund.refundId());
+        payment.setRefundReason("Staff cancelled booking");
+        payment.setRefundFailedReason(refund.failureReason());
+        if (refund.status() == PaymentStatus.REFUNDED) {
+            payment.setRefundedAt(java.time.LocalDateTime.now());
+        }
+        paymentRepository.save(payment);
+
+        if (refund.status() == PaymentStatus.REFUND_FAILED || refund.status() == PaymentStatus.REFUND_PENDING) {
+            return getBooking(bookingId);
+        }
 
         booking.setStatus(BookingStatus.CANCELLED);
+        bookingService.releaseSeats(booking);
         bookingRepository.save(booking);
         return getBooking(bookingId);
     }
