@@ -21,7 +21,7 @@ public class PaymentWebhookController {
     }
 
     @PostMapping("/payos")
-    public ResponseEntity<ApiResponse<?>> payos(@RequestBody String payload) {
+    public ResponseEntity<ApiResponse<?>> payos(@RequestBody(required = false) String payload) {
         PaymentGatewayService.PayosWebhookResult result = paymentGatewayService.parsePayosWebhook(payload);
         if (result.paid()) {
             bookingService.confirmPayosPayment(result.orderCode(), result.paymentId());
