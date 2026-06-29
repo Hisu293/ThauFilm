@@ -154,6 +154,9 @@ public class StaffTicketService {
                             .price(price)
                             .paymentMethod(payment != null ? payment.getPaymentMethod() : null)
                             .paymentStatus(payment != null && payment.getStatus() != null ? payment.getStatus().name() : null)
+                            .paymentAmount(payment != null ? payment.getAmount() : null)
+                            .transactionId(payment != null ? payment.getTransactionId() : null)
+                            .paidAt(payment != null ? payment.getPaidAt() : null)
                             .build();
                 })
                 .toList();
@@ -196,7 +199,8 @@ public class StaffTicketService {
 
     @Transactional
     public TicketResponse checkIn(String ticketCode) {
-        return bookingService.checkIn(ticketCode);
+        TicketResponse checkedIn = bookingService.checkIn(ticketCode);
+        return getTicket(checkedIn.getId());
     }
 
     public ResponseEntity<ByteArrayResource> reprintTicket(UUID ticketId) {
