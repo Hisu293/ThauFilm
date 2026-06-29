@@ -435,6 +435,15 @@ public class BookingService {
                                  BigDecimal discountAmount, BigDecimal finalAmount, String movieTitle) {
         String cinema = "Rap";
         String showtime = "";
+        List<BookingSeat> bookingSeats = bookingSeatRepository.findByBookingId(booking.getId());
+        Map<UUID, BigDecimal> seatPriceById = new HashMap<>();
+        BigDecimal seatTotal = BigDecimal.ZERO;
+        for (BookingSeat bookingSeat : bookingSeats) {
+            BigDecimal price = bookingSeat.getPriceAtBooking() != null ? bookingSeat.getPriceAtBooking() : BigDecimal.ZERO;
+            seatPriceById.put(bookingSeat.getSeatId(), price);
+            seatTotal = seatTotal.add(price);
+        }
+        BigDecimal comboTotal = booking.getTotalAmount().subtract(seatTotal).max(BigDecimal.ZERO);
 
         Showtime s = showtimeRepository.findById(booking.getShowtimeId()).orElse(null);
         if (s != null) {
@@ -457,10 +466,12 @@ public class BookingService {
                 case COUPLE -> "Doi";
                 case STANDARD -> "Thuong";
             } : "Khong ro";
+            BigDecimal seatPrice = seatPriceById.getOrDefault(ticket.getSeatId(), BigDecimal.ZERO);
             ticketListHtml.append("<li>")
                     .append(escape(ticket.getTicketCode()))
                     .append(" - Ghe ").append(escape(seatLabel))
                     .append(" - Loai ").append(escape(seatType))
+                    .append(" - Gia ").append(formatMoney(seatPrice)).append(" VND")
                     .append("</li>");
         }
 
@@ -475,7 +486,11 @@ public class BookingService {
         builder.append("<tr><td style='padding:6px 8px;color:#666'>Ma dat ve</td><td style='padding:6px 8px'>").append(escape(booking.getConfirmationCode())).append("</td></tr>");
         builder.append("</table>");
         builder.append("<p>Danh sach ve:</p><ul>").append(ticketListHtml).append("</ul>");
-        builder.append("<p>Tong tien: <b>").append(formatMoney(booking.getTotalAmount())).append(" VND</b></p>");
+        builder.append("<p>Tien ghe: <b>").append(formatMoney(seatTotal)).append(" VND</b></p>");
+        if (comboTotal.compareTo(BigDecimal.ZERO) > 0) {
+            builder.append("<p>Combo bap nuoc: <b>").append(formatMoney(comboTotal)).append(" VND</b></p>");
+        }
+        builder.append("<p>Tong tien truoc giam: <b>").append(formatMoney(booking.getTotalAmount())).append(" VND</b></p>");
         if (discountAmount.compareTo(BigDecimal.ZERO) > 0) {
             builder.append("<p>Giam gia: <b>-").append(formatMoney(discountAmount)).append(" VND</b></p>");
         }

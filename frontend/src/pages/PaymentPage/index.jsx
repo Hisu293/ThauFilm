@@ -350,6 +350,7 @@ export const PaymentPage = () => {
 
         const replacementBooking = await create(showtimeId, seatIds, 'ONLINE', selectedComboIds);
         payableBookingId = replacementBooking.id;
+        setBookingOriginalAmount(Number(replacementBooking.totalAmount) || subtotal);
         saveBookingReplacement(bookingId, payableBookingId);
         setBookingId(payableBookingId);
         sessionStorage.setItem('tf_booking_id', payableBookingId);
