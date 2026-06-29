@@ -15,11 +15,9 @@ import org.springframework.web.client.RestTemplate;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
-import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.text.Normalizer;
-import java.time.LocalDateTime;
 import java.util.*;
 
 @Service
@@ -95,20 +93,26 @@ public class PaymentGatewayService {
             throw new BadRequestException("PayOS credentials are not configured");
         }
         try {
-            long orderCode = Math.abs(payment.getId().getMostSignificantBits());
+            long orderCode = Math.abs(payment.getId().getMostSignificantBits() % 1_000_000_000_000L);
+            if (orderCode < 100_000L) {
+                orderCode += 100_000L;
+            }
             int amount = payment.getAmount().setScale(0, RoundingMode.HALF_UP).intValueExact();
             String safeDescription = ascii(description);
             if (safeDescription.length() > 25) {
                 safeDescription = safeDescription.substring(0, 25);
             }
+            String cleanFrontendUrl = trimTrailingSlash(frontendUrl);
+            String returnUrl = cleanFrontendUrl + "/my-bookings/" + payment.getBookingId();
+            String cancelUrl = cleanFrontendUrl + "/my-bookings/" + payment.getBookingId();
 
             Map<String, Object> request = new LinkedHashMap<>();
             request.put("orderCode", orderCode);
             request.put("amount", amount);
             request.put("description", safeDescription);
-            request.put("returnUrl", frontendUrl + "/my-bookings?payment=success&bookingId=" + payment.getBookingId());
-            request.put("cancelUrl", frontendUrl + "/booking/payment?payment=cancelled&bookingId=" + payment.getBookingId());
-            request.put("signature", signPayosCreateRequest(request));
+            request.put("returnUrl", returnUrl);
+            request.put("cancelUrl", cancelUrl);
+            request.put("signature", signPayosCreateRequest(amount, cancelUrl, safeDescription, orderCode, returnUrl));
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
@@ -139,12 +143,12 @@ public class PaymentGatewayService {
         }
     }
 
-    private String signPayosCreateRequest(Map<String, Object> request) {
-        String raw = "amount=" + request.get("amount")
-                + "&cancelUrl=" + request.get("cancelUrl")
-                + "&description=" + request.get("description")
-                + "&orderCode=" + request.get("orderCode")
-                + "&returnUrl=" + request.get("returnUrl");
+    private String signPayosCreateRequest(int amount, String cancelUrl, String description, long orderCode, String returnUrl) {
+        String raw = "amount=" + amount
+                + "&cancelUrl=" + cancelUrl
+                + "&description=" + description
+                + "&orderCode=" + orderCode
+                + "&returnUrl=" + returnUrl;
         return hmacSha256(raw, payosChecksumKey);
     }
 
@@ -164,7 +168,7 @@ public class PaymentGatewayService {
     private String hmacSha256(String data, String key) {
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(key.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            mac.init(new SecretKeySpec(key.trim().getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
             byte[] bytes = mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
             StringBuilder result = new StringBuilder();
             for (byte b : bytes) {
@@ -185,6 +189,14 @@ public class PaymentGatewayService {
         String normalized = Normalizer.normalize(String.valueOf(value), Normalizer.Form.NFD)
                 .replaceAll("\\p{M}", "");
         return normalized.replaceAll("[^A-Za-z0-9 ]", " ").replaceAll("\\s+", " ").trim();
+    }
+
+    private String trimTrailingSlash(String value) {
+        String normalized = String.valueOf(value == null ? "" : value).trim();
+        while (normalized.endsWith("/")) {
+            normalized = normalized.substring(0, normalized.length() - 1);
+        }
+        return normalized.isBlank() ? "http://localhost:5173" : normalized;
     }
 
     public record GatewayPayment(String provider, String checkoutId, String paymentId, String checkoutUrl, String qrCode) {}
