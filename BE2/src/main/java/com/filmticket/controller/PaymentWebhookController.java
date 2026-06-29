@@ -23,6 +23,22 @@ public class PaymentWebhookController {
 
     @PostMapping(value = "/payos", produces = MediaType.TEXT_PLAIN_VALUE)
     public ResponseEntity<String> payos(@RequestBody(required = false) String payload) {
+        handlePayosPayload(payload);
+        return ResponseEntity.ok("OK");
+    }
+
+    @GetMapping(value = "/payos-webhook", produces = MediaType.TEXT_PLAIN_VALUE)
+    public ResponseEntity<String> payosWebhookHealth() {
+        return ResponseEntity.ok("OK");
+    }
+
+    @PostMapping(value = "/payos-webhook", produces = MediaType.TEXT_PLAIN_VALUE)
+    public ResponseEntity<String> payosWebhook(@RequestBody(required = false) String payload) {
+        handlePayosPayload(payload);
+        return ResponseEntity.ok("OK");
+    }
+
+    private void handlePayosPayload(String payload) {
         try {
             PaymentGatewayService.PayosWebhookResult result = paymentGatewayService.parsePayosWebhook(payload);
             if (result.paid()) {
@@ -32,6 +48,5 @@ public class PaymentWebhookController {
             // PayOS verifies webhook availability with non-payment payloads.
             // Always return 200 so the channel can be saved; real payment failures are logged upstream.
         }
-        return ResponseEntity.ok("OK");
     }
 }
