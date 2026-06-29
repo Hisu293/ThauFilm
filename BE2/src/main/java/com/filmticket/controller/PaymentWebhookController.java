@@ -15,6 +15,11 @@ public class PaymentWebhookController {
     private final PaymentGatewayService paymentGatewayService;
     private final BookingService bookingService;
 
+    @GetMapping("/payos")
+    public ResponseEntity<ApiResponse<?>> payosHealth() {
+        return ResponseEntity.ok(ApiResponse.success("PayOS webhook is ready", null));
+    }
+
     @PostMapping("/payos")
     public ResponseEntity<ApiResponse<?>> payos(@RequestBody String payload) {
         PaymentGatewayService.PayosWebhookResult result = paymentGatewayService.parsePayosWebhook(payload);

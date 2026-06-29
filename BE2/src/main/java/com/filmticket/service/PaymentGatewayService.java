@@ -60,17 +60,20 @@ public class PaymentGatewayService {
 
     public PayosWebhookResult parsePayosWebhook(String payload) {
         try {
+            if (payload == null || payload.isBlank()) {
+                return new PayosWebhookResult(false, null, null);
+            }
             Map<String, Object> body = objectMapper.readValue(payload, new TypeReference<>() {});
             Object dataObj = body.get("data");
             if (!(dataObj instanceof Map<?, ?> data)) {
-                throw new BadRequestException("Invalid PayOS webhook payload");
+                return new PayosWebhookResult(false, null, null);
             }
 
             String expectedSignature = signPayosData(data);
             String receivedSignature = Objects.toString(body.get("signature"), "");
             if (payosChecksumKey != null && !payosChecksumKey.isBlank()
                     && !expectedSignature.equalsIgnoreCase(receivedSignature)) {
-                throw new BadRequestException("Invalid PayOS webhook signature");
+                return new PayosWebhookResult(false, null, null);
             }
 
             String code = Objects.toString(data.get("code"), Objects.toString(body.get("code"), ""));
@@ -81,7 +84,7 @@ public class PaymentGatewayService {
         } catch (BadRequestException ex) {
             throw ex;
         } catch (Exception ex) {
-            throw new BadRequestException("Cannot parse PayOS webhook payload");
+            return new PayosWebhookResult(false, null, null);
         }
     }
 
