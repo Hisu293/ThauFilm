@@ -24,6 +24,9 @@ public class ShowtimeSeatResponse {
     private SeatBookingStatus status;
     private BigDecimal price;
 
+    @Builder.Default
+    private boolean isHeldByMe = false;
+
     public static ShowtimeSeatResponse fromSeatAvailability(SeatAvailability availability) {
         return ShowtimeSeatResponse.builder()
                 .seatId(availability.getSeatId())
@@ -37,6 +40,7 @@ public class ShowtimeSeatResponse {
         if (seat != null) {
             response.setRowName(seat.getRowName());
             response.setSeatNumber(seat.getSeatNumber());
+            response.setLabel(seat.getRowName() + seat.getSeatNumber());
             response.setType(seat.getType().toStorageValue());
         }
         return response;

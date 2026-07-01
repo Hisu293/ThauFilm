@@ -67,14 +67,23 @@ export const ShowtimeSelector = ({ movieId, onSelectShowtime }) => {
     return () => window.clearInterval(timer);
   }, []);
 
-  const dates = useMemo(() => {
-    return [...new Set(showtimes.map((s) => s.date).filter(Boolean))].sort();
-  }, [showtimes]);
+  const upcomingShowtimes = useMemo(
+    () => showtimes.filter((showtime) => {
+      const startMs = new Date(showtime.startTime).getTime();
+      return Number.isNaN(startMs) ? false : startMs > nowTs;
+    }),
+    [showtimes, nowTs],
+  );
 
-  const selectedDate = dates[selectedDateIdx] || '';
+  const dates = useMemo(() => {
+    return [...new Set(upcomingShowtimes.map((s) => s.date).filter(Boolean))].sort();
+  }, [upcomingShowtimes]);
+
+  const safeSelectedDateIdx = selectedDateIdx < dates.length ? selectedDateIdx : 0;
+  const selectedDate = dates[safeSelectedDateIdx] || '';
   const dateShowtimes = selectedDate
-    ? showtimes.filter((s) => s.date === selectedDate)
-    : showtimes;
+    ? upcomingShowtimes.filter((s) => s.date === selectedDate)
+    : upcomingShowtimes;
 
   const theaterGroups = useMemo(() => {
     const grouped = dateShowtimes.reduce((acc, showtime) => {
@@ -123,7 +132,7 @@ export const ShowtimeSelector = ({ movieId, onSelectShowtime }) => {
 
       {dates.length > 0 && (
         <Tabs
-          value={selectedDateIdx}
+          value={safeSelectedDateIdx}
           onChange={handleTabChange}
           variant="scrollable"
           scrollButtons="auto"
@@ -151,8 +160,8 @@ export const ShowtimeSelector = ({ movieId, onSelectShowtime }) => {
                 }
                 sx={{
                   minWidth: 90,
-                  bgcolor: selectedDateIdx === index ? 'primary.main' : 'background.paper',
-                  color: selectedDateIdx === index ? 'primary.contrastText' : 'text.secondary',
+                  bgcolor: safeSelectedDateIdx === index ? 'primary.main' : 'background.paper',
+                  color: safeSelectedDateIdx === index ? 'primary.contrastText' : 'text.secondary',
                   border: '1px solid rgba(148, 163, 184, 0.08)',
                   borderRadius: 2,
                   '&.Mui-selected': {

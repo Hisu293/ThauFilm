@@ -99,7 +99,11 @@ export const useQuickBooking = () => {
 
         // flat already has _date embedded on every entry
         const { flat } = bookingService.normalizeShowtimesForWidget(rawShowtimes);
-        setAllShowtimes(flat);
+        const now = Date.now();
+        setAllShowtimes(flat.filter((showtime) => {
+          const startMs = new Date(showtime.startTime).getTime();
+          return !Number.isNaN(startMs) && startMs > now;
+        }));
       } catch {
         // Silently degrade — the widget will show no options
       } finally {

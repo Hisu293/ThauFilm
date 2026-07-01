@@ -37,6 +37,7 @@
     "hls.js": "^1.6.16",
     "html5-qrcode": "^2.3.8",
     "lucide-react": "^1.16.0",
+    "qrcode": "^1.5.4",
     "react-router-dom": "^7.15.1"
   },
   "msw": {

@@ -8,7 +8,6 @@ import {
   CardContent,
   Chip,
   Container,
-  Skeleton,
   Stack,
   Typography,
 } from '@mui/material';
@@ -16,6 +15,7 @@ import ConfirmationNumberRoundedIcon from '@mui/icons-material/ConfirmationNumbe
 import { useBooking } from '../hooks/useBooking';
 import EmptyState from '../components/common/EmptyState';
 import ConfirmationDialog from '../components/common/ConfirmationDialog';
+import LoadingOverlay from '../components/common/LoadingOverlay';
 import { getPendingBooking, mergeMovieContext, mergeShowtimeContext } from '../utils/pendingBookingStorage';
 import { bookingApi } from '../api/bookingApi';
 import { bookingService } from '../services/bookingService';
@@ -163,6 +163,8 @@ const MyBookingsPage = () => {
   const { loading, error, clearError, getHistory, cancel } = useBooking();
   const [bookings, setBookings] = useState([]);
   const [cancelTarget, setCancelTarget] = useState(null);
+  const [dataLoading, setDataLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -191,7 +193,10 @@ const MyBookingsPage = () => {
             .catch(() => {});
         });
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        if (active) setDataLoading(false);
+      });
     return () => {
       active = false;
     };
@@ -199,6 +204,7 @@ const MyBookingsPage = () => {
 
   const handleCancel = async () => {
     if (!cancelTarget) return;
+    setActionLoading(true);
     try {
       const updated = await cancel(cancelTarget.id);
       if (updated) {
@@ -206,6 +212,7 @@ const MyBookingsPage = () => {
       }
     } finally {
       setCancelTarget(null);
+      setActionLoading(false);
     }
   };
 
@@ -218,7 +225,13 @@ const MyBookingsPage = () => {
   );
 
   return (
-    <Container maxWidth="lg" sx={{ py: 5 }}>
+    <Container maxWidth="lg" sx={{ py: 5, position: 'relative', minHeight: '70vh' }}>
+      <LoadingOverlay
+        open={dataLoading || actionLoading}
+        message={actionLoading ? 'Đang hủy booking...' : 'Đang tải danh sách vé...'}
+        blur
+        fullScreen
+      />
       <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={2} sx={{ mb: 3 }}>
         <Box>
           <Typography variant="h4" sx={{ fontWeight: 900 }}>
@@ -237,13 +250,7 @@ const MyBookingsPage = () => {
         </Alert>
       )}
 
-      {loading && bookings.length === 0 ? (
-        <Stack spacing={2}>
-          {[1, 2, 3].map((item) => (
-            <Skeleton key={item} variant="rounded" height={128} sx={{ borderRadius: 2 }} />
-          ))}
-        </Stack>
-      ) : sortedBookings.length === 0 ? (
+      {!dataLoading && sortedBookings.length === 0 ? (
         <EmptyState
           icon={ConfirmationNumberRoundedIcon}
           title="Chưa có vé nào"
@@ -310,6 +317,7 @@ const MyBookingsPage = () => {
         title="Hủy giữ ghế?"
         description="Booking này sẽ bị hủy và các ghế đang giữ sẽ được trả lại cho suất chiếu."
         confirmText="Hủy giữ ghế"
+        loading={loading || actionLoading}
         onCancel={() => setCancelTarget(null)}
         onConfirm={handleCancel}
       />

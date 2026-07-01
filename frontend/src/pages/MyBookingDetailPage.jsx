@@ -9,17 +9,15 @@ import {
   Chip,
   Container,
   Divider,
-  Paper,
-  Skeleton,
   Snackbar,
   Stack,
   Typography,
 } from '@mui/material';
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
-import QrCode2RoundedIcon from '@mui/icons-material/QrCode2Rounded';
 import { useBooking } from '../hooks/useBooking';
 import ConfirmationDialog from '../components/common/ConfirmationDialog';
 import EmptyState from '../components/common/EmptyState';
+import LoadingOverlay from '../components/common/LoadingOverlay';
 import { bookingApi } from '../api/bookingApi';
 import { bookingService } from '../services/bookingService';
 
@@ -69,6 +67,8 @@ const MyBookingDetailPage = () => {
   const [tickets, setTickets] = useState([]);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [snackbar, setSnackbar] = useState('');
+  const [dataLoading, setDataLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -87,7 +87,10 @@ const MyBookingDetailPage = () => {
         setBooking(enrichBooking(bookingDetail, showtimeMap));
         setTickets(Array.isArray(ticketList) ? ticketList : []);
       })
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => {
+        if (active) setDataLoading(false);
+      });
     return () => {
       active = false;
     };
@@ -96,6 +99,7 @@ const MyBookingDetailPage = () => {
   const seatLabels = useMemo(() => (booking?.seats || []).map((seat) => seat.label).join(', '), [booking]);
 
   const handleCancel = async () => {
+    setActionLoading(true);
     try {
       const updated = await cancel(bookingId);
       if (updated) setBooking(updated);
@@ -103,18 +107,20 @@ const MyBookingDetailPage = () => {
       setSnackbar('Đã hủy booking và giải phóng ghế.');
     } catch {
       setConfirmOpen(false);
+    } finally {
+      setActionLoading(false);
     }
   };
 
-  if (loading && !booking) {
+  if (dataLoading && !booking) {
     return (
-      <Container maxWidth="md" sx={{ py: 5 }}>
-        <Skeleton variant="rounded" height={420} sx={{ borderRadius: 2 }} />
+      <Container maxWidth="md" sx={{ py: 5, minHeight: '70vh', position: 'relative' }}>
+        <LoadingOverlay open message="Đang tải chi tiết booking..." blur fullScreen />
       </Container>
     );
   }
 
-  if (!booking && !loading) {
+  if (!booking && !dataLoading) {
     return (
       <Container maxWidth="md" sx={{ py: 5 }}>
         <EmptyState title="Không tìm thấy booking" description="Booking này không tồn tại hoặc bạn không có quyền truy cập." />
@@ -123,7 +129,8 @@ const MyBookingDetailPage = () => {
   }
 
   return (
-    <Container maxWidth="md" sx={{ py: 5 }}>
+    <Container maxWidth="md" sx={{ py: 5, position: 'relative', minHeight: '70vh' }}>
+      <LoadingOverlay open={actionLoading} message="Đang hủy booking..." blur fullScreen />
       <Button startIcon={<ArrowBackRoundedIcon />} onClick={() => navigate('/my-bookings')} sx={{ mb: 3 }}>
         Quay lại vé đã đặt
       </Button>
@@ -180,31 +187,6 @@ const MyBookingDetailPage = () => {
             )}
           </Stack>
 
-          <Paper
-            variant="outlined"
-            sx={{
-              mt: 4,
-              p: 3,
-              borderRadius: 2,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 2,
-              bgcolor: 'background.default',
-            }}
-          >
-            <Box>
-              <Typography sx={{ fontWeight: 800 }}>QR Code placeholder</Typography>
-              <Typography variant="body2" color="text.secondary">
-                Dùng mã này để đối chiếu tại quầy hoặc máy soát vé.
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                Tickets: {tickets.length || 'Chưa phát sinh'}
-              </Typography>
-            </Box>
-            <QrCode2RoundedIcon sx={{ fontSize: 96, color: 'primary.main' }} />
-          </Paper>
-
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mt: 4 }}>
             {booking.status === 'CONFIRMED' && (
               <Button
@@ -255,6 +237,7 @@ const MyBookingDetailPage = () => {
         title="Hủy booking?"
         description="Ghế đang giữ sẽ được giải phóng. Bạn có chắc chắn muốn hủy booking này không?"
         confirmText="Hủy booking"
+        loading={loading || actionLoading}
         onCancel={() => setConfirmOpen(false)}
         onConfirm={handleCancel}
       />

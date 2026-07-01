@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { Container, Box, Typography, Stack, Divider, Paper, Snackbar, Alert } from '@mui/material';
+import { useLocation } from 'react-router-dom';
+import { Container, Box, Typography, Stack, Divider, Snackbar, Alert } from '@mui/material';
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import ConfirmationNumberRoundedIcon from '@mui/icons-material/ConfirmationNumberRounded';
 
@@ -10,11 +10,12 @@ import CustomButton from '../../components/common/CustomButton';
 import LoadingOverlay from '../../components/common/LoadingOverlay';
 
 import { useBooking } from '../../hooks/useBooking';
+import { useBookingNavigate } from '../../context/BookingNavigationContext';
 import { savePaidBookingSummary } from '../../utils/paidBookingStorage';
 
 export const BookingSuccessPage = () => {
   const location = useLocation();
-  const navigate = useNavigate();
+  const navigate = useBookingNavigate();
 
   const { loading: apiLoading, error: apiError, clearError, getTickets } = useBooking();
 
@@ -285,59 +286,6 @@ export const BookingSuccessPage = () => {
             </Box>
           </Stack>
 
-          <Divider sx={{ borderStyle: 'dashed', width: '100%' }} />
-
-          {/* Mã QR — căn giữa khung vé */}
-          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
-            <Paper
-              variant="outlined"
-              sx={{
-                p: 2,
-                bgcolor: '#FFF',
-                borderRadius: 3,
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                mb: 2,
-                boxShadow: '0 8px 25px rgba(0,0,0,0.3)'
-              }}
-            >
-              {/* SVG QR layout */}
-              <svg width="140" height="140" viewBox="0 0 140 140" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <rect x="10" y="10" width="30" height="30" stroke="#0F172A" strokeWidth="6" />
-                  <rect x="20" y="20" width="10" height="10" fill="#0F172A" />
-                  
-                  <rect x="100" y="10" width="30" height="30" stroke="#0F172A" strokeWidth="6" />
-                  <rect x="110" y="20" width="10" height="10" fill="#0F172A" />
-                  
-                  <rect x="10" y="100" width="30" height="30" stroke="#0F172A" strokeWidth="6" />
-                  <rect x="20" y="110" width="10" height="10" fill="#0F172A" />
-                  
-                  <rect x="50" y="10" width="10" height="10" fill="#0F172A" />
-                  <rect x="70" y="10" width="20" height="10" fill="#0F172A" />
-                  <rect x="50" y="30" width="10" height="20" fill="#0F172A" />
-                  <rect x="80" y="30" width="10" height="10" fill="#0F172A" />
-                  <rect x="110" y="50" width="20" height="10" fill="#0F172A" />
-                  <rect x="10" y="60" width="20" height="10" fill="#0F172A" />
-                  <rect x="40" y="60" width="30" height="10" fill="#0F172A" />
-                  <rect x="80" y="60" width="10" height="20" fill="#0F172A" />
-                  <rect x="100" y="70" width="10" height="20" fill="#0F172A" />
-                  <rect x="20" y="80" width="10" height="10" fill="#0F172A" />
-                  <rect x="50" y="80" width="20" height="10" fill="#0F172A" />
-                  <rect x="120" y="80" width="10" height="10" fill="#0F172A" />
-                  <rect x="50" y="100" width="10" height="10" fill="#0F172A" />
-                  <rect x="70" y="100" width="10" height="30" fill="#0F172A" />
-                  <rect x="90" y="110" width="20" height="10" fill="#0F172A" />
-                  <rect x="120" y="110" width="10" height="20" fill="#0F172A" />
-                  <rect x="50" y="120" width="20" height="10" fill="#0F172A" />
-                  <rect x="100" y="120" width="10" height="10" fill="#0F172A" />
-                </svg>
-              </Paper>
-
-              <Typography variant="caption" color="text.secondary" sx={{ textAlign: 'center', display: 'block', px: 2, maxWidth: 360 }}>
-                Đưa mã QR này cho nhân viên tại quầy vé hoặc quét tại máy soát vé để in vé cứng của bạn.
-              </Typography>
-            </Box>
         </Stack>
       </SectionCard>
 

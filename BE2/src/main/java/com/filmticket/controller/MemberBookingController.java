@@ -35,14 +35,16 @@ public class MemberBookingController {
     private final DiscountService discountService;
     private final TicketQueueService ticketQueueService;
 
+    // ĐÃ SỬA: Lấy thêm userId để truyền xuống Service nhận diện cờ isHeldByMe
     @Operation(summary = "Get available seats for a showtime")
     @GetMapping("/showtimes/{showtimeId}/seats")
     public ResponseEntity<ApiResponse<List<ShowtimeSeatResponse>>> getAvailableSeats(
             @PathVariable UUID showtimeId
     ) {
+        UUID userId = getCurrentUserId(); // Lấy ID của user đang đăng nhập
         return ResponseEntity.ok(ApiResponse.success(
                 "Available seats fetched",
-                bookingService.getAvailableSeats(showtimeId)
+                bookingService.getAvailableSeats(showtimeId, userId)
         ));
     }
 
@@ -94,6 +96,20 @@ public class MemberBookingController {
         return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(
                 "Booking created. Complete payment before hold expires.",
                 bookingService.createBooking(userId, request)
+        ));
+    }
+
+    // ĐÃ THÊM: API đổi ghế khi người dùng quay lại từ màn hình thanh toán
+    @Operation(summary = "Update seats for an existing booking hold (Back to change seats)")
+    @PutMapping("/{bookingId}/seats")
+    public ResponseEntity<ApiResponse<BookingResponse>> updateBookingSeats(
+            @PathVariable UUID bookingId,
+            @Valid @RequestBody UpdateBookingSeatsRequest request
+    ) {
+        UUID userId = getCurrentUserId();
+        return ResponseEntity.ok(ApiResponse.success(
+                "Booking seats updated successfully. Hold timer reset.",
+                bookingService.updateBookingSeats(bookingId, userId, request)
         ));
     }
 
