@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { clearAuthStorageAndReload, getAccessToken } from '../utils/authStorage';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
@@ -10,7 +11,7 @@ const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('cinema_token');
+  const token = getAccessToken();
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
@@ -24,6 +25,11 @@ api.interceptors.response.use(
       return Promise.reject(
         new Error(`Không thể kết nối đến API tại ${API_BASE_URL}. Hãy kiểm tra backend đã chạy trên 8080 và CORS.`)
       );
+    }
+
+    if ([401, 403].includes(error.response.status) && getAccessToken()) {
+      clearAuthStorageAndReload();
+      window.location.assign('/login');
     }
 
     const message =

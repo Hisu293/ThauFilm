@@ -6,6 +6,7 @@ import com.filmticket.repository.UserRepository;
 import com.filmticket.service.BookingService;
 import com.filmticket.service.ComboService;
 import com.filmticket.service.DiscountService;
+import com.filmticket.service.TicketQueueService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
@@ -32,6 +33,7 @@ public class MemberBookingController {
     private final UserRepository userRepository;
     private final ComboService comboService;
     private final DiscountService discountService;
+    private final TicketQueueService ticketQueueService;
 
     // ĐÃ SỬA: Lấy thêm userId để truyền xuống Service nhận diện cờ isHeldByMe
     @Operation(summary = "Get available seats for a showtime")
@@ -43,6 +45,45 @@ public class MemberBookingController {
         return ResponseEntity.ok(ApiResponse.success(
                 "Available seats fetched",
                 bookingService.getAvailableSeats(showtimeId, userId)
+        ));
+    }
+
+    @Operation(summary = "Suggest adjacent seats for a group")
+    @GetMapping("/showtimes/{showtimeId}/seat-suggestions")
+    public ResponseEntity<ApiResponse<SeatSuggestionResponse>> suggestSeats(
+            @PathVariable UUID showtimeId,
+            @RequestParam(defaultValue = "2") int count
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Seat suggestion generated",
+                bookingService.suggestSeats(showtimeId, count)
+        ));
+    }
+
+    @Operation(summary = "Join showtime seat selection queue")
+    @PostMapping("/showtimes/{showtimeId}/queue/join")
+    public ResponseEntity<ApiResponse<TicketQueueStatusResponse>> joinQueue(@PathVariable UUID showtimeId) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Queue joined",
+                ticketQueueService.join(showtimeId, getCurrentUserId())
+        ));
+    }
+
+    @Operation(summary = "Get showtime seat selection queue status")
+    @GetMapping("/showtimes/{showtimeId}/queue/status")
+    public ResponseEntity<ApiResponse<TicketQueueStatusResponse>> queueStatus(@PathVariable UUID showtimeId) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Queue status fetched",
+                ticketQueueService.status(showtimeId, getCurrentUserId())
+        ));
+    }
+
+    @Operation(summary = "Leave showtime seat selection queue")
+    @PostMapping("/showtimes/{showtimeId}/queue/leave")
+    public ResponseEntity<ApiResponse<TicketQueueStatusResponse>> leaveQueue(@PathVariable UUID showtimeId) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Queue left",
+                ticketQueueService.leave(showtimeId, getCurrentUserId())
         ));
     }
 

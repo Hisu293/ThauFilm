@@ -1,7 +1,14 @@
+<<<<<<< frontend/src/pages/SeatSelectionPage/index.jsx
 import { useCallback, useState, useEffect, useMemo, useRef } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
 import { Container, Box, Alert, Snackbar, Button } from '@mui/material';
+=======
+import { useCallback, useState, useEffect, useMemo } from 'react';
+import { useLocation, useParams, useNavigate } from 'react-router-dom';
+import { Container, Box, Alert, Snackbar, Button, Chip, CircularProgress, LinearProgress, Paper, Stack, TextField, Typography } from '@mui/material';
+>>>>>>> frontend/src/pages/SeatSelectionPage/index.jsx
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
+import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 
 import BookingStepper from '../../components/BookingStepper';
 import SeatMap from '../../components/SeatMap';
@@ -20,6 +27,70 @@ import { useBookingNavigate } from '../../context/BookingNavigationContext';
 import { pruneExpiredPendingBookings, removePendingBooking, savePendingBooking } from '../../utils/pendingBookingStorage';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const unwrapApiResponse = (response) => response?.data?.data ?? response?.data ?? response;
+const formatQueueWait = (seconds = 0) => {
+  if (seconds <= 0) return 'Đang đến lượt';
+  const minutes = Math.max(1, Math.ceil(seconds / 60));
+  return `Khoảng ${minutes} phút`;
+};
+
+const buildGroupSeatSuggestion = (seats = [], count = 1) => {
+  const availableSeats = seats
+    .filter((seat) => !seat.isSold)
+    .slice()
+    .sort((a, b) => String(a.rowName).localeCompare(String(b.rowName)) || Number(a.col) - Number(b.col));
+
+  if (availableSeats.length < count) {
+    throw new Error(`Không còn đủ ${count} ghế trống cho suất chiếu này.`);
+  }
+
+  const byRow = bookingService.groupSeatsByRow(availableSeats);
+  const findBestWindow = (requireAdjacent) => {
+    let best = null;
+    byRow.forEach(({ seats: rowSeats }) => {
+      if (rowSeats.length < count) return;
+      for (let start = 0; start <= rowSeats.length - count; start += 1) {
+        const group = rowSeats.slice(start, start + count);
+        const span = group[group.length - 1].col - group[0].col;
+        if (requireAdjacent && span !== count - 1) continue;
+        const gaps = span - (count - 1);
+        const score = span * 100 + gaps * 1000 + Math.abs(group[0].col + group[group.length - 1].col);
+        if (!best || score < best.score) best = { seats: group, score };
+      }
+    });
+    return best;
+  };
+
+  const exact = findBestWindow(true);
+  if (exact) {
+    return {
+      exactMatch: true,
+      requestedCount: count,
+      message: `Đã tìm thấy ${count} ghế liền nhau cùng hàng.`,
+      seats: exact.seats,
+      seatIds: exact.seats.map((seat) => seat.id),
+    };
+  }
+
+  const nearestSameRow = findBestWindow(false);
+  if (nearestSameRow) {
+    return {
+      exactMatch: false,
+      requestedCount: count,
+      message: `Không có đủ ${count} ghế liền nhau. Đây là cụm ghế gần nhau nhất trong cùng hàng.`,
+      seats: nearestSameRow.seats,
+      seatIds: nearestSameRow.seats.map((seat) => seat.id),
+    };
+  }
+
+  return {
+    exactMatch: false,
+    requestedCount: count,
+    message: `Không có đủ ${count} ghế trong một hàng. Đây là các ghế gần nhất còn trống.`,
+    seats: availableSeats.slice(0, count),
+    seatIds: availableSeats.slice(0, count).map((seat) => seat.id),
+  };
+};
 
 export const SeatSelectionPage = () => {
   const { showtimeId } = useParams();
@@ -40,7 +111,17 @@ export const SeatSelectionPage = () => {
   const [selectedSeats, setSelectedSeats] = useState(location.state?.selectedSeats || []);
   const [loadingDetails, setLoadingDetails] = useState(true);
   const [, setActiveBooking] = useState(location.state?.activeBooking || null);
+
   const editingSeatIdsRef = useRef(new Set((location.state?.selectedSeats || []).map((seat) => String(seat.id))));
+
+
+  const [groupSeatCount, setGroupSeatCount] = useState(6);
+  const [suggestingSeats, setSuggestingSeats] = useState(false);
+  const [seatSuggestion, setSeatSuggestion] = useState(null);
+  const [ticketQueue, setTicketQueue] = useState(null);
+  const [queueReady, setQueueReady] = useState(false);
+  const [queueBusy, setQueueBusy] = useState(false);
+  const [queueLoading, setQueueLoading] = useState(true);
 
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
@@ -163,6 +244,50 @@ export const SeatSelectionPage = () => {
   }, [showtimeId, refreshSeats]);
 
   useEffect(() => {
+    if (!showtimeId || loadingDetails) return undefined;
+    let cancelled = false;
+
+    const joinQueue = async () => {
+      setQueueLoading(true);
+      try {
+        const status = unwrapApiResponse(await bookingApi.joinTicketQueue(showtimeId));
+        if (cancelled) return;
+        setTicketQueue(status);
+        setQueueReady(false);
+      } catch {
+        if (!cancelled) {
+          setTicketQueue(null);
+          setQueueReady(true);
+        }
+      } finally {
+        if (!cancelled) setQueueLoading(false);
+      }
+    };
+
+    joinQueue();
+    return () => { cancelled = true; };
+  }, [showtimeId, loadingDetails]);
+
+  useEffect(() => {
+    if (!showtimeId || queueReady || !ticketQueue?.queueRequired) return undefined;
+
+    let cancelled = false;
+    const timer = window.setInterval(async () => {
+      try {
+        const status = unwrapApiResponse(await bookingApi.fetchTicketQueueStatus(showtimeId));
+        if (!cancelled) setTicketQueue(status);
+      } catch {
+        if (!cancelled) setQueueReady(true);
+      }
+    }, 2500);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [queueReady, showtimeId, ticketQueue?.queueRequired]);
+
+  useEffect(() => {
     if (!showtimeId) return;
     const cancelledRef = { current: false };
 
@@ -262,6 +387,7 @@ export const SeatSelectionPage = () => {
   );
 
   const handleToggleSelectSeat = (seat) => {
+    setSeatSuggestion(null);
     setSelectedSeats((prev) => {
       const isAlreadySelected = prev.some((s) => s.id === seat.id);
       if (isAlreadySelected) {
@@ -285,6 +411,26 @@ export const SeatSelectionPage = () => {
       const next = [...prev, seat];
       return next;
     });
+  };
+
+  const handleSuggestGroupSeats = async () => {
+    const count = Math.max(1, Math.min(8, Number(groupSeatCount) || 1));
+    setGroupSeatCount(count);
+    setSuggestingSeats(true);
+    setSeatSuggestion(null);
+
+    try {
+      const suggestion = buildGroupSeatSuggestion(seats, count);
+      setSelectedSeats(suggestion.seats);
+      setSeatSuggestion(suggestion);
+      setSnackbarMessage(suggestion.message);
+      setSnackbarOpen(true);
+    } catch (err) {
+      setSnackbarMessage(err.message || 'Không thể tìm ghế nhóm phù hợp.');
+      setSnackbarOpen(true);
+    } finally {
+      setSuggestingSeats(false);
+    }
   };
 
   useEffect(() => {
@@ -419,11 +565,120 @@ export const SeatSelectionPage = () => {
     clearError();
   };
 
+  const handleEnterSeatSelection = async () => {
+    setQueueBusy(true);
+    try {
+      await bookingApi.leaveTicketQueue(showtimeId);
+    } catch {
+      // The seat map is still usable if leaving the display queue fails.
+    } finally {
+      setQueueReady(true);
+      setQueueBusy(false);
+    }
+  };
+
   if (loadingDetails) {
     return (
       <Box sx={{ minHeight: '80vh', position: 'relative' }}>
         <LoadingOverlay open={true} message="Đang xử lý thông tin..." blur />
       </Box>
+    );
+  }
+
+  if (!queueReady && queueLoading) {
+    return (
+      <Box sx={{ minHeight: '80vh', position: 'relative' }}>
+        <LoadingOverlay open={true} message="Đang vào hàng đợi..." blur />
+      </Box>
+    );
+  }
+
+  if (!queueReady && ticketQueue?.queueRequired) {
+    const entries = Array.isArray(ticketQueue.entries) ? ticketQueue.entries : [];
+    const currentEntry = entries.find((entry) => entry.currentUser);
+    const canEnter = Boolean(ticketQueue.admitted || currentEntry?.admitted);
+
+    return (
+      <Container maxWidth="md" sx={{ minHeight: '78vh', display: 'flex', alignItems: 'center', justifyContent: 'center', py: 6 }}>
+        <Paper
+          sx={{
+            width: '100%',
+            p: { xs: 3, md: 4 },
+            borderRadius: 2,
+            border: '1px solid rgba(251, 191, 36, 0.22)',
+            bgcolor: 'rgba(15, 23, 42, 0.94)',
+          }}
+        >
+          <Stack spacing={3}>
+            <Box textAlign="center">
+              <Typography variant="overline" color="primary.main" fontWeight={900}>
+                Hàng đợi chọn ghế
+              </Typography>
+              <Typography variant="h4" fontWeight={900} sx={{ mt: 1 }}>
+                Team đang vào theo thứ tự
+              </Typography>
+              <Typography color="text.secondary" sx={{ mt: 1.5 }}>
+                Mỗi tài khoản đăng nhập vào suất chiếu này sẽ có một dòng riêng trong hàng đợi.
+              </Typography>
+            </Box>
+
+            <Box textAlign="center">
+              <Typography variant="h2" fontWeight={900} color="primary.main">
+                #{ticketQueue.position || currentEntry?.position || '-'}
+              </Typography>
+              <Typography variant="h6" fontWeight={800}>
+                {canEnter ? 'Đã đến lượt bạn' : formatQueueWait(ticketQueue.estimatedWaitSeconds)}
+              </Typography>
+            </Box>
+
+            <LinearProgress variant={canEnter ? 'determinate' : 'indeterminate'} value={canEnter ? 100 : undefined} sx={{ height: 8, borderRadius: 999 }} />
+
+            <Stack spacing={1.25}>
+              {entries.map((entry) => (
+                <Paper
+                  key={entry.userId}
+                  variant="outlined"
+                  sx={{
+                    p: 1.5,
+                    borderRadius: 2,
+                    borderColor: entry.currentUser ? 'primary.main' : 'rgba(148, 163, 184, 0.18)',
+                    bgcolor: entry.currentUser ? 'rgba(251, 191, 36, 0.10)' : 'rgba(15, 23, 42, 0.58)',
+                  }}
+                >
+                  <Stack direction="row" spacing={2} alignItems="center" justifyContent="space-between">
+                    <Stack direction="row" spacing={1.5} alignItems="center" minWidth={0}>
+                      <Typography color="primary.main" fontWeight={900} sx={{ width: 44 }}>
+                        #{entry.position}
+                      </Typography>
+                      <Box minWidth={0}>
+                        <Typography fontWeight={800} noWrap>
+                          {entry.displayName || entry.email || 'Thành viên'}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" noWrap>
+                          {entry.email || 'Đang chờ chọn ghế'}
+                        </Typography>
+                      </Box>
+                    </Stack>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      {entry.currentUser && <Chip size="small" color="primary" label="Bạn" />}
+                      <Chip size="small" color={entry.admitted ? 'success' : 'warning'} label={entry.admitted ? 'Đến lượt' : 'Đang chờ'} />
+                    </Stack>
+                  </Stack>
+                </Paper>
+              ))}
+            </Stack>
+
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} justifyContent="space-between" alignItems={{ sm: 'center' }}>
+              <Typography variant="body2" color="text.secondary">
+                Danh sách tự cập nhật khi thành viên khác đăng nhập hoặc vào chọn ghế.
+              </Typography>
+              <Button variant="contained" disabled={!canEnter || queueBusy} onClick={handleEnterSeatSelection}>
+                {queueBusy ? 'Đang mở...' : 'Vào chọn ghế'}
+              </Button>
+            </Stack>
+          </Stack>
+        </Paper>
+      </Container>
     );
   }
 
@@ -490,6 +745,59 @@ export const SeatSelectionPage = () => {
                 position: 'relative',
               }}
             >
+              <Box
+                sx={{
+                  width: '100%',
+                  mb: 3,
+                  p: 2,
+                  borderRadius: 2,
+                  border: '1px solid rgba(148, 163, 184, 0.14)',
+                  bgcolor: 'rgba(15, 23, 42, 0.32)',
+                }}
+              >
+                <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems={{ md: 'center' }} justifyContent="space-between">
+                  <Box>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <AutoAwesomeRoundedIcon color="primary" fontSize="small" />
+                      <Typography variant="subtitle1" fontWeight={900}>Tìm ghế nhóm tự động</Typography>
+                      {seatSuggestion && (
+                        <Chip
+                          size="small"
+                          color={seatSuggestion.exactMatch ? 'success' : 'warning'}
+                          label={seatSuggestion.exactMatch ? 'Liền nhau' : 'Gần nhất'}
+                        />
+                      )}
+                    </Stack>
+                    <Typography variant="body2" color="text.secondary">
+                      Nhập số người, hệ thống ưu tiên tìm ghế liền nhau cùng hàng; nếu hết chỗ sẽ chọn cụm gần nhất.
+                    </Typography>
+                  </Box>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <TextField
+                      label="Số người"
+                      type="number"
+                      size="small"
+                      value={groupSeatCount}
+                      onChange={(event) => setGroupSeatCount(event.target.value)}
+                      inputProps={{ min: 1, max: 8 }}
+                      sx={{ width: 110 }}
+                    />
+                    <Button
+                      variant="contained"
+                      startIcon={suggestingSeats ? <CircularProgress size={16} color="inherit" /> : <AutoAwesomeRoundedIcon />}
+                      onClick={handleSuggestGroupSeats}
+                      disabled={suggestingSeats || apiLoading || seats.length === 0}
+                    >
+                      Tìm ghế
+                    </Button>
+                  </Stack>
+                </Stack>
+                {seatSuggestion?.message && (
+                  <Alert severity={seatSuggestion.exactMatch ? 'success' : 'warning'} sx={{ mt: 2 }}>
+                    {seatSuggestion.message}
+                  </Alert>
+                )}
+              </Box>
               <SeatMap
                 seats={seats}
                 selectedSeats={selectedSeats}

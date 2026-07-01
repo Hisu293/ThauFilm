@@ -32,6 +32,24 @@ export const bookingApi = {
     return axiosClient.get(`/api/member/booking/showtimes/${showtimeId}/seats`);
   },
 
+  suggestGroupSeats: (showtimeId, count) => {
+    return axiosClient.get(`/api/member/booking/showtimes/${showtimeId}/seat-suggestions`, {
+      params: { count },
+    });
+  },
+
+  joinTicketQueue: (showtimeId) => {
+    return axiosClient.post(`/api/member/booking/showtimes/${showtimeId}/queue/join`);
+  },
+
+  fetchTicketQueueStatus: (showtimeId) => {
+    return axiosClient.get(`/api/member/booking/showtimes/${showtimeId}/queue/status`);
+  },
+
+  leaveTicketQueue: (showtimeId) => {
+    return axiosClient.post(`/api/member/booking/showtimes/${showtimeId}/queue/leave`);
+  },
+
   // Create booking and temporarily hold seats: POST /api/member/booking
   createBooking: (showtimeId, seatIds, channel = DEFAULT_BOOKING_CHANNEL, comboIds = []) => {
     return axiosClient.post('/api/member/booking', {

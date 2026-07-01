@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Link as RouterLink, useParams } from 'react-router-dom';
+﻿import { useState, useEffect } from 'react';
+import { Link as RouterLink, useParams, useNavigate } from 'react-router-dom';
 import {
   Box, Button, Chip, Container, Divider,
   Stack, Typography, Dialog, IconButton
@@ -17,6 +17,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import ForumRoundedIcon from '@mui/icons-material/ForumRounded';
 
 import { fetchMovieById } from '../services/movieService';
+import watchPartyService from '../services/watchPartyService';
 import { useBookingFlow } from '../context/BookingContext';
 import { useBookingNavigate } from '../context/BookingNavigationContext';
 import BookingStepper from '../components/BookingStepper';
@@ -28,7 +29,7 @@ import './MovieDetailPage.css';
 
 /* ---------- helpers ---------- */
 const fmtDate = (dateStr) => {
-  if (!dateStr) return '—';
+  if (!dateStr) return 'â€”';
   try {
     return new Date(dateStr).toLocaleDateString('vi-VN', {
       day: '2-digit', month: '2-digit', year: 'numeric',
@@ -96,6 +97,7 @@ const MovieDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [openOnlineMovie, setOpenOnlineMovie] = useState(false);
+  const [creatingWatchParty, setCreatingWatchParty] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -166,6 +168,18 @@ const MovieDetailPage = () => {
         showtime
       }
     });
+  };
+
+  const handleCreateWatchParty = async () => {
+    setCreatingWatchParty(true);
+    try {
+      const room = await watchPartyService.create(movie.id);
+      navigate(`/watch-party/${room.id}`);
+    } catch (err) {
+      setError(err.message || 'Không thể tạo phòng xem nhóm.');
+    } finally {
+      setCreatingWatchParty(false);
+    }
   };
 
   return (
@@ -354,6 +368,16 @@ const MovieDetailPage = () => {
                 sx={{ fontWeight: 700, px: 3 }}
               >
                 Xem đánh giá cộng đồng
+              </Button>
+              <Button
+                variant="contained"
+                size="large"
+                startIcon={<GroupRoundedIcon />}
+                onClick={handleCreateWatchParty}
+                disabled={creatingWatchParty}
+                sx={{ fontWeight: 800, px: 4, py: 1.6, borderRadius: 2 }}
+              >
+                Tạo phòng xem nhóm
               </Button>
             </Stack>
           </Box>
