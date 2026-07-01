@@ -48,6 +48,7 @@ public class BookingService {
     private final RealtimeEventService realtimeEventService;
     private final ApplicationEventPublisher eventPublisher;
     private final PaymentGatewayService paymentGatewayService;
+    private final PricingService pricingService;
 
     @Value("${app.mail.from:onboarding@resend.dev}")
     private String mailFrom;
@@ -59,6 +60,7 @@ public class BookingService {
         return LocalDateTime.now(VIETNAM_ZONE);
     }
 
+<<<<<<< Updated upstream
     @Transactional(readOnly = true)
     public List<ShowtimeSeatResponse> getAvailableSeats(UUID showtimeId) {
         if (!showtimeRepository.existsById(showtimeId)) {
@@ -68,6 +70,16 @@ public class BookingService {
         List<UUID> seatIds = availabilities.stream()
                 .map(SeatAvailability::getSeatId)
                 .toList();
+=======
+    // ĐÃ SỬA: Thêm UUID currentUserId
+    @Transactional
+    public List<ShowtimeSeatResponse> getAvailableSeats(UUID showtimeId, UUID currentUserId) {
+        Showtime showtime = showtimeRepository.findById(showtimeId)
+                .orElseThrow(() -> new BadRequestException("Showtime not found"));
+
+        List<SeatAvailability> availabilities = ensureSeatAvailabilities(showtime);
+        List<UUID> seatIds = availabilities.stream().map(SeatAvailability::getSeatId).toList();
+>>>>>>> Stashed changes
 
         Map<UUID, Seat> seatById = seatRepository.findAllById(seatIds)
                 .stream()
@@ -96,7 +108,40 @@ public class BookingService {
                 .toList();
     }
 
-    @Transactional(readOnly = true)
+    private List<SeatAvailability> ensureSeatAvailabilities(Showtime showtime) {
+        List<SeatAvailability> existing = seatAvailabilityRepository.findByShowtimeIdOrderBySeatId(showtime.getId());
+        List<Seat> roomSeats = seatRepository.findAllByCinemaRoomIdOrderByRowNameAscSeatNumberAsc(showtime.getCinemaRoomId());
+
+        if (roomSeats.isEmpty()) {
+            throw new BadRequestException("Cinema room has no seats configured");
+        }
+
+        Set<UUID> existingSeatIds = existing.stream()
+                .map(SeatAvailability::getSeatId)
+                .collect(Collectors.toSet());
+
+        List<SeatAvailability> missing = roomSeats.stream()
+                .filter(seat -> !existingSeatIds.contains(seat.getId()))
+                .map(seat -> SeatAvailability.builder()
+                        .showtimeId(showtime.getId())
+                        .seatId(seat.getId())
+                        .status(SeatBookingStatus.AVAILABLE)
+                        .price(pricingService.getPriceForSeatType(showtime.getId(), seat.getType().toStorageValue()))
+                        .build())
+                .toList();
+
+        if (missing.isEmpty()) {
+            return existing;
+        }
+
+        List<SeatAvailability> created = seatAvailabilityRepository.saveAll(missing);
+        List<SeatAvailability> merged = new ArrayList<>(existing.size() + created.size());
+        merged.addAll(existing);
+        merged.addAll(created);
+        return merged;
+    }
+
+    @Transactional
     public SeatSuggestionResponse suggestSeats(UUID showtimeId, int count) {
         if (count < 1 || count > 8) {
             throw new BadRequestException("Số ghế cần tìm phải từ 1 đến 8");
