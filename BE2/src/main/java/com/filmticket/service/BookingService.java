@@ -60,26 +60,14 @@ public class BookingService {
         return LocalDateTime.now(VIETNAM_ZONE);
     }
 
-<<<<<<< Updated upstream
-    @Transactional(readOnly = true)
-    public List<ShowtimeSeatResponse> getAvailableSeats(UUID showtimeId) {
-        if (!showtimeRepository.existsById(showtimeId)) {
-            throw new BadRequestException("Showtime not found");
-        }
-        List<SeatAvailability> availabilities = seatAvailabilityRepository.findByShowtimeIdOrderBySeatId(showtimeId);
-        List<UUID> seatIds = availabilities.stream()
-                .map(SeatAvailability::getSeatId)
-                .toList();
-=======
-    // ĐÃ SỬA: Thêm UUID currentUserId
+    // Lazily create seat availability rows for legacy showtimes that do not have them yet.
     @Transactional
-    public List<ShowtimeSeatResponse> getAvailableSeats(UUID showtimeId, UUID currentUserId) {
+    public List<ShowtimeSeatResponse> getAvailableSeats(UUID showtimeId) {
         Showtime showtime = showtimeRepository.findById(showtimeId)
                 .orElseThrow(() -> new BadRequestException("Showtime not found"));
 
         List<SeatAvailability> availabilities = ensureSeatAvailabilities(showtime);
         List<UUID> seatIds = availabilities.stream().map(SeatAvailability::getSeatId).toList();
->>>>>>> Stashed changes
 
         Map<UUID, Seat> seatById = seatRepository.findAllById(seatIds)
                 .stream()
