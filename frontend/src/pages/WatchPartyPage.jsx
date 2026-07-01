@@ -18,7 +18,13 @@ const REACTIONS = {
   laugh: '\uD83D\uDE02',
   wow: '\uD83D\uDE2E',
 };
+
 const money = (value) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(value) || 0);
+
+const getPublicAppUrl = () => {
+  const configuredUrl = String(import.meta.env.VITE_PUBLIC_APP_URL || '').trim();
+  return (configuredUrl || window.location.origin).replace(/\/+$/, '');
+};
 
 export default function WatchPartyPage() {
   const { roomId } = useParams();
@@ -38,7 +44,7 @@ export default function WatchPartyPage() {
   const [inviteCopied, setInviteCopied] = useState(false);
 
   const streamUrl = useMemo(() => (room ? getMovieStreamUrl({ id: room.movieId }) : ''), [room]);
-  const inviteUrl = room ? `${window.location.origin}${room.invitePath || `/watch-party/${room.id}`}` : '';
+  const inviteUrl = room ? `${getPublicAppUrl()}${room.invitePath || `/watch-party/${room.id}`}` : '';
   const me = room?.members?.find((member) => member.currentUser);
 
   const load = useCallback(async () => {
@@ -215,7 +221,7 @@ export default function WatchPartyPage() {
               </Stack>
             </Box>
           </Stack>
-          <Stack direction="row" spacing={1}>
+          <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
             <Button variant="outlined" startIcon={<ContentCopyRoundedIcon />} onClick={copyInvite}>
               {inviteCopied ? 'Đã copy' : 'Copy link mời'}
             </Button>
