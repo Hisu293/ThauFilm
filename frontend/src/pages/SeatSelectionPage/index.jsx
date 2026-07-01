@@ -1,7 +1,8 @@
 import { useCallback, useState, useEffect, useMemo } from 'react';
 import { useLocation, useParams, useNavigate } from 'react-router-dom';
-import { Container, Box, Alert, Snackbar, Button } from '@mui/material';
+import { Container, Box, Alert, Snackbar, Button, Chip, CircularProgress, LinearProgress, Paper, Stack, TextField, Typography } from '@mui/material';
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
+import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 
 import BookingStepper from '../../components/BookingStepper';
 import SeatMap from '../../components/SeatMap';
@@ -19,6 +20,71 @@ import { useBookingFlow } from '../../context/BookingContext';
 import { pruneExpiredPendingBookings, savePendingBooking } from '../../utils/pendingBookingStorage';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const unwrapApiResponse = (response) => response?.data ?? response;
+
+const formatQueueWait = (seconds = 0) => {
+  if (seconds <= 0) return 'Đang mở cổng chọn ghế';
+  const minutes = Math.max(1, Math.ceil(seconds / 60));
+  return `Còn khoảng ${minutes} phút`;
+};
+
+const buildGroupSeatSuggestion = (seats = [], count = 1) => {
+  const availableSeats = seats
+    .filter((seat) => !seat.isSold)
+    .slice()
+    .sort((a, b) => String(a.rowName).localeCompare(String(b.rowName)) || Number(a.col) - Number(b.col));
+
+  if (availableSeats.length < count) {
+    throw new Error(`Không còn đủ ${count} ghế trống cho suất chiếu này.`);
+  }
+
+  const byRow = bookingService.groupSeatsByRow(availableSeats);
+  const findBestWindow = (requireAdjacent) => {
+    let best = null;
+    byRow.forEach(({ seats: rowSeats }) => {
+      if (rowSeats.length < count) return;
+      for (let start = 0; start <= rowSeats.length - count; start += 1) {
+        const group = rowSeats.slice(start, start + count);
+        const span = group[group.length - 1].col - group[0].col;
+        if (requireAdjacent && span !== count - 1) continue;
+        const gaps = span - (count - 1);
+        const score = span * 100 + gaps * 1000 + Math.abs(group[0].col + group[group.length - 1].col);
+        if (!best || score < best.score) best = { seats: group, score };
+      }
+    });
+    return best;
+  };
+
+  const exact = findBestWindow(true);
+  if (exact) {
+    return {
+      exactMatch: true,
+      requestedCount: count,
+      message: `Đã tìm thấy ${count} ghế liền nhau cùng hàng.`,
+      seats: exact.seats,
+      seatIds: exact.seats.map((seat) => seat.id),
+    };
+  }
+
+  const nearestSameRow = findBestWindow(false);
+  if (nearestSameRow) {
+    return {
+      exactMatch: false,
+      requestedCount: count,
+      message: `Không có đủ ${count} ghế liền nhau. Đây là cụm ghế gần nhau nhất trong cùng hàng.`,
+      seats: nearestSameRow.seats,
+      seatIds: nearestSameRow.seats.map((seat) => seat.id),
+    };
+  }
+
+  return {
+    exactMatch: false,
+    requestedCount: count,
+    message: `Không có đủ ${count} ghế trong một hàng. Đây là các ghế gần nhất còn trống.`,
+    seats: availableSeats.slice(0, count),
+    seatIds: availableSeats.slice(0, count).map((seat) => seat.id),
+  };
+};
 
 export const SeatSelectionPage = () => {
   const { showtimeId } = useParams();
@@ -34,6 +100,11 @@ export const SeatSelectionPage = () => {
   const [selectedSeats, setSelectedSeats] = useState([]);
   const [loadingDetails, setLoadingDetails] = useState(true);
   const [, setActiveBooking] = useState(location.state?.activeBooking || null);
+  const [groupSeatCount, setGroupSeatCount] = useState(6);
+  const [suggestingSeats, setSuggestingSeats] = useState(false);
+  const [seatSuggestion, setSeatSuggestion] = useState(null);
+  const [ticketQueue, setTicketQueue] = useState(null);
+  const [queueReady, setQueueReady] = useState(false);
 
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
@@ -153,6 +224,51 @@ export const SeatSelectionPage = () => {
   }, [showtimeId, refreshSeats]);
 
   useEffect(() => {
+    if (!showtimeId || loadingDetails) return undefined;
+    let cancelled = false;
+
+    const joinQueue = async () => {
+
+      try {
+        const status = unwrapApiResponse(await bookingApi.joinTicketQueue(showtimeId));
+        if (cancelled) return;
+        setTicketQueue(status);
+        setQueueReady(!status?.queueRequired || status?.admitted);
+      } catch {
+        if (!cancelled) {
+          setTicketQueue(null);
+          setQueueReady(true);
+        }
+      }
+    };
+
+    setQueueReady(false);
+    joinQueue();
+    return () => { cancelled = true; };
+  }, [showtimeId, loadingDetails]);
+
+  useEffect(() => {
+    if (!ticketQueue?.queueRequired || ticketQueue.admitted || !ticketQueue.token || queueReady) return undefined;
+
+    let cancelled = false;
+    const timer = window.setInterval(async () => {
+      try {
+        const status = unwrapApiResponse(await bookingApi.fetchTicketQueueStatus(showtimeId, ticketQueue.token));
+        if (cancelled) return;
+        setTicketQueue(status);
+        if (status?.admitted) setQueueReady(true);
+      } catch {
+        if (!cancelled) setQueueReady(true);
+      }
+    }, 1500);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [queueReady, showtimeId, ticketQueue]);
+
+  useEffect(() => {
     if (!showtimeId) return;
     const cancelledRef = { current: false };
 
@@ -241,6 +357,7 @@ export const SeatSelectionPage = () => {
   );
 
   const handleToggleSelectSeat = (seat) => {
+    setSeatSuggestion(null);
     setSelectedSeats((prev) => {
       const isAlreadySelected = prev.some((s) => s.id === seat.id);
       if (isAlreadySelected) {
@@ -264,6 +381,26 @@ export const SeatSelectionPage = () => {
       const next = [...prev, seat];
       return next;
     });
+  };
+
+  const handleSuggestGroupSeats = async () => {
+    const count = Math.max(1, Math.min(8, Number(groupSeatCount) || 1));
+    setGroupSeatCount(count);
+    setSuggestingSeats(true);
+    setSeatSuggestion(null);
+
+    try {
+      const suggestion = buildGroupSeatSuggestion(seats, count);
+      setSelectedSeats(suggestion.seats);
+      setSeatSuggestion(suggestion);
+      setSnackbarMessage(suggestion.message);
+      setSnackbarOpen(true);
+    } catch (err) {
+      setSnackbarMessage(err.message || 'Không thể tìm ghế nhóm phù hợp.');
+      setSnackbarOpen(true);
+    } finally {
+      setSuggestingSeats(false);
+    }
   };
 
   useEffect(() => {
@@ -388,6 +525,47 @@ export const SeatSelectionPage = () => {
     );
   }
 
+  if (!queueReady && ticketQueue?.queueRequired) {
+    return (
+      <Container maxWidth="sm" sx={{ minHeight: '78vh', display: 'flex', alignItems: 'center', justifyContent: 'center', py: 6 }}>
+        <Paper
+          sx={{
+            width: '100%',
+            p: { xs: 3, md: 4 },
+            borderRadius: 2,
+            border: '1px solid rgba(251, 191, 36, 0.22)',
+            bgcolor: 'rgba(15, 23, 42, 0.92)',
+            textAlign: 'center',
+          }}
+        >
+          <Typography variant="overline" color="primary.main" fontWeight={900}>
+            Phim hot đang mở bán
+          </Typography>
+          <Typography variant="h4" fontWeight={900} sx={{ mt: 1 }}>
+            Bạn đang trong hàng đợi
+          </Typography>
+          <Typography color="text.secondary" sx={{ mt: 1.5 }}>
+            Chúng tôi đang điều tiết lượt vào để giữ hệ thống đặt vé ổn định.
+          </Typography>
+
+          <Box sx={{ my: 4 }}>
+            <Typography variant="h2" fontWeight={900} color="primary.main">
+              #{ticketQueue.position}
+            </Typography>
+            <Typography variant="h6" fontWeight={800}>
+              {formatQueueWait(ticketQueue.estimatedWaitSeconds)}
+            </Typography>
+          </Box>
+
+          <LinearProgress sx={{ height: 8, borderRadius: 999, mb: 2 }} />
+          <Typography variant="body2" color="text.secondary">
+            Vui lòng giữ trang này. Khi đến lượt, hệ thống sẽ tự mở sơ đồ ghế.
+          </Typography>
+        </Paper>
+      </Container>
+    );
+  }
+
   if (!movie || !showtime) {
     return (
       <Container maxWidth="xl" sx={{ py: 6 }}>
@@ -451,6 +629,59 @@ export const SeatSelectionPage = () => {
                 position: 'relative',
               }}
             >
+              <Box
+                sx={{
+                  width: '100%',
+                  mb: 3,
+                  p: 2,
+                  borderRadius: 2,
+                  border: '1px solid rgba(148, 163, 184, 0.14)',
+                  bgcolor: 'rgba(15, 23, 42, 0.32)',
+                }}
+              >
+                <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems={{ md: 'center' }} justifyContent="space-between">
+                  <Box>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      <AutoAwesomeRoundedIcon color="primary" fontSize="small" />
+                      <Typography variant="subtitle1" fontWeight={900}>Tìm ghế nhóm tự động</Typography>
+                      {seatSuggestion && (
+                        <Chip
+                          size="small"
+                          color={seatSuggestion.exactMatch ? 'success' : 'warning'}
+                          label={seatSuggestion.exactMatch ? 'Liền nhau' : 'Gần nhất'}
+                        />
+                      )}
+                    </Stack>
+                    <Typography variant="body2" color="text.secondary">
+                      Nhập số người, hệ thống ưu tiên tìm ghế liền nhau cùng hàng; nếu hết chỗ sẽ chọn cụm gần nhất.
+                    </Typography>
+                  </Box>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <TextField
+                      label="Số người"
+                      type="number"
+                      size="small"
+                      value={groupSeatCount}
+                      onChange={(event) => setGroupSeatCount(event.target.value)}
+                      inputProps={{ min: 1, max: 8 }}
+                      sx={{ width: 110 }}
+                    />
+                    <Button
+                      variant="contained"
+                      startIcon={suggestingSeats ? <CircularProgress size={16} color="inherit" /> : <AutoAwesomeRoundedIcon />}
+                      onClick={handleSuggestGroupSeats}
+                      disabled={suggestingSeats || apiLoading || seats.length === 0}
+                    >
+                      Tìm ghế
+                    </Button>
+                  </Stack>
+                </Stack>
+                {seatSuggestion?.message && (
+                  <Alert severity={seatSuggestion.exactMatch ? 'success' : 'warning'} sx={{ mt: 2 }}>
+                    {seatSuggestion.message}
+                  </Alert>
+                )}
+              </Box>
               <SeatMap
                 seats={seats}
                 selectedSeats={selectedSeats}

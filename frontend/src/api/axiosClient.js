@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { clearAuthStorageAndReload, getAccessToken } from '../utils/authStorage';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
@@ -13,7 +14,7 @@ const axiosClient = axios.create({
 // Request interceptor to automatically add authorization token
 axiosClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('cinema_token');
+    const token = getAccessToken();
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -30,6 +31,11 @@ axiosClient.interceptors.response.use(
       return Promise.reject(
         new Error(`Không thể kết nối đến server tại ${API_BASE_URL}. Vui lòng kiểm tra kết nối mạng hoặc server backend.`)
       );
+    }
+
+    if ([401, 403].includes(error.response.status) && getAccessToken()) {
+      clearAuthStorageAndReload();
+      window.location.assign('/login');
     }
 
     const message =

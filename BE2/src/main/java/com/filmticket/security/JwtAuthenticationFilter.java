@@ -11,6 +11,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
+import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
@@ -49,8 +50,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 SecurityContextHolder.getContext().setAuthentication(authentication);
 
                 log.info("Authenticated request path={} user={} authorities={}", request.getServletPath(), username, authorities);
-            } else if (request.getServletPath().startsWith("/api/") && !request.getServletPath().equals("/api/events/movies")) {
-                log.warn("Missing or invalid JWT for path={}", request.getServletPath());
+            } else if (StringUtils.hasText(jwt) && !isPublicRequest(request)) {
+                log.warn("Invalid JWT for path={}", request.getServletPath());
             }
         } catch (Exception ex) {
             log.error("Could not set user authentication in security context", ex);
@@ -69,10 +70,28 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
+        return isPublicRequest(request);
+    }
+
+    private boolean isPublicRequest(HttpServletRequest request) {
         String path = request.getServletPath();
-        return path.startsWith("/api/auth/register")
+        String method = request.getMethod();
+
+        return HttpMethod.OPTIONS.matches(method)
+                || path.startsWith("/api/auth/register")
                 || path.startsWith("/api/auth/login")
                 || path.startsWith("/api/auth/google")
+                || path.startsWith("/api/auth/refresh")
+                || path.startsWith("/api/auth/logout")
+                || path.equals("/api/payments/webhooks") || path.startsWith("/api/payments/webhooks/")
+                || path.equals("/api/movie-chatbot") || path.startsWith("/api/movie-chatbot/")
+                || path.equals("/api/showtimes") || path.startsWith("/api/showtimes/")
+                || path.equals("/api/events/movies")
+                || path.equals("/actuator/health")
+                || path.equals("/actuator/info")
+                || (HttpMethod.GET.matches(method) && path.startsWith("/api/movies/"))
+                || (HttpMethod.GET.matches(method) && path.equals("/api/movies"))
+                || (HttpMethod.GET.matches(method) && path.startsWith("/api/favorite-lists/public/"))
                 || path.startsWith("/swagger-ui")
                 || path.startsWith("/v3/api-docs");
     }
