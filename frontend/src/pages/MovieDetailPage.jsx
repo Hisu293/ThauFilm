@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Link as RouterLink, useParams, useNavigate } from 'react-router-dom';
+import { Link as RouterLink, useParams } from 'react-router-dom';
 import {
   Box, Button, Chip, Container, Divider,
   Stack, Typography, Dialog, IconButton
@@ -18,6 +18,7 @@ import ForumRoundedIcon from '@mui/icons-material/ForumRounded';
 
 import { fetchMovieById } from '../services/movieService';
 import { useBookingFlow } from '../context/BookingContext';
+import { useBookingNavigate } from '../context/BookingNavigationContext';
 import BookingStepper from '../components/BookingStepper';
 import ShowtimeSelector from '../components/ShowtimeSelector';
 import StatusChip from '../components/common/StatusChip';
@@ -89,7 +90,7 @@ const MovieNotFound = ({ message }) => (
    ===================================================== */
 const MovieDetailPage = () => {
   const { id } = useParams();
-  const navigate = useNavigate();
+  const navigate = useBookingNavigate();
   const { updateBookingState } = useBookingFlow();
   const [movie, setMovie] = useState(null);
   const [loading, setLoading] = useState(true);

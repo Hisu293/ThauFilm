@@ -3,6 +3,7 @@ import { CssBaseline, ThemeProvider } from '@mui/material';
 import AppRoutes from './routes/AppRoutes';
 import { AuthProvider } from './context/AuthContext';
 import { BookingProvider } from './context/BookingContext';
+import { BookingNavigationProvider } from './context/BookingNavigationContext';
 import cinemaTheme from './theme/cinemaTheme';
 
 function App() {
@@ -12,7 +13,9 @@ function App() {
       <AuthProvider>
         <BookingProvider>
           <BrowserRouter>
-            <AppRoutes />
+            <BookingNavigationProvider>
+              <AppRoutes />
+            </BookingNavigationProvider>
           </BrowserRouter>
         </BookingProvider>
       </AuthProvider>

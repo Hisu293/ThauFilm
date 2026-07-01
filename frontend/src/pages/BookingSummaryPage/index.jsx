@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import {
   Alert,
   Box,
@@ -28,6 +28,7 @@ import StatusChip from '../../components/common/StatusChip';
 import { SEAT_TYPE, enumLabel } from '../../constants/enums';
 import { useBooking } from '../../hooks/useBooking';
 import { useBookingFlow } from '../../context/BookingContext';
+import { useBookingNavigate } from '../../context/BookingNavigationContext';
 import { useHoldCountdown } from '../../hooks/useHoldCountdown';
 import {
   getPendingBooking,
@@ -60,7 +61,7 @@ const buildFallbackShowtime = (booking, showtimeState) => ({
 
 export const BookingSummaryPage = () => {
   const location = useLocation();
-  const navigate = useNavigate();
+  const navigate = useBookingNavigate();
   const { loading: apiLoading, error: apiError, clearError, getDetail } = useBooking();
   const { updateBookingState } = useBookingFlow();
 

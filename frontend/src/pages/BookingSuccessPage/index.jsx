@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { Container, Box, Typography, Stack, Divider, Paper, Snackbar, Alert } from '@mui/material';
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import ConfirmationNumberRoundedIcon from '@mui/icons-material/ConfirmationNumberRounded';
@@ -10,11 +10,12 @@ import CustomButton from '../../components/common/CustomButton';
 import LoadingOverlay from '../../components/common/LoadingOverlay';
 
 import { useBooking } from '../../hooks/useBooking';
+import { useBookingNavigate } from '../../context/BookingNavigationContext';
 import { savePaidBookingSummary } from '../../utils/paidBookingStorage';
 
 export const BookingSuccessPage = () => {
   const location = useLocation();
-  const navigate = useNavigate();
+  const navigate = useBookingNavigate();
 
   const { loading: apiLoading, error: apiError, clearError, getTickets } = useBooking();
 

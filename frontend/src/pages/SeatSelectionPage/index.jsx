@@ -1,5 +1,5 @@
 import { useCallback, useState, useEffect, useMemo } from 'react';
-import { useLocation, useParams, useNavigate } from 'react-router-dom';
+import { useLocation, useParams } from 'react-router-dom';
 import { Container, Box, Alert, Snackbar, Button } from '@mui/material';
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
 
@@ -16,6 +16,7 @@ import { bookingApi } from '../../api/bookingApi';
 import { bookingService } from '../../services/bookingService';
 import { fetchMovieById } from '../../services/movieService';
 import { useBookingFlow } from '../../context/BookingContext';
+import { useBookingNavigate } from '../../context/BookingNavigationContext';
 import { pruneExpiredPendingBookings, savePendingBooking } from '../../utils/pendingBookingStorage';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -23,7 +24,7 @@ const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3
 export const SeatSelectionPage = () => {
   const { showtimeId } = useParams();
   const location = useLocation();
-  const navigate = useNavigate();
+  const navigate = useBookingNavigate();
   const { updateBookingState } = useBookingFlow();
 
   const { loading: apiLoading, error: apiError, clearError, getSeats, create, getHistory, getDetail, cancel } = useBooking();
