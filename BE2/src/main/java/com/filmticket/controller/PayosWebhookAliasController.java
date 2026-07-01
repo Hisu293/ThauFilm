@@ -2,6 +2,7 @@ package com.filmticket.controller;
 
 import com.filmticket.service.BookingService;
 import com.filmticket.service.PaymentGatewayService;
+import com.filmticket.service.WatchPartyService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -13,6 +14,7 @@ public class PayosWebhookAliasController {
 
     private final PaymentGatewayService paymentGatewayService;
     private final BookingService bookingService;
+    private final WatchPartyService watchPartyService;
 
     @GetMapping(value = "/payos-webhook", produces = MediaType.TEXT_PLAIN_VALUE)
     public ResponseEntity<String> health() {
@@ -24,7 +26,11 @@ public class PayosWebhookAliasController {
         try {
             PaymentGatewayService.PayosWebhookResult result = paymentGatewayService.parsePayosWebhook(payload);
             if (result.paid()) {
-                bookingService.confirmPayosPayment(result.orderCode(), result.paymentId());
+                try {
+                    bookingService.confirmPayosPayment(result.orderCode(), result.paymentId());
+                } catch (Exception bookingPaymentNotFound) {
+                    watchPartyService.confirmPayosPayment(result.orderCode(), result.paymentId());
+                }
             }
         } catch (Exception ignored) {
             // Keep PayOS webhook verification successful even for non-payment test payloads.

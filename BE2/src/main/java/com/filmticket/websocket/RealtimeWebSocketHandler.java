@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.filmticket.service.MovieMatchInteractionService;
 import com.filmticket.service.GroupBookingRealtimeService;
+import com.filmticket.service.WatchPartyService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
@@ -20,6 +21,7 @@ public class RealtimeWebSocketHandler extends TextWebSocketHandler {
     private final RealtimeEventService realtimeEventService;
     private final MovieMatchInteractionService movieMatchInteractionService;
     private final GroupBookingRealtimeService groupBookingRealtimeService;
+    private final WatchPartyService watchPartyService;
     private final ObjectMapper objectMapper;
 
     @Override
@@ -65,6 +67,45 @@ public class RealtimeWebSocketHandler extends TextWebSocketHandler {
                 }
                 groupBookingRealtimeService.toggleSeat(
                         groupId, userId, UUID.fromString(data.path("seatId").asText()));
+                return;
+            }
+            if ("WATCH_PARTY_SUBSCRIBE".equals(type)) {
+                UUID roomId = UUID.fromString(data.path("roomId").asText());
+                watchPartyService.authorize(roomId, userId);
+                session.getAttributes().put("watchPartyId", roomId);
+                send(session, Map.of("type", "WATCH_PARTY_SUBSCRIBED", "data", watchPartyService.get(roomId, userId)));
+                return;
+            }
+            if ("WATCH_PARTY_PLAYBACK".equals(type)) {
+                UUID roomId = UUID.fromString(data.path("roomId").asText());
+                if (!roomId.equals(session.getAttributes().get("watchPartyId"))) {
+                    sendError(session, "NOT_SUBSCRIBED", "Bạn chưa tham gia phòng xem nhóm này");
+                    return;
+                }
+                watchPartyService.updatePlayback(
+                        roomId,
+                        userId,
+                        data.path("currentTime").asDouble(0),
+                        data.path("paused").asBoolean(true)
+                );
+                return;
+            }
+            if ("WATCH_PARTY_CHAT".equals(type)) {
+                UUID roomId = UUID.fromString(data.path("roomId").asText());
+                if (!roomId.equals(session.getAttributes().get("watchPartyId"))) {
+                    sendError(session, "NOT_SUBSCRIBED", "Bạn chưa tham gia phòng xem nhóm này");
+                    return;
+                }
+                watchPartyService.sendChat(roomId, userId, data.path("content").asText(""));
+                return;
+            }
+            if ("WATCH_PARTY_REACTION".equals(type)) {
+                UUID roomId = UUID.fromString(data.path("roomId").asText());
+                if (!roomId.equals(session.getAttributes().get("watchPartyId"))) {
+                    sendError(session, "NOT_SUBSCRIBED", "Bạn chưa tham gia phòng xem nhóm này");
+                    return;
+                }
+                watchPartyService.sendReaction(roomId, userId, data.path("reaction").asText(""));
                 return;
             }
             if (!"MATCH_SEND_MESSAGE".equals(type)) {

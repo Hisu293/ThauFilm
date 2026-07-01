@@ -42,10 +42,12 @@ export const bookingApi = {
     return axiosClient.post(`/api/member/booking/showtimes/${showtimeId}/queue/join`);
   },
 
-  fetchTicketQueueStatus: (showtimeId, token) => {
-    return axiosClient.get(`/api/member/booking/showtimes/${showtimeId}/queue/status`, {
-      params: { token },
-    });
+  fetchTicketQueueStatus: (showtimeId) => {
+    return axiosClient.get(`/api/member/booking/showtimes/${showtimeId}/queue/status`);
+  },
+
+  leaveTicketQueue: (showtimeId) => {
+    return axiosClient.post(`/api/member/booking/showtimes/${showtimeId}/queue/leave`);
   },
 
   // Create booking and temporarily hold seats: POST /api/member/booking

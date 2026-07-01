@@ -81,6 +81,13 @@ public class RealtimeEventService {
         ), type, groupBookingId);
     }
 
+    public void sendWatchPartyEvent(UUID roomId, String type, Object data) {
+        sendMatching(session -> roomId.equals(session.getAttributes().get("watchPartyId")), Map.of(
+                "type", type,
+                "data", data
+        ), type, roomId);
+    }
+
     private void sendMatching(java.util.function.Predicate<WebSocketSession> predicate, Object event, String eventType, Object targetId) {
         try {
             String payload = objectMapper.writeValueAsString(event);

@@ -40,9 +40,22 @@ public class PaymentGatewayService {
     private String payosChecksumKey;
 
     public GatewayPayment createGatewayPayment(String provider, Payment payment, String description) {
+        String cleanFrontendUrl = trimTrailingSlash(frontendUrl);
+        return createGatewayPayment(
+                provider,
+                payment,
+                description,
+                cleanFrontendUrl + "/my-bookings/" + payment.getBookingId(),
+                cleanFrontendUrl + "/my-bookings/" + payment.getBookingId()
+        );
+    }
+
+    public GatewayPayment createGatewayPayment(String provider, Payment payment, String description, String returnUrl, String cancelUrl) {
         String normalizedProvider = normalizeProvider(provider);
+        String resolvedReturnUrl = resolveFrontendUrl(returnUrl);
+        String resolvedCancelUrl = resolveFrontendUrl(cancelUrl);
         return switch (normalizedProvider) {
-            case "PAYOS" -> createPayosLink(payment, description);
+            case "PAYOS" -> createPayosLink(payment, description, resolvedReturnUrl, resolvedCancelUrl);
             default -> throw new BadRequestException("Unsupported payment provider: " + provider);
         };
     }
@@ -86,7 +99,7 @@ public class PaymentGatewayService {
         }
     }
 
-    private GatewayPayment createPayosLink(Payment payment, String description) {
+    private GatewayPayment createPayosLink(Payment payment, String description, String returnUrl, String cancelUrl) {
         if (payosClientId == null || payosClientId.isBlank()
                 || payosApiKey == null || payosApiKey.isBlank()
                 || payosChecksumKey == null || payosChecksumKey.isBlank()) {
@@ -102,10 +115,6 @@ public class PaymentGatewayService {
             if (safeDescription.length() > 25) {
                 safeDescription = safeDescription.substring(0, 25);
             }
-            String cleanFrontendUrl = trimTrailingSlash(frontendUrl);
-            String returnUrl = cleanFrontendUrl + "/my-bookings/" + payment.getBookingId();
-            String cancelUrl = cleanFrontendUrl + "/my-bookings/" + payment.getBookingId();
-
             Map<String, Object> request = new LinkedHashMap<>();
             request.put("orderCode", orderCode);
             request.put("amount", amount);
@@ -197,6 +206,15 @@ public class PaymentGatewayService {
             normalized = normalized.substring(0, normalized.length() - 1);
         }
         return normalized.isBlank() ? "http://localhost:5173" : normalized;
+    }
+
+    private String resolveFrontendUrl(String value) {
+        String normalized = String.valueOf(value == null ? "" : value).trim();
+        if (normalized.startsWith("http://") || normalized.startsWith("https://")) {
+            return normalized;
+        }
+        if (!normalized.startsWith("/")) normalized = "/" + normalized;
+        return trimTrailingSlash(frontendUrl) + normalized;
     }
 
     public record GatewayPayment(String provider, String checkoutId, String paymentId, String checkoutUrl, String qrCode) {}
