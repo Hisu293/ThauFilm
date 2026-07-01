@@ -240,3 +240,75 @@ export const connectGroupBooking = ({ groupId, onEvent, onStatus }) => {
     },
   };
 };
+
+export const connectWatchParty = ({ roomId, onEvent, onStatus }) => {
+  let socket;
+  let reconnectTimer;
+  let stopped = false;
+  let attempts = 0;
+
+  const sendPayload = (payload) => {
+    if (socket?.readyState !== WebSocket.OPEN) {
+      console.warn('[WS WatchParty] Cannot send, socket not open:', socket?.readyState);
+      return false;
+    }
+    socket.send(JSON.stringify(payload));
+    return true;
+  };
+
+  const connect = () => {
+    if (stopped) return;
+    const url = buildWebSocketUrl();
+    console.debug('[WS WatchParty] Connecting to:', url.replace(/token=[^&]+/, 'token=***'));
+    socket = new WebSocket(url);
+    let opened = false;
+    onStatus?.('connecting');
+    socket.onopen = () => {
+      opened = true;
+      attempts = 0;
+      socket.send(JSON.stringify({ type: 'WATCH_PARTY_SUBSCRIBE', data: { roomId } }));
+      onStatus?.('connected');
+    };
+    socket.onmessage = (message) => {
+      try {
+        onEvent?.(JSON.parse(message.data));
+      } catch (e) {
+        console.warn('[WS WatchParty] Failed to parse message:', e);
+      }
+    };
+    socket.onerror = () => onStatus?.('error');
+    socket.onclose = () => {
+      onStatus?.('disconnected');
+      if (!opened && getAccessToken()) {
+        clearAuthStorage();
+        onStatus?.('invalid-token');
+        return;
+      }
+      if (!stopped) {
+        attempts += 1;
+        reconnectTimer = window.setTimeout(connect, Math.min(1000 * (2 ** attempts), 15000));
+      }
+    };
+  };
+
+  reconnectTimer = window.setTimeout(connect, 0);
+  return {
+    syncPlayback: ({ currentTime, paused }) => sendPayload({
+      type: 'WATCH_PARTY_PLAYBACK',
+      data: { roomId, currentTime, paused },
+    }),
+    sendMessage: (content) => sendPayload({
+      type: 'WATCH_PARTY_CHAT',
+      data: { roomId, content },
+    }),
+    sendReaction: (reaction) => sendPayload({
+      type: 'WATCH_PARTY_REACTION',
+      data: { roomId, reaction },
+    }),
+    disconnect: () => {
+      stopped = true;
+      window.clearTimeout(reconnectTimer);
+      socket?.close();
+    },
+  };
+};

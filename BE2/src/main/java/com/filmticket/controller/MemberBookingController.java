@@ -58,24 +58,30 @@ public class MemberBookingController {
         ));
     }
 
-    @Operation(summary = "Join virtual ticket sale queue for a hot showtime")
+    @Operation(summary = "Join showtime seat selection queue")
     @PostMapping("/showtimes/{showtimeId}/queue/join")
     public ResponseEntity<ApiResponse<TicketQueueStatusResponse>> joinQueue(@PathVariable UUID showtimeId) {
         return ResponseEntity.ok(ApiResponse.success(
-                "Queue status fetched",
-                ticketQueueService.join(showtimeId)
+                "Queue joined",
+                ticketQueueService.join(showtimeId, getCurrentUserId())
         ));
     }
 
-    @Operation(summary = "Get virtual ticket sale queue status")
+    @Operation(summary = "Get showtime seat selection queue status")
     @GetMapping("/showtimes/{showtimeId}/queue/status")
-    public ResponseEntity<ApiResponse<TicketQueueStatusResponse>> queueStatus(
-            @PathVariable UUID showtimeId,
-            @RequestParam String token
-    ) {
+    public ResponseEntity<ApiResponse<TicketQueueStatusResponse>> queueStatus(@PathVariable UUID showtimeId) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Queue status fetched",
-                ticketQueueService.status(showtimeId, token)
+                ticketQueueService.status(showtimeId, getCurrentUserId())
+        ));
+    }
+
+    @Operation(summary = "Leave showtime seat selection queue")
+    @PostMapping("/showtimes/{showtimeId}/queue/leave")
+    public ResponseEntity<ApiResponse<TicketQueueStatusResponse>> leaveQueue(@PathVariable UUID showtimeId) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Queue left",
+                ticketQueueService.leave(showtimeId, getCurrentUserId())
         ));
     }
 

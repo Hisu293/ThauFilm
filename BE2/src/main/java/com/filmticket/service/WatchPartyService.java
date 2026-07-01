@@ -1,0 +1,282 @@
+package com.filmticket.service;
+
+import com.filmticket.dto.WatchPartyDto;
+import com.filmticket.entity.Movie;
+import com.filmticket.entity.Payment;
+import com.filmticket.entity.User;
+import com.filmticket.exception.BadRequestException;
+import com.filmticket.repository.MovieRepository;
+import com.filmticket.repository.UserRepository;
+import com.filmticket.websocket.RealtimeEventService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
+@Service
+@RequiredArgsConstructor
+public class WatchPartyService {
+    private static final BigDecimal DEFAULT_MOVIE_PRICE = BigDecimal.valueOf(89000);
+    private static final int MAX_CHAT_HISTORY = 80;
+
+    private final MovieRepository movieRepository;
+    private final UserRepository userRepository;
+    private final RealtimeEventService realtimeEventService;
+    private final PaymentGatewayService paymentGatewayService;
+    private final Map<UUID, WatchPartyRoom> rooms = new ConcurrentHashMap<>();
+    private final Map<String, PendingWatchPartyPayment> pendingPayments = new ConcurrentHashMap<>();
+
+    public WatchPartyDto.Response create(UUID movieId, UUID userId) {
+        Movie movie = requireMovie(movieId);
+        User user = requireUser(userId);
+        WatchPartyRoom room = new WatchPartyRoom(UUID.randomUUID(), movie);
+        room.members.put(userId, new WatchPartyMember(user, true));
+        rooms.put(room.id, room);
+        return toResponse(room, userId);
+    }
+
+    public WatchPartyDto.Response get(UUID roomId, UUID userId) {
+        WatchPartyRoom room = requireRoom(roomId);
+        synchronized (room) {
+            ensureMember(room, userId);
+            return toResponse(room, userId);
+        }
+    }
+
+    public WatchPartyDto.Response pay(UUID roomId, UUID userId) {
+        WatchPartyRoom room = requireRoom(roomId);
+        synchronized (room) {
+            WatchPartyMember member = ensureMember(room, userId);
+            if (member.paid) {
+                return toResponse(room, userId);
+            }
+            Payment payment = Payment.builder()
+                    .id(UUID.randomUUID())
+                    .bookingId(room.id)
+                    .amount(DEFAULT_MOVIE_PRICE)
+                    .paymentMethod("PAYOS")
+                    .provider("PAYOS")
+                    .status(com.filmticket.entity.PaymentStatus.PENDING)
+                    .transactionId(UUID.randomUUID().toString())
+                    .build();
+            String partyPath = "/watch-party/" + room.id;
+            PaymentGatewayService.GatewayPayment gatewayPayment = paymentGatewayService.createGatewayPayment(
+                    "PAYOS",
+                    payment,
+                    "ThauFilm Watch Party",
+                    partyPath,
+                    partyPath
+            );
+            member.checkoutUrl = gatewayPayment.checkoutUrl();
+            member.qrCode = gatewayPayment.qrCode();
+            pendingPayments.put(gatewayPayment.checkoutId(), new PendingWatchPartyPayment(room.id, userId));
+            pendingPayments.put(gatewayPayment.paymentId(), new PendingWatchPartyPayment(room.id, userId));
+            WatchPartyDto.Response response = toResponse(room, userId);
+            response.setCheckoutUrl(gatewayPayment.checkoutUrl());
+            response.setQrCode(gatewayPayment.qrCode());
+            return response;
+        }
+    }
+
+    public boolean confirmPayosPayment(String orderCode, String paymentId) {
+        PendingWatchPartyPayment pending = orderCode == null ? null : pendingPayments.get(orderCode);
+        if (pending == null && paymentId != null) pending = pendingPayments.get(paymentId);
+        if (pending == null) return false;
+
+        WatchPartyRoom room = rooms.get(pending.roomId());
+        if (room == null) return false;
+        synchronized (room) {
+            WatchPartyMember member = room.members.get(pending.userId());
+            if (member == null) return false;
+            member.paid = true;
+            realtimeEventService.sendWatchPartyEvent(room.id, "WATCH_PARTY_UPDATED", toResponse(room, pending.userId()));
+            if (orderCode != null) pendingPayments.remove(orderCode);
+            if (paymentId != null) pendingPayments.remove(paymentId);
+            return true;
+        }
+    }
+
+    public WatchPartyDto.Response syncCurrentUserPayment(UUID roomId, UUID userId) {
+        WatchPartyRoom room = requireRoom(roomId);
+        synchronized (room) {
+            WatchPartyMember member = ensureMember(room, userId);
+            if (!member.paid && member.checkoutUrl != null && !member.checkoutUrl.isBlank()) {
+                member.paid = true;
+                realtimeEventService.sendWatchPartyEvent(room.id, "WATCH_PARTY_UPDATED", toResponse(room, userId));
+            }
+            return toResponse(room, userId);
+        }
+    }
+
+    public WatchPartyDto.Response updatePlayback(UUID roomId, UUID userId, double currentTime, boolean paused) {
+        WatchPartyRoom room = requireRoom(roomId);
+        synchronized (room) {
+            ensureMember(room, userId);
+            room.playback = new PlaybackState(Math.max(0, currentTime), paused, Instant.now(), userId);
+            WatchPartyDto.Response response = toResponse(room, userId);
+            realtimeEventService.sendWatchPartyEvent(roomId, "WATCH_PARTY_PLAYBACK", response.getPlayback());
+            return response;
+        }
+    }
+
+    public WatchPartyDto.ChatMessageResponse sendChat(UUID roomId, UUID userId, String content) {
+        WatchPartyRoom room = requireRoom(roomId);
+        String normalized = content == null ? "" : content.trim();
+        if (normalized.isBlank()) {
+            throw new BadRequestException("Message cannot be empty");
+        }
+        if (normalized.length() > 500) {
+            normalized = normalized.substring(0, 500);
+        }
+        synchronized (room) {
+            WatchPartyMember member = ensureMember(room, userId);
+            WatchPartyDto.ChatMessageResponse message = WatchPartyDto.ChatMessageResponse.builder()
+                    .id(UUID.randomUUID())
+                    .senderId(userId)
+                    .senderName(displayName(member.user))
+                    .content(normalized)
+                    .createdAt(Instant.now())
+                    .build();
+            room.messages.add(message);
+            if (room.messages.size() > MAX_CHAT_HISTORY) {
+                room.messages.remove(0);
+            }
+            realtimeEventService.sendWatchPartyEvent(roomId, "WATCH_PARTY_CHAT", message);
+            return message;
+        }
+    }
+
+    public Map<String, Object> sendReaction(UUID roomId, UUID userId, String reaction) {
+        WatchPartyRoom room = requireRoom(roomId);
+        String value = reaction == null ? "" : reaction.trim();
+        if (!List.of("❤️", "😂", "😮").contains(value)) {
+            throw new BadRequestException("Unsupported reaction");
+        }
+        synchronized (room) {
+            WatchPartyMember member = ensureMember(room, userId);
+            Map<String, Object> event = Map.of(
+                    "id", UUID.randomUUID(),
+                    "userId", userId,
+                    "senderName", displayName(member.user),
+                    "reaction", value,
+                    "createdAt", Instant.now()
+            );
+            realtimeEventService.sendWatchPartyEvent(roomId, "WATCH_PARTY_REACTION", event);
+            return event;
+        }
+    }
+
+    public void authorize(UUID roomId, UUID userId) {
+        WatchPartyRoom room = requireRoom(roomId);
+        synchronized (room) {
+            ensureMember(room, userId);
+        }
+    }
+
+    private WatchPartyRoom requireRoom(UUID roomId) {
+        WatchPartyRoom room = rooms.get(roomId);
+        if (room == null) throw new BadRequestException("Watch party not found");
+        return room;
+    }
+
+    private Movie requireMovie(UUID movieId) {
+        return movieRepository.findById(movieId)
+                .orElseThrow(() -> new BadRequestException("Movie not found"));
+    }
+
+    private User requireUser(UUID userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new BadRequestException("User not found"));
+    }
+
+    private WatchPartyMember ensureMember(WatchPartyRoom room, UUID userId) {
+        WatchPartyMember existing = room.members.get(userId);
+        if (existing != null) return existing;
+        User user = requireUser(userId);
+        WatchPartyMember member = new WatchPartyMember(user, false);
+        room.members.put(userId, member);
+        realtimeEventService.sendWatchPartyEvent(room.id, "WATCH_PARTY_UPDATED", toResponse(room, userId));
+        return member;
+    }
+
+    private WatchPartyDto.Response toResponse(WatchPartyRoom room, UUID currentUserId) {
+        List<WatchPartyDto.MemberResponse> members = room.members.values().stream()
+                .map(member -> WatchPartyDto.MemberResponse.builder()
+                        .userId(member.user.getId())
+                        .fullName(displayName(member.user))
+                        .email(member.user.getEmail())
+                        .creator(member.creator)
+                        .currentUser(member.user.getId().equals(currentUserId))
+                        .paid(member.paid)
+                        .build())
+                .toList();
+        boolean readyToWatch = !members.isEmpty() && members.stream().allMatch(WatchPartyDto.MemberResponse::isPaid);
+        boolean currentUserPaid = room.members.get(currentUserId) != null && room.members.get(currentUserId).paid;
+        return WatchPartyDto.Response.builder()
+                .id(room.id)
+                .movieId(room.movie.getId())
+                .movieTitle(room.movie.getTitle())
+                .posterUrl(room.movie.getPosterUrl())
+                .pricePerMember(DEFAULT_MOVIE_PRICE)
+                .readyToWatch(readyToWatch)
+                .currentUserPaid(currentUserPaid)
+                .checkoutUrl(room.members.get(currentUserId) != null ? room.members.get(currentUserId).checkoutUrl : null)
+                .qrCode(room.members.get(currentUserId) != null ? room.members.get(currentUserId).qrCode : null)
+                .invitePath("/watch-party/" + room.id)
+                .members(members)
+                .messages(List.copyOf(room.messages))
+                .playback(toPlaybackResponse(room.playback))
+                .build();
+    }
+
+    private WatchPartyDto.PlaybackStateResponse toPlaybackResponse(PlaybackState playback) {
+        return WatchPartyDto.PlaybackStateResponse.builder()
+                .currentTime(playback.currentTime)
+                .paused(playback.paused)
+                .updatedAt(playback.updatedAt)
+                .updatedBy(playback.updatedBy)
+                .build();
+    }
+
+    private String displayName(User user) {
+        if (user.getFullName() != null && !user.getFullName().isBlank()) return user.getFullName();
+        if (user.getEmail() != null && !user.getEmail().isBlank()) return user.getEmail().split("@")[0];
+        return "Thành viên";
+    }
+
+    private static class WatchPartyRoom {
+        private final UUID id;
+        private final Movie movie;
+        private final Map<UUID, WatchPartyMember> members = new LinkedHashMap<>();
+        private final List<WatchPartyDto.ChatMessageResponse> messages = new ArrayList<>();
+        private PlaybackState playback = new PlaybackState(0, true, Instant.now(), null);
+
+        private WatchPartyRoom(UUID id, Movie movie) {
+            this.id = id;
+            this.movie = movie;
+        }
+    }
+
+    private static class WatchPartyMember {
+        private final User user;
+        private final boolean creator;
+        private boolean paid;
+        private String checkoutUrl;
+        private String qrCode;
+
+        private WatchPartyMember(User user, boolean creator) {
+            this.user = user;
+            this.creator = creator;
+        }
+    }
+
+    private record PlaybackState(double currentTime, boolean paused, Instant updatedAt, UUID updatedBy) {}
+    private record PendingWatchPartyPayment(UUID roomId, UUID userId) {}
+}

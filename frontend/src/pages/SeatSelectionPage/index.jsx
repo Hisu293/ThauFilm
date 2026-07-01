@@ -20,12 +20,11 @@ import { useBookingFlow } from '../../context/BookingContext';
 import { pruneExpiredPendingBookings, savePendingBooking } from '../../utils/pendingBookingStorage';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const unwrapApiResponse = (response) => response?.data ?? response;
-
+const unwrapApiResponse = (response) => response?.data?.data ?? response?.data ?? response;
 const formatQueueWait = (seconds = 0) => {
-  if (seconds <= 0) return 'Đang mở cổng chọn ghế';
+  if (seconds <= 0) return 'Đang đến lượt';
   const minutes = Math.max(1, Math.ceil(seconds / 60));
-  return `Còn khoảng ${minutes} phút`;
+  return `Khoảng ${minutes} phút`;
 };
 
 const buildGroupSeatSuggestion = (seats = [], count = 1) => {
@@ -105,7 +104,8 @@ export const SeatSelectionPage = () => {
   const [seatSuggestion, setSeatSuggestion] = useState(null);
   const [ticketQueue, setTicketQueue] = useState(null);
   const [queueReady, setQueueReady] = useState(false);
-
+  const [queueBusy, setQueueBusy] = useState(false);
+  const [queueLoading, setQueueLoading] = useState(true);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
 
@@ -228,45 +228,44 @@ export const SeatSelectionPage = () => {
     let cancelled = false;
 
     const joinQueue = async () => {
-
+      setQueueLoading(true);
       try {
         const status = unwrapApiResponse(await bookingApi.joinTicketQueue(showtimeId));
         if (cancelled) return;
         setTicketQueue(status);
-        setQueueReady(!status?.queueRequired || status?.admitted);
+        setQueueReady(false);
       } catch {
         if (!cancelled) {
           setTicketQueue(null);
           setQueueReady(true);
         }
+      } finally {
+        if (!cancelled) setQueueLoading(false);
       }
     };
 
-    setQueueReady(false);
     joinQueue();
     return () => { cancelled = true; };
   }, [showtimeId, loadingDetails]);
 
   useEffect(() => {
-    if (!ticketQueue?.queueRequired || ticketQueue.admitted || !ticketQueue.token || queueReady) return undefined;
+    if (!showtimeId || queueReady || !ticketQueue?.queueRequired) return undefined;
 
     let cancelled = false;
     const timer = window.setInterval(async () => {
       try {
-        const status = unwrapApiResponse(await bookingApi.fetchTicketQueueStatus(showtimeId, ticketQueue.token));
-        if (cancelled) return;
-        setTicketQueue(status);
-        if (status?.admitted) setQueueReady(true);
+        const status = unwrapApiResponse(await bookingApi.fetchTicketQueueStatus(showtimeId));
+        if (!cancelled) setTicketQueue(status);
       } catch {
         if (!cancelled) setQueueReady(true);
       }
-    }, 1500);
+    }, 2500);
 
     return () => {
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [queueReady, showtimeId, ticketQueue]);
+  }, [queueReady, showtimeId, ticketQueue?.queueRequired]);
 
   useEffect(() => {
     if (!showtimeId) return;
@@ -517,6 +516,18 @@ export const SeatSelectionPage = () => {
     clearError();
   };
 
+  const handleEnterSeatSelection = async () => {
+    setQueueBusy(true);
+    try {
+      await bookingApi.leaveTicketQueue(showtimeId);
+    } catch {
+      // The seat map is still usable if leaving the display queue fails.
+    } finally {
+      setQueueReady(true);
+      setQueueBusy(false);
+    }
+  };
+
   if (loadingDetails) {
     return (
       <Box sx={{ minHeight: '80vh', position: 'relative' }}>
@@ -525,42 +536,98 @@ export const SeatSelectionPage = () => {
     );
   }
 
-  if (!queueReady && ticketQueue?.queueRequired) {
+  if (!queueReady && queueLoading) {
     return (
-      <Container maxWidth="sm" sx={{ minHeight: '78vh', display: 'flex', alignItems: 'center', justifyContent: 'center', py: 6 }}>
+      <Box sx={{ minHeight: '80vh', position: 'relative' }}>
+        <LoadingOverlay open={true} message="Đang vào hàng đợi..." blur />
+      </Box>
+    );
+  }
+
+  if (!queueReady && ticketQueue?.queueRequired) {
+    const entries = Array.isArray(ticketQueue.entries) ? ticketQueue.entries : [];
+    const currentEntry = entries.find((entry) => entry.currentUser);
+    const canEnter = Boolean(ticketQueue.admitted || currentEntry?.admitted);
+
+    return (
+      <Container maxWidth="md" sx={{ minHeight: '78vh', display: 'flex', alignItems: 'center', justifyContent: 'center', py: 6 }}>
         <Paper
           sx={{
             width: '100%',
             p: { xs: 3, md: 4 },
             borderRadius: 2,
             border: '1px solid rgba(251, 191, 36, 0.22)',
-            bgcolor: 'rgba(15, 23, 42, 0.92)',
-            textAlign: 'center',
+            bgcolor: 'rgba(15, 23, 42, 0.94)',
           }}
         >
-          <Typography variant="overline" color="primary.main" fontWeight={900}>
-            Phim hot đang mở bán
-          </Typography>
-          <Typography variant="h4" fontWeight={900} sx={{ mt: 1 }}>
-            Bạn đang trong hàng đợi
-          </Typography>
-          <Typography color="text.secondary" sx={{ mt: 1.5 }}>
-            Chúng tôi đang điều tiết lượt vào để giữ hệ thống đặt vé ổn định.
-          </Typography>
+          <Stack spacing={3}>
+            <Box textAlign="center">
+              <Typography variant="overline" color="primary.main" fontWeight={900}>
+                Hàng đợi chọn ghế
+              </Typography>
+              <Typography variant="h4" fontWeight={900} sx={{ mt: 1 }}>
+                Team đang vào theo thứ tự
+              </Typography>
+              <Typography color="text.secondary" sx={{ mt: 1.5 }}>
+                Mỗi tài khoản đăng nhập vào suất chiếu này sẽ có một dòng riêng trong hàng đợi.
+              </Typography>
+            </Box>
 
-          <Box sx={{ my: 4 }}>
-            <Typography variant="h2" fontWeight={900} color="primary.main">
-              #{ticketQueue.position}
-            </Typography>
-            <Typography variant="h6" fontWeight={800}>
-              {formatQueueWait(ticketQueue.estimatedWaitSeconds)}
-            </Typography>
-          </Box>
+            <Box textAlign="center">
+              <Typography variant="h2" fontWeight={900} color="primary.main">
+                #{ticketQueue.position || currentEntry?.position || '-'}
+              </Typography>
+              <Typography variant="h6" fontWeight={800}>
+                {canEnter ? 'Đã đến lượt bạn' : formatQueueWait(ticketQueue.estimatedWaitSeconds)}
+              </Typography>
+            </Box>
 
-          <LinearProgress sx={{ height: 8, borderRadius: 999, mb: 2 }} />
-          <Typography variant="body2" color="text.secondary">
-            Vui lòng giữ trang này. Khi đến lượt, hệ thống sẽ tự mở sơ đồ ghế.
-          </Typography>
+            <LinearProgress variant={canEnter ? 'determinate' : 'indeterminate'} value={canEnter ? 100 : undefined} sx={{ height: 8, borderRadius: 999 }} />
+
+            <Stack spacing={1.25}>
+              {entries.map((entry) => (
+                <Paper
+                  key={entry.userId}
+                  variant="outlined"
+                  sx={{
+                    p: 1.5,
+                    borderRadius: 2,
+                    borderColor: entry.currentUser ? 'primary.main' : 'rgba(148, 163, 184, 0.18)',
+                    bgcolor: entry.currentUser ? 'rgba(251, 191, 36, 0.10)' : 'rgba(15, 23, 42, 0.58)',
+                  }}
+                >
+                  <Stack direction="row" spacing={2} alignItems="center" justifyContent="space-between">
+                    <Stack direction="row" spacing={1.5} alignItems="center" minWidth={0}>
+                      <Typography color="primary.main" fontWeight={900} sx={{ width: 44 }}>
+                        #{entry.position}
+                      </Typography>
+                      <Box minWidth={0}>
+                        <Typography fontWeight={800} noWrap>
+                          {entry.displayName || entry.email || 'Thành viên'}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" noWrap>
+                          {entry.email || 'Đang chờ chọn ghế'}
+                        </Typography>
+                      </Box>
+                    </Stack>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                      {entry.currentUser && <Chip size="small" color="primary" label="Bạn" />}
+                      <Chip size="small" color={entry.admitted ? 'success' : 'warning'} label={entry.admitted ? 'Đến lượt' : 'Đang chờ'} />
+                    </Stack>
+                  </Stack>
+                </Paper>
+              ))}
+            </Stack>
+
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} justifyContent="space-between" alignItems={{ sm: 'center' }}>
+              <Typography variant="body2" color="text.secondary">
+                Danh sách tự cập nhật khi thành viên khác đăng nhập hoặc vào chọn ghế.
+              </Typography>
+              <Button variant="contained" disabled={!canEnter || queueBusy} onClick={handleEnterSeatSelection}>
+                {queueBusy ? 'Đang mở...' : 'Vào chọn ghế'}
+              </Button>
+            </Stack>
+          </Stack>
         </Paper>
       </Container>
     );

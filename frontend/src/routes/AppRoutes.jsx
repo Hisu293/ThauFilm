@@ -30,6 +30,7 @@ import BookingSuccessPage from '../pages/BookingSuccessPage';
 import MyBookingsPage from '../pages/MyBookingsPage';
 import MyBookingDetailPage from '../pages/MyBookingDetailPage';
 import GroupBookingPage from '../pages/GroupBookingPage';
+import WatchPartyPage from '../pages/WatchPartyPage';
 
 // Staff Pages
 import StaffDashboard from '../pages/staff/StaffDashboard';
@@ -67,6 +68,7 @@ const AppRoutes = () => {
         <Route path="/payment" element={<PaymentPage />} />
         <Route path="/booking/success" element={<BookingSuccessPage />} />
         <Route path="/booking/group/:groupId" element={<GroupBookingPage />} />
+        <Route path="/watch-party/:roomId" element={<WatchPartyPage />} />
         <Route path="/my-bookings" element={<MyBookingsPage />} />
         <Route path="/my-bookings/:bookingId" element={<MyBookingDetailPage />} />
 
