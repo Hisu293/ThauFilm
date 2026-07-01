@@ -314,6 +314,7 @@ export const NAV_LINKS = [
   { label: 'Phim', to: '/movies' },
   { label: 'Rạp chiếu', to: '/cinemas' },
   { label: 'Khuyến mãi', to: '/promotions' },
+  { label: 'AI Chatbot', to: '/movie-chatbot' },
   { label: 'AI & Cộng đồng', to: '/intelligence' },
 ];
 

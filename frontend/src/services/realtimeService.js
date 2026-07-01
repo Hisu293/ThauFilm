@@ -1,3 +1,5 @@
+import { clearAuthStorage, getAccessToken } from '../utils/authStorage';
+
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
 const buildWebSocketUrl = (movieId) => {
@@ -5,7 +7,7 @@ const buildWebSocketUrl = (movieId) => {
   base.protocol = base.protocol === 'https:' ? 'wss:' : 'ws:';
   base.pathname = '/ws';
   base.search = '';
-  const token = localStorage.getItem('cinema_token');
+  const token = getAccessToken();
   console.debug('[WS] buildWebSocketUrl - token exists:', !!token, token ? `(${token.substring(0, 20)}...)` : '');
   if (token) base.searchParams.set('token', token);
   if (movieId) base.searchParams.set('movieId', movieId);
@@ -32,8 +34,10 @@ const createSharedConnection = (movieId) => {
     console.debug('[WS] Connecting to:', url.replace(/token=[^&]+/, 'token=***'));
     const socket = new WebSocket(url);
     connection.socket = socket;
+    let opened = false;
     emitStatus('connecting');
     socket.onopen = () => {
+      opened = true;
       console.info('[WS] Connected successfully');
       connection.attempts = 0;
       emitStatus('connected');
@@ -55,6 +59,11 @@ const createSharedConnection = (movieId) => {
       console.info('[WS] Connection closed, code:', event.code, 'reason:', event.reason);
       if (connection.socket === socket) connection.socket = null;
       emitStatus('disconnected');
+      if (!opened && getAccessToken() && !movieId) {
+        clearAuthStorage();
+        emitStatus('invalid-token');
+        return;
+      }
       if (connection.listeners.size > 0) {
         connection.attempts += 1;
         const delay = Math.min(1000 * (2 ** connection.attempts), 15000);
@@ -102,8 +111,10 @@ export const connectMatchChat = ({ matchId, onEvent, onStatus }) => {
     const url = buildWebSocketUrl();
     console.debug('[WS Match] Connecting to:', url.replace(/token=[^&]+/, 'token=***'));
     socket = new WebSocket(url);
+    let opened = false;
     onStatus?.('connecting');
     socket.onopen = () => {
+      opened = true;
       console.info('[WS Match] Connected, subscribing to match:', matchId);
       attempts = 0;
       socket.send(JSON.stringify({ type: 'MATCH_SUBSCRIBE', data: { matchId } }));
@@ -125,6 +136,11 @@ export const connectMatchChat = ({ matchId, onEvent, onStatus }) => {
     socket.onclose = (event) => {
       console.info('[WS Match] Connection closed, code:', event.code);
       onStatus?.('disconnected');
+      if (!opened && getAccessToken()) {
+        clearAuthStorage();
+        onStatus?.('invalid-token');
+        return;
+      }
       if (!stopped) {
         attempts += 1;
         const delay = Math.min(1000 * (2 ** attempts), 15000);
@@ -167,8 +183,10 @@ export const connectGroupBooking = ({ groupId, onEvent, onStatus }) => {
     const url = buildWebSocketUrl();
     console.debug('[WS Group] Connecting to:', url.replace(/token=[^&]+/, 'token=***'));
     socket = new WebSocket(url);
+    let opened = false;
     onStatus?.('connecting');
     socket.onopen = () => {
+      opened = true;
       console.info('[WS Group] Connected, subscribing to group:', groupId);
       attempts = 0;
       socket.send(JSON.stringify({ type: 'GROUP_SUBSCRIBE', data: { groupId } }));
@@ -190,6 +208,11 @@ export const connectGroupBooking = ({ groupId, onEvent, onStatus }) => {
     socket.onclose = (event) => {
       console.info('[WS Group] Connection closed, code:', event.code);
       onStatus?.('disconnected');
+      if (!opened && getAccessToken()) {
+        clearAuthStorage();
+        onStatus?.('invalid-token');
+        return;
+      }
       if (!stopped) {
         attempts += 1;
         const delay = Math.min(1000 * (2 ** attempts), 15000);

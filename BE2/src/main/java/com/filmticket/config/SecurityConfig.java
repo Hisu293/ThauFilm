@@ -56,6 +56,7 @@ public class SecurityConfig {
                     "/api/auth/refresh",
                     "/api/auth/logout",
                     "/api/payments/webhooks/**",
+                    "/api/movie-chatbot/**",
                     "/api/showtimes/**",
                     "/api/events/movies",
                     "/swagger-ui/**",

@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import { authService, parseAuthResponse } from '../services/authService';
 import { buildListFilmMovies, saveListFilmToStorage } from '../data/listFilmCatalog';
+import { clearAuthStorage } from '../utils/authStorage';
 
 const TOKEN_KEY = 'cinema_token';
 const REFRESH_TOKEN_KEY = 'cinema_refresh_token';
@@ -64,6 +65,12 @@ export const AuthProvider = ({ children }) => {
     if (user) saveListFilmToStorage(buildListFilmMovies());
   }, [user]);
 
+  useEffect(() => {
+    const handleInvalidToken = () => setUser(null);
+    window.addEventListener('auth:invalid-token', handleInvalidToken);
+    return () => window.removeEventListener('auth:invalid-token', handleInvalidToken);
+  }, []);
+
   const logout = useCallback(async () => {
     const refreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
 
@@ -75,9 +82,7 @@ export const AuthProvider = ({ children }) => {
       }
     }
 
-    localStorage.removeItem(TOKEN_KEY);
-    localStorage.removeItem(REFRESH_TOKEN_KEY);
-    localStorage.removeItem(USER_KEY);
+    clearAuthStorage();
     localStorage.removeItem('cinema_listfilm_catalog');
     localStorage.removeItem('cinema_listfilm_catalog_v2');
     setUser(null);

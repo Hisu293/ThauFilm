@@ -6,6 +6,7 @@ import com.filmticket.repository.UserRepository;
 import com.filmticket.service.BookingService;
 import com.filmticket.service.ComboService;
 import com.filmticket.service.DiscountService;
+import com.filmticket.service.TicketQueueService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
@@ -32,6 +33,7 @@ public class MemberBookingController {
     private final UserRepository userRepository;
     private final ComboService comboService;
     private final DiscountService discountService;
+    private final TicketQueueService ticketQueueService;
 
     @Operation(summary = "Get available seats for a showtime")
     @GetMapping("/showtimes/{showtimeId}/seats")
@@ -41,6 +43,39 @@ public class MemberBookingController {
         return ResponseEntity.ok(ApiResponse.success(
                 "Available seats fetched",
                 bookingService.getAvailableSeats(showtimeId)
+        ));
+    }
+
+    @Operation(summary = "Suggest adjacent seats for a group")
+    @GetMapping("/showtimes/{showtimeId}/seat-suggestions")
+    public ResponseEntity<ApiResponse<SeatSuggestionResponse>> suggestSeats(
+            @PathVariable UUID showtimeId,
+            @RequestParam(defaultValue = "2") int count
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Seat suggestion generated",
+                bookingService.suggestSeats(showtimeId, count)
+        ));
+    }
+
+    @Operation(summary = "Join virtual ticket sale queue for a hot showtime")
+    @PostMapping("/showtimes/{showtimeId}/queue/join")
+    public ResponseEntity<ApiResponse<TicketQueueStatusResponse>> joinQueue(@PathVariable UUID showtimeId) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Queue status fetched",
+                ticketQueueService.join(showtimeId)
+        ));
+    }
+
+    @Operation(summary = "Get virtual ticket sale queue status")
+    @GetMapping("/showtimes/{showtimeId}/queue/status")
+    public ResponseEntity<ApiResponse<TicketQueueStatusResponse>> queueStatus(
+            @PathVariable UUID showtimeId,
+            @RequestParam String token
+    ) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Queue status fetched",
+                ticketQueueService.status(showtimeId, token)
         ));
     }
 

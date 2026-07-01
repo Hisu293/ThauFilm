@@ -2,6 +2,7 @@ package com.filmticket.exception;
 
 import com.filmticket.dto.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.catalina.connector.ClientAbortException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.dao.DataIntegrityViolationException;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -80,10 +82,37 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error(returnMessage));
     }
 
+    @ExceptionHandler(ClientAbortException.class)
+    public ResponseEntity<Void> handleClientAbort(ClientAbortException ex) {
+        log.debug("Client aborted the connection: {}", ex.getMessage());
+        return ResponseEntity.noContent().build();
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleGenericException(Exception ex) {
+        if (isClientAbort(ex)) {
+            log.debug("Client aborted the connection: {}", ex.getMessage());
+            return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
+        }
+
         log.error("Unhandled exception: ", ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.error("Internal server error"));
+    }
+
+    private boolean isClientAbort(Throwable ex) {
+        Throwable current = ex;
+        while (current != null) {
+            if (current instanceof ClientAbortException) {
+                return true;
+            }
+            if (current instanceof IOException
+                    && current.getMessage() != null
+                    && current.getMessage().toLowerCase().contains("aborted")) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 }
