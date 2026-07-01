@@ -1,12 +1,6 @@
-<<<<<<< frontend/src/pages/SeatSelectionPage/index.jsx
 import { useCallback, useState, useEffect, useMemo, useRef } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
-import { Container, Box, Alert, Snackbar, Button } from '@mui/material';
-=======
-import { useCallback, useState, useEffect, useMemo } from 'react';
-import { useLocation, useParams, useNavigate } from 'react-router-dom';
 import { Container, Box, Alert, Snackbar, Button, Chip, CircularProgress, LinearProgress, Paper, Stack, TextField, Typography } from '@mui/material';
->>>>>>> frontend/src/pages/SeatSelectionPage/index.jsx
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 

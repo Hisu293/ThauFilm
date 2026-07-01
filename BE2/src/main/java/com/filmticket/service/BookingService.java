@@ -113,7 +113,7 @@ public class BookingService {
         if (count < 1 || count > 8) {
             throw new BadRequestException("Số ghế cần tìm phải từ 1 đến 8");
         }
-        List<ShowtimeSeatResponse> availableSeats = getAvailableSeats(showtimeId).stream()
+        List<ShowtimeSeatResponse> availableSeats = getAvailableSeats(showtimeId, null).stream()
                 .filter(seat -> seat.getStatus() == SeatBookingStatus.AVAILABLE)
                 .filter(seat -> seat.getRowName() != null && seat.getSeatNumber() != null)
                 .sorted(Comparator.comparing(ShowtimeSeatResponse::getRowName)
