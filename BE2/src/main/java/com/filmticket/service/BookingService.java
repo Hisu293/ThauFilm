@@ -25,6 +25,7 @@ import java.text.NumberFormat;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -59,29 +60,40 @@ public class BookingService {
         return LocalDateTime.now(VIETNAM_ZONE);
     }
 
+    // ĐÃ SỬA: Thêm UUID currentUserId
     @Transactional(readOnly = true)
-    public List<ShowtimeSeatResponse> getAvailableSeats(UUID showtimeId) {
+    public List<ShowtimeSeatResponse> getAvailableSeats(UUID showtimeId, UUID currentUserId) {
         if (!showtimeRepository.existsById(showtimeId)) {
             throw new BadRequestException("Showtime not found");
         }
+
         List<SeatAvailability> availabilities = seatAvailabilityRepository.findByShowtimeIdOrderBySeatId(showtimeId);
-        List<UUID> seatIds = availabilities.stream()
-                .map(SeatAvailability::getSeatId)
-                .toList();
+        List<UUID> seatIds = availabilities.stream().map(SeatAvailability::getSeatId).toList();
 
         Map<UUID, Seat> seatById = seatRepository.findAllById(seatIds)
                 .stream()
-                .collect(java.util.stream.Collectors.toMap(Seat::getId, seat -> seat));
+                .collect(Collectors.toMap(Seat::getId, seat -> seat));
+
+        // Lấy danh sách ID ghế mà user hiện tại đang giữ chỗ (nếu đã đăng nhập)
+        Set<UUID> myHeldSeatIds = new HashSet<>();
+        if (currentUserId != null) {
+            bookingRepository.findByUserIdAndShowtimeIdAndStatus(currentUserId, showtimeId, BookingStatus.HOLD)
+                    .ifPresent(booking -> {
+                        List<BookingSeat> mySeats = bookingSeatRepository.findByBookingId(booking.getId());
+                        mySeats.forEach(bs -> myHeldSeatIds.add(bs.getSeatId()));
+                    });
+        }
 
         return availabilities.stream()
                 .map(availability -> {
                     Seat seat = seatById.get(availability.getSeatId());
-                    ShowtimeSeatResponse response = ShowtimeSeatResponse.fromSeatAvailability(availability);
-                    if (seat != null) {
-                        response.setRowName(seat.getRowName());
-                        response.setSeatNumber(seat.getSeatNumber());
-                        response.setType(seat.getType().toStorageValue());
+                    ShowtimeSeatResponse response = ShowtimeSeatResponse.fromSeatAvailability(availability, seat);
+
+                    // Nếu ghế đang HOLDING và nằm trong danh sách của user -> Bật cờ
+                    if (availability.getStatus() == SeatBookingStatus.HOLDING && myHeldSeatIds.contains(availability.getSeatId())) {
+                        response.setHeldByMe(true);
                     }
+
                     return response;
                 })
                 .sorted(Comparator
@@ -173,13 +185,82 @@ public class BookingService {
         return toBookingResponse(booking, seats);
     }
 
+    // ĐÃ THÊM: Hàm cập nhật chỗ ngồi cho Booking đang giữ
+    @Transactional
+    public BookingResponse updateBookingSeats(UUID bookingId, UUID userId, UpdateBookingSeatsRequest request) {
+        Booking booking = bookingRepository.findByIdAndUserId(bookingId, userId)
+                .orElseThrow(() -> new BadRequestException("Booking not found or not owned by you"));
+
+        if (booking.getStatus() != BookingStatus.HOLD) {
+            throw new BadRequestException("Can only update booking in HOLD status");
+        }
+
+        if (booking.getHoldExpiresAt().isBefore(now())) {
+            releaseSeats(booking);
+            booking.setStatus(BookingStatus.EXPIRED);
+            bookingRepository.save(booking);
+            throw new BadRequestException("Booking hold has expired. Please create a new booking.");
+        }
+
+        // Nhả ghế cũ
+        releaseSeats(booking);
+        bookingSeatRepository.deleteAll(bookingSeatRepository.findByBookingId(bookingId));
+
+        // Khóa ghế mới
+        List<SeatAvailability> newAvailabilities = new ArrayList<>();
+        List<Seat> newSeats = new ArrayList<>();
+        BigDecimal seatTotal = BigDecimal.ZERO;
+
+        for (UUID seatId : request.getSeatIds()) {
+            SeatAvailability av = seatAvailabilityRepository
+                    .findByShowtimeIdAndSeatId(request.getShowtimeId(), seatId)
+                    .orElseThrow(() -> new BadRequestException("Seat not found: " + seatId));
+
+            if (av.getStatus() != SeatBookingStatus.AVAILABLE) {
+                throw new BadRequestException("Seat is already taken: " + seatId);
+            }
+
+            av.setStatus(SeatBookingStatus.HOLDING);
+            newAvailabilities.add(av);
+
+            Seat seat = seatRepository.findById(seatId).orElse(null);
+            if (seat != null) newSeats.add(seat);
+
+            seatTotal = seatTotal.add(av.getPrice());
+        }
+
+        seatAvailabilityRepository.saveAll(newAvailabilities);
+
+        for (int i = 0; i < newSeats.size(); i++) {
+            BookingSeat bs = BookingSeat.builder()
+                    .bookingId(booking.getId())
+                    .seatId(newSeats.get(i).getId())
+                    .priceAtBooking(newAvailabilities.get(i).getPrice())
+                    .build();
+            bookingSeatRepository.save(bs);
+        }
+
+        BigDecimal comboTotal = BigDecimal.ZERO;
+        if (request.getComboIds() != null && !request.getComboIds().isEmpty()) {
+            List<ComboResponse> combos = comboService.getCombos(request.getComboIds());
+            for (ComboResponse combo : combos) {
+                comboTotal = comboTotal.add(combo.getPrice());
+            }
+        }
+
+        booking.setTotalAmount(seatTotal.add(comboTotal));
+        // Reset thời gian giữ ghế thêm 10 phút tính từ lúc update
+        booking.setHoldExpiresAt(now().plusMinutes(HOLD_MINUTES));
+        booking = bookingRepository.save(booking);
+
+        return toBookingResponse(booking, newSeats);
+    }
+
     @Transactional
     public BookingPaymentResponse payBooking(UUID bookingId, UUID userId, PayBookingRequest request) {
         Booking booking = bookingRepository.findByIdAndUserId(bookingId, userId)
                 .orElseThrow(() -> new BadRequestException("Booking not found"));
 
-        // A client can legitimately retry when the first response is lost or times out.
-        // Return the completed payment instead of turning that retry into a false failure.
         if (booking.getStatus() == BookingStatus.CONFIRMED) {
             Payment existingPayment = paymentRepository.findByBookingId(bookingId)
                     .filter(payment -> payment.getStatus() == PaymentStatus.PAID)
@@ -294,8 +375,8 @@ public class BookingService {
     }
 
     private BookingPaymentResponse confirmPaidBooking(Booking booking, Payment payment,
-                                                       BigDecimal originalAmount, BigDecimal discountAmount,
-                                                       String discountCode) {
+                                                      BigDecimal originalAmount, BigDecimal discountAmount,
+                                                      String discountCode) {
 
         booking.setStatus(BookingStatus.CONFIRMED);
         booking.setConfirmedAt(now());
@@ -454,10 +535,6 @@ public class BookingService {
         log.info("Ticket email sent to {} for booking {}", to, booking.getId());
     }
 
-    /**
-     * Sends the same ticket email used by the individual booking flow for a
-     * booking that was confirmed by another flow (for example group booking).
-     */
     public void sendConfirmedBookingEmail(Booking booking) {
         if (booking == null || booking.getStatus() != BookingStatus.CONFIRMED) return;
 
@@ -473,7 +550,6 @@ public class BookingService {
         try {
             sendTicketEmail(user.getEmail(), booking, tickets, payment, BigDecimal.ZERO, payment.getAmount());
         } catch (Exception ex) {
-            // Payment and ticket issuance must remain successful if SMTP is temporarily unavailable.
             log.error("Failed to send group ticket email for booking {}", booking.getId(), ex);
         }
     }

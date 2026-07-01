@@ -11,6 +11,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.security.Principal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -81,11 +82,25 @@ public class ShowtimeController {
     @Operation(summary = "Get seat map for a showtime")
     @GetMapping("/{showtimeId}/seats")
     public ResponseEntity<ApiResponse<List<ShowtimeSeatResponse>>> getShowtimeSeats(
-            @PathVariable UUID showtimeId
+            @PathVariable UUID showtimeId,
+            Principal principal // BẮT THÔNG TIN USER ĐĂNG NHẬP
     ) {
+        UUID userId = null;
+
+        // Trích xuất userId nếu user đã đăng nhập
+        if (principal != null && principal.getName() != null) {
+            try {
+                userId = UUID.fromString(principal.getName());
+            } catch (IllegalArgumentException e) {
+                // Nếu principal.getName() không phải UUID (vd: là email), bạn cần
+                // tuỳ chỉnh lại logic lấy userId tại đây tuỳ theo cấu hình hệ thống
+            }
+        }
+
+        // TRUYỀN THÊM userId XUỐNG SERVICE
         return ResponseEntity.ok(ApiResponse.success(
                 "Seat map fetched",
-                bookingService.getAvailableSeats(showtimeId)
+                bookingService.getAvailableSeats(showtimeId, userId)
         ));
     }
 }
