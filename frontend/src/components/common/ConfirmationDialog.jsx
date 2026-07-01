@@ -14,6 +14,7 @@ export const ConfirmationDialog = ({
   description = 'Bạn có chắc chắn muốn thực hiện hành động này?',
   confirmText = 'Xác nhận',
   cancelText = 'Hủy',
+  loading = false,
   onConfirm,
   onCancel,
 }) => {
@@ -37,10 +38,10 @@ export const ConfirmationDialog = ({
         </DialogContentText>
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2, gap: 1 }}>
-        <Button onClick={onCancel} sx={{ color: 'text.secondary', fontWeight: 600 }}>
+        <Button onClick={onCancel} disabled={loading} sx={{ color: 'text.secondary', fontWeight: 600 }}>
           {cancelText}
         </Button>
-        <CustomButton variant="primary" onClick={onConfirm} size="small">
+        <CustomButton variant="primary" onClick={onConfirm} size="small" loading={loading} disabled={loading}>
           {confirmText}
         </CustomButton>
       </DialogActions>

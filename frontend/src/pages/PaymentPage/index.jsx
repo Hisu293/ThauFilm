@@ -18,6 +18,9 @@ import {
 import LockIcon from '@mui/icons-material/Lock';
 import LocalOfferRoundedIcon from '@mui/icons-material/LocalOfferRounded';
 import FastfoodRoundedIcon from '@mui/icons-material/FastfoodRounded';
+import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
+import OpenInNewRoundedIcon from '@mui/icons-material/OpenInNewRounded';
+import QRCode from 'qrcode';
 
 import BookingStepper from '../../components/BookingStepper';
 import PageHeader from '../../components/common/PageHeader';
@@ -43,6 +46,29 @@ import {
   saveBookingReplacement,
   savePaidBookingSummary,
 } from '../../utils/paidBookingStorage';
+
+const BOOKING_COMBOS_KEY = 'tf_booking_combos';
+
+const readBookingComboIds = (bookingId) => {
+  if (!bookingId) return [];
+  try {
+    const store = JSON.parse(sessionStorage.getItem(BOOKING_COMBOS_KEY) || '{}');
+    return Array.isArray(store[String(bookingId)]) ? store[String(bookingId)] : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveBookingComboIds = (bookingId, comboIds) => {
+  if (!bookingId) return;
+  try {
+    const store = JSON.parse(sessionStorage.getItem(BOOKING_COMBOS_KEY) || '{}');
+    store[String(bookingId)] = comboIds;
+    sessionStorage.setItem(BOOKING_COMBOS_KEY, JSON.stringify(store));
+  } catch {
+    // Storage failure must not block payment.
+  }
+};
 
 const buildFallbackMovie = (booking) => ({
   title: booking.movieTitle,
@@ -135,15 +161,38 @@ export const PaymentPage = () => {
   const [discounts, setDiscounts] = useState([]);
   const [combos, setCombos] = useState([]);
   const [selectedComboIds, setSelectedComboIds] = useState([]);
+  const [originalComboIds, setOriginalComboIds] = useState([]);
   const [selectedDiscountId, setSelectedDiscountId] = useState('');
   const [loadingPromotions, setLoadingPromotions] = useState(true);
   const [promotionNotice, setPromotionNotice] = useState('');
   const [bookingStatus, setBookingStatus] = useState('');
   const [bookingOriginalAmount, setBookingOriginalAmount] = useState(null);
   const [invalidBookingMessage, setInvalidBookingMessage] = useState('');
+  const [payosCheckout, setPayosCheckout] = useState(null);
+  const [qrImage, setQrImage] = useState('');
+  const [checkoutNotice, setCheckoutNotice] = useState('');
+  const [checkingPayment, setCheckingPayment] = useState(false);
   const paymentInFlight = useRef(false);
   const { isExpired } = useHoldCountdown(holdExpiresAt);
   const isHoldExpired = Boolean(holdExpiresAt) && isExpired;
+
+  useEffect(() => {
+    let active = true;
+    if (!payosCheckout?.qrCode) {
+      return undefined;
+    }
+    QRCode.toDataURL(payosCheckout.qrCode, {
+      width: 320,
+      margin: 2,
+      errorCorrectionLevel: 'M',
+      color: { dark: '#0F172A', light: '#FFFFFF' },
+    }).then((dataUrl) => {
+      if (active) setQrImage(dataUrl);
+    }).catch(() => {
+      if (active) setQrImage('');
+    });
+    return () => { active = false; };
+  }, [payosCheckout]);
 
   useEffect(() => {
     let currentBookingId = location.state?.bookingId;
@@ -155,6 +204,9 @@ export const PaymentPage = () => {
     Promise.resolve().then(() => {
       if (currentBookingId) {
         setBookingId(currentBookingId);
+        const savedComboIds = readBookingComboIds(currentBookingId);
+        setSelectedComboIds(savedComboIds);
+        setOriginalComboIds(savedComboIds);
       }
       setMovie(mergeMovieContext(location.state?.movie, pendingContext?.movie));
       setShowtime(mergeShowtimeContext(location.state?.showtime, pendingContext?.showtime));
@@ -274,9 +326,6 @@ export const PaymentPage = () => {
     (sum, seat) => sum + (Number(seat.price) || 0),
     0,
   );
-  const seatsTotal = bookingOriginalAmount !== null
-    ? Number(bookingOriginalAmount)
-    : selectedSeatsTotal;
   const availableCombos = useMemo(
     () => combos.filter((combo) => combo.active !== false && combo.id && combo.price > 0),
     [combos],
@@ -286,6 +335,12 @@ export const PaymentPage = () => {
     [availableCombos, selectedComboIds],
   );
   const comboTotal = selectedCombos.reduce((sum, combo) => sum + (Number(combo.price) || 0), 0);
+  const originalComboTotal = availableCombos
+    .filter((combo) => originalComboIds.includes(combo.id))
+    .reduce((sum, combo) => sum + (Number(combo.price) || 0), 0);
+  const seatsTotal = bookingOriginalAmount !== null
+    ? Math.max(Number(bookingOriginalAmount) - originalComboTotal, 0)
+    : selectedSeatsTotal;
   const subtotal = seatsTotal + comboTotal;
   const availableDiscounts = discounts.filter(
     (discount) => !getDiscountUnavailableReason(discount, subtotal, selectedSeats),
@@ -364,9 +419,11 @@ export const PaymentPage = () => {
       };
       const backendPaymentMethod = paymentMethodMap[paymentMethod] || 'CASH';
       const discountCode = selectedDiscount?.code || '';
+      const comboSelectionChanged =
+        [...selectedComboIds].sort().join(',') !== [...originalComboIds].sort().join(',');
       updateBookingState({ bookingId, paymentStatus: 'PAYING' });
 
-      if (selectedComboIds.length > 0) {
+      if (comboSelectionChanged) {
         const seatIds = selectedSeats.map((seat) => seat.id).filter(Boolean);
         const showtimeId = showtime?.id;
         if (!showtimeId || seatIds.length === 0) {
@@ -380,6 +437,8 @@ export const PaymentPage = () => {
         payableBookingId = replacementBooking.id;
         setBookingOriginalAmount(Number(replacementBooking.totalAmount) || subtotal);
         saveBookingReplacement(bookingId, payableBookingId);
+        saveBookingComboIds(payableBookingId, selectedComboIds);
+        setOriginalComboIds(selectedComboIds);
         setBookingId(payableBookingId);
         sessionStorage.setItem('tf_booking_id', payableBookingId);
         updateBookingState({ bookingId: payableBookingId, paymentStatus: 'PAYING' });
@@ -396,6 +455,9 @@ export const PaymentPage = () => {
       const result = await pay(payableBookingId, backendPaymentMethod, discountCode);
       const checkoutUrl = result?.checkoutUrl || result?.payment?.checkoutUrl;
       if (checkoutUrl) {
+        if (selectedComboIds.length > 0) {
+          saveBookingComboIds(payableBookingId, selectedComboIds);
+        }
         savePaidBookingSummary(payableBookingId, {
           originalAmount: subtotal,
           discountAmount,
@@ -403,7 +465,14 @@ export const PaymentPage = () => {
           discountCode: selectedDiscount?.code || '',
           paymentMethod,
         });
-        window.location.assign(checkoutUrl);
+        setQrImage('');
+        setPayosCheckout({
+          bookingId: payableBookingId,
+          checkoutUrl,
+          qrCode: result?.qrCode || result?.payment?.qrCode || '',
+          amount: Number(result?.finalAmount ?? result?.payment?.amount ?? totalAmount),
+          transactionId: result?.payment?.transactionId || '',
+        });
         return;
       }
       goToSuccess(result, {}, payableBookingId);
@@ -433,6 +502,25 @@ export const PaymentPage = () => {
       setSnackbarOpen(true);
     } finally {
       paymentInFlight.current = false;
+    }
+  };
+
+  const handleVerifyPayment = async () => {
+    if (!payosCheckout?.bookingId || checkingPayment) return;
+    setCheckingPayment(true);
+    setCheckoutNotice('');
+    try {
+      const confirmedBooking = await getDetail(payosCheckout.bookingId);
+      if (String(confirmedBooking?.status || '').toUpperCase() !== 'CONFIRMED') {
+        setCheckoutNotice('Chưa nhận được xác nhận thanh toán từ PayOS. Vui lòng kiểm tra lại sau vài giây.');
+        return;
+      }
+      const confirmedTickets = await getTickets(payosCheckout.bookingId).catch(() => []);
+      goToSuccess({}, { booking: confirmedBooking, tickets: confirmedTickets }, payosCheckout.bookingId);
+    } catch (err) {
+      setCheckoutNotice(err.message || 'Không thể kiểm tra trạng thái thanh toán.');
+    } finally {
+      setCheckingPayment(false);
     }
   };
 
@@ -471,6 +559,78 @@ export const PaymentPage = () => {
         <Button variant="contained" color="primary" onClick={() => navigate('/movies')} sx={{ mt: 3 }}>
           Quay lại trang chủ
         </Button>
+      </Container>
+    );
+  }
+
+  if (payosCheckout) {
+    return (
+      <Container maxWidth="md" sx={{ py: 4, minHeight: '82vh', position: 'relative' }}>
+        <LoadingOverlay open={checkingPayment} message="Đang kiểm tra thanh toán..." blur fullScreen />
+        <BookingStepper activeStep={3} />
+
+        <Card sx={{ mt: 3, borderRadius: 5, overflow: 'hidden', border: '1px solid rgba(251,191,36,0.22)' }}>
+          <Box sx={{ px: { xs: 3, md: 5 }, py: 3, bgcolor: 'rgba(251,191,36,0.08)', borderBottom: '1px solid rgba(251,191,36,0.16)' }}>
+            <Typography variant="h4" fontWeight={900}>Quét mã để thanh toán</Typography>
+            <Typography color="text.secondary" sx={{ mt: 0.5 }}>
+              Mở ứng dụng ngân hàng và quét mã VietQR bên dưới.
+            </Typography>
+          </Box>
+
+          <CardContent sx={{ p: { xs: 3, md: 5 } }}>
+            <Stack direction={{ xs: 'column', md: 'row' }} spacing={5} alignItems="center">
+              <Box sx={{ width: { xs: 260, sm: 320 }, minHeight: { xs: 260, sm: 320 }, p: 2, bgcolor: '#fff', borderRadius: 4, display: 'grid', placeItems: 'center', boxShadow: '0 18px 45px rgba(0,0,0,0.35)' }}>
+                {qrImage ? (
+                  <Box component="img" src={qrImage} alt="Mã VietQR thanh toán" sx={{ width: '100%', display: 'block' }} />
+                ) : (
+                  <Typography color="#475569">Đang tạo mã QR...</Typography>
+                )}
+              </Box>
+
+              <Stack spacing={2.25} sx={{ flex: 1, width: '100%' }}>
+                <Box>
+                  <Typography variant="caption" color="text.secondary">Phim</Typography>
+                  <Typography variant="h6" fontWeight={800}>{movie.title}</Typography>
+                </Box>
+                <Divider />
+                <Box>
+                  <Typography variant="caption" color="text.secondary">Mã booking</Typography>
+                  <Typography fontWeight={800}>{payosCheckout.bookingId}</Typography>
+                </Box>
+                <Box>
+                  <Typography variant="caption" color="text.secondary">Số tiền cần thanh toán</Typography>
+                  <Typography variant="h4" fontWeight={900} color="primary.main">
+                    {formatCurrency(payosCheckout.amount)}
+                  </Typography>
+                </Box>
+                <Alert severity="info" sx={{ borderRadius: 3 }}>
+                  Giữ nguyên số tiền và nội dung chuyển khoản được điền trong mã QR.
+                </Alert>
+                {checkoutNotice && <Alert severity="warning" sx={{ borderRadius: 3 }}>{checkoutNotice}</Alert>}
+                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+                  <CustomButton
+                    variant="primary"
+                    startIcon={<CheckCircleRoundedIcon />}
+                    onClick={handleVerifyPayment}
+                    disabled={checkingPayment}
+                  >
+                    Tôi đã thanh toán
+                  </CustomButton>
+                  <Button variant="outlined" onClick={() => setPayosCheckout(null)}>
+                    Quay lại chỉnh đơn
+                  </Button>
+                  <Button
+                    variant="text"
+                    endIcon={<OpenInNewRoundedIcon />}
+                    onClick={() => window.open(payosCheckout.checkoutUrl, '_blank', 'noopener,noreferrer')}
+                  >
+                    Mở PayOS
+                  </Button>
+                </Stack>
+              </Stack>
+            </Stack>
+          </CardContent>
+        </Card>
       </Container>
     );
   }
@@ -626,6 +786,12 @@ export const PaymentPage = () => {
                           Combo bắp nước
                         </Typography>
                       </Stack>
+
+                      {originalComboIds.length > 0 && (
+                        <Alert severity="info" sx={{ mb: 1.5, borderRadius: 3 }}>
+                          Bạn có thể bỏ combo cũ hoặc chọn combo khác. Thay đổi sẽ được cập nhật khi tiếp tục thanh toán.
+                        </Alert>
+                      )}
 
                       {availableCombos.length === 0 ? (
                         <Alert severity="info" sx={{ borderRadius: 3 }}>
