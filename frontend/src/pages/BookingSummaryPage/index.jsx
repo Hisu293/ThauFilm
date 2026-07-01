@@ -225,7 +225,9 @@ export const BookingSummaryPage = () => {
       <PageHeader
         title="Xác Nhận Đặt Vé"
         subtitle="Vui lòng kiểm tra kỹ các thông tin đặt vé trước khi tiến hành thanh toán."
-        onBack={() => navigate(`/booking/seats/${showtime?.id || ''}`, { state: { movie, showtime } })}
+        onBack={() => navigate(`/booking/seats/${showtime?.id || ''}`, {
+          state: { bookingId, movie, showtime, selectedSeats, holdExpiresAt, editMode: true },
+        })}
       />
 
       <Box
@@ -246,7 +248,9 @@ export const BookingSummaryPage = () => {
                 showtime?.id && (
                   <Button
                     startIcon={<EditRoundedIcon />}
-                    onClick={() => navigate(`/booking/seats/${showtime.id}`, { state: { movie, showtime } })}
+                    onClick={() => navigate(`/booking/seats/${showtime.id}`, {
+                      state: { bookingId, movie, showtime, selectedSeats, holdExpiresAt, editMode: true },
+                    })}
                     sx={{ color: 'primary.main', fontWeight: 700 }}
                   >
                     Thay đổi

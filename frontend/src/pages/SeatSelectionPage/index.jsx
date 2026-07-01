@@ -1,4 +1,4 @@
-import { useCallback, useState, useEffect, useMemo } from 'react';
+import { useCallback, useState, useEffect, useMemo, useRef } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
 import { Container, Box, Alert, Snackbar, Button } from '@mui/material';
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
@@ -17,7 +17,7 @@ import { bookingService } from '../../services/bookingService';
 import { fetchMovieById } from '../../services/movieService';
 import { useBookingFlow } from '../../context/BookingContext';
 import { useBookingNavigate } from '../../context/BookingNavigationContext';
-import { pruneExpiredPendingBookings, savePendingBooking } from '../../utils/pendingBookingStorage';
+import { pruneExpiredPendingBookings, removePendingBooking, savePendingBooking } from '../../utils/pendingBookingStorage';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -25,16 +25,22 @@ export const SeatSelectionPage = () => {
   const { showtimeId } = useParams();
   const location = useLocation();
   const navigate = useBookingNavigate();
-  const { updateBookingState } = useBookingFlow();
+  const { updateBookingState, clearBookingState } = useBookingFlow();
 
-  const { loading: apiLoading, error: apiError, clearError, getSeats, create, getHistory, getDetail, cancel } = useBooking();
+  const { loading: apiLoading, error: apiError, clearError, getSeats, create, updateSeats, getHistory, getDetail, cancel } = useBooking();
+  const [editingBookingId, setEditingBookingId] = useState(() => (
+    location.state?.editMode && location.state?.bookingId
+      ? location.state.bookingId
+      : sessionStorage.getItem('tf_booking_id')
+  ));
 
   const [movie, setMovie] = useState(null);
   const [showtime, setShowtime] = useState(null);
   const [seats, setSeats] = useState([]);
-  const [selectedSeats, setSelectedSeats] = useState([]);
+  const [selectedSeats, setSelectedSeats] = useState(location.state?.selectedSeats || []);
   const [loadingDetails, setLoadingDetails] = useState(true);
   const [, setActiveBooking] = useState(location.state?.activeBooking || null);
+  const editingSeatIdsRef = useRef(new Set((location.state?.selectedSeats || []).map((seat) => String(seat.id))));
 
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
@@ -46,7 +52,10 @@ export const SeatSelectionPage = () => {
         ? bookingService.normalizeSeats((await bookingApi.fetchShowtimeSeats(showtimeId))?.data ?? [])
         : await getSeats(showtimeId);
       if (cancelledRef.current) return;
-      setSeats(Array.isArray(seatLayout) ? seatLayout : []);
+      const editableSeatIds = editingSeatIdsRef.current;
+      setSeats((Array.isArray(seatLayout) ? seatLayout : []).map((seat) => (
+        editableSeatIds.has(String(seat.id)) ? { ...seat, isSold: false } : seat
+      )));
     } catch {
       if (cancelledRef.current) return;
       setSeats([]);
@@ -199,9 +208,9 @@ export const SeatSelectionPage = () => {
     };
   }, [showtimeId, refreshSeats]);
 
-  // Khi có bookingId từ navigation (từ trang thanh toán), gọi lại detail để recover selectedSeats
+  // Recover the active hold after back navigation, refresh, or a login redirect.
   useEffect(() => {
-    const bookingId = location.state?.bookingId;
+    const bookingId = editingBookingId;
     if (!bookingId) return;
     let cancelled = false;
 
@@ -209,14 +218,25 @@ export const SeatSelectionPage = () => {
       try {
         const detail = await getDetail(bookingId);
         if (cancelled || !detail) return;
+        const isEditableHold = String(detail.status || '').toUpperCase() === 'HOLD';
+        const belongsToShowtime = String(detail.showtimeId) === String(showtimeId);
+        if (!isEditableHold || !belongsToShowtime) {
+          setEditingBookingId(null);
+          editingSeatIdsRef.current = new Set();
+          return;
+        }
         const recoveredSeats = Array.isArray(detail.seats) ? detail.seats : [];
+        editingSeatIdsRef.current = new Set(recoveredSeats.map((seat) => String(seat.id)));
         setSelectedSeats((prev) => {
           if (recoveredSeats.length === 0) return prev;
           return recoveredSeats;
         });
+        setSeats((current) => current.map((seat) => (
+          editingSeatIdsRef.current.has(String(seat.id)) ? { ...seat, isSold: false } : seat
+        )));
         setActiveBooking(detail);
       } catch {
-        // keep current selectedSeats if recovery failed
+        if (!cancelled) setEditingBookingId(null);
       }
     };
 
@@ -224,7 +244,7 @@ export const SeatSelectionPage = () => {
     return () => {
       cancelled = true;
     };
-  }, [location.state?.bookingId, getDetail]);
+  }, [editingBookingId, getDetail, showtimeId]);
 
   // Bắt lỗi API và hiển thị snackbar
   useEffect(() => {
@@ -277,7 +297,22 @@ export const SeatSelectionPage = () => {
   }, [movie, selectedSeats, showtime, updateBookingState]);
 
   const handleProceed = async () => {
-    if (selectedSeats.length === 0 || apiLoading) return;
+    if (apiLoading) return;
+
+    if (selectedSeats.length === 0) {
+      if (!editingBookingId) return;
+      try {
+        await cancel(editingBookingId);
+        sessionStorage.removeItem('tf_booking_id');
+        removePendingBooking(editingBookingId);
+        clearBookingState();
+        navigate(movie?.id ? `/movies/${movie.id}` : '/my-bookings', { replace: true });
+      } catch (err) {
+        setSnackbarMessage(err.message || 'Không thể hủy booking này.');
+        setSnackbarOpen(true);
+      }
+      return;
+    }
 
     if (showtime?.startTime) {
       const showtimeMs = new Date(showtime.startTime).getTime();
@@ -309,8 +344,9 @@ export const SeatSelectionPage = () => {
     }
 
     try {
-      // Create a booking hold on the backend
-      const bookingResult = await create(showtimeId, seatIds, 'ONLINE');
+      const bookingResult = editingBookingId
+        ? await updateSeats(editingBookingId, showtimeId, seatIds)
+        : await create(showtimeId, seatIds, 'ONLINE');
       if (bookingResult && bookingResult.id) {
         savePendingBooking({
           id: bookingResult.id,
@@ -339,7 +375,7 @@ export const SeatSelectionPage = () => {
         });
       }
     } catch (err) {
-      try {
+      if (!editingBookingId) try {
         const history = await getHistory();
         const selectedIdSet = new Set(seatIds.map(String));
         const matchedPendingBooking = history.find((booking) => {
@@ -362,9 +398,11 @@ export const SeatSelectionPage = () => {
       }
 
       setSnackbarMessage(
-        err.message || 'Không thể giữ ghế. Có thể các ghế này đang nằm trong một đơn chờ thanh toán khác.'
+        err.message || (editingBookingId
+          ? 'Không thể cập nhật ghế cho booking này.'
+          : 'Không thể giữ ghế. Có thể các ghế này đang nằm trong một đơn chờ thanh toán khác.')
       );
-      console.error('Create booking failed', {
+      console.error(editingBookingId ? 'Update booking seats failed' : 'Create booking failed', {
         message: err.message,
         details: err.details,
         raw: err.raw,
@@ -467,8 +505,9 @@ export const SeatSelectionPage = () => {
             showtime={showtime}
             selectedSeats={selectedSeats}
             onProceed={handleProceed}
-            proceedText="Tiếp tục thanh toán"
-            disabled={selectedSeats.length === 0 || apiLoading}
+            proceedText={editingBookingId && selectedSeats.length === 0 ? 'Hủy booking' : editingBookingId ? 'Cập nhật ghế' : 'Tiếp tục thanh toán'}
+            allowEmptyProceed={Boolean(editingBookingId)}
+            disabled={(!editingBookingId && selectedSeats.length === 0) || apiLoading}
           />
         </Box>
       </Box>
@@ -479,8 +518,9 @@ export const SeatSelectionPage = () => {
           showtime={showtime}
           selectedSeats={selectedSeats}
           onProceed={handleProceed}
-          proceedText="Tiếp tục thanh toán"
-          disabled={selectedSeats.length === 0 || apiLoading}
+          proceedText={editingBookingId && selectedSeats.length === 0 ? 'Hủy booking' : editingBookingId ? 'Cập nhật ghế' : 'Tiếp tục thanh toán'}
+          allowEmptyProceed={Boolean(editingBookingId)}
+          disabled={(!editingBookingId && selectedSeats.length === 0) || apiLoading}
         />
       </Box>
 

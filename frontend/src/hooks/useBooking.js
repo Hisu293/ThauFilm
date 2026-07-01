@@ -86,6 +86,20 @@ export const useBooking = () => {
     }
   }, []);
 
+  const updateSeats = useCallback(async (bookingId, showtimeId, seatIds, comboIds = []) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await bookingApi.updateBookingSeats(bookingId, showtimeId, seatIds, comboIds);
+      return bookingService.normalizeBooking(response?.data ?? response);
+    } catch (err) {
+      setError(err.message || 'Không thể cập nhật ghế cho booking này.');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const getHistory = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -199,6 +213,7 @@ export const useBooking = () => {
     clearError,
     getSeats,
     create,
+    updateSeats,
     getHistory,
     getDetail,
     getTickets,

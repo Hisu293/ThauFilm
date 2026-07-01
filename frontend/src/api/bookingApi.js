@@ -42,6 +42,15 @@ export const bookingApi = {
     });
   },
 
+  // Change seats while preserving the existing booking hold.
+  updateBookingSeats: (bookingId, showtimeId, seatIds, comboIds = []) => {
+    return axiosClient.put(`/api/member/booking/${bookingId}/seats`, {
+      showtimeId,
+      seatIds,
+      comboIds,
+    });
+  },
+
   // Display booking history: GET /api/member/booking
   fetchBookingHistory: () => {
     return axiosClient.get('/api/member/booking');

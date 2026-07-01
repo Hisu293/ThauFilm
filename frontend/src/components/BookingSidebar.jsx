@@ -12,6 +12,7 @@ export const BookingSidebar = ({
   onProceed,
   proceedText = 'Tiếp tục thanh toán',
   disabled = false,
+  allowEmptyProceed = false,
   showSummaryOnly = false,
 }) => {
   const seatsTotal = selectedSeats.reduce((sum, seat) => sum + (seat.price || 0), 0);
@@ -157,7 +158,7 @@ export const BookingSidebar = ({
             fullWidth
             variant="primary"
             size="large"
-            disabled={disabled || selectedSeats.length === 0}
+            disabled={disabled || (!allowEmptyProceed && selectedSeats.length === 0)}
             onClick={onProceed}
             sx={{ py: 1.8 }}
           >
