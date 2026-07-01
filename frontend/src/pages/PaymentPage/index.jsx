@@ -290,6 +290,11 @@ export const PaymentPage = () => {
   const availableDiscounts = discounts.filter(
     (discount) => !getDiscountUnavailableReason(discount, subtotal, selectedSeats),
   );
+  const sortedDiscounts = [...discounts].sort((first, second) => {
+    const firstUnavailable = Boolean(getDiscountUnavailableReason(first, subtotal, selectedSeats));
+    const secondUnavailable = Boolean(getDiscountUnavailableReason(second, subtotal, selectedSeats));
+    return Number(firstUnavailable) - Number(secondUnavailable);
+  });
   const selectedDiscount = availableDiscounts.find((discount) => discount.id === selectedDiscountId) || null;
   const discountAmount = getDiscountAmount(selectedDiscount, subtotal);
   const totalAmount = Math.max(subtotal - discountAmount, 0);
@@ -554,7 +559,7 @@ export const PaymentPage = () => {
                           </CardContent>
                         </Card>
 
-                        {discounts.map((discount) => {
+                        {sortedDiscounts.map((discount) => {
                           const previewDiscount = getDiscountAmount(discount, subtotal);
                           const unavailableReason = getDiscountUnavailableReason(discount, subtotal, selectedSeats);
 

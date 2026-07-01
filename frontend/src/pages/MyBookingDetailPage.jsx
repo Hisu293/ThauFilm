@@ -9,14 +9,12 @@ import {
   Chip,
   Container,
   Divider,
-  Paper,
   Skeleton,
   Snackbar,
   Stack,
   Typography,
 } from '@mui/material';
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
-import QrCode2RoundedIcon from '@mui/icons-material/QrCode2Rounded';
 import { useBooking } from '../hooks/useBooking';
 import ConfirmationDialog from '../components/common/ConfirmationDialog';
 import EmptyState from '../components/common/EmptyState';
@@ -179,31 +177,6 @@ const MyBookingDetailPage = () => {
               </>
             )}
           </Stack>
-
-          <Paper
-            variant="outlined"
-            sx={{
-              mt: 4,
-              p: 3,
-              borderRadius: 2,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: 2,
-              bgcolor: 'background.default',
-            }}
-          >
-            <Box>
-              <Typography sx={{ fontWeight: 800 }}>QR Code placeholder</Typography>
-              <Typography variant="body2" color="text.secondary">
-                Dùng mã này để đối chiếu tại quầy hoặc máy soát vé.
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                Tickets: {tickets.length || 'Chưa phát sinh'}
-              </Typography>
-            </Box>
-            <QrCode2RoundedIcon sx={{ fontSize: 96, color: 'primary.main' }} />
-          </Paper>
 
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ mt: 4 }}>
             {booking.status === 'CONFIRMED' && (
