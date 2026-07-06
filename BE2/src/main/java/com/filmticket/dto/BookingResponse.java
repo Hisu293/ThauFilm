@@ -30,7 +30,9 @@ public class BookingResponse {
     private LocalDateTime startTime;
     private BigDecimal totalAmount;
     private String status;
+    private Boolean accessGranted;
     private String confirmationCode;
+    private LocalDateTime createdAt;
     private LocalDateTime holdExpiresAt;
     private LocalDateTime confirmedAt;
     private List<ShowtimeSeatResponse> seats;
@@ -54,7 +56,9 @@ public class BookingResponse {
                 .cinemaRoomName(cinemaRoomName)
                 .totalAmount(booking.getTotalAmount())
                 .status(booking.getStatus().name())
+                .accessGranted("CONFIRMED".equals(booking.getStatus().name()))
                 .confirmationCode(booking.getConfirmationCode())
+                .createdAt(booking.getCreatedAt())
                 .holdExpiresAt(booking.getHoldExpiresAt())
                 .confirmedAt(booking.getConfirmedAt())
                 .seats(seats)

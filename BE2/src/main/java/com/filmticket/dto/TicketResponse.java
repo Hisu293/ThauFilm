@@ -20,6 +20,7 @@ public class TicketResponse {
     private UUID seatId;
     private String ticketCode;
     private boolean checkedIn;
+    private LocalDateTime createdAt;
     private String confirmationCode;
     private String bookingStatus;
 
@@ -66,6 +67,7 @@ public class TicketResponse {
                 .seatId(ticket.getSeatId())
                 .ticketCode(ticket.getTicketCode())
                 .checkedIn(ticket.isCheckedIn())
+                .createdAt(ticket.getCreatedAt())
                 .build();
     }
 }

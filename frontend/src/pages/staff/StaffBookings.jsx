@@ -16,6 +16,7 @@ import {
   TableCell,
   TableContainer,
   TableHead,
+  TablePagination,
   TableRow,
   TextField,
   Typography,
@@ -45,10 +46,12 @@ const STATUS_META = {
   PENDING: { label: 'Chờ thanh toán', color: 'warning' },
   CANCELLED: { label: 'Đã hủy', color: 'error' },
   REFUNDED: { label: 'Đã hoàn tiền', color: 'default' },
+  REFUND_PENDING: { label: 'Chờ hoàn tiền thủ công', color: 'warning' },
 };
 const PAY_META = {
   PAID: { label: 'Đã thanh toán', color: 'success' },
   PENDING: { label: 'Chờ thanh toán', color: 'warning' },
+  REFUND_PENDING: { label: 'Chờ hoàn tiền thủ công', color: 'warning' },
   REFUNDED: { label: 'Đã hoàn tiền', color: 'default' },
   FAILED: { label: 'Thất bại', color: 'error' },
 };
@@ -64,7 +67,17 @@ const formatDateTime = (iso) => {
   }
 };
 const formatCurrency = (n) =>
-  typeof n === 'number' ? new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(n) : '—';
+  Number.isFinite(Number(n)) ? new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(n)) : '—';
+const PAGE_SIZE = 10;
+const latestTime = (item) => {
+  const value = item?.createdAt || item?.confirmedAt || item?.paidAt || item?.updatedAt || item?.startTime;
+  const time = value ? new Date(value).getTime() : 0;
+  return Number.isFinite(time) ? time : 0;
+};
+const paymentMethodOf = (payment, detail) =>
+  payment?.paymentMethod || payment?.method || detail?.paymentMethod || detail?.payment?.paymentMethod || detail?.payment?.method;
+const paymentStatusOf = (payment, detail) =>
+  payment?.status || detail?.paymentStatus || detail?.payment?.status;
 
 const StaffBookings = () => {
   const [bookings, setBookings] = useState([]);
@@ -77,6 +90,7 @@ const StaffBookings = () => {
   const [payment, setPayment] = useState(null);
   const [purchased, setPurchased] = useState(null);
   const [busy, setBusy] = useState(false);
+  const [page, setPage] = useState(0);
 
   const [confirm, setConfirm] = useState(null); // { action, booking }
   const [toast, setToast] = useState(null);
@@ -142,8 +156,11 @@ const StaffBookings = () => {
         await refreshDetail(booking.id);
       } else if (action === 'refund') {
         await staffBookingApi.refund(booking.id).then(unwrap);
-        setToast({ severity: 'success', message: 'Đã hoàn tiền cho khách.' });
-        patchBooking({ id: booking.id, status: 'REFUNDED' });
+        setToast({
+          severity: 'success',
+          message: 'Đã ghi nhận yêu cầu hoàn tiền. Cần xử lý chuyển khoản thủ công theo thông tin khách.',
+        });
+        patchBooking({ id: booking.id, status: 'REFUND_PENDING' });
         const pay = await staffBookingApi.fetchPayment(booking.id).then(unwrap).catch(() => null);
         setPayment(pay);
       } else if (action === 'cancel') {
@@ -167,10 +184,16 @@ const StaffBookings = () => {
           .some((v) => String(v).toLowerCase().includes(q)),
       )
     : bookings;
+  const sortedFiltered = [...filtered].sort((a, b) => latestTime(b) - latestTime(a));
+  const pagedBookings = sortedFiltered.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
+
+  useEffect(() => {
+    setPage(0);
+  }, [search, bookings.length]);
 
   const confirmText = {
     regrant: { title: 'Cấp lại quyền xem?', body: 'Cấp lại quyền xem phim online cho khách của đơn này?', btn: 'Cấp lại quyền', color: 'primary' },
-    refund: { title: 'Hoàn tiền?', body: 'Xác nhận hoàn tiền cho đơn này theo chính sách?', btn: 'Hoàn tiền', color: 'warning' },
+    refund: { title: 'Ghi nhận yêu cầu hoàn tiền?', body: 'Hệ thống không có QR chuyển khoản của khách. Thao tác này chỉ đánh dấu chờ hoàn tiền thủ công để nhân viên kế toán xử lý.', btn: 'Ghi nhận', color: 'warning' },
     cancel: { title: 'Hủy đơn hàng?', body: 'Hủy đơn sẽ giải phóng ghế và thu hồi quyền xem. Tiếp tục?', btn: 'Hủy đơn', color: 'error' },
   };
 
@@ -205,7 +228,7 @@ const StaffBookings = () => {
               <Typography color="error" sx={{ mb: 2 }}>{error}</Typography>
               <Button variant="outlined" onClick={loadBookings}>Thử lại</Button>
             </Box>
-          ) : filtered.length === 0 ? (
+          ) : sortedFiltered.length === 0 ? (
             <Box sx={{ textAlign: 'center', py: 6, color: 'text.secondary' }}>Không có đơn hàng nào khớp.</Box>
           ) : (
             <TableContainer>
@@ -222,7 +245,7 @@ const StaffBookings = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {filtered.map((b) => {
+                  {pagedBookings.map((b) => {
                     const meta = STATUS_META[b.status] || { label: b.status, color: 'default' };
                     return (
                       <TableRow key={b.id} hover>
@@ -245,6 +268,14 @@ const StaffBookings = () => {
                   })}
                 </TableBody>
               </Table>
+              <TablePagination
+                component="div"
+                count={sortedFiltered.length}
+                page={page}
+                onPageChange={(_, nextPage) => setPage(nextPage)}
+                rowsPerPage={PAGE_SIZE}
+                rowsPerPageOptions={[PAGE_SIZE]}
+              />
             </TableContainer>
           )}
         </CardContent>
@@ -272,7 +303,7 @@ const StaffBookings = () => {
                 <Row label="Số điện thoại" value={detail.customerPhone} />
                 <Row
                   label="Quyền xem phim"
-                  value={detail.accessGranted ? '✅ Đã cấp' : '⛔ Chưa cấp / lỗi'}
+                  value={detail.accessGranted || detail.paymentStatus === 'PAID' || paymentStatusOf(payment, detail) === 'PAID' ? 'Đã cấp' : 'Chưa cấp / cần kiểm tra'}
                 />
                 <Divider />
                 <Typography variant="subtitle2" fontWeight={700}>Đơn hàng</Typography>
@@ -287,12 +318,12 @@ const StaffBookings = () => {
                 <Typography variant="subtitle2" fontWeight={700} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                   <PaymentRoundedIcon fontSize="small" /> Thanh toán
                 </Typography>
-                <Row label="Phương thức" value={payment?.method || detail.payment?.method} />
+                <Row label="Phương thức" value={paymentMethodOf(payment, detail)} />
                 <Row label="Số tiền" value={formatCurrency(payment?.amount ?? detail.payment?.amount)} />
                 <Stack direction="row" justifyContent="space-between" alignItems="center">
                   <Typography variant="body2" color="text.secondary">Tình trạng</Typography>
                   {(() => {
-                    const ps = payment?.status || detail.payment?.status;
+                    const ps = paymentStatusOf(payment, detail);
                     const pm = PAY_META[ps] || { label: ps, color: 'default' };
                     return <Chip size="small" label={pm.label} color={pm.color} sx={{ fontWeight: 700 }} />;
                   })()}
@@ -354,7 +385,7 @@ const StaffBookings = () => {
                 color="warning"
                 startIcon={<CurrencyExchangeRoundedIcon />}
                 onClick={() => setConfirm({ action: 'refund', booking: detail })}
-                disabled={busy || (payment?.status || detail.payment?.status) !== 'PAID'}
+                disabled={busy || paymentStatusOf(payment, detail) !== 'PAID'}
               >
                 Hoàn tiền
               </Button>

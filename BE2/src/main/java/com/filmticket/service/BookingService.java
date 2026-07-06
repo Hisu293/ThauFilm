@@ -602,8 +602,8 @@ public class BookingService {
         if (s != null) {
             Movie m = movieRepository.findById(s.getMovieId()).orElse(null);
             if (m != null) {
-                subject = "Ve xem phim - " + m.getTitle();
-                movieTitle = m.getTitle();
+                movieTitle = displayMovieTitle(s, m.getTitle());
+                subject = "Ve xem phim - " + movieTitle;
             }
         }
 
@@ -757,7 +757,7 @@ public class BookingService {
             if (optShowtime.isPresent()) {
                 Showtime showtime = optShowtime.get();
                 movieTitle = movieRepository.findById(showtime.getMovieId())
-                        .map(Movie::getTitle).orElse(null);
+                        .map(movie -> displayMovieTitle(showtime, movie.getTitle())).orElse(null);
                 cinemaRoomName = cinemaRoomRepository.findById(showtime.getCinemaRoomId())
                         .map(CinemaRoom::getName).orElse(null);
             }
@@ -791,7 +791,7 @@ public class BookingService {
             if (optShowtime.isPresent()) {
                 Showtime showtime = optShowtime.get();
                 movieTitle = movieRepository.findById(showtime.getMovieId())
-                        .map(Movie::getTitle).orElse(null);
+                        .map(movie -> displayMovieTitle(showtime, movie.getTitle())).orElse(null);
                 cinemaRoomName = cinemaRoomRepository.findById(showtime.getCinemaRoomId())
                         .map(CinemaRoom::getName).orElse(null);
             }
@@ -807,6 +807,14 @@ public class BookingService {
         format.setMinimumFractionDigits(0);
         String formatted = format.format(rounded);
         return formatted.replace("₫", "").trim();
+    }
+
+    private String displayMovieTitle(Showtime showtime, String realTitle) {
+        if (showtime == null || !showtime.isMystery()) {
+            return realTitle;
+        }
+        LocalDateTime unlockAt = showtime.getMysteryUnlockAt() != null ? showtime.getMysteryUnlockAt() : showtime.getStartTime();
+        return LocalDateTime.now().isBefore(unlockAt) ? "Mystery Movie Night" : realTitle;
     }
 
     private String escape(String value) {

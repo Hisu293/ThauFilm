@@ -7,10 +7,12 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControlLabel,
   IconButton,
   InputAdornment,
   MenuItem,
   Stack,
+  Switch,
   Table,
   TableBody,
   TableCell,
@@ -41,11 +43,36 @@ import {
 } from '../../constants/enums';
 
 const thSx = { color: 'rgba(255,255,255,0.45)', fontWeight: 600 };
+const PAGE_SIZE = 10;
+const sortByLatest = (items = []) =>
+  [...items].sort((a, b) => {
+    const aTime = new Date(a.createdAt || a.updatedAt || a.startTime || 0).getTime();
+    const bTime = new Date(b.createdAt || b.updatedAt || b.startTime || 0).getTime();
+    return (Number.isFinite(bTime) ? bTime : 0) - (Number.isFinite(aTime) ? aTime : 0);
+  });
+const getPagedRows = (rows, page) => rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+const PaginationBar = ({ total, page, onPageChange }) => {
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  return (
+    <Stack direction="row" justifyContent="flex-end" alignItems="center" spacing={1.5} sx={{ px: 2, py: 1.5, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+      <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.55)' }}>
+        {total === 0 ? '0' : `${(page - 1) * PAGE_SIZE + 1}-${Math.min(page * PAGE_SIZE, total)}`} / {total}
+      </Typography>
+      <Button size="small" disabled={page <= 1} onClick={() => onPageChange(page - 1)}>Trước</Button>
+      <Button size="small" disabled={page >= totalPages} onClick={() => onPageChange(page + 1)}>Sau</Button>
+    </Stack>
+  );
+};
 
 export const TheatersSection = ({ crud }) => {
   const [dialog, setDialog] = useState(null);
   const [form, setForm] = useState({ name: '', address: '', city: '', phoneNumber: '', status: 'ACTIVE' });
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, crud.list.length]);
 
   const save = async () => {
     try {
@@ -89,6 +116,8 @@ export const TheatersSection = ({ crud }) => {
           .some((value) => String(value).toLowerCase().includes(q)),
       )
     : crud.list;
+  const sortedTheaters = sortByLatest(filteredTheaters);
+  const pagedTheaters = getPagedRows(sortedTheaters, page);
 
   return (
     <>
@@ -110,7 +139,7 @@ export const TheatersSection = ({ crud }) => {
           }}
         />
         <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', ml: 'auto' }}>
-          {t('admin.theater', 'count', 'vi', { filtered: filteredTheaters.length, total: crud.list.length })}
+          {t('admin.theater', 'count', 'vi', { filtered: sortedTheaters.length, total: crud.list.length })}
         </Typography>
       </Box>
 
@@ -118,7 +147,7 @@ export const TheatersSection = ({ crud }) => {
         <Box sx={{ textAlign: 'center', py: 4, color: 'text.secondary' }}>
           {t('admin.theater', 'empty')}
         </Box>
-      ) : filteredTheaters.length === 0 ? (
+      ) : sortedTheaters.length === 0 ? (
         <Box sx={{ textAlign: 'center', py: 4, color: 'text.secondary' }}>
           {t('admin.theater', 'noResult', 'vi', { keyword: search })}
         </Box>
@@ -139,7 +168,7 @@ export const TheatersSection = ({ crud }) => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {filteredTheaters.map((theater) => (
+                {pagedTheaters.map((theater) => (
                   <TableRow key={theater.id} className="admin-table-row">
                     <TableCell>
                       <Typography fontWeight={600}>{theater.name}</Typography>
@@ -163,6 +192,7 @@ export const TheatersSection = ({ crud }) => {
               </TableBody>
             </Table>
           </TableContainer>
+          <PaginationBar total={sortedTheaters.length} page={page} onPageChange={setPage} />
         </Box>
       )}
       <CrudDialog open={!!dialog} title={dialog === 'add' ? 'Thêm rạp' : 'Sửa rạp'} onClose={() => setDialog(null)} onSave={save}>
@@ -184,12 +214,18 @@ export const RoomsSection = ({ crud, theaters, getTheaterName }) => {
   const [dialog, setDialog] = useState(null);
   const [expandedRoom, setExpandedRoom] = useState(null);
   const [form, setForm] = useState({ theaterId: '', name: '', type: 'STANDARD', rowsCount: 8, seatsPerRow: 10, status: 'ACTIVE' });
+  const [page, setPage] = useState(1);
 
   // Chỉ hiện rạp đang hoạt động (status === 'ACTIVE')
   const activeTheaters = theaters.filter((t) => t.status === 'ACTIVE');
   const activeTheaterIds = new Set(activeTheaters.map((t) => t.id));
   // Chỉ hiện phòng thuộc rạp đang hoạt động
-  const visibleRooms = crud.list.filter((room) => activeTheaterIds.has(room.theaterId));
+  const visibleRooms = sortByLatest(crud.list.filter((room) => activeTheaterIds.has(room.theaterId)));
+  const pagedRooms = getPagedRows(visibleRooms, page);
+
+  useEffect(() => {
+    setPage(1);
+  }, [crud.list.length, theaters.length]);
 
   const save = async () => {
     try {
@@ -256,7 +292,7 @@ export const RoomsSection = ({ crud, theaters, getTheaterName }) => {
                   </TableCell>
                 </TableRow>
               ) : (
-                visibleRooms.map((room) => (
+                pagedRooms.map((room) => (
                   <RoomRow
                     key={room.id}
                     room={room}
@@ -272,6 +308,7 @@ export const RoomsSection = ({ crud, theaters, getTheaterName }) => {
             </TableBody>
           </Table>
         </TableContainer>
+        <PaginationBar total={visibleRooms.length} page={page} onPageChange={setPage} />
       </Box>
       <CrudDialog open={!!dialog} title={dialog === 'add' ? t('admin.room', 'add') : t('admin.room', 'edit')} onClose={() => setDialog(null)} onSave={save}>
         {dialog === 'add' ? (
@@ -623,7 +660,14 @@ export const ShowtimesSection = ({ crud, movies, theaters, rooms }) => {
     startTime: '',
     endTime: '',
     status: 'SCHEDULED',
+    mystery: false,
+    mysteryUnlockAt: '',
   });
+  const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    setPage(1);
+  }, [crud.list.length]);
 
   const save = async () => {
     try {
@@ -643,13 +687,15 @@ export const ShowtimesSection = ({ crud, movies, theaters, rooms }) => {
           startTime: form.startTime,
           endTime: form.endTime,
           status: 'SCHEDULED',
+          mystery: Boolean(form.mystery),
+          mysteryUnlockAt: form.mystery ? form.mysteryUnlockAt || null : null,
         });
       } else {
         await crud.updateShowtime(dialog, { status: form.status });
       }
       setDialog(null);
       setFormError('');
-      setForm({ movieId: '', cinemaRoomId: '', startTime: '', endTime: '', status: 'SCHEDULED' });
+      setForm({ movieId: '', cinemaRoomId: '', startTime: '', endTime: '', status: 'SCHEDULED', mystery: false, mysteryUnlockAt: '' });
     } catch (err) {
       setFormError(err.message || 'Không thể lưu suất chiếu.');
       console.error('Lỗi khi lưu suất chiếu:', err);
@@ -694,6 +740,8 @@ export const ShowtimesSection = ({ crud, movies, theaters, rooms }) => {
   const getMovieTitle = (id) => movies.find((movie) => movie.id === id)?.title || '—';
   const getTheaterName = (id) => activeTheaters.find((theater) => theater.id === id)?.name || '—';
   const getCinemaRoomName = (id) => activeRooms.find((room) => room.id === id || room.cinemaRoomId === id)?.name || '—';
+  const sortedShowtimes = sortByLatest(crud.list);
+  const pagedShowtimes = getPagedRows(sortedShowtimes, page);
 
   if (crud.loading) {
     return (
@@ -754,7 +802,7 @@ export const ShowtimesSection = ({ crud, movies, theaters, rooms }) => {
                   </TableCell>
                 </TableRow>
               ) : (
-              crud.list.map((s) => {
+              pagedShowtimes.map((s) => {
                 // Backend trả enum chuỗi; vẫn ánh xạ số cũ để tương thích dữ liệu cũ.
                 const legacyMap = { 0: 'SCHEDULED', 1: 'OPEN', 2: 'COMPLETED', 3: 'CANCELLED' };
                 const statusStr = typeof s.status === 'number' ? legacyMap[s.status] ?? 'SCHEDULED' : (s.status ?? 'SCHEDULED');
@@ -762,6 +810,11 @@ export const ShowtimesSection = ({ crud, movies, theaters, rooms }) => {
                   <TableRow key={s.id} className="admin-table-row">
                     <TableCell>
                       <Typography fontWeight={600}>{s.movie?.title || getMovieTitle(s.movieId)}</Typography>
+                      {s.mystery ? (
+                        <Typography variant="caption" sx={{ color: '#f59e0b' }} display="block">
+                          Mystery Movie Night
+                        </Typography>
+                      ) : null}
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2">{s.room?.name || getCinemaRoomName(s.cinemaRoomId || s.roomId)}</Typography>
@@ -775,7 +828,7 @@ export const ShowtimesSection = ({ crud, movies, theaters, rooms }) => {
                       <StatusChip status={statusStr} />
                     </TableCell>
                     <TableCell align="right">
-                      <IconButton size="small" onClick={() => { setForm({ ...s, status: statusStr, startTime: fromUTCToLocal(s.startTime), endTime: fromUTCToLocal(s.endTime) }); setDialog(s.id); }}>
+                      <IconButton size="small" onClick={() => { setForm({ ...s, status: statusStr, startTime: fromUTCToLocal(s.startTime), endTime: fromUTCToLocal(s.endTime), mystery: Boolean(s.mystery), mysteryUnlockAt: fromUTCToLocal(s.mysteryUnlockAt) }); setDialog(s.id); }}>
                         <EditRoundedIcon fontSize="small" />
                       </IconButton>
                       <IconButton size="small" onClick={() => crud.remove(s.id)} sx={{ color: '#f87171' }}>
@@ -789,6 +842,7 @@ export const ShowtimesSection = ({ crud, movies, theaters, rooms }) => {
             </TableBody>
           </Table>
         </TableContainer>
+        <PaginationBar total={sortedShowtimes.length} page={page} onPageChange={setPage} />
       </Box>
       <CrudDialog open={!!dialog} title={dialog === 'add' ? t('admin.showtime', 'add') : t('admin.showtime', 'edit')} onClose={() => setDialog(null)} onSave={save}>
         {dialog === 'add' ? (
@@ -841,6 +895,31 @@ export const ShowtimesSection = ({ crud, movies, theaters, rooms }) => {
             </TextField>
             <TextField key="start" label="Giờ bắt đầu" type="datetime-local" fullWidth InputLabelProps={{ shrink: true }} value={form.startTime || ''} onChange={(e) => setForm({ ...form, startTime: e.target.value })} />
             <TextField key="end" label="Giờ kết thúc" type="datetime-local" fullWidth InputLabelProps={{ shrink: true }} value={form.endTime || ''} onChange={(e) => setForm({ ...form, endTime: e.target.value })} />
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={Boolean(form.mystery)}
+                  onChange={(e) => setForm({
+                    ...form,
+                    mystery: e.target.checked,
+                    mysteryUnlockAt: e.target.checked ? form.mysteryUnlockAt : '',
+                  })}
+                />
+              }
+              label="Mystery Movie Night"
+            />
+            {form.mystery ? (
+              <TextField
+                key="mysteryUnlockAt"
+                label="Mở khóa tên phim lúc"
+                type="datetime-local"
+                fullWidth
+                InputLabelProps={{ shrink: true }}
+                value={form.mysteryUnlockAt || ''}
+                onChange={(e) => setForm({ ...form, mysteryUnlockAt: e.target.value })}
+                helperText="Trước thời điểm này khách chỉ thấy Mystery Movie Night."
+              />
+            ) : null}
           </>
         ) : (
           <TextField select label="Trạng thái" fullWidth value={form.status ?? 'SCHEDULED'} onChange={(e) => setForm({ ...form, status: e.target.value })}>

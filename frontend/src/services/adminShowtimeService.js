@@ -13,6 +13,8 @@ export const SHOWTIME_FIELDS = [
   'startTime',
   'endTime',
   'status',
+  'mystery',
+  'mysteryUnlockAt',
 ];
 
 /** Chuyển form → payload theo API backend */
@@ -27,6 +29,8 @@ export const toShowtimePayload = (form) => {
   // Backend uses LocalDateTime, so send local wall-clock time without timezone.
   if (form.startTime) payload.startTime = toBackendLocalDateTime(form.startTime);
   if (form.endTime) payload.endTime = toBackendLocalDateTime(form.endTime);
+  payload.mystery = Boolean(form.mystery);
+  if (form.mysteryUnlockAt) payload.mysteryUnlockAt = toBackendLocalDateTime(form.mysteryUnlockAt);
   // ShowtimeStatus là enum chuỗi: SCHEDULED | OPEN | RUNNING | COMPLETED | CANCELLED
   if (form.status !== undefined && form.status !== '') payload.status = form.status;
   return payload;

@@ -55,7 +55,7 @@ public class StaffBookingController {
     @Operation(summary = "Refund an order")
     @PostMapping("/{bookingId}/refund")
     public ResponseEntity<ApiResponse<?>> refund(@PathVariable UUID bookingId) {
-        return ResponseEntity.ok(ApiResponse.success("Refund processed successfully", staffBookingService.refund(bookingId)));
+        return ResponseEntity.ok(ApiResponse.success("Refund request recorded successfully", staffBookingService.refund(bookingId)));
     }
 
     @Operation(summary = "Cancel a booking (release seats if in HOLD status)")

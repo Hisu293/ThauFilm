@@ -3,6 +3,7 @@ package com.filmticket.entity;
 import com.filmticket.model.ShowtimeStatus;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
@@ -43,6 +44,17 @@ public class Showtime {
     @Column(nullable = false, length = 20)
     @Builder.Default
     private ShowtimeStatus status = ShowtimeStatus.SCHEDULED;
+
+    @Column(name = "mystery", nullable = false)
+    @Builder.Default
+    private boolean mystery = false;
+
+    @Column(name = "mystery_unlock_at")
+    private LocalDateTime mysteryUnlockAt;
+
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
 
     @PrePersist
     public void prePersist() {

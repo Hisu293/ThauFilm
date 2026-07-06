@@ -17,8 +17,10 @@ import com.filmticket.repository.SeatRepository;
 import com.filmticket.repository.ShowtimeRepository;
 import com.filmticket.repository.TheaterRepository;
 import com.filmticket.model.RoomStatus;
+import com.filmticket.model.ShowtimeStatus;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,6 +36,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class ShowtimeService {
 
+    private static final BigDecimal MYSTERY_PRICE = BigDecimal.valueOf(79000);
+
     private final ShowtimeRepository showtimeRepository;
     private final MovieRepository movieRepository;
     private final CinemaRoomRepository cinemaRoomRepository;
@@ -43,6 +47,10 @@ public class ShowtimeService {
     private final PricingService pricingService;
 
     private List<ShowtimeResponse> enrich(List<Showtime> showtimes) {
+        return enrich(showtimes, true);
+    }
+
+    private List<ShowtimeResponse> enrich(List<Showtime> showtimes, boolean revealMystery) {
         if (showtimes.isEmpty()) return List.of();
 
         List<UUID> movieIds = showtimes.stream().map(Showtime::getMovieId).distinct().toList();
@@ -70,7 +78,8 @@ public class ShowtimeService {
                             movieTitleByMovieId.get(s.getMovieId()),
                             cinemaRoomName,
                             theaterId,
-                            theaterName
+                            theaterName,
+                            revealMystery
                     );
                 })
                 .toList();
@@ -78,7 +87,12 @@ public class ShowtimeService {
 
     @Transactional(readOnly = true)
     public List<ShowtimeResponse> getAllShowtimes() {
-        return enrich(showtimeRepository.findAll());
+        return enrich(showtimeRepository.findAll(Sort.by(Sort.Direction.DESC, "createdAt")));
+    }
+
+    @Transactional(readOnly = true)
+    public List<ShowtimeResponse> getPublicAllShowtimes() {
+        return enrich(showtimeRepository.findAll(Sort.by(Sort.Direction.DESC, "createdAt")), false);
     }
 
     private static final int CLEANUP_MINUTES = 15;
@@ -118,6 +132,10 @@ public class ShowtimeService {
                 .startTime(request.getStartTime())
                 .endTime(endTime)
                 .status(request.getStatus())
+                .mystery(Boolean.TRUE.equals(request.getMystery()))
+                .mysteryUnlockAt(Boolean.TRUE.equals(request.getMystery())
+                        ? (request.getMysteryUnlockAt() != null ? request.getMysteryUnlockAt() : request.getStartTime())
+                        : null)
                 .build();
 
         Showtime savedShowtime = showtimeRepository.save(showtime);
@@ -161,6 +179,10 @@ public class ShowtimeService {
         showtime.setStartTime(request.getStartTime());
         showtime.setEndTime(endTime);
         showtime.setStatus(request.getStatus());
+        showtime.setMystery(Boolean.TRUE.equals(request.getMystery()));
+        showtime.setMysteryUnlockAt(showtime.isMystery()
+                ? (request.getMysteryUnlockAt() != null ? request.getMysteryUnlockAt() : request.getStartTime())
+                : null);
 
         Showtime savedShowtime = showtimeRepository.save(showtime);
         ensureSeatAvailabilities(savedShowtime);
@@ -169,7 +191,9 @@ public class ShowtimeService {
 
     @Transactional
     public void deleteShowtime(UUID showtimeId) {
-        showtimeRepository.delete(getShowtimeEntityOrThrow(showtimeId));
+        Showtime showtime = getShowtimeEntityOrThrow(showtimeId);
+        showtime.setStatus(ShowtimeStatus.CANCELLED);
+        showtimeRepository.save(showtime);
     }
 
     @Transactional(readOnly = true)
@@ -187,8 +211,21 @@ public class ShowtimeService {
     }
 
     @Transactional(readOnly = true)
+    public List<ShowtimeResponse> getPublicShowtimesByMovie(UUID movieId) {
+        if (!movieRepository.existsById(movieId)) {
+            throw new BadRequestException("Movie not found");
+        }
+        return enrich(showtimeRepository.findByMovieIdOrderByStartTimeAsc(movieId), false);
+    }
+
+    @Transactional(readOnly = true)
     public List<ShowtimeResponse> getShowtimesByDate(java.time.LocalDate date) {
         return enrich(showtimeRepository.findByDate(date));
+    }
+
+    @Transactional(readOnly = true)
+    public List<ShowtimeResponse> getPublicShowtimesByDate(java.time.LocalDate date) {
+        return enrich(showtimeRepository.findByDate(date), false);
     }
 
     @Transactional(readOnly = true)
@@ -200,8 +237,21 @@ public class ShowtimeService {
     }
 
     @Transactional(readOnly = true)
+    public List<ShowtimeResponse> getPublicShowtimesByMovieAndDate(UUID movieId, java.time.LocalDate date) {
+        if (!movieRepository.existsById(movieId)) {
+            throw new BadRequestException("Movie not found");
+        }
+        return enrich(showtimeRepository.findByMovieIdAndDate(movieId, date), false);
+    }
+
+    @Transactional(readOnly = true)
     public List<ShowtimeResponse> getShowtimesByTheater(UUID theaterId) {
         return enrich(showtimeRepository.findByTheaterId(theaterId));
+    }
+
+    @Transactional(readOnly = true)
+    public List<ShowtimeResponse> getPublicShowtimesByTheater(UUID theaterId) {
+        return enrich(showtimeRepository.findByTheaterId(theaterId), false);
     }
 
     @Transactional(readOnly = true)
@@ -210,6 +260,14 @@ public class ShowtimeService {
             throw new BadRequestException("Movie not found");
         }
         return enrich(showtimeRepository.findByTheaterIdAndMovieId(theaterId, movieId));
+    }
+
+    @Transactional(readOnly = true)
+    public List<ShowtimeResponse> getPublicShowtimesByMovieAndTheater(UUID movieId, UUID theaterId) {
+        if (!movieRepository.existsById(movieId)) {
+            throw new BadRequestException("Movie not found");
+        }
+        return enrich(showtimeRepository.findByTheaterIdAndMovieId(theaterId, movieId), false);
     }
 
     @Transactional(readOnly = true)
@@ -257,12 +315,20 @@ public class ShowtimeService {
                             .build())
                     .toList();
             seatAvailabilityRepository.saveAll(newAvailabilities);
-            pricingService.applyDefaultPricing(newAvailabilities);
+            applyPricing(showtime, newAvailabilities);
             seatAvailabilityRepository.saveAll(newAvailabilities);
         } else {
-            pricingService.applyDefaultPricing(existing);
+            applyPricing(showtime, existing);
             seatAvailabilityRepository.saveAll(existing);
         }
+    }
+
+    private void applyPricing(Showtime showtime, List<SeatAvailability> availabilities) {
+        if (showtime.isMystery()) {
+            availabilities.forEach(availability -> availability.setPrice(MYSTERY_PRICE));
+            return;
+        }
+        pricingService.applyDefaultPricing(availabilities);
     }
 
     private void validateNoOverlap(UUID cinemaRoomId, LocalDateTime startTime,
