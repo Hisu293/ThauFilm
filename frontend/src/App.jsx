@@ -1,5 +1,6 @@
 import { BrowserRouter } from 'react-router-dom';
 import { CssBaseline, ThemeProvider } from '@mui/material';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 import AppRoutes from './routes/AppRoutes';
 import { AuthProvider } from './context/AuthContext';
 import { BookingProvider } from './context/BookingContext';
@@ -19,6 +20,7 @@ function App() {
           </BrowserRouter>
         </BookingProvider>
       </AuthProvider>
+      <SpeedInsights />
     </ThemeProvider>
   );
 }

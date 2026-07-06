@@ -34,6 +34,7 @@
     "@mui/icons-material": "^7.3.11",
     "@mui/material": "^7.3.11",
     "@react-oauth/google": "^0.13.5",
+    "@vercel/speed-insights": "^2.0.0",
     "axios": "^1.17.0",
     "hls.js": "^1.6.16",
     "html5-qrcode": "^2.3.8",
