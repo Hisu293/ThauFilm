@@ -282,6 +282,27 @@ export const SeatSelectionPage = () => {
   }, [queueReady, showtimeId, ticketQueue?.queueRequired]);
 
   useEffect(() => {
+    if (!showtimeId || !queueReady) return undefined;
+    let cancelled = false;
+    const heartbeat = async () => {
+      try {
+        await bookingApi.heartbeatTicketQueue(showtimeId);
+      } catch {
+        // Presence is best-effort; booking flow should not be blocked by it.
+      }
+    };
+    heartbeat();
+    const timer = window.setInterval(() => {
+      if (!cancelled) heartbeat();
+    }, 30000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [queueReady, showtimeId]);
+
+  useEffect(() => {
     if (!showtimeId) return;
     const cancelledRef = { current: false };
 

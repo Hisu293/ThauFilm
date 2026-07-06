@@ -46,6 +46,10 @@ export const bookingApi = {
     return axiosClient.get(`/api/member/booking/showtimes/${showtimeId}/queue/status`);
   },
 
+  heartbeatTicketQueue: (showtimeId) => {
+    return axiosClient.post(`/api/member/booking/showtimes/${showtimeId}/queue/heartbeat`);
+  },
+
   leaveTicketQueue: (showtimeId) => {
     return axiosClient.post(`/api/member/booking/showtimes/${showtimeId}/queue/leave`);
   },

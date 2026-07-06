@@ -78,6 +78,15 @@ public class MemberBookingController {
         ));
     }
 
+    @Operation(summary = "Heartbeat for showtime seat selection presence")
+    @PostMapping("/showtimes/{showtimeId}/queue/heartbeat")
+    public ResponseEntity<ApiResponse<TicketQueueStatusResponse>> queueHeartbeat(@PathVariable UUID showtimeId) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Queue heartbeat recorded",
+                ticketQueueService.heartbeat(showtimeId, getCurrentUserId())
+        ));
+    }
+
     @Operation(summary = "Leave showtime seat selection queue")
     @PostMapping("/showtimes/{showtimeId}/queue/leave")
     public ResponseEntity<ApiResponse<TicketQueueStatusResponse>> leaveQueue(@PathVariable UUID showtimeId) {

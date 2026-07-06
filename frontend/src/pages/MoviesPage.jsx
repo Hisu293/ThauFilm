@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Box, CircularProgress, Container, Typography } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
 import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
 import MoviePosterCard from '../components/movies/MoviePosterCard';
 import { fetchMovies } from '../services/movieService';
+import { bookingApi } from '../api/bookingApi';
 import './MoviesPage.css';
 
 const TABS = [
@@ -12,14 +14,31 @@ const TABS = [
 ];
 
 const PAGE_SIZE = 12;
+const unwrapApiResponse = (response) => response?.data?.data ?? response?.data ?? response;
+const formatMysteryDate = (value) => {
+  if (!value) return '';
+  try {
+    return new Intl.DateTimeFormat('vi-VN', {
+      weekday: 'short',
+      day: '2-digit',
+      month: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(new Date(value));
+  } catch {
+    return value;
+  }
+};
 
 const MoviesPage = () => {
+  const navigate = useNavigate();
   const [tab, setTab] = useState(0);
   const [query, setQuery] = useState('');
   const [genre, setGenre] = useState('Tất cả');
   const [page, setPage] = useState(1);
 
   const [allMovies, setAllMovies] = useState([]);
+  const [mysteryShowtimes, setMysteryShowtimes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -27,8 +46,21 @@ const MoviesPage = () => {
     setLoading(true);
     setError(null);
     try {
-      const { movies } = await fetchMovies();
+      const [{ movies }, showtimesResponse] = await Promise.all([
+        fetchMovies(),
+        bookingApi.fetchShowtimes().catch(() => ({ data: [] })),
+      ]);
       setAllMovies(movies);
+      const showtimes = unwrapApiResponse(showtimesResponse);
+      const now = Date.now();
+      setMysteryShowtimes((Array.isArray(showtimes) ? showtimes : [])
+        .filter((showtime) => showtime?.mystery)
+        .filter((showtime) => {
+          const startTime = showtime.startTime ? new Date(showtime.startTime).getTime() : 0;
+          return Number.isFinite(startTime) && startTime > now;
+        })
+        .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
+        .slice(0, 6));
     } catch (err) {
       setError(err.message || 'Không tải được danh sách phim.');
     } finally {
@@ -70,6 +102,34 @@ const MoviesPage = () => {
   const handleTabChange = (i) => { setTab(i); setPage(1); };
   const handleQueryChange = (e) => { setQuery(e.target.value); setPage(1); };
   const handleGenreChange = (e) => { setGenre(e.target.value); setPage(1); };
+  const handleMysteryBooking = (showtime) => {
+    const mysteryMovie = {
+      id: '',
+      title: showtime.movieTitle || 'Mystery Movie Night',
+      posterUrl: '/placeholder.svg',
+      poster: '/placeholder.svg',
+      genre: 'Sự kiện bí mật',
+      duration: null,
+      isMystery: true,
+    };
+    const mysteryShowtime = {
+      id: String(showtime.id ?? showtime.showtimeId ?? ''),
+      movieId: '',
+      movieTitle: showtime.movieTitle || 'Mystery Movie Night',
+      time: showtime.startTime ? String(showtime.startTime).slice(11, 16) : '',
+      date: showtime.startTime ? String(showtime.startTime).slice(0, 10) : '',
+      room: showtime.cinemaRoomName || showtime.roomName || showtime.room || '',
+      format: showtime.format || '2D',
+      theaterName: showtime.theaterName || 'ThauFilm Cinema',
+      startTime: showtime.startTime,
+      endTime: showtime.endTime,
+      mystery: true,
+      mysteryUnlockAt: showtime.mysteryUnlockAt,
+    };
+    navigate(`/booking/seats/${mysteryShowtime.id}`, {
+      state: { movie: mysteryMovie, showtime: mysteryShowtime },
+    });
+  };
 
   return (
     <Box sx={{ color: '#fff', pb: 8 }}>
@@ -85,6 +145,34 @@ const MoviesPage = () => {
       </div>
 
       <Container maxWidth="xl" sx={{ mt: 4 }}>
+        {!loading && !error && mysteryShowtimes.length > 0 && (
+          <section className="mystery-strip">
+            <div className="mystery-strip__head">
+              <div>
+                <Typography variant="overline" sx={{ color: '#fbbf24', fontWeight: 900, letterSpacing: '0.12em' }}>
+                  SỰ KIỆN BÍ MẬT
+                </Typography>
+                <h2>Mystery Movie Night</h2>
+                <p>Mua vé 79.000đ, tên phim sẽ được mở khóa khi đến giờ chiếu.</p>
+              </div>
+            </div>
+            <div className="mystery-strip__grid">
+              {mysteryShowtimes.map((showtime) => (
+                <article key={showtime.id} className="mystery-card">
+                  <div>
+                    <h3>{showtime.movieTitle || 'Mystery Movie Night'}</h3>
+                    <p>{formatMysteryDate(showtime.startTime)}</p>
+                    <span>{showtime.theaterName || 'ThauFilm Cinema'} · {showtime.cinemaRoomName || showtime.roomName || 'Phòng chiếu'}</span>
+                  </div>
+                  <button type="button" onClick={() => handleMysteryBooking(showtime)}>
+                    Đặt vé
+                  </button>
+                </article>
+              ))}
+            </div>
+          </section>
+        )}
+
         <div className="movies-tabs">
           <button
             type="button"

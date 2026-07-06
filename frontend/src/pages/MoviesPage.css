@@ -10,6 +10,78 @@
 .movies-hero__title { font-size: clamp(2rem, 4vw, 3rem); font-weight: 900; margin: 14px 0 16px; letter-spacing: -0.02em; line-height: 1.15; }
 .movies-hero__sub { color: rgba(255, 255, 255, 0.65); max-width: 540px; margin: 0; line-height: 1.6; }
 
+.mystery-strip {
+  margin-bottom: 28px;
+  padding: 22px;
+  border-radius: 14px;
+  border: 1px solid rgba(251, 191, 36, 0.22);
+  background:
+    linear-gradient(135deg, rgba(251, 191, 36, 0.11), rgba(229, 9, 20, 0.08)),
+    #141414;
+}
+.mystery-strip__head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+.mystery-strip__head h2 {
+  margin: 2px 0 6px;
+  font-size: 1.55rem;
+  line-height: 1.2;
+  font-weight: 900;
+}
+.mystery-strip__head p {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.68);
+}
+.mystery-strip__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+.mystery-card {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: center;
+  min-height: 112px;
+  padding: 16px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.24);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+.mystery-card h3 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+  font-weight: 900;
+}
+.mystery-card p {
+  margin: 0 0 4px;
+  color: #fbbf24;
+  font-weight: 800;
+}
+.mystery-card span {
+  display: block;
+  color: rgba(255, 255, 255, 0.58);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+.mystery-card button {
+  flex: 0 0 auto;
+  min-width: 88px;
+  height: 40px;
+  border: none;
+  border-radius: 10px;
+  background: #e50914;
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.92rem;
+  font-weight: 900;
+  cursor: pointer;
+}
+.mystery-card button:hover { background: #f40612; }
+
 .movies-tabs {
   display: flex;
   gap: 8px;
