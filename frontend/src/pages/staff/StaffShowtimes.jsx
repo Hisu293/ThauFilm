@@ -23,7 +23,9 @@ import {
   Alert,
   Snackbar,
   CircularProgress,
+  FormControlLabel,
   LinearProgress,
+  Switch,
   Tooltip,
 } from '@mui/material';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
@@ -39,7 +41,7 @@ import {
   enumLabel,
 } from '../../constants/enums';
 
-const emptyForm = { movieId: '', cinemaRoomId: '', startTime: '', endTime: '', status: 'SCHEDULED' };
+const emptyForm = { movieId: '', cinemaRoomId: '', startTime: '', endTime: '', status: 'SCHEDULED', mystery: false, mysteryUnlockAt: '' };
 
 const STATUS_COLOR = {
   SCHEDULED: 'default',
@@ -139,6 +141,8 @@ const StaffShowtimes = () => {
       startTime: fromUTCToLocal(s.startTime),
       endTime: fromUTCToLocal(s.endTime),
       status: s.status || 'SCHEDULED',
+      mystery: Boolean(s.mystery),
+      mysteryUnlockAt: fromUTCToLocal(s.mysteryUnlockAt),
     });
     setFormError('');
     setDialog({ mode: 'edit', id: s.id });
@@ -259,6 +263,11 @@ const StaffShowtimes = () => {
                     <TableRow key={s.id} hover>
                       <TableCell>
                         <Typography fontWeight={700}>{s.movieTitle || '—'}</Typography>
+                        {s.mystery ? (
+                          <Typography variant="caption" color="warning.main" display="block">
+                            Mystery Movie Night
+                          </Typography>
+                        ) : null}
                       </TableCell>
                       <TableCell>
                         <Typography variant="body2">{showtimeRoomName(s)}</Typography>
@@ -359,6 +368,30 @@ const StaffShowtimes = () => {
                 <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
               ))}
             </TextField>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={Boolean(form.mystery)}
+                  onChange={(e) => setForm({
+                    ...form,
+                    mystery: e.target.checked,
+                    mysteryUnlockAt: e.target.checked ? form.mysteryUnlockAt : '',
+                  })}
+                />
+              }
+              label="Mystery Movie Night"
+            />
+            {form.mystery ? (
+              <TextField
+                label="Mở khóa tên phim lúc"
+                type="datetime-local"
+                fullWidth
+                InputLabelProps={{ shrink: true }}
+                value={form.mysteryUnlockAt}
+                onChange={(e) => setForm({ ...form, mysteryUnlockAt: e.target.value })}
+                helperText="Trước thời điểm này khách chỉ thấy Mystery Movie Night."
+              />
+            ) : null}
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>

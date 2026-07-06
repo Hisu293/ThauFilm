@@ -13,6 +13,7 @@ import com.filmticket.exception.BadRequestException;
 import com.filmticket.repository.*;
 import com.filmticket.util.TicketPdfGenerator;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Sort;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -42,7 +43,7 @@ public class StaffTicketService {
     private final TheaterRepository theaterRepository;
 
     public List<TicketResponse> listTickets() {
-        List<Ticket> tickets = ticketRepository.findAll();
+        List<Ticket> tickets = ticketRepository.findAll(Sort.by(Sort.Direction.DESC, "createdAt"));
         if (tickets.isEmpty()) return List.of();
 
         Set<UUID> bookingIds = tickets.stream().map(Ticket::getBookingId).collect(Collectors.toSet());
@@ -55,6 +56,10 @@ public class StaffTicketService {
         Set<UUID> userIds = bookingsById.values().stream().map(Booking::getUserId).collect(Collectors.toSet());
         Set<UUID> showtimeIds = bookingsById.values().stream().map(Booking::getShowtimeId).collect(Collectors.toSet());
         Set<UUID> seatIdsOnly = new HashSet<>(seatIds);
+
+        Map<UUID, Seat> seatsById = seatRepository.findAllById(seatIdsOnly).stream()
+                .filter(s -> s.getId() != null)
+                .collect(Collectors.toMap(Seat::getId, s -> s, (a, b) -> a));
 
         Map<UUID, String> userNameById = userRepository.findAllById(userIds).stream()
                 .filter(u -> u.getId() != null)
@@ -72,6 +77,10 @@ public class StaffTicketService {
 
         Set<UUID> movieIds = showtimesById.values().stream().map(Showtime::getMovieId).collect(Collectors.toSet());
         Set<UUID> roomIds = showtimesById.values().stream().map(Showtime::getCinemaRoomId).collect(Collectors.toSet());
+        roomIds.addAll(seatsById.values().stream()
+                .map(Seat::getCinemaRoomId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet()));
 
         Map<UUID, Movie> moviesById = movieRepository.findAllById(movieIds).stream()
                 .filter(m -> m.getId() != null)
@@ -80,14 +89,13 @@ public class StaffTicketService {
                 .filter(r -> r.getId() != null)
                 .collect(Collectors.toMap(CinemaRoom::getId, r -> r, (a, b) -> a));
 
-        Set<UUID> theaterIds = roomsById.values().stream().map(CinemaRoom::getTheaterId).collect(Collectors.toSet());
+        Set<UUID> theaterIds = roomsById.values().stream()
+                .map(CinemaRoom::getTheaterId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
         Map<UUID, Theater> theatersById = theaterRepository.findAllById(theaterIds).stream()
                 .filter(t -> t.getId() != null)
                 .collect(Collectors.toMap(Theater::getId, t -> t, (a, b) -> a));
-
-        Map<UUID, Seat> seatsById = seatRepository.findAllById(seatIdsOnly).stream()
-                .filter(s -> s.getId() != null)
-                .collect(Collectors.toMap(Seat::getId, s -> s, (a, b) -> a));
 
         Map<String, BigDecimal> priceBySeatId = seatAvailabilityRepository
                 .findAllByShowtimeIdInAndSeatIdIn(showtimeIds, seatIdsOnly).stream()
@@ -118,9 +126,12 @@ public class StaffTicketService {
 
                     Showtime showtime = finalShowtimesById.get(booking.getShowtimeId());
                     Movie movie = showtime != null ? finalMoviesById.get(showtime.getMovieId()) : null;
-                    CinemaRoom room = showtime != null ? finalRoomsById.get(showtime.getCinemaRoomId()) : null;
-                    Theater theater = room != null ? finalTheatersById.get(room.getTheaterId()) : null;
                     Seat seat = finalSeatsById.get(ticket.getSeatId());
+                    CinemaRoom room = showtime != null ? finalRoomsById.get(showtime.getCinemaRoomId()) : null;
+                    if (room == null && seat != null) {
+                        room = finalRoomsById.get(seat.getCinemaRoomId());
+                    }
+                    Theater theater = room != null ? finalTheatersById.get(room.getTheaterId()) : null;
                     com.filmticket.entity.Payment payment = finalPaymentByBookingId.get(booking.getId());
 
                     String seatLabel = seat != null ? seat.getRowName() + seat.getSeatNumber() : null;
@@ -135,6 +146,7 @@ public class StaffTicketService {
                             .seatId(ticket.getSeatId())
                             .ticketCode(ticket.getTicketCode())
                             .checkedIn(ticket.isCheckedIn())
+                            .createdAt(ticket.getCreatedAt())
                             .confirmationCode(booking.getConfirmationCode())
                             .bookingStatus(booking.getStatus().name())
                             .customerName(finalUserNameById.get(booking.getUserId()))

@@ -24,16 +24,16 @@ import MovieCreationRoundedIcon from '@mui/icons-material/MovieCreationRounded';
 import { movieChatbotService } from '../services/movieChatbotService';
 
 const quickPrompts = [
-  'Tôi thích phim giống Interstellar',
+  'Gợi ý phim hành động',
   'Có phim nào dưới 2 tiếng không?',
-  'Gợi ý phim viễn tưởng đáng xem',
-  'Tôi muốn xem phim nhẹ nhàng cuối tuần',
+  'Phim nào khoảng 120 phút?',
+  'Gợi ý phim viễn tưởng đang chiếu',
 ];
 
 const initialMessages = [
   {
     role: 'bot',
-    text: 'Bạn muốn xem phim theo gu nào? Hỏi mình theo tên phim, thể loại, thời lượng hoặc tâm trạng hôm nay.',
+    text: 'Bạn muốn xem phim theo gu nào? Hỏi mình theo tên phim, thể loại, thời lượng hoặc trạng thái đang chiếu/sắp chiếu.',
     recommendations: [],
   },
 ];
@@ -88,7 +88,7 @@ const MovieChatbotPage = () => {
             </Typography>
           </Stack>
           <Typography color="text.secondary">
-            Hỏi theo gu phim, thời lượng, thể loại hoặc một phim bạn từng thích. Chatbot chỉ gợi ý phim đang có trong hệ thống ThauFilm.
+            Hỏi theo gu phim, thời lượng, thể loại, trạng thái hoặc một phim bạn từng thích. Chatbot chỉ gợi ý phim đang có trong hệ thống ThauFilm.
           </Typography>
         </Box>
 
@@ -129,7 +129,7 @@ const MovieChatbotPage = () => {
                   fullWidth
                   value={input}
                   onChange={(event) => setInput(event.target.value)}
-                  placeholder="Ví dụ: Tôi thích phim giống Interstellar"
+                  placeholder="Ví dụ: Gợi ý phim hành động dưới 2 tiếng"
                   disabled={loading}
                   size="medium"
                 />

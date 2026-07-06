@@ -12,6 +12,7 @@ import com.filmticket.repository.CinemaRoomRepository;
 import com.filmticket.repository.SeatRepository;
 import com.filmticket.repository.TheaterRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -48,7 +49,7 @@ public class CinemaRoomService {
 
     @Transactional(readOnly = true)
     public List<CinemaRoomResponse> getAllRooms() {
-        return cinemaRoomRepository.findAll().stream()
+        return cinemaRoomRepository.findAll(Sort.by(Sort.Direction.DESC, "createdAt")).stream()
                 .map(this::convertToResponse)
                 .collect(Collectors.toList());
     }

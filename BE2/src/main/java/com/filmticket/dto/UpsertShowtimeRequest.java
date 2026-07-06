@@ -28,4 +28,8 @@ public class UpsertShowtimeRequest {
 
     @NotNull(message = "Status is required")
     private ShowtimeStatus status;
+
+    private Boolean mystery;
+
+    private LocalDateTime mysteryUnlockAt;
 }

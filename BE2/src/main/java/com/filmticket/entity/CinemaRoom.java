@@ -4,7 +4,9 @@ import com.filmticket.model.RoomStatus;
 import com.filmticket.model.RoomType;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
@@ -41,6 +43,10 @@ public class CinemaRoom {
 
     @Column(name = "theater_id")
     private UUID theaterId;
+
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
 
     @PrePersist
     public void prePersist() {

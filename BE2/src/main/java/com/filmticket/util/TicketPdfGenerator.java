@@ -25,6 +25,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.net.URI;
 import java.text.NumberFormat;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import java.util.List;
@@ -77,17 +78,28 @@ public class TicketPdfGenerator {
     private String getMovieTitle(Booking booking) {
         return showtimeRepository.findById(booking.getShowtimeId())
                 .map(s -> movieRepository.findById(s.getMovieId())
-                        .map(Movie::getTitle)
+                        .map(movie -> displayMovieTitle(s, movie.getTitle()))
                         .orElse("Phim"))
                 .orElse("Phim");
     }
 
     private String getMoviePosterUrl(Booking booking) {
         return showtimeRepository.findById(booking.getShowtimeId())
+                .filter(s -> !isMysteryLocked(s))
                 .map(s -> movieRepository.findById(s.getMovieId())
                         .map(Movie::getPosterUrl)
                         .orElse(null))
                 .orElse(null);
+    }
+
+    private String displayMovieTitle(Showtime showtime, String realTitle) {
+        return isMysteryLocked(showtime) ? "Mystery Movie Night" : realTitle;
+    }
+
+    private boolean isMysteryLocked(Showtime showtime) {
+        if (showtime == null || !showtime.isMystery()) return false;
+        LocalDateTime unlockAt = showtime.getMysteryUnlockAt() != null ? showtime.getMysteryUnlockAt() : showtime.getStartTime();
+        return LocalDateTime.now().isBefore(unlockAt);
     }
 
     private void addPoster(Document document, Booking booking) throws Exception {

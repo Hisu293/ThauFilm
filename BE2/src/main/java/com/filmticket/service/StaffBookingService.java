@@ -7,10 +7,12 @@ import com.filmticket.exception.BadRequestException;
 import com.filmticket.model.SeatBookingStatus;
 import com.filmticket.repository.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -32,7 +34,7 @@ public class StaffBookingService {
     private final PaymentGatewayService paymentGatewayService;
 
     public List<BookingResponse> listBookings() {
-        List<Booking> bookings = bookingRepository.findAll();
+        List<Booking> bookings = bookingRepository.findAll(Sort.by(Sort.Direction.DESC, "createdAt"));
         if (bookings.isEmpty()) return List.of();
         return enrichBookings(bookings, null);
     }
@@ -100,7 +102,8 @@ public class StaffBookingService {
 
         Map<UUID, com.filmticket.entity.Payment> paymentByBookingId = paymentRepository.findAllByBookingIdIn(bookingIds).stream()
                 .filter(p -> p.getBookingId() != null)
-                .collect(Collectors.toMap(com.filmticket.entity.Payment::getBookingId, p -> p, (a, b) -> a));
+                .collect(Collectors.groupingBy(com.filmticket.entity.Payment::getBookingId,
+                        Collectors.collectingAndThen(Collectors.toList(), this::selectPreferredPayment)));
 
         Map<UUID, Showtime> finalShowtimesById = showtimesById;
         Map<UUID, Movie> finalMoviesById = moviesById;
@@ -158,7 +161,9 @@ public class StaffBookingService {
                             .startTime(Optional.ofNullable(finalShowtimesById.get(booking.getShowtimeId())).map(Showtime::getStartTime).orElse(null))
                             .totalAmount(booking.getTotalAmount())
                             .status(booking.getStatus().name())
+                            .accessGranted(booking.getStatus() == BookingStatus.CONFIRMED)
                             .confirmationCode(booking.getConfirmationCode())
+                            .createdAt(booking.getCreatedAt())
                             .holdExpiresAt(booking.getHoldExpiresAt())
                             .confirmedAt(booking.getConfirmedAt())
                             .seats(seatResponses)
@@ -167,6 +172,15 @@ public class StaffBookingService {
                             .paymentAmount(payment != null ? payment.getAmount() : null)
                             .build();
                 }).toList();
+    }
+
+    private com.filmticket.entity.Payment selectPreferredPayment(List<com.filmticket.entity.Payment> payments) {
+        return payments.stream()
+                .max(Comparator
+                        .comparing((com.filmticket.entity.Payment payment) -> payment.getStatus() == PaymentStatus.PAID)
+                        .thenComparing(com.filmticket.entity.Payment::getPaidAt, Comparator.nullsFirst(LocalDateTime::compareTo))
+                        .thenComparing(com.filmticket.entity.Payment::getCreatedAt, Comparator.nullsFirst(LocalDateTime::compareTo)))
+                .orElse(null);
     }
 
     public Object checkPayment(UUID bookingId) {

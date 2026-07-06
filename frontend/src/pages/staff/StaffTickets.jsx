@@ -17,6 +17,7 @@ import {
   TableCell,
   TableContainer,
   TableHead,
+  TablePagination,
   TableRow,
   TextField,
   Typography,
@@ -29,7 +30,6 @@ import {
 import QrCodeScannerRoundedIcon from '@mui/icons-material/QrCodeScannerRounded';
 import ConfirmationNumberRoundedIcon from '@mui/icons-material/ConfirmationNumberRounded';
 import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded';
-import PrintRoundedIcon from '@mui/icons-material/PrintRounded';
 import CancelRoundedIcon from '@mui/icons-material/CancelRounded';
 import PaymentRoundedIcon from '@mui/icons-material/PaymentRounded';
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
@@ -80,6 +80,16 @@ const formatDateTime = (iso) => {
 };
 const formatCurrency = (n) =>
   Number.isFinite(Number(n)) ? new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(n)) : '—';
+const PAGE_SIZE = 10;
+const latestTime = (item) => {
+  const value = item?.createdAt || item?.paidAt || item?.updatedAt || item?.startTime || item?.showtime;
+  const time = value ? new Date(value).getTime() : 0;
+  return Number.isFinite(time) ? time : 0;
+};
+const formatTheaterRoom = (ticket) =>
+  [ticket?.theaterName, ticket?.cinemaRoomName || ticket?.roomName].filter(Boolean).join(' · ');
+const movieDisplay = (ticket) => ticket?.movieTitle || (ticket?.showtimeId ? 'Phim không còn trong dữ liệu' : '—');
+const showtimeDisplay = (ticket) => formatDateTime(ticket?.startTime || ticket?.showtime);
 
 const StaffTickets = () => {
   const [tickets, setTickets] = useState([]);
@@ -96,10 +106,10 @@ const StaffTickets = () => {
   const [detail, setDetail] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [payment, setPayment] = useState(null);
+  const [page, setPage] = useState(0);
 
-  // Hủy & in lại
+  // Hủy vé
   const [cancelTarget, setCancelTarget] = useState(null);
-  const [reprintData, setReprintData] = useState(null);
   const [toast, setToast] = useState(null);
 
   const loadTickets = useCallback(async () => {
@@ -189,23 +199,20 @@ const StaffTickets = () => {
     }
   };
 
-  const handleReprint = async (ticket) => {
-    try {
-      const data = await staffTicketService.reprint(ticket.id);
-      setReprintData(data);
-    } catch (err) {
-      setToast({ severity: 'error', message: err.message || 'Không thể in lại vé.' });
-    }
-  };
-
   const q = search.trim().toLowerCase();
   const filtered = q
     ? tickets.filter((t) =>
-      [t.ticketCode, t.bookingId, t.customerName, t.movieTitle, t.seatLabel]
+      [t.ticketCode, t.customerName, t.movieTitle, t.theaterName, t.cinemaRoomName, t.roomName, t.seatLabel]
         .filter(Boolean)
         .some((v) => String(v).toLowerCase().includes(q)),
     )
     : tickets;
+  const sortedFiltered = [...filtered].sort((a, b) => latestTime(b) - latestTime(a));
+  const pagedTickets = sortedFiltered.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
+
+  useEffect(() => {
+    setPage(0);
+  }, [search, tickets.length]);
 
   return (
     <Box>
@@ -281,7 +288,7 @@ const StaffTickets = () => {
               <Typography color="error" sx={{ mb: 2 }}>{error}</Typography>
               <Button variant="outlined" onClick={loadTickets}>Thử lại</Button>
             </Box>
-          ) : filtered.length === 0 ? (
+          ) : sortedFiltered.length === 0 ? (
             <Box sx={{ textAlign: 'center', py: 6, color: 'text.secondary' }}>Không có vé nào khớp.</Box>
           ) : (
             <TableContainer>
@@ -296,7 +303,7 @@ const StaffTickets = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {filtered.map((t) => {
+                  {pagedTickets.map((t) => {
                     const st = statusOf(t);
                     const meta = STATUS_META[st] || { label: st, color: 'default' };
                     const cancellable = !t.checkedIn && st !== 'CANCELLED';
@@ -304,11 +311,11 @@ const StaffTickets = () => {
                       <TableRow key={t.id} hover>
                         <TableCell>
                           <Typography fontWeight={700}>{t.ticketCode}</Typography>
-                          <Typography variant="caption" color="text.secondary">{t.bookingId}</Typography>
                         </TableCell>
                         <TableCell>{t.customerName || '—'}</TableCell>
                         <TableCell>
-                          <Typography variant="body2">{t.movieTitle || '—'}</Typography>
+                          <Typography variant="body2">{movieDisplay(t)}</Typography>
+                          <Typography variant="caption" color="text.secondary" display="block">{formatTheaterRoom(t)}</Typography>
                           <Typography variant="caption" color="text.secondary">Ghế {t.seatLabel || '—'}</Typography>
                         </TableCell>
                         <TableCell>
@@ -319,13 +326,6 @@ const StaffTickets = () => {
                             <IconButton size="small" onClick={() => openDetail(t)}>
                               <VisibilityRoundedIcon fontSize="small" />
                             </IconButton>
-                          </Tooltip>
-                          <Tooltip title="In lại vé">
-                            <span>
-                              <IconButton size="small" onClick={() => handleReprint(t)} disabled={st === 'CANCELLED'}>
-                                <PrintRoundedIcon fontSize="small" />
-                              </IconButton>
-                            </span>
                           </Tooltip>
                           <Tooltip title={cancellable ? 'Hủy vé' : 'Không thể hủy'}>
                             <span>
@@ -340,6 +340,14 @@ const StaffTickets = () => {
                   })}
                 </TableBody>
               </Table>
+              <TablePagination
+                component="div"
+                count={sortedFiltered.length}
+                page={page}
+                onPageChange={(_, nextPage) => setPage(nextPage)}
+                rowsPerPage={PAGE_SIZE}
+                rowsPerPageOptions={[PAGE_SIZE]}
+              />
             </TableContainer>
           )}
         </CardContent>
@@ -351,7 +359,6 @@ const StaffTickets = () => {
           <>
             <DialogTitle sx={{ fontWeight: 800 }}>
               Vé {detail.ticketCode}
-              <Typography variant="caption" display="block" color="text.secondary">Mã đặt vé: {detail.bookingId}</Typography>
             </DialogTitle>
             <DialogContent dividers>
               {detailLoading && <CircularProgress size={20} sx={{ mb: 1 }} />}
@@ -361,10 +368,10 @@ const StaffTickets = () => {
                 <Row label="Email" value={detail.customerEmail} />
                 <Row label="Số điện thoại" value={detail.customerPhone} />
                 <Divider />
-                <Row label="Phim" value={detail.movieTitle} />
-                <Row label="Rạp / Phòng" value={[detail.theaterName, detail.cinemaRoomName || detail.roomName].filter(Boolean).join(' · ')} />
+                <Row label="Phim" value={movieDisplay(detail)} />
+                <Row label="Rạp / Phòng" value={formatTheaterRoom(detail)} />
                 <Row label="Ghế" value={detail.seatLabel} />
-                <Row label="Suất chiếu" value={formatDateTime(detail.startTime || detail.showtime)} />
+                <Row label="Suất chiếu" value={showtimeDisplay(detail)} />
                 <Divider />
                 <Typography variant="subtitle2" fontWeight={700} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                   <PaymentRoundedIcon fontSize="small" /> Thanh toán
@@ -378,13 +385,6 @@ const StaffTickets = () => {
             </DialogContent>
             <DialogActions sx={{ px: 3, py: 2 }}>
               <Button onClick={() => setDetail(null)}>Đóng</Button>
-              <Button
-                startIcon={<PrintRoundedIcon />}
-                onClick={() => handleReprint(detail)}
-                disabled={statusOf(detail) === 'CANCELLED'}
-              >
-                In lại vé
-              </Button>
               <Button
                 color="error"
                 variant="contained"
@@ -411,31 +411,6 @@ const StaffTickets = () => {
         <DialogActions sx={{ px: 3, py: 2 }}>
           <Button onClick={() => setCancelTarget(null)}>Đóng</Button>
           <Button color="error" variant="contained" onClick={handleCancel}>Xác nhận hủy</Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Dialog in lại vé */}
-      <Dialog open={!!reprintData} onClose={() => setReprintData(null)} maxWidth="xs" fullWidth>
-        <DialogTitle sx={{ fontWeight: 800 }}>In lại vé</DialogTitle>
-        <DialogContent dividers>
-          {reprintData && (
-            <Stack spacing={1.5} alignItems="center" sx={{ textAlign: 'center' }}>
-              <Box sx={{ p: 1.5, bgcolor: '#fff', borderRadius: 2, display: 'inline-flex' }}>
-                <QrCodeScannerRoundedIcon sx={{ fontSize: 96, color: '#0F172A' }} />
-              </Box>
-              <Typography variant="h6" fontWeight={800} color="primary">{reprintData.ticketCode}</Typography>
-              <Box sx={{ width: '100%' }}>
-                <Row label="Phim" value={reprintData.movieTitle} />
-                <Row label="Rạp / Phòng" value={[reprintData.theaterName, reprintData.cinemaRoomName || reprintData.roomName].filter(Boolean).join(' · ')} />
-                <Row label="Ghế" value={reprintData.seatLabel} />
-                <Row label="Suất chiếu" value={formatDateTime(reprintData.startTime || reprintData.showtime)} />
-              </Box>
-            </Stack>
-          )}
-        </DialogContent>
-        <DialogActions sx={{ px: 3, py: 2 }}>
-          <Button onClick={() => setReprintData(null)}>Đóng</Button>
-          <Button variant="contained" startIcon={<PrintRoundedIcon />} onClick={() => window.print()}>In</Button>
         </DialogActions>
       </Dialog>
 

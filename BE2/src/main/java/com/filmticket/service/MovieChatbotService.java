@@ -32,9 +32,18 @@ import java.util.regex.Pattern;
 public class MovieChatbotService {
     private static final String GEMINI_ENDPOINT =
             "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent";
-    private static final Pattern DURATION_PATTERN = Pattern.compile(
-            "(?:duoi|dưới|under|less than|khong qua|không quá|<=?)\\s*(\\d{1,3})\\s*(tieng|tiếng|h|hour|hours|phut|phút|min|minutes)?",
-            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE
+    private static final int DURATION_TOLERANCE_MINUTES = 10;
+    private static final Pattern MAX_DURATION_PATTERN = Pattern.compile(
+            "(?:duoi|under|less than|khong qua|toi da|<=?)\\s*(\\d{1,3})\\s*(tieng|h|hour|hours|phut|p|min|minutes)?",
+            Pattern.CASE_INSENSITIVE
+    );
+    private static final Pattern MIN_DURATION_PATTERN = Pattern.compile(
+            "(?:tren|hon|over|more than|tu)\\s*(\\d{1,3})\\s*(tieng|h|hour|hours|phut|p|min|minutes)?",
+            Pattern.CASE_INSENSITIVE
+    );
+    private static final Pattern NEAR_DURATION_PATTERN = Pattern.compile(
+            "(?:khoang|tam|gan|around|about)?\\s*(\\d{1,3})\\s*(tieng|h|hour|hours|phut|p|min|minutes)\\b",
+            Pattern.CASE_INSENSITIVE
     );
 
     private final MovieRepository movieRepository;
@@ -65,7 +74,7 @@ public class MovieChatbotService {
                 .map(item -> toRecommendation(item.movie(), item.reason()))
                 .toList();
 
-        String answer = buildFallbackAnswer(message, recommendations);
+        String answer = buildFallbackAnswer(recommendations);
         if (hasText(geminiApiKey) && !recommendations.isEmpty() && System.currentTimeMillis() >= geminiRetryAfterMillis) {
             try {
                 answer = callGemini(message, recommendations);
@@ -87,12 +96,10 @@ public class MovieChatbotService {
 
     private List<ScoredMovie> rankMovies(String message, List<Movie> movies) {
         String query = normalize(message);
-        Integer maxDuration = extractMaxDurationMinutes(query);
-        Movie reference = findReferenceMovie(query, movies);
-        Set<String> requestedGenres = detectGenres(query);
+        QueryIntent intent = parseIntent(query, movies);
 
         return movies.stream()
-                .map(movie -> scoreMovie(movie, query, maxDuration, reference, requestedGenres))
+                .map(movie -> scoreMovie(movie, query, intent))
                 .filter(item -> item.score() > 0)
                 .sorted(this::compareScoredMovies)
                 .toList();
@@ -106,39 +113,83 @@ public class MovieChatbotService {
         return rightRating.compareTo(leftRating);
     }
 
-    private ScoredMovie scoreMovie(Movie movie, String query, Integer maxDuration, Movie reference, Set<String> requestedGenres) {
-        int score = 1;
+    private ScoredMovie scoreMovie(Movie movie, String query, QueryIntent intent) {
+        int score = intent.hasCriteria() ? 0 : 10;
+        boolean matchedCriteria = !intent.hasCriteria();
         List<String> reasons = new ArrayList<>();
 
-        if (maxDuration != null) {
-            if (movie.getDurationMinutes() == null || movie.getDurationMinutes() > maxDuration) {
+        if (intent.maxDurationMinutes() != null) {
+            if (movie.getDurationMinutes() == null || movie.getDurationMinutes() > intent.maxDurationMinutes()) {
                 return new ScoredMovie(movie, 0, "");
             }
-            score += 60;
-            reasons.add("dưới " + maxDuration + " phút");
+            score += 70;
+            matchedCriteria = true;
+            reasons.add("dưới " + intent.maxDurationMinutes() + " phút");
         }
 
-        if (reference != null) {
-            if (movie.getId().equals(reference.getId())) {
+        if (intent.minDurationMinutes() != null) {
+            if (movie.getDurationMinutes() == null || movie.getDurationMinutes() < intent.minDurationMinutes()) {
+                return new ScoredMovie(movie, 0, "");
+            }
+            score += 55;
+            matchedCriteria = true;
+            reasons.add("từ " + intent.minDurationMinutes() + " phút trở lên");
+        }
+
+        if (intent.nearDurationMinutes() != null) {
+            if (movie.getDurationMinutes() == null) {
+                return new ScoredMovie(movie, 0, "");
+            }
+            int diff = Math.abs(movie.getDurationMinutes() - intent.nearDurationMinutes());
+            if (diff > DURATION_TOLERANCE_MINUTES) {
+                return new ScoredMovie(movie, 0, "");
+            }
+            score += 90 - diff * 3;
+            matchedCriteria = true;
+            reasons.add(diff == 0
+                    ? "đúng " + intent.nearDurationMinutes() + " phút"
+                    : "gần " + intent.nearDurationMinutes() + " phút");
+        }
+
+        if (intent.status() != null) {
+            if (movie.getStatus() != intent.status()) {
+                return new ScoredMovie(movie, 0, "");
+            }
+            score += 50;
+            matchedCriteria = true;
+            reasons.add(intent.status() == Movie.Status.NOW_SHOWING ? "đang chiếu" : "sắp chiếu");
+        }
+
+        if (intent.reference() != null) {
+            if (movie.getId().equals(intent.reference().getId())) {
                 score -= 20;
             }
-            int genreOverlap = overlap(tokens(reference.getGenre()), tokens(movie.getGenre()));
-            int textOverlap = overlap(tokens(reference.getDescription()), tokens(movie.getDescription()));
+            int genreOverlap = overlap(tokens(intent.reference().getGenre()), tokens(movie.getGenre()));
+            int textOverlap = overlap(tokens(intent.reference().getDescription()), tokens(movie.getDescription()));
             score += genreOverlap * 35 + Math.min(textOverlap, 4) * 6;
-            if (genreOverlap > 0) reasons.add("cùng chất " + safe(reference.getTitle()));
+            if (genreOverlap > 0 || textOverlap > 0) {
+                matchedCriteria = true;
+            }
+            if (genreOverlap > 0) reasons.add("cùng chất " + safe(intent.reference().getTitle()));
         }
 
         Set<String> movieGenres = tokens(movie.getGenre());
-        for (String genre : requestedGenres) {
+        for (String genre : intent.genres()) {
             if (movieGenres.contains(genre)) {
-                score += 40;
-                reasons.add("hợp gu " + genre);
+                score += 65;
+                matchedCriteria = true;
+                reasons.add("thuộc thể loại " + genreLabel(genre));
             }
         }
 
         if (matchesFreeText(query, movie)) {
-            score += 25;
+            score += 30;
+            matchedCriteria = true;
             reasons.add("khớp nội dung bạn hỏi");
+        }
+
+        if (!matchedCriteria) {
+            return new ScoredMovie(movie, 0, "");
         }
 
         BigDecimal rating = movie.getRating();
@@ -150,11 +201,40 @@ public class MovieChatbotService {
         return new ScoredMovie(movie, score, reason);
     }
 
+    private QueryIntent parseIntent(String query, List<Movie> movies) {
+        return new QueryIntent(
+                extractMaxDurationMinutes(query),
+                extractMinDurationMinutes(query),
+                extractNearDurationMinutes(query),
+                findReferenceMovie(query, movies),
+                detectGenres(query),
+                detectStatus(query)
+        );
+    }
+
     private Integer extractMaxDurationMinutes(String query) {
-        Matcher matcher = DURATION_PATTERN.matcher(query);
+        Matcher matcher = MAX_DURATION_PATTERN.matcher(query);
         if (!matcher.find()) return null;
-        int value = Integer.parseInt(matcher.group(1));
-        String unit = matcher.group(2);
+        return parseDurationMinutes(matcher.group(1), matcher.group(2));
+    }
+
+    private Integer extractMinDurationMinutes(String query) {
+        Matcher matcher = MIN_DURATION_PATTERN.matcher(query);
+        if (!matcher.find()) return null;
+        return parseDurationMinutes(matcher.group(1), matcher.group(2));
+    }
+
+    private Integer extractNearDurationMinutes(String query) {
+        if (extractMaxDurationMinutes(query) != null || extractMinDurationMinutes(query) != null) {
+            return null;
+        }
+        Matcher matcher = NEAR_DURATION_PATTERN.matcher(query);
+        if (!matcher.find()) return null;
+        return parseDurationMinutes(matcher.group(1), matcher.group(2));
+    }
+
+    private Integer parseDurationMinutes(String rawValue, String unit) {
+        int value = Integer.parseInt(rawValue);
         if (unit == null || unit.isBlank()) return value <= 5 ? value * 60 : value;
         String normalizedUnit = normalize(unit);
         return normalizedUnit.contains("tieng") || normalizedUnit.equals("h") || normalizedUnit.startsWith("hour")
@@ -171,14 +251,18 @@ public class MovieChatbotService {
 
     private Set<String> detectGenres(String query) {
         Set<String> genres = new LinkedHashSet<>();
-        addIfContains(genres, query, "hanh", "action", "hanh dong");
-        addIfContains(genres, query, "fiction", "sci fi", "science fiction", "vien tuong", "khoa hoc");
+        addIfContains(genres, query, "action", "hanh dong", "hanh");
+        addIfContains(genres, query, "sci", "sci fi", "science fiction", "vien tuong", "khoa hoc");
         addIfContains(genres, query, "romance", "tinh cam", "lang man");
         addIfContains(genres, query, "comedy", "hai");
         addIfContains(genres, query, "horror", "kinh di");
         addIfContains(genres, query, "drama", "tam ly");
         addIfContains(genres, query, "animation", "hoat hinh");
         addIfContains(genres, query, "adventure", "phieu luu");
+        addIfContains(genres, query, "family", "gia dinh");
+        addIfContains(genres, query, "fantasy", "gia tuong", "ky ao");
+        addIfContains(genres, query, "mystery", "bi an", "trinh tham");
+        addIfContains(genres, query, "history", "lich su");
         return genres;
     }
 
@@ -195,9 +279,22 @@ public class MovieChatbotService {
         }
     }
 
+    private Movie.Status detectStatus(String query) {
+        if (query.contains("dang chieu") || query.contains("now showing")) {
+            return Movie.Status.NOW_SHOWING;
+        }
+        if (query.contains("sap chieu") || query.contains("coming soon")) {
+            return Movie.Status.COMING_SOON;
+        }
+        return null;
+    }
+
     private boolean matchesFreeText(String query, Movie movie) {
         Set<String> queryTokens = tokens(query);
-        queryTokens.removeAll(Set.of("phim", "nao", "toi", "thich", "co", "khong", "giong", "duoi", "tieng"));
+        queryTokens.removeAll(Set.of(
+                "phim", "nao", "toi", "minh", "thich", "co", "khong", "giong", "duoi", "tren",
+                "hon", "tieng", "phut", "the", "loai", "goi", "xem", "dang", "sap", "chieu"
+        ));
         if (queryTokens.isEmpty()) return false;
         Set<String> movieTokens = tokens(String.join(" ",
                 safe(movie.getTitle()), safe(movie.getGenre()), safe(movie.getDescription()),
@@ -205,14 +302,14 @@ public class MovieChatbotService {
         return overlap(queryTokens, movieTokens) >= Math.min(2, queryTokens.size());
     }
 
-    private String buildFallbackAnswer(String message, List<MovieChatResponse.MovieRecommendation> recommendations) {
+    private String buildFallbackAnswer(List<MovieChatResponse.MovieRecommendation> recommendations) {
         if (recommendations.isEmpty()) {
-            return "Mình chưa tìm thấy phim thật sự khớp. Bạn thử hỏi cụ thể hơn như \"phim dưới 2 tiếng\", \"phim hành động\", hoặc \"giống Interstellar\" nhé.";
+            return "Mình chưa tìm thấy phim thật sự khớp. Bạn thử hỏi cụ thể hơn như \"phim dưới 2 tiếng\", \"phim hành động\", \"phim khoảng 120 phút\" hoặc \"phim đang chiếu\" nhé.";
         }
         StringBuilder builder = new StringBuilder("Mình gợi ý cho bạn:\n");
         recommendations.forEach(movie -> builder.append("- ")
                 .append(movie.getTitle())
-                .append(" — ")
+                .append(" - ")
                 .append(movie.getReason())
                 .append(".\n"));
         builder.append("Bạn có thể mở chi tiết phim để xem suất chiếu phù hợp.");
@@ -239,7 +336,7 @@ public class MovieChatbotService {
         }
         String text = objectMapper.readTree(response.body()).path("candidates").path(0)
                 .path("content").path("parts").path(0).path("text").asText();
-        return hasText(text) ? text.trim() : buildFallbackAnswer(message, recommendations);
+        return hasText(text) ? text.trim() : buildFallbackAnswer(recommendations);
     }
 
     private String buildPrompt(String message, List<MovieChatResponse.MovieRecommendation> recommendations) {
@@ -300,6 +397,42 @@ public class MovieChatbotService {
 
     private String safe(String value) {
         return value == null ? "" : value;
+    }
+
+    private String genreLabel(String genre) {
+        return switch (genre) {
+            case "action" -> "hành động";
+            case "sci" -> "viễn tưởng";
+            case "romance" -> "tình cảm";
+            case "comedy" -> "hài";
+            case "horror" -> "kinh dị";
+            case "drama" -> "tâm lý";
+            case "animation" -> "hoạt hình";
+            case "adventure" -> "phiêu lưu";
+            case "family" -> "gia đình";
+            case "fantasy" -> "giả tưởng";
+            case "mystery" -> "bí ẩn";
+            case "history" -> "lịch sử";
+            default -> genre;
+        };
+    }
+
+    private record QueryIntent(
+            Integer maxDurationMinutes,
+            Integer minDurationMinutes,
+            Integer nearDurationMinutes,
+            Movie reference,
+            Set<String> genres,
+            Movie.Status status
+    ) {
+        private boolean hasCriteria() {
+            return maxDurationMinutes != null
+                    || minDurationMinutes != null
+                    || nearDurationMinutes != null
+                    || reference != null
+                    || !genres.isEmpty()
+                    || status != null;
+        }
     }
 
     private record ScoredMovie(Movie movie, int score, String reason) {}

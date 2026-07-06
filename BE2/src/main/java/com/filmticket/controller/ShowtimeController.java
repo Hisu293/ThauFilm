@@ -34,36 +34,36 @@ public class ShowtimeController {
         List<ShowtimeResponse> showtimes;
 
         if (movieId != null && theaterId != null) {
-            showtimes = showtimeService.getShowtimesByMovieAndTheater(movieId, theaterId);
+            showtimes = showtimeService.getPublicShowtimesByMovieAndTheater(movieId, theaterId);
             return ResponseEntity.ok(ApiResponse.success(
                     "Showtimes for movie in theater fetched", showtimes));
         }
 
         if (theaterId != null) {
-            showtimes = showtimeService.getShowtimesByTheater(theaterId);
+            showtimes = showtimeService.getPublicShowtimesByTheater(theaterId);
             return ResponseEntity.ok(ApiResponse.success(
                     "Showtimes for theater fetched", showtimes));
         }
 
         if (movieId != null && date != null) {
-            showtimes = showtimeService.getShowtimesByMovieAndDate(movieId, date);
+            showtimes = showtimeService.getPublicShowtimesByMovieAndDate(movieId, date);
             return ResponseEntity.ok(ApiResponse.success(
                     "Showtimes for movie on date fetched", showtimes));
         }
 
         if (movieId != null) {
-            showtimes = showtimeService.getShowtimesByMovie(movieId);
+            showtimes = showtimeService.getPublicShowtimesByMovie(movieId);
             return ResponseEntity.ok(ApiResponse.success(
                     "Showtimes for movie fetched", showtimes));
         }
 
         if (date != null) {
-            showtimes = showtimeService.getShowtimesByDate(date);
+            showtimes = showtimeService.getPublicShowtimesByDate(date);
             return ResponseEntity.ok(ApiResponse.success(
                     "Showtimes by date fetched", showtimes));
         }
 
-        showtimes = showtimeService.getAllShowtimes();
+        showtimes = showtimeService.getPublicAllShowtimes();
         return ResponseEntity.ok(ApiResponse.success(
                 "All showtimes fetched", showtimes));
     }
@@ -75,7 +75,7 @@ public class ShowtimeController {
     ) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Showtimes for movie fetched",
-                showtimeService.getShowtimesByMovie(movieId)
+                showtimeService.getPublicShowtimesByMovie(movieId)
         ));
     }
 

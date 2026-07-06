@@ -3,7 +3,9 @@ package com.filmticket.entity;
 import com.filmticket.model.TheaterStatus;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
@@ -35,6 +37,10 @@ public class Theater {
     @Column(nullable = false, length = 20)
     @Builder.Default
     private TheaterStatus status = TheaterStatus.ACTIVE;
+
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
 
     @PrePersist
     public void prePersist() {
