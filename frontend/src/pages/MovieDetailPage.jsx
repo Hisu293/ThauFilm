@@ -17,6 +17,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import ForumRoundedIcon from '@mui/icons-material/ForumRounded';
 
 import { fetchMovieById } from '../services/movieService';
+import movieStreamService from '../services/movieStreamService';
 import watchPartyService from '../services/watchPartyService';
 import { useBookingFlow } from '../context/BookingContext';
 import { useBookingNavigate } from '../context/BookingNavigationContext';
@@ -24,7 +25,6 @@ import BookingStepper from '../components/BookingStepper';
 import ShowtimeSelector from '../components/ShowtimeSelector';
 import StatusChip from '../components/common/StatusChip';
 import HlsVideoPlayer from '../components/HlsVideoPlayer';
-import { getMovieStreamUrl } from '../data/movieStreams';
 import './MovieDetailPage.css';
 
 /* ---------- helpers ---------- */
@@ -97,6 +97,9 @@ const MovieDetailPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [openOnlineMovie, setOpenOnlineMovie] = useState(false);
+  const [onlineStreamUrl, setOnlineStreamUrl] = useState('');
+  const [streamLoading, setStreamLoading] = useState(false);
+  const [streamError, setStreamError] = useState('');
   const [creatingWatchParty, setCreatingWatchParty] = useState(false);
 
   useEffect(() => {
@@ -152,7 +155,6 @@ const MovieDetailPage = () => {
     .split(',').map((a) => a.trim()).filter(Boolean);
 
   const posterSrc = movie.posterUrl || movie.poster || '/placeholder.svg';
-  const streamUrl = getMovieStreamUrl(movie);
 
   const handleSelectShowtime = (showtime) => {
     updateBookingState({
@@ -168,6 +170,21 @@ const MovieDetailPage = () => {
         showtime
       }
     });
+  };
+
+  const handleOpenOnlineMovie = async () => {
+    setOpenOnlineMovie(true);
+    setStreamLoading(true);
+    setStreamError('');
+    try {
+      const stream = await movieStreamService.getMovieStream(movie.id);
+      setOnlineStreamUrl(stream?.streamUrl || '');
+    } catch (err) {
+      setOnlineStreamUrl('');
+      setStreamError(err.message || 'Khong the lay link xem phim online.');
+    } finally {
+      setStreamLoading(false);
+    }
   };
 
   const handleCreateWatchParty = async () => {
@@ -354,10 +371,11 @@ const MovieDetailPage = () => {
                 variant="outlined"
                 size="large"
                 startIcon={<PlayArrowRoundedIcon />}
-                onClick={() => setOpenOnlineMovie(true)}
+                onClick={handleOpenOnlineMovie}
+                disabled={streamLoading}
                 sx={{ borderColor: 'primary.main', color: 'primary.main', fontWeight: 700, px: 4.5, py: 1.6, borderRadius: 2 }}
               >
-                Xem phim online
+                {streamLoading ? 'Dang tai...' : 'Xem phim online'}
               </Button>
               <Button
                 component={RouterLink}
@@ -423,11 +441,16 @@ const MovieDetailPage = () => {
             <CloseIcon />
           </IconButton>
           <HlsVideoPlayer
-            key={streamUrl}
-            src={streamUrl}
+            key={onlineStreamUrl}
+            src={onlineStreamUrl}
             title={`${movie.title} Online`}
             poster={posterSrc}
           />
+          {streamError && (
+            <Box sx={{ color: '#fca5a5', fontWeight: 700, px: 1, py: 1.5 }}>
+              {streamError}
+            </Box>
+          )}
         </Box>
       </Dialog>
     </Box>

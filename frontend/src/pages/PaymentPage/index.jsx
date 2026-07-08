@@ -593,10 +593,12 @@ export const PaymentPage = () => {
                   <Typography variant="h6" fontWeight={800}>{movie.title}</Typography>
                 </Box>
                 <Divider />
-                <Box>
-                  <Typography variant="caption" color="text.secondary">Mã booking</Typography>
-                  <Typography fontWeight={800}>{payosCheckout.bookingId}</Typography>
-                </Box>
+                {(payosCheckout.confirmationCode || payosCheckout.bookingCode) && (
+                  <Box>
+                    <Typography variant="caption" color="text.secondary">Mã đặt vé</Typography>
+                    <Typography fontWeight={800}>{payosCheckout.confirmationCode || payosCheckout.bookingCode}</Typography>
+                  </Box>
+                )}
                 <Box>
                   <Typography variant="caption" color="text.secondary">Số tiền cần thanh toán</Typography>
                   <Typography variant="h4" fontWeight={900} color="primary.main">

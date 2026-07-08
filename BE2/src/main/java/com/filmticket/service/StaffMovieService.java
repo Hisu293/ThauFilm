@@ -20,14 +20,14 @@ public class StaffMovieService {
 
     public List<MovieResponse> listMovies() {
         return movieRepository.findAll().stream()
-                .map(MovieResponse::fromMovie)
+                .map(MovieResponse::fromMovieWithStream)
                 .toList();
     }
 
     public MovieResponse getMovie(UUID movieId) {
         Movie movie = movieRepository.findById(movieId)
                 .orElseThrow(() -> new BadRequestException("Movie not found"));
-        return MovieResponse.fromMovie(movie);
+        return MovieResponse.fromMovieWithStream(movie);
     }
 
     @Transactional
@@ -56,8 +56,20 @@ public class StaffMovieService {
         if (request.getReleaseDate() != null) {
             movie.setReleaseDate(request.getReleaseDate());
         }
+        if (request.getStreamProvider() != null) {
+            movie.setStreamProvider(normalizeNullable(request.getStreamProvider()));
+        }
+        if (request.getStreamKey() != null) {
+            movie.setStreamKey(normalizeNullable(request.getStreamKey()));
+        }
 
         Movie saved = movieRepository.save(movie);
-        return MovieResponse.fromMovie(saved);
+        return MovieResponse.fromMovieWithStream(saved);
+    }
+
+    private String normalizeNullable(String value) {
+        if (value == null) return null;
+        String normalized = value.trim();
+        return normalized.isBlank() ? null : normalized;
     }
 }

@@ -20,6 +20,8 @@ export const MOVIE_FIELDS = [
   'releaseDate',
   'language',
   'rated',
+  'streamProvider',
+  'streamKey',
   'status',
 ];
 

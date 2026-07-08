@@ -1,6 +1,7 @@
 package com.filmticket.controller;
 
 import com.filmticket.dto.ApiResponse;
+import com.filmticket.dto.MovieStreamResponse;
 import com.filmticket.dto.WatchPartyDto;
 import com.filmticket.exception.BadRequestException;
 import com.filmticket.repository.UserRepository;
@@ -52,6 +53,14 @@ public class WatchPartyController {
         return ResponseEntity.ok(ApiResponse.success(
                 "Watch party payment synced",
                 watchPartyService.syncCurrentUserPayment(roomId, userId())
+        ));
+    }
+
+    @GetMapping("/{roomId}/stream")
+    public ResponseEntity<ApiResponse<MovieStreamResponse>> stream(@PathVariable UUID roomId) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Watch party stream fetched",
+                watchPartyService.getStream(roomId, userId())
         ));
     }
 

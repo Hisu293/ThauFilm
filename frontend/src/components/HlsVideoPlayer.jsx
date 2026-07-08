@@ -3,6 +3,11 @@ import { Alert, Box } from '@mui/material';
 
 const HLS_MIME_TYPE = 'application/vnd.apple.mpegurl';
 
+const isHlsSource = (src) => {
+  const clean = String(src || '').split('?')[0].toLowerCase();
+  return clean.endsWith('.m3u8');
+};
+
 const HlsVideoPlayer = ({ src, title, poster }) => {
   const videoRef = useRef(null);
   const [error, setError] = useState('');
@@ -18,7 +23,7 @@ const HlsVideoPlayer = ({ src, title, poster }) => {
     };
 
     const initializePlayer = async () => {
-      if (video.canPlayType(HLS_MIME_TYPE)) {
+      if (!isHlsSource(src) || video.canPlayType(HLS_MIME_TYPE)) {
         video.src = src;
         video.addEventListener('error', showPlaybackError);
         return;

@@ -15,6 +15,8 @@ export const STAFF_MOVIE_FIELDS = [
   'releaseDate',
   'language',
   'rated',
+  'streamProvider',
+  'streamKey',
   'status',
 ];
 
