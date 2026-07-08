@@ -108,6 +108,18 @@ public class MemberBookingController {
         ));
     }
 
+    @Operation(summary = "Create an online movie booking without seat selection")
+    @PostMapping("/online")
+    public ResponseEntity<ApiResponse<BookingResponse>> createOnlineBooking(
+            @Valid @RequestBody CreateOnlineBookingRequest request
+    ) {
+        UUID userId = getCurrentUserId();
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(
+                "Online movie booking created. Complete payment before hold expires.",
+                bookingService.createOnlineBooking(userId, request)
+        ));
+    }
+
     // ĐÃ THÊM: API đổi ghế khi người dùng quay lại từ màn hình thanh toán
     @Operation(summary = "Update seats for an existing booking hold (Back to change seats)")
     @PutMapping("/{bookingId}/seats")

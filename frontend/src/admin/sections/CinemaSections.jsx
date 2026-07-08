@@ -660,6 +660,7 @@ export const ShowtimesSection = ({ crud, movies, theaters, rooms }) => {
     startTime: '',
     endTime: '',
     status: 'SCHEDULED',
+    online: false,
     mystery: false,
     mysteryUnlockAt: '',
   });
@@ -673,7 +674,7 @@ export const ShowtimesSection = ({ crud, movies, theaters, rooms }) => {
     try {
       setFormError('');
       if (dialog === 'add') {
-        if (!form.movieId || !form.cinemaRoomId || !form.startTime || !form.endTime) {
+        if (!form.movieId || (!form.online && !form.cinemaRoomId) || !form.startTime || !form.endTime) {
           setFormError(t('admin.showtime', 'errorRequired'));
           return;
         }
@@ -683,10 +684,11 @@ export const ShowtimesSection = ({ crud, movies, theaters, rooms }) => {
         }
         await crud.add({
           movieId: String(form.movieId),
-          cinemaRoomId: String(form.cinemaRoomId),
+          cinemaRoomId: form.online ? '' : String(form.cinemaRoomId),
           startTime: form.startTime,
           endTime: form.endTime,
           status: 'SCHEDULED',
+          online: Boolean(form.online),
           mystery: Boolean(form.mystery),
           mysteryUnlockAt: form.mystery ? form.mysteryUnlockAt || null : null,
         });
@@ -695,7 +697,7 @@ export const ShowtimesSection = ({ crud, movies, theaters, rooms }) => {
       }
       setDialog(null);
       setFormError('');
-      setForm({ movieId: '', cinemaRoomId: '', startTime: '', endTime: '', status: 'SCHEDULED', mystery: false, mysteryUnlockAt: '' });
+      setForm({ movieId: '', cinemaRoomId: '', startTime: '', endTime: '', status: 'SCHEDULED', online: false, mystery: false, mysteryUnlockAt: '' });
     } catch (err) {
       setFormError(err.message || 'Không thể lưu suất chiếu.');
       console.error('Lỗi khi lưu suất chiếu:', err);
@@ -817,9 +819,9 @@ export const ShowtimesSection = ({ crud, movies, theaters, rooms }) => {
                       ) : null}
                     </TableCell>
                     <TableCell>
-                      <Typography variant="body2">{s.room?.name || getCinemaRoomName(s.cinemaRoomId || s.roomId)}</Typography>
+                      <Typography variant="body2">{s.online ? 'Xem online' : (s.room?.name || getCinemaRoomName(s.cinemaRoomId || s.roomId))}</Typography>
                       <Typography variant="caption" color="text.secondary">
-                        {getTheaterName(s.theaterId || s.room?.theaterId)}
+                        {s.online ? 'Online' : getTheaterName(s.theaterId || s.room?.theaterId)}
                       </Typography>
                     </TableCell>
                     <TableCell>{formatDateTime(s.startTime)}</TableCell>
@@ -828,7 +830,7 @@ export const ShowtimesSection = ({ crud, movies, theaters, rooms }) => {
                       <StatusChip status={statusStr} />
                     </TableCell>
                     <TableCell align="right">
-                      <IconButton size="small" onClick={() => { setForm({ ...s, status: statusStr, startTime: fromUTCToLocal(s.startTime), endTime: fromUTCToLocal(s.endTime), mystery: Boolean(s.mystery), mysteryUnlockAt: fromUTCToLocal(s.mysteryUnlockAt) }); setDialog(s.id); }}>
+                      <IconButton size="small" onClick={() => { setForm({ ...s, status: statusStr, startTime: fromUTCToLocal(s.startTime), endTime: fromUTCToLocal(s.endTime), online: Boolean(s.online), mystery: Boolean(s.mystery), mysteryUnlockAt: fromUTCToLocal(s.mysteryUnlockAt) }); setDialog(s.id); }}>
                         <EditRoundedIcon fontSize="small" />
                       </IconButton>
                       <IconButton size="small" onClick={() => crud.remove(s.id)} sx={{ color: '#f87171' }}>
@@ -886,7 +888,28 @@ export const ShowtimesSection = ({ crud, movies, theaters, rooms }) => {
                 ))}
               </Stack>
             )}
-            <TextField select label={t('admin.showtime', 'room')} fullWidth value={form.cinemaRoomId || ''} onChange={(event) => setForm({ ...form, cinemaRoomId: String(event.target.value) })}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={Boolean(form.online)}
+                  onChange={(e) => setForm({
+                    ...form,
+                    online: e.target.checked,
+                    cinemaRoomId: e.target.checked ? '' : form.cinemaRoomId,
+                  })}
+                />
+              }
+              label="Suất chiếu online"
+            />
+            <TextField
+              select
+              label={t('admin.showtime', 'room')}
+              fullWidth
+              disabled={Boolean(form.online)}
+              helperText={form.online ? 'Suất online không cần chọn rạp/phòng.' : ''}
+              value={form.cinemaRoomId || ''}
+              onChange={(event) => setForm({ ...form, cinemaRoomId: String(event.target.value) })}
+            >
               {activeRooms.map((room) => (
                 <MenuItem key={room.id} value={room.cinemaRoomId || room.id}>
                   {room.name} — {getTheaterName(room.theaterId)}

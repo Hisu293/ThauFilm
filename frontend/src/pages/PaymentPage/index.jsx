@@ -155,6 +155,7 @@ export const PaymentPage = () => {
   const [movie, setMovie] = useState(null);
   const [showtime, setShowtime] = useState(null);
   const [selectedSeats, setSelectedSeats] = useState([]);
+  const [bookingMode, setBookingMode] = useState('THEATER');
   const [paymentMethod, setPaymentMethod] = useState('qr_pay');
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [holdExpiresAt, setHoldExpiresAt] = useState(null);
@@ -175,6 +176,7 @@ export const PaymentPage = () => {
   const paymentInFlight = useRef(false);
   const { isExpired } = useHoldCountdown(holdExpiresAt);
   const isHoldExpired = Boolean(holdExpiresAt) && isExpired;
+  const isOnlineMovieBooking = bookingMode === 'ONLINE_MOVIE';
 
   useEffect(() => {
     let active = true;
@@ -211,6 +213,7 @@ export const PaymentPage = () => {
       setMovie(mergeMovieContext(location.state?.movie, pendingContext?.movie));
       setShowtime(mergeShowtimeContext(location.state?.showtime, pendingContext?.showtime));
       setSelectedSeats(location.state?.selectedSeats || pendingContext?.selectedSeats || []);
+      setBookingMode(location.state?.bookingMode || pendingContext?.bookingMode || 'THEATER');
       setHoldExpiresAt(location.state?.holdExpiresAt || pendingContext?.holdExpiresAt || null);
     });
   }, [location.state]);
@@ -251,12 +254,16 @@ export const PaymentPage = () => {
         setMovie((current) => current || mergedMovie);
         setShowtime((current) => current || mergedShowtime);
         setSelectedSeats((current) => (current.length > 0 ? current : booking.seats || []));
+        if ((booking.seats || []).length === 0 && Number(booking.totalAmount || booking.originalAmount) > 0) {
+          setBookingMode('ONLINE_MOVIE');
+        }
 
         savePendingBooking({
           id: booking.id,
           movie: mergedMovie,
           showtime: mergedShowtime,
           selectedSeats: booking.seats || [],
+          bookingMode: (booking.seats || []).length === 0 ? 'ONLINE_MOVIE' : bookingMode,
           holdExpiresAt: booking.holdExpiresAt,
           confirmationCode: booking.confirmationCode,
         });
@@ -270,6 +277,17 @@ export const PaymentPage = () => {
     let active = true;
 
     const loadPromotions = async () => {
+      if (bookingMode === 'ONLINE_MOVIE') {
+        setDiscounts([]);
+        setCombos([]);
+        setSelectedDiscountId('');
+        setSelectedComboIds([]);
+        setOriginalComboIds([]);
+        setLoadingPromotions(false);
+        setPromotionNotice('Vé xem phim online không áp dụng mã giảm giá hoặc combo bắp nước.');
+        return;
+      }
+
       setLoadingPromotions(true);
       try {
         const [discountRes, comboRes] = await Promise.allSettled([
@@ -315,7 +333,7 @@ export const PaymentPage = () => {
     return () => {
       active = false;
     };
-  }, []);
+  }, [bookingMode]);
 
   useEffect(() => {
     if (apiError) {
@@ -338,10 +356,12 @@ export const PaymentPage = () => {
   const originalComboTotal = availableCombos
     .filter((combo) => originalComboIds.includes(combo.id))
     .reduce((sum, combo) => sum + (Number(combo.price) || 0), 0);
-  const seatsTotal = bookingOriginalAmount !== null
+  const seatsTotal = isOnlineMovieBooking
+    ? Number(bookingOriginalAmount ?? 0)
+    : bookingOriginalAmount !== null
     ? Math.max(Number(bookingOriginalAmount) - originalComboTotal, 0)
     : selectedSeatsTotal;
-  const subtotal = seatsTotal + comboTotal;
+  const subtotal = isOnlineMovieBooking ? seatsTotal : seatsTotal + comboTotal;
   const availableDiscounts = discounts.filter(
     (discount) => !getDiscountUnavailableReason(discount, subtotal, selectedSeats),
   );
@@ -419,9 +439,9 @@ export const PaymentPage = () => {
         qr_pay: 'PAYOS',
       };
       const backendPaymentMethod = paymentMethodMap[paymentMethod] || 'CASH';
-      const discountCode = selectedDiscount?.code || '';
+      const discountCode = isOnlineMovieBooking ? '' : (selectedDiscount?.code || '');
       const comboSelectionChanged =
-        [...selectedComboIds].sort().join(',') !== [...originalComboIds].sort().join(',');
+        !isOnlineMovieBooking && [...selectedComboIds].sort().join(',') !== [...originalComboIds].sort().join(',');
       updateBookingState({ bookingId, paymentStatus: 'PAYING' });
 
       if (comboSelectionChanged) {
@@ -530,7 +550,7 @@ export const PaymentPage = () => {
     clearError();
   };
 
-  if (apiLoading && bookingId && (!movie || !showtime || selectedSeats.length === 0)) {
+  if (apiLoading && bookingId && (!movie || !showtime || (!isOnlineMovieBooking && selectedSeats.length === 0))) {
     return (
       <Box sx={{ minHeight: '80vh', position: 'relative' }}>
         <LoadingOverlay open={true} message="Đang tải thông tin thanh toán..." blur />
@@ -551,7 +571,7 @@ export const PaymentPage = () => {
     );
   }
 
-  if (!bookingId || !movie || !showtime || selectedSeats.length === 0) {
+  if (!bookingId || !movie || !showtime || (!isOnlineMovieBooking && selectedSeats.length === 0)) {
     return (
       <Container maxWidth="xl" sx={{ py: 6 }}>
         <Alert severity="error" sx={{ borderRadius: 3 }}>
@@ -650,12 +670,14 @@ export const PaymentPage = () => {
       <BookingStepper activeStep={3} />
 
       <PageHeader
-        title="Thanh Toán Đơn Hàng"
-        subtitle="Chọn phương thức thanh toán và ưu đãi hiện có trước khi hoàn tất giao dịch."
+        title={isOnlineMovieBooking ? 'Thanh toán phim online' : 'Thanh Toán Đơn Hàng'}
+        subtitle={isOnlineMovieBooking ? 'Hoàn tất thanh toán để mở quyền xem phim online trong đúng khung giờ chiếu.' : 'Chọn phương thức thanh toán và ưu đãi hiện có trước khi hoàn tất giao dịch.'}
         onBack={() =>
-          navigate('/booking/summary', {
-            state: { bookingId, movie, showtime, selectedSeats, holdExpiresAt },
-          })
+          isOnlineMovieBooking
+            ? navigate(`/movies/${movie?.id || movie?.movieId || ''}`)
+            : navigate('/booking/summary', {
+              state: { bookingId, movie, showtime, selectedSeats, holdExpiresAt },
+            })
         }
       />
 
@@ -675,6 +697,7 @@ export const PaymentPage = () => {
               <PaymentMethodCard selectedMethodId={paymentMethod} onSelectMethod={setPaymentMethod} />
             </SectionCard>
 
+            {!isOnlineMovieBooking && (
             <SectionCard title="Chọn Khuyến Mãi">
               <Stack spacing={2.5}>
                 <Alert severity="info" sx={{ borderRadius: 3 }}>
@@ -846,6 +869,7 @@ export const PaymentPage = () => {
                 )}
               </Stack>
             </SectionCard>
+            )}
 
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'text.secondary', px: 1 }}>
               <LockIcon sx={{ fontSize: 16 }} />
@@ -890,29 +914,42 @@ export const PaymentPage = () => {
                   </Typography>
                 </Box>
 
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}>
-                  <Typography variant="body2" color="text.secondary">
-                    Phòng chiếu:
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                    {showtime.room}
-                  </Typography>
-                </Box>
+                {isOnlineMovieBooking ? (
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}>
+                    <Typography variant="body2" color="text.secondary">
+                      Hình thức:
+                    </Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 800, color: 'primary.main', textAlign: 'right' }}>
+                      Xem phim online
+                    </Typography>
+                  </Box>
+                ) : (
+                  <>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        Phòng chiếu:
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                        {showtime.room}
+                      </Typography>
+                    </Box>
 
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}>
-                  <Typography variant="body2" color="text.secondary">
-                    Ghế đã chọn:
-                  </Typography>
-                  <Typography variant="body2" sx={{ fontWeight: 800, color: 'primary.main' }}>
-                    {selectedSeats.map((seat) => seat.label || `${seat.rowName}${seat.seatNumber}` || seat.id).join(', ')}
-                  </Typography>
-                </Box>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', gap: 2 }}>
+                      <Typography variant="body2" color="text.secondary">
+                        Ghế đã chọn:
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 800, color: 'primary.main' }}>
+                        {selectedSeats.map((seat) => seat.label || `${seat.rowName}${seat.seatNumber}` || seat.id).join(', ')}
+                      </Typography>
+                    </Box>
+                  </>
+                )}
 
                 <Divider sx={{ my: 1 }} />
 
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 2 }}>
                   <Typography variant="body2" color="text.secondary">
-                    Tổng giá vé:
+                    {isOnlineMovieBooking ? 'Vé online:' : 'Tổng giá vé:'}
                   </Typography>
                   <Typography variant="body2" sx={{ fontWeight: 600 }}>
                     {formatCurrency(seatsTotal)}
@@ -974,8 +1011,9 @@ export const PaymentPage = () => {
                 </Box>
 
                 <Typography variant="caption" color="text.secondary">
-                  Combo được ghi vào booking qua API tạo đơn; mã giảm giá được backend kiểm tra lại khi xác nhận thanh toán.
-                  Số tiền cuối cùng lấy theo kết quả API thanh toán.
+                  {isOnlineMovieBooking
+                    ? 'Vé online không giữ ghế và không áp dụng combo/mã giảm giá. Quyền xem được mở trong đúng khung giờ suất chiếu sau khi thanh toán.'
+                    : 'Combo được ghi vào booking qua API tạo đơn; mã giảm giá được backend kiểm tra lại khi xác nhận thanh toán. Số tiền cuối cùng lấy theo kết quả API thanh toán.'}
                 </Typography>
 
                 <CustomButton fullWidth variant="primary" size="large" onClick={handlePay} disabled={apiLoading} sx={{ py: 1.8, mt: 2 }}>

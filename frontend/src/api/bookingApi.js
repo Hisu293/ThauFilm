@@ -64,6 +64,12 @@ export const bookingApi = {
     });
   },
 
+  createOnlineBooking: (showtimeId) => {
+    return axiosClient.post('/api/member/booking/online', {
+      showtimeId,
+    });
+  },
+
   // Change seats while preserving the existing booking hold.
   updateBookingSeats: (bookingId, showtimeId, seatIds, comboIds = []) => {
     return axiosClient.put(`/api/member/booking/${bookingId}/seats`, {

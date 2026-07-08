@@ -41,7 +41,7 @@ import {
   enumLabel,
 } from '../../constants/enums';
 
-const emptyForm = { movieId: '', cinemaRoomId: '', startTime: '', endTime: '', status: 'SCHEDULED', mystery: false, mysteryUnlockAt: '' };
+const emptyForm = { movieId: '', cinemaRoomId: '', startTime: '', endTime: '', status: 'SCHEDULED', online: false, mystery: false, mysteryUnlockAt: '' };
 
 const STATUS_COLOR = {
   SCHEDULED: 'default',
@@ -121,8 +121,9 @@ const StaffShowtimes = () => {
   // Backend không trả theaterName cho suất chiếu (luôn null), nên suy ra từ
   // cinemaRoomId → room.theaterId → theater.name bằng dữ liệu đã load sẵn.
   const roomById = (id) => rooms.find((r) => r.id === id);
-  const showtimeRoomName = (s) => s.cinemaRoomName || roomById(s.cinemaRoomId)?.name || '—';
+  const showtimeRoomName = (s) => s.online ? 'Xem online' : (s.cinemaRoomName || roomById(s.cinemaRoomId)?.name || '—');
   const showtimeTheaterName = (s) => {
+    if (s.online) return 'Online';
     if (s.theaterName) return s.theaterName;
     const room = roomById(s.cinemaRoomId);
     return room ? theaterName(room.theaterId) || '—' : '—';
@@ -141,6 +142,7 @@ const StaffShowtimes = () => {
       startTime: fromUTCToLocal(s.startTime),
       endTime: fromUTCToLocal(s.endTime),
       status: s.status || 'SCHEDULED',
+      online: Boolean(s.online),
       mystery: Boolean(s.mystery),
       mysteryUnlockAt: fromUTCToLocal(s.mysteryUnlockAt),
     });
@@ -155,7 +157,7 @@ const StaffShowtimes = () => {
 
   const handleSave = async () => {
     setFormError('');
-    if (!form.movieId || !form.cinemaRoomId || !form.startTime || !form.endTime) {
+    if (!form.movieId || (!form.online && !form.cinemaRoomId) || !form.startTime || !form.endTime) {
       setFormError('Vui lòng chọn đầy đủ phim, phòng chiếu, giờ bắt đầu và giờ kết thúc.');
       return;
     }
@@ -285,7 +287,7 @@ const StaffShowtimes = () => {
                       </TableCell>
                       <TableCell align="right">
                         <Tooltip title="Tình trạng ghế & vé đã bán">
-                          <IconButton size="small" onClick={() => openSeats(s)}>
+                          <IconButton size="small" onClick={() => openSeats(s)} disabled={Boolean(s.online)}>
                             <EventSeatRoundedIcon fontSize="small" />
                           </IconButton>
                         </Tooltip>
@@ -328,10 +330,25 @@ const StaffShowtimes = () => {
                 <MenuItem key={m.id} value={m.id}>{m.title}</MenuItem>
               ))}
             </TextField>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={Boolean(form.online)}
+                  onChange={(e) => setForm({
+                    ...form,
+                    online: e.target.checked,
+                    cinemaRoomId: e.target.checked ? '' : (form.cinemaRoomId || rooms[0]?.id || ''),
+                  })}
+                />
+              }
+              label="Suất chiếu online"
+            />
             <TextField
               select
               label="Phòng chiếu"
               fullWidth
+              disabled={Boolean(form.online)}
+              helperText={form.online ? 'Suất online không cần chọn rạp/phòng.' : ''}
               value={form.cinemaRoomId}
               onChange={(e) => setForm({ ...form, cinemaRoomId: e.target.value })}
             >

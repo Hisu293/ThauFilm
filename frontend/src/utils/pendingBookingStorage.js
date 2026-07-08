@@ -28,6 +28,7 @@ export const savePendingBooking = (booking) => {
     movie: booking.movie || null,
     showtime: booking.showtime || null,
     selectedSeats: booking.selectedSeats || [],
+    bookingMode: booking.bookingMode || 'THEATER',
     holdExpiresAt: booking.holdExpiresAt || null,
     confirmationCode: booking.confirmationCode || '',
     updatedAt: new Date().toISOString(),

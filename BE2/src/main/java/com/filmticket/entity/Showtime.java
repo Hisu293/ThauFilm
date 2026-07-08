@@ -31,7 +31,7 @@ public class Showtime {
     @Column(name = "movie_id", nullable = false)
     private UUID movieId;
 
-    @Column(name = "cinema_room_id", nullable = false)
+    @Column(name = "cinema_room_id")
     private UUID cinemaRoomId;
 
     @Column(name = "start_time", nullable = false)
@@ -44,6 +44,10 @@ public class Showtime {
     @Column(nullable = false, length = 20)
     @Builder.Default
     private ShowtimeStatus status = ShowtimeStatus.SCHEDULED;
+
+    @Column(name = "online", nullable = false)
+    @Builder.Default
+    private boolean online = false;
 
     @Column(name = "mystery", nullable = false)
     @Builder.Default

@@ -20,6 +20,8 @@ import { fetchMovieById } from '../services/movieService';
 import movieStreamService from '../services/movieStreamService';
 import watchPartyService from '../services/watchPartyService';
 import { getAccessToken } from '../utils/authStorage';
+import { savePendingBooking } from '../utils/pendingBookingStorage';
+import { useBooking } from '../hooks/useBooking';
 import { useBookingFlow } from '../context/BookingContext';
 import { useBookingNavigate } from '../context/BookingNavigationContext';
 import BookingStepper from '../components/BookingStepper';
@@ -95,6 +97,7 @@ const MovieDetailPage = () => {
   const [searchParams] = useSearchParams();
   const navigate = useBookingNavigate();
   const routeNavigate = useNavigate();
+  const { createOnline } = useBooking();
   const { updateBookingState } = useBookingFlow();
   const [movie, setMovie] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -105,6 +108,7 @@ const MovieDetailPage = () => {
   const [streamError, setStreamError] = useState('');
   const [creatingWatchParty, setCreatingWatchParty] = useState(false);
   const [autoWatchStarted, setAutoWatchStarted] = useState(false);
+  const [creatingOnlineShowtimeId, setCreatingOnlineShowtimeId] = useState('');
 
   useEffect(() => {
     if (!id) return;
@@ -191,6 +195,7 @@ const MovieDetailPage = () => {
       selectedMovie: movie,
       selectedShowtime: showtime,
       selectedSeats: [],
+      bookingMode: 'THEATER',
       bookingId: null,
       paymentStatus: 'SELECTING_SEATS',
     });
@@ -200,6 +205,52 @@ const MovieDetailPage = () => {
         showtime
       }
     });
+  };
+
+  const handleSelectOnlineShowtime = async (showtime) => {
+    if (!movie?.id || !showtime?.id) return;
+    if (!getAccessToken()) {
+      routeNavigate('/login', { state: { from: `/movies/${movie.id}` } });
+      return;
+    }
+
+    setCreatingOnlineShowtimeId(showtime.id);
+    try {
+      const booking = await createOnline(showtime.id);
+      const bookingId = booking?.id;
+      if (!bookingId) throw new Error('Không thể tạo đơn xem phim online.');
+
+      const paymentState = {
+        bookingId,
+        movie,
+        showtime,
+        selectedSeats: [],
+        holdExpiresAt: booking.holdExpiresAt,
+        bookingMode: 'ONLINE_MOVIE',
+      };
+
+      savePendingBooking({
+        id: bookingId,
+        movie,
+        showtime,
+        selectedSeats: [],
+        holdExpiresAt: booking.holdExpiresAt,
+        confirmationCode: booking.confirmationCode,
+        bookingMode: 'ONLINE_MOVIE',
+      });
+      sessionStorage.setItem('tf_booking_id', bookingId);
+      updateBookingState({
+        bookingId,
+        selectedMovie: movie,
+        selectedShowtime: showtime,
+        selectedSeats: [],
+        bookingMode: 'ONLINE_MOVIE',
+        paymentStatus: 'READY_TO_PAY',
+      });
+      navigate('/booking/payment', { state: paymentState });
+    } finally {
+      setCreatingOnlineShowtimeId('');
+    }
   };
 
   const handleCreateWatchParty = async () => {
@@ -419,7 +470,12 @@ const MovieDetailPage = () => {
         <Divider sx={{ borderColor: 'rgba(148, 163, 184, 0.1)', my: 4 }} />
 
         {/* Showtimes Selection Section */}
-        <ShowtimeSelector movieId={movie.id} onSelectShowtime={handleSelectShowtime} />
+        <ShowtimeSelector
+          movieId={movie.id}
+          onSelectShowtime={handleSelectShowtime}
+          onSelectOnlineShowtime={handleSelectOnlineShowtime}
+          onlineLoadingShowtimeId={creatingOnlineShowtimeId}
+        />
 
 
       </Container>
