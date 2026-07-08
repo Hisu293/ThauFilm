@@ -86,6 +86,20 @@ export const useBooking = () => {
     }
   }, []);
 
+  const createOnline = useCallback(async (showtimeId) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await bookingApi.createOnlineBooking(showtimeId);
+      return bookingService.normalizeBooking(res?.data ?? res);
+    } catch (err) {
+      setError(err.message || 'Không thể tạo đơn xem phim online.');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const updateSeats = useCallback(async (bookingId, showtimeId, seatIds, comboIds = []) => {
     setLoading(true);
     setError(null);
@@ -213,6 +227,7 @@ export const useBooking = () => {
     clearError,
     getSeats,
     create,
+    createOnline,
     updateSeats,
     getHistory,
     getDetail,

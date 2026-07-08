@@ -85,6 +85,7 @@ export const bookingService = {
       id: backendBooking.id,
       userId: backendBooking.userId,
       showtimeId: backendBooking.showtimeId,
+      movieId: backendBooking.movieId ?? null,
       movieTitle: backendBooking.movieTitle || 'Vé xem phim',
       roomName: backendBooking.cinemaRoomName || 'Phòng chiếu',
       startTime: backendBooking.startTime,
@@ -185,7 +186,8 @@ export const bookingService = {
       const timeStr = raw.length > 10 ? raw.slice(11, 16) : showtime.time ?? '';
 
       if (!byDate[dateStr]) byDate[dateStr] = [];
-      const theaterName =
+      const isOnline = Boolean(showtime.online);
+      const theaterName = isOnline ? 'Online' :
         showtime.theaterName ??
         showtime.cinemaName ??
         showtime.theater?.name ??
@@ -197,10 +199,11 @@ export const bookingService = {
         movieId: String(showtime.movieId ?? ''),
         movieTitle: showtime.movieTitle ?? '',
         time: timeStr,
-        room: showtime.cinemaRoomName ?? showtime.roomName ?? showtime.room ?? '',
+        room: isOnline ? 'Xem online' : (showtime.cinemaRoomName ?? showtime.roomName ?? showtime.room ?? ''),
         format: showtime.format ?? '2D',
         theaterId: String(showtime.theaterId ?? ''),
         theaterName,
+        online: isOnline,
         startTime: raw,
         endTime: showtime.endTime ?? '',
         date: dateStr,
@@ -219,7 +222,8 @@ export const bookingService = {
     const date = rawStart ? String(rawStart).slice(0, 10) : '';
     const time = rawStart && String(rawStart).length > 10 ? String(rawStart).slice(11, 16) : showtime.time ?? '';
 
-    const theaterName =
+    const isOnline = Boolean(showtime.online);
+    const theaterName = isOnline ? 'Online' :
       showtime.theaterName ??
       showtime.cinemaName ??
       showtime.theater?.name ??
@@ -233,12 +237,13 @@ export const bookingService = {
       cinemaRoomId: String(showtime.cinemaRoomId ?? showtime.roomId ?? ''),
       theaterId: String(showtime.theaterId ?? ''),
       theaterName,
+      online: isOnline,
       date,
       time,
       startTime: rawStart,
       endTime: rawEnd,
-      room: showtime.cinemaRoomName ?? showtime.roomName ?? showtime.room ?? '',
-      format: showtime.format ?? '2D',
+      room: isOnline ? 'Xem online' : (showtime.cinemaRoomName ?? showtime.roomName ?? showtime.room ?? ''),
+      format: isOnline ? 'Online' : (showtime.format ?? '2D'),
       status: showtime.status,
     };
   },

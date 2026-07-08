@@ -18,7 +18,6 @@ public class UpsertShowtimeRequest {
     @NotNull(message = "Movie id is required")
     private UUID movieId;
 
-    @NotNull(message = "Cinema room id is required")
     private UUID cinemaRoomId;
 
     @NotNull(message = "Start time is required")
@@ -28,6 +27,8 @@ public class UpsertShowtimeRequest {
 
     @NotNull(message = "Status is required")
     private ShowtimeStatus status;
+
+    private Boolean online;
 
     private Boolean mystery;
 

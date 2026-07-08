@@ -13,6 +13,7 @@ export const SHOWTIME_FIELDS = [
   'startTime',
   'endTime',
   'status',
+  'online',
   'mystery',
   'mysteryUnlockAt',
 ];
@@ -25,10 +26,11 @@ export const toShowtimePayload = (form) => {
   }
   // Đảm bảo UUID string
   if (form.movieId !== undefined) payload.movieId = String(form.movieId);
-  if (form.cinemaRoomId !== undefined) payload.cinemaRoomId = String(form.cinemaRoomId);
+  if (form.cinemaRoomId !== undefined && form.cinemaRoomId !== '') payload.cinemaRoomId = String(form.cinemaRoomId);
   // Backend uses LocalDateTime, so send local wall-clock time without timezone.
   if (form.startTime) payload.startTime = toBackendLocalDateTime(form.startTime);
   if (form.endTime) payload.endTime = toBackendLocalDateTime(form.endTime);
+  payload.online = Boolean(form.online);
   payload.mystery = Boolean(form.mystery);
   if (form.mysteryUnlockAt) payload.mysteryUnlockAt = toBackendLocalDateTime(form.mysteryUnlockAt);
   // ShowtimeStatus là enum chuỗi: SCHEDULED | OPEN | RUNNING | COMPLETED | CANCELLED

@@ -34,7 +34,7 @@ public class MovieService {
     @Transactional(readOnly = true)
     public List<MovieResponse> getAllMovies() {
         return movieRepository.findAll().stream()
-                .map(MovieResponse::fromMovie)
+                .map(MovieResponse::fromMovieWithStream)
                 .toList();
     }
 
@@ -70,7 +70,7 @@ public class MovieService {
 
     @Transactional(readOnly = true)
     public MovieResponse getMovieById(UUID movieId) {
-        return MovieResponse.fromMovie(getMovieEntityOrThrow(movieId));
+        return MovieResponse.fromMovieWithStream(getMovieEntityOrThrow(movieId));
     }
 
     @Transactional
@@ -90,11 +90,13 @@ public class MovieService {
                 .releaseDate(request.getReleaseDate())
                 .language(normalizeNullable(request.getLanguage()))
                 .rated(normalizeNullable(request.getRated()))
+                .streamProvider(normalizeNullable(request.getStreamProvider()))
+                .streamKey(normalizeNullable(request.getStreamKey()))
                 .status(request.getStatus() == null ? Movie.Status.COMING_SOON : request.getStatus())
                 .build();
 
         Movie saved = movieRepository.save(movie);
-        MovieResponse response = MovieResponse.fromMovie(saved);
+        MovieResponse response = MovieResponse.fromMovieWithStream(saved);
         movieEventService.publishMovieCreated(response);
         return response;
     }
@@ -116,10 +118,12 @@ public class MovieService {
         movie.setReleaseDate(request.getReleaseDate());
         movie.setLanguage(normalizeNullable(request.getLanguage()));
         movie.setRated(normalizeNullable(request.getRated()));
+        movie.setStreamProvider(normalizeNullable(request.getStreamProvider()));
+        movie.setStreamKey(normalizeNullable(request.getStreamKey()));
         movie.setStatus(request.getStatus() == null ? Movie.Status.COMING_SOON : request.getStatus());
 
         Movie saved = movieRepository.save(movie);
-        MovieResponse response = MovieResponse.fromMovie(saved);
+        MovieResponse response = MovieResponse.fromMovieWithStream(saved);
         movieEventService.publishMovieUpdated(response);
         return response;
     }
@@ -185,6 +189,8 @@ public class MovieService {
         private LocalDate releaseDate;
         private String language;
         private String rated;
+        private String streamProvider;
+        private String streamKey;
         private Movie.Status status;
     }
 }

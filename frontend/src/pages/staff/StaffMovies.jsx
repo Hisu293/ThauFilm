@@ -60,6 +60,8 @@ const emptyForm = {
   releaseDate: '',
   language: '',
   rated: '',
+  streamProvider: 'S3',
+  streamKey: '',
   status: 'NOW_SHOWING',
 };
 
@@ -295,6 +297,22 @@ const StaffMovies = () => {
             />
 
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+              <TextField
+                label="Stream provider"
+                fullWidth
+                value={form.streamProvider || 'S3'}
+                onChange={(e) => setForm({ ...form, streamProvider: e.target.value })}
+              />
+              <TextField
+                label="S3 object key"
+                fullWidth
+                placeholder="movies/example/master.m3u8"
+                value={form.streamKey || ''}
+                onChange={(e) => setForm({ ...form, streamKey: e.target.value })}
+              />
+            </Stack>
+
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
               <TextField label="Đạo diễn" fullWidth value={form.director} onChange={(e) => setForm({ ...form, director: e.target.value })} />
               <TextField label="Diễn viên" fullWidth value={form.actors} onChange={(e) => setForm({ ...form, actors: e.target.value })} />
             </Stack>
@@ -408,6 +426,7 @@ const MovieDetail = ({ movie, onEdit, onClose }) => {
             <DetailRow label="Thời lượng" value={movie.durationMinutes ? `${movie.durationMinutes} phút` : ''} />
             <DetailRow label="Ngôn ngữ" value={movie.language} />
             <DetailRow label="Ngày phát hành" value={movie.releaseDate} />
+            <DetailRow label="Stream" value={movie.streamKey ? `${movie.streamProvider || 'S3'} / ${movie.streamKey}` : ''} />
             {movie.trailerUrl ? (
               <Button
                 size="small"

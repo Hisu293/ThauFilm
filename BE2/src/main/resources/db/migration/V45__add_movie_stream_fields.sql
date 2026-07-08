@@ -1,0 +1,3 @@
+ALTER TABLE movies
+    ADD COLUMN IF NOT EXISTS stream_provider VARCHAR(50),
+    ADD COLUMN IF NOT EXISTS stream_key VARCHAR(1000);

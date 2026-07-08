@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Box, Button, Chip, CircularProgress, Container, IconButton, Paper, Stack, TextField, Typography } from '@mui/material';
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
 import ContentCopyRoundedIcon from '@mui/icons-material/ContentCopyRounded';
@@ -8,11 +8,11 @@ import PlayArrowRoundedIcon from '@mui/icons-material/PlayArrowRounded';
 import SendRoundedIcon from '@mui/icons-material/SendRounded';
 import SentimentVerySatisfiedRoundedIcon from '@mui/icons-material/SentimentVerySatisfiedRounded';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
-import { getMovieStreamUrl } from '../data/movieStreams';
 import { connectWatchParty } from '../services/realtimeService';
 import watchPartyService from '../services/watchPartyService';
 
 const HLS_MIME_TYPE = 'application/vnd.apple.mpegurl';
+const isHlsSource = (src) => String(src || '').split('?')[0].toLowerCase().endsWith('.m3u8');
 const REACTIONS = {
   heart: '\u2764\uFE0F',
   laugh: '\uD83D\uDE02',
@@ -42,8 +42,8 @@ export default function WatchPartyPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [inviteCopied, setInviteCopied] = useState(false);
+  const [streamUrl, setStreamUrl] = useState('');
 
-  const streamUrl = useMemo(() => (room ? getMovieStreamUrl({ id: room.movieId }) : ''), [room]);
   const inviteUrl = room ? `${getPublicAppUrl()}${room.invitePath || `/watch-party/${room.id}`}` : '';
   const me = room?.members?.find((member) => member.currentUser);
 
@@ -62,6 +62,25 @@ export default function WatchPartyPage() {
   }, [roomId]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (!room?.readyToWatch || !me?.paid) {
+      setStreamUrl('');
+      return;
+    }
+    let cancelled = false;
+    watchPartyService.stream(roomId)
+      .then((stream) => {
+        if (!cancelled) {
+          setStreamUrl(stream?.streamUrl || '');
+          setError('');
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err.message || 'Khong the lay link xem phim nhom.');
+      });
+    return () => { cancelled = true; };
+  }, [me?.paid, room?.readyToWatch, roomId]);
 
   useEffect(() => {
     if (!roomId || !location.search) return;
@@ -86,7 +105,7 @@ export default function WatchPartyPage() {
     let hls;
     let cancelled = false;
     const init = async () => {
-      if (video.canPlayType(HLS_MIME_TYPE)) {
+      if (!isHlsSource(streamUrl) || video.canPlayType(HLS_MIME_TYPE)) {
         video.src = streamUrl;
         return;
       }

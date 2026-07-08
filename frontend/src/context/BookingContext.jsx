@@ -37,6 +37,7 @@ export const BookingProvider = ({ children }) => {
       selectedMovie: state.selectedMovie || null,
       selectedShowtime: state.selectedShowtime || null,
       selectedSeats: state.selectedSeats || [],
+      bookingMode: state.bookingMode || 'THEATER',
       bookingId: state.bookingId || null,
       paymentStatus: state.paymentStatus || 'IDLE',
       updateBookingState,

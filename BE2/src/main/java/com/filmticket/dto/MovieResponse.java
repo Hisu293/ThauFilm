@@ -28,9 +28,19 @@ public class MovieResponse {
     private LocalDate releaseDate;
     private String language;
     private String rated;
+    private String streamProvider;
+    private String streamKey;
     private Movie.Status status;
 
     public static MovieResponse fromMovie(Movie movie) {
+        return fromMovie(movie, false);
+    }
+
+    public static MovieResponse fromMovieWithStream(Movie movie) {
+        return fromMovie(movie, true);
+    }
+
+    private static MovieResponse fromMovie(Movie movie, boolean includeStream) {
         return MovieResponse.builder()
                 .id(movie.getId())
                 .title(movie.getTitle())
@@ -45,6 +55,8 @@ public class MovieResponse {
                 .releaseDate(movie.getReleaseDate())
                 .language(movie.getLanguage())
                 .rated(movie.getRated())
+                .streamProvider(includeStream ? movie.getStreamProvider() : null)
+                .streamKey(includeStream ? movie.getStreamKey() : null)
                 .status(movie.getStatus())
                 .build();
     }

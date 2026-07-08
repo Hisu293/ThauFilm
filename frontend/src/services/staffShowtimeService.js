@@ -21,7 +21,7 @@ import { toBackendLocalDateTime, fromUTCToLocal } from './adminShowtimeService';
 
 const unwrap = (res) => (res?.data?.data !== undefined ? res.data.data : res?.data);
 
-export const STAFF_SHOWTIME_FIELDS = ['movieId', 'cinemaRoomId', 'startTime', 'endTime', 'status', 'mystery', 'mysteryUnlockAt'];
+export const STAFF_SHOWTIME_FIELDS = ['movieId', 'cinemaRoomId', 'startTime', 'endTime', 'status', 'online', 'mystery', 'mysteryUnlockAt'];
 
 /** Chuyển form (datetime-local) → payload backend. */
 export const toShowtimePayload = (form) => {
@@ -31,6 +31,7 @@ export const toShowtimePayload = (form) => {
   if (form.startTime) payload.startTime = toBackendLocalDateTime(form.startTime);
   if (form.endTime) payload.endTime = toBackendLocalDateTime(form.endTime);
   if (form.status) payload.status = form.status;
+  payload.online = Boolean(form.online);
   payload.mystery = Boolean(form.mystery);
   if (form.mysteryUnlockAt) payload.mysteryUnlockAt = toBackendLocalDateTime(form.mysteryUnlockAt);
   return payload;

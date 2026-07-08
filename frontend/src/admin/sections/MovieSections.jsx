@@ -46,6 +46,8 @@ const emptyMovie = {
   releaseDate: '',
   language: '',
   rated: '',
+  streamProvider: 'S3',
+  streamKey: '',
   status: 'NOW_SHOWING',
 };
 const emptyGenre = { name: '', slug: '' };
@@ -318,6 +320,16 @@ export const MoviesSection = ({ crud }) => {
           </TextField>
         </Stack>
         <TextField label="Poster URL" fullWidth value={form.posterUrl} onChange={set('posterUrl')} />
+        <Stack direction="row" spacing={2}>
+          <TextField label="Stream provider" value={form.streamProvider || 'S3'} onChange={set('streamProvider')} sx={{ flex: 1 }} />
+          <TextField
+            label="S3 object key"
+            value={form.streamKey || ''}
+            onChange={set('streamKey')}
+            sx={{ flex: 2 }}
+            placeholder="movies/example/master.m3u8"
+          />
+        </Stack>
         <FormControlLabel
           control={<Switch checked={!!form.active} onChange={(e) => setForm((f) => ({ ...f, active: e.target.checked }))} />}
           label="Kích hoạt (active)"

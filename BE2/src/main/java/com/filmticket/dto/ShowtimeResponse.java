@@ -25,6 +25,7 @@ public class ShowtimeResponse {
     private LocalDateTime startTime;
     private LocalDateTime endTime;
     private ShowtimeStatus status;
+    private boolean online;
     private boolean mystery;
     private boolean mysteryUnlocked;
     private LocalDateTime mysteryUnlockAt;
@@ -40,6 +41,7 @@ public class ShowtimeResponse {
                 .startTime(showtime.getStartTime())
                 .endTime(showtime.getEndTime())
                 .status(showtime.getStatus())
+                .online(showtime.isOnline())
                 .mystery(showtime.isMystery())
                 .mysteryUnlocked(unlocked)
                 .mysteryUnlockAt(unlockAt)
@@ -66,6 +68,7 @@ public class ShowtimeResponse {
                 .startTime(showtime.getStartTime())
                 .endTime(showtime.getEndTime())
                 .status(showtime.getStatus())
+                .online(showtime.isOnline())
                 .mystery(mystery)
                 .mysteryUnlocked(unlocked)
                 .mysteryUnlockAt(unlockAt)

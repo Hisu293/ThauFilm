@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Alert, Box, Button, Card, Grid, Stack, Tab, Tabs, Typography } from '@mui/material';
 import ScheduleRoundedIcon from '@mui/icons-material/ScheduleRounded';
 import LocationOnRoundedIcon from '@mui/icons-material/LocationOnRounded';
+import PlayArrowRoundedIcon from '@mui/icons-material/PlayArrowRounded';
 import { bookingApi } from '../api/bookingApi';
 import { bookingService } from '../services/bookingService';
 
@@ -22,7 +23,7 @@ const formatDateTab = (dateStr, index) => {
   };
 };
 
-export const ShowtimeSelector = ({ movieId, onSelectShowtime }) => {
+export const ShowtimeSelector = ({ movieId, onSelectShowtime, onSelectOnlineShowtime, onlineLoadingShowtimeId }) => {
   const [selectedDateIdx, setSelectedDateIdx] = useState(0);
   const [showtimes, setShowtimes] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -94,8 +95,8 @@ export const ShowtimeSelector = ({ movieId, onSelectShowtime }) => {
         }
       }
 
-      const theaterName = showtime.theaterName || showtime.cinemaName || 'ThauFilm Cinema';
-      const theaterKey = showtime.theaterId || theaterName || 'default-theater';
+      const theaterName = showtime.online ? 'Online' : (showtime.theaterName || showtime.cinemaName || 'ThauFilm Cinema');
+      const theaterKey = showtime.online ? 'online-showtimes' : (showtime.theaterId || theaterName || 'default-theater');
       if (!acc[theaterKey]) {
         acc[theaterKey] = {
           id: theaterKey,
@@ -219,37 +220,58 @@ export const ShowtimeSelector = ({ movieId, onSelectShowtime }) => {
               <Grid container spacing={2}>
                 {group.showtimes.map((showtime) => (
                   <Grid item xs={6} sm={4} md={3} lg={2} key={showtime.id}>
-                    <Button
-                      fullWidth
-                      variant="outlined"
-                      onClick={() => onSelectShowtime(showtime)}
-                      sx={{
-                        display: 'flex',
-                        flexDirection: 'column',
-                        alignItems: 'center',
-                        py: 1.7,
-                        borderRadius: 2.5,
-                        borderColor: 'rgba(148, 163, 184, 0.15)',
-                        bgcolor: 'rgba(30, 41, 59, 0.4)',
-                        color: 'text.primary',
-                        transition: 'all 0.25s ease',
-                        '&:hover': {
-                          borderColor: 'primary.main',
-                          bgcolor: 'rgba(251, 191, 36, 0.06)',
-                          transform: 'translateY(-2px)',
-                          boxShadow: '0 4px 16px rgba(251, 191, 36, 0.12)',
-                        },
-                      }}
-                    >
-                      <Typography variant="h6" sx={{ fontWeight: 800, color: 'primary.main' }}>
-                        {showtime.time}
-                      </Typography>
-                      {showtime.format && (
-                        <Typography variant="caption" color="text.secondary" sx={{ mt: 0.4, fontWeight: 700 }}>
-                          {showtime.format}
+                    <Stack spacing={1}>
+                      <Button
+                        fullWidth
+                        variant="outlined"
+                          onClick={() => {
+                            if (showtime.online && onSelectOnlineShowtime) {
+                              onSelectOnlineShowtime(showtime);
+                              return;
+                            }
+                            onSelectShowtime(showtime);
+                          }}
+                        sx={{
+                          display: 'flex',
+                          flexDirection: 'column',
+                          alignItems: 'center',
+                          py: 1.7,
+                          borderRadius: 2.5,
+                          borderColor: 'rgba(148, 163, 184, 0.15)',
+                          bgcolor: 'rgba(30, 41, 59, 0.4)',
+                          color: 'text.primary',
+                          transition: 'all 0.25s ease',
+                          '&:hover': {
+                            borderColor: 'primary.main',
+                            bgcolor: 'rgba(251, 191, 36, 0.06)',
+                            transform: 'translateY(-2px)',
+                            boxShadow: '0 4px 16px rgba(251, 191, 36, 0.12)',
+                          },
+                        }}
+                      >
+                        <Typography variant="h6" sx={{ fontWeight: 800, color: 'primary.main' }}>
+                          {showtime.time}
                         </Typography>
+                        {showtime.format && (
+                          <Typography variant="caption" color="text.secondary" sx={{ mt: 0.4, fontWeight: 700 }}>
+                            {showtime.format}
+                          </Typography>
+                        )}
+                      </Button>
+                      {showtime.online && onSelectOnlineShowtime && (
+                        <Button
+                          fullWidth
+                          size="small"
+                          variant="contained"
+                          startIcon={<PlayArrowRoundedIcon />}
+                          disabled={onlineLoadingShowtimeId === showtime.id}
+                          onClick={() => onSelectOnlineShowtime(showtime)}
+                          sx={{ borderRadius: 2, fontWeight: 800, minHeight: 36 }}
+                        >
+                          {onlineLoadingShowtimeId === showtime.id ? 'Đang tạo...' : 'Mua online'}
+                        </Button>
                       )}
-                    </Button>
+                    </Stack>
                   </Grid>
                 ))}
               </Grid>

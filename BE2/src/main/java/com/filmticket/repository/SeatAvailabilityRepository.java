@@ -18,6 +18,8 @@ public interface SeatAvailabilityRepository extends JpaRepository<SeatAvailabili
     
     Optional<SeatAvailability> findByShowtimeIdAndSeatId(UUID showtimeId, UUID seatId);
 
+    void deleteByShowtimeId(UUID showtimeId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT sa FROM SeatAvailability sa WHERE sa.showtimeId = :showtimeId AND sa.seatId IN :seatIds")
     List<SeatAvailability> lockByShowtimeIdAndSeatIdIn(UUID showtimeId, List<UUID> seatIds);

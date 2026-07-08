@@ -32,6 +32,7 @@ import java.util.stream.Collectors;
 public class BookingService {
 
     private static final Logger log = LoggerFactory.getLogger(BookingService.class);
+    private static final BigDecimal ONLINE_MOVIE_PRICE = BigDecimal.valueOf(79000);
     private final BookingRepository bookingRepository;
     private final BookingSeatRepository bookingSeatRepository;
     private final SeatAvailabilityRepository seatAvailabilityRepository;
@@ -273,6 +274,44 @@ public class BookingService {
         }
 
         return toBookingResponse(booking, seats);
+    }
+
+    @Transactional
+    public BookingResponse createOnlineBooking(UUID userId, CreateOnlineBookingRequest request) {
+        if (!userRepository.existsById(userId)) {
+            throw new BadRequestException("User not found");
+        }
+
+        Showtime showtime = showtimeRepository.findById(request.getShowtimeId())
+                .orElseThrow(() -> new BadRequestException("Showtime not found"));
+
+        if (showtime.getStartTime().isBefore(now())) {
+            throw new BadRequestException("Cannot book a past showtime");
+        }
+        if (!showtime.isOnline()) {
+            throw new BadRequestException("This showtime is not available for online viewing");
+        }
+
+        Movie movie = movieRepository.findById(showtime.getMovieId())
+                .orElseThrow(() -> new BadRequestException("Movie not found"));
+        if (!movie.isActive()) {
+            throw new BadRequestException("Movie is not available");
+        }
+        if (movie.getStreamKey() == null || movie.getStreamKey().trim().isBlank()) {
+            throw new BadRequestException("Online stream is not configured for this movie");
+        }
+
+        Booking booking = Booking.builder()
+                .userId(userId)
+                .showtimeId(request.getShowtimeId())
+                .totalAmount(ONLINE_MOVIE_PRICE)
+                .status(BookingStatus.HOLD)
+                .confirmationCode(generateConfirmationCode())
+                .holdExpiresAt(now().plusMinutes(HOLD_MINUTES))
+                .build();
+
+        booking = bookingRepository.save(booking);
+        return toBookingResponse(booking, List.of());
     }
 
     // ĐÃ THÊM: Hàm cập nhật chỗ ngồi cho Booking đang giữ
@@ -681,9 +720,13 @@ public class BookingService {
 
         Showtime s = showtimeRepository.findById(booking.getShowtimeId()).orElse(null);
         if (s != null) {
-            CinemaRoom room = cinemaRoomRepository.findById(s.getCinemaRoomId()).orElse(null);
+            CinemaRoom room = s.getCinemaRoomId() != null
+                    ? cinemaRoomRepository.findById(s.getCinemaRoomId()).orElse(null)
+                    : null;
             if (room != null) {
                 cinema = room.getName();
+            } else if (s.isOnline()) {
+                cinema = "Online";
             }
             showtime = s.getStartTime().format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm"));
         }
@@ -752,18 +795,23 @@ public class BookingService {
 
         String movieTitle = null;
         String cinemaRoomName = null;
+        UUID movieId = null;
         if (booking.getShowtimeId() != null) {
             var optShowtime = showtimeRepository.findById(booking.getShowtimeId());
             if (optShowtime.isPresent()) {
                 Showtime showtime = optShowtime.get();
+                movieId = showtime.getMovieId();
                 movieTitle = movieRepository.findById(showtime.getMovieId())
                         .map(movie -> displayMovieTitle(showtime, movie.getTitle())).orElse(null);
-                cinemaRoomName = cinemaRoomRepository.findById(showtime.getCinemaRoomId())
-                        .map(CinemaRoom::getName).orElse(null);
+                cinemaRoomName = showtime.isOnline()
+                        ? "Xem online"
+                        : (showtime.getCinemaRoomId() != null
+                                ? cinemaRoomRepository.findById(showtime.getCinemaRoomId()).map(CinemaRoom::getName).orElse(null)
+                                : null);
             }
         }
 
-        return BookingResponse.fromBooking(booking, seatResponses, movieTitle, cinemaRoomName);
+        return BookingResponse.fromBooking(booking, seatResponses, movieId, movieTitle, cinemaRoomName);
     }
 
     private BookingResponse toBookingResponseWithoutSeats(Booking booking) {
@@ -786,18 +834,23 @@ public class BookingService {
 
         String movieTitle = null;
         String cinemaRoomName = null;
+        UUID movieId = null;
         if (booking.getShowtimeId() != null) {
             var optShowtime = showtimeRepository.findById(booking.getShowtimeId());
             if (optShowtime.isPresent()) {
                 Showtime showtime = optShowtime.get();
+                movieId = showtime.getMovieId();
                 movieTitle = movieRepository.findById(showtime.getMovieId())
                         .map(movie -> displayMovieTitle(showtime, movie.getTitle())).orElse(null);
-                cinemaRoomName = cinemaRoomRepository.findById(showtime.getCinemaRoomId())
-                        .map(CinemaRoom::getName).orElse(null);
+                cinemaRoomName = showtime.isOnline()
+                        ? "Xem online"
+                        : (showtime.getCinemaRoomId() != null
+                                ? cinemaRoomRepository.findById(showtime.getCinemaRoomId()).map(CinemaRoom::getName).orElse(null)
+                                : null);
             }
         }
 
-        return BookingResponse.fromBooking(booking, seatResponses, movieTitle, cinemaRoomName);
+        return BookingResponse.fromBooking(booking, seatResponses, movieId, movieTitle, cinemaRoomName);
     }
 
     private String formatMoney(BigDecimal value) {

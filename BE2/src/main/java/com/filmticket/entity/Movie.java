@@ -69,6 +69,12 @@ public class Movie {
     @Column(length = 50)
     private String rated;
 
+    @Column(length = 50)
+    private String streamProvider;
+
+    @Column(length = 1000)
+    private String streamKey;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     @Builder.Default

@@ -30,6 +30,12 @@ public class StaffMovieRequest {
     @Size(max = 100, message = "Genre is too long")
     private String genre;
 
+    @Size(max = 50, message = "Stream provider is too long")
+    private String streamProvider;
+
+    @Size(max = 1000, message = "Stream key is too long")
+    private String streamKey;
+
     @Min(value = 1, message = "Duration must be greater than 0")
     private Integer durationMinutes;
 

@@ -94,6 +94,7 @@ const enrichBooking = (booking, showtimeMap) => {
 
   return {
     ...booking,
+    movieId: booking.movieId || showtime.movieId,
     movieTitle: hasMovieTitle ? booking.movieTitle : showtime.movieTitle || booking.movieTitle,
     roomName: hasRoomName ? booking.roomName : showtime.room || booking.roomName,
     startTime: booking.startTime || showtime.startTime,
@@ -133,7 +134,7 @@ const canResumeBooking = (booking) => {
 const toPaymentState = (booking) => {
   const pendingContext = getPendingContext(booking);
   const movie = mergeMovieContext(
-    { title: booking.movieTitle, posterUrl: '/placeholder.svg' },
+    { id: booking.movieId, movieId: booking.movieId, title: booking.movieTitle, posterUrl: '/placeholder.svg' },
     pendingContext?.movie,
   );
   const showtime = mergeShowtimeContext(
@@ -145,6 +146,7 @@ const toPaymentState = (booking) => {
       theaterName: booking.theaterName || 'ThauFilm Cinema',
       format: booking.showtimeFormat || '2D',
       startTime: booking.startTime,
+      movieId: booking.movieId,
     },
     pendingContext?.showtime,
   );
@@ -294,6 +296,11 @@ const MyBookingsPage = () => {
                       <Button variant="outlined" onClick={() => navigate(`/my-bookings/${booking.id}`)}>
                         Xem chi tiết
                       </Button>
+                      {String(displayStatus(booking) || '').toUpperCase() === 'CONFIRMED' && booking.movieId && (
+                        <Button variant="contained" onClick={() => navigate(`/movies/${booking.movieId}?watch=1`)}>
+                          Xem phim online
+                        </Button>
+                      )}
                       {canResumeBooking(booking) && (
                         <Button variant="contained" onClick={() => navigate('/payment', { state: toPaymentState(booking) })}>
                           Tiếp tục thanh toán

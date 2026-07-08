@@ -1,5 +1,5 @@
-﻿import { useState, useEffect } from 'react';
-import { Link as RouterLink, useParams, useNavigate } from 'react-router-dom';
+﻿import { useState, useEffect, useCallback } from 'react';
+import { Link as RouterLink, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   Box, Button, Chip, Container, Divider,
   Stack, Typography, Dialog, IconButton
@@ -17,14 +17,17 @@ import CloseIcon from '@mui/icons-material/Close';
 import ForumRoundedIcon from '@mui/icons-material/ForumRounded';
 
 import { fetchMovieById } from '../services/movieService';
+import movieStreamService from '../services/movieStreamService';
 import watchPartyService from '../services/watchPartyService';
+import { getAccessToken } from '../utils/authStorage';
+import { savePendingBooking } from '../utils/pendingBookingStorage';
+import { useBooking } from '../hooks/useBooking';
 import { useBookingFlow } from '../context/BookingContext';
 import { useBookingNavigate } from '../context/BookingNavigationContext';
 import BookingStepper from '../components/BookingStepper';
 import ShowtimeSelector from '../components/ShowtimeSelector';
 import StatusChip from '../components/common/StatusChip';
 import HlsVideoPlayer from '../components/HlsVideoPlayer';
-import { getMovieStreamUrl } from '../data/movieStreams';
 import './MovieDetailPage.css';
 
 /* ---------- helpers ---------- */
@@ -91,13 +94,21 @@ const MovieNotFound = ({ message }) => (
    ===================================================== */
 const MovieDetailPage = () => {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
   const navigate = useBookingNavigate();
+  const routeNavigate = useNavigate();
+  const { createOnline } = useBooking();
   const { updateBookingState } = useBookingFlow();
   const [movie, setMovie] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [openOnlineMovie, setOpenOnlineMovie] = useState(false);
+  const [onlineStreamUrl, setOnlineStreamUrl] = useState('');
+  const [streamLoading, setStreamLoading] = useState(false);
+  const [streamError, setStreamError] = useState('');
   const [creatingWatchParty, setCreatingWatchParty] = useState(false);
+  const [autoWatchStarted, setAutoWatchStarted] = useState(false);
+  const [creatingOnlineShowtimeId, setCreatingOnlineShowtimeId] = useState('');
 
   useEffect(() => {
     if (!id) return;
@@ -141,6 +152,32 @@ const MovieDetailPage = () => {
     return () => { cancelled = true; };
   }, [id]);
 
+  const handleOpenOnlineMovie = useCallback(async () => {
+    if (!movie?.id) return;
+    if (!getAccessToken()) {
+      routeNavigate('/login', { state: { from: `/movies/${movie.id}` } });
+      return;
+    }
+    setOpenOnlineMovie(true);
+    setStreamLoading(true);
+    setStreamError('');
+    try {
+      const stream = await movieStreamService.getMovieStream(movie.id);
+      setOnlineStreamUrl(stream?.streamUrl || '');
+    } catch (err) {
+      setOnlineStreamUrl('');
+      setStreamError(err.message || 'Không thể lấy link xem phim online.');
+    } finally {
+      setStreamLoading(false);
+    }
+  }, [movie?.id, routeNavigate]);
+
+  useEffect(() => {
+    if (!movie || autoWatchStarted || searchParams.get('watch') !== '1') return;
+    setAutoWatchStarted(true);
+    handleOpenOnlineMovie();
+  }, [autoWatchStarted, handleOpenOnlineMovie, movie, searchParams]);
+
   if (loading) return <MovieDetailSkeleton />;
   if (error || !movie) return <MovieNotFound message={error} />;
 
@@ -152,13 +189,13 @@ const MovieDetailPage = () => {
     .split(',').map((a) => a.trim()).filter(Boolean);
 
   const posterSrc = movie.posterUrl || movie.poster || '/placeholder.svg';
-  const streamUrl = getMovieStreamUrl(movie);
 
   const handleSelectShowtime = (showtime) => {
     updateBookingState({
       selectedMovie: movie,
       selectedShowtime: showtime,
       selectedSeats: [],
+      bookingMode: 'THEATER',
       bookingId: null,
       paymentStatus: 'SELECTING_SEATS',
     });
@@ -168,6 +205,52 @@ const MovieDetailPage = () => {
         showtime
       }
     });
+  };
+
+  const handleSelectOnlineShowtime = async (showtime) => {
+    if (!movie?.id || !showtime?.id) return;
+    if (!getAccessToken()) {
+      routeNavigate('/login', { state: { from: `/movies/${movie.id}` } });
+      return;
+    }
+
+    setCreatingOnlineShowtimeId(showtime.id);
+    try {
+      const booking = await createOnline(showtime.id);
+      const bookingId = booking?.id;
+      if (!bookingId) throw new Error('Không thể tạo đơn xem phim online.');
+
+      const paymentState = {
+        bookingId,
+        movie,
+        showtime,
+        selectedSeats: [],
+        holdExpiresAt: booking.holdExpiresAt,
+        bookingMode: 'ONLINE_MOVIE',
+      };
+
+      savePendingBooking({
+        id: bookingId,
+        movie,
+        showtime,
+        selectedSeats: [],
+        holdExpiresAt: booking.holdExpiresAt,
+        confirmationCode: booking.confirmationCode,
+        bookingMode: 'ONLINE_MOVIE',
+      });
+      sessionStorage.setItem('tf_booking_id', bookingId);
+      updateBookingState({
+        bookingId,
+        selectedMovie: movie,
+        selectedShowtime: showtime,
+        selectedSeats: [],
+        bookingMode: 'ONLINE_MOVIE',
+        paymentStatus: 'READY_TO_PAY',
+      });
+      navigate('/booking/payment', { state: paymentState });
+    } finally {
+      setCreatingOnlineShowtimeId('');
+    }
   };
 
   const handleCreateWatchParty = async () => {
@@ -354,10 +437,11 @@ const MovieDetailPage = () => {
                 variant="outlined"
                 size="large"
                 startIcon={<PlayArrowRoundedIcon />}
-                onClick={() => setOpenOnlineMovie(true)}
+                onClick={handleOpenOnlineMovie}
+                disabled={streamLoading}
                 sx={{ borderColor: 'primary.main', color: 'primary.main', fontWeight: 700, px: 4.5, py: 1.6, borderRadius: 2 }}
               >
-                Xem phim online
+                {streamLoading ? 'Dang tai...' : 'Xem phim online'}
               </Button>
               <Button
                 component={RouterLink}
@@ -386,7 +470,12 @@ const MovieDetailPage = () => {
         <Divider sx={{ borderColor: 'rgba(148, 163, 184, 0.1)', my: 4 }} />
 
         {/* Showtimes Selection Section */}
-        <ShowtimeSelector movieId={movie.id} onSelectShowtime={handleSelectShowtime} />
+        <ShowtimeSelector
+          movieId={movie.id}
+          onSelectShowtime={handleSelectShowtime}
+          onSelectOnlineShowtime={handleSelectOnlineShowtime}
+          onlineLoadingShowtimeId={creatingOnlineShowtimeId}
+        />
 
 
       </Container>
@@ -422,12 +511,24 @@ const MovieDetailPage = () => {
           >
             <CloseIcon />
           </IconButton>
-          <HlsVideoPlayer
-            key={streamUrl}
-            src={streamUrl}
-            title={`${movie.title} Online`}
-            poster={posterSrc}
-          />
+          {streamLoading && (
+            <Box sx={{ color: '#e5e7eb', fontWeight: 700, px: 1, py: 1.5 }}>
+              Đang lấy link xem phim online...
+            </Box>
+          )}
+          {streamError && (
+            <Box sx={{ color: '#fca5a5', fontWeight: 700, px: 1, py: 1.5 }}>
+              {streamError}
+            </Box>
+          )}
+          {!streamLoading && !streamError && onlineStreamUrl && (
+            <HlsVideoPlayer
+              key={onlineStreamUrl}
+              src={onlineStreamUrl}
+              title={`${movie.title} Online`}
+              poster={posterSrc}
+            />
+          )}
         </Box>
       </Dialog>
     </Box>

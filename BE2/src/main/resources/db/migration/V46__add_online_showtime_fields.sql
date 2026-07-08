@@ -1,0 +1,9 @@
+ALTER TABLE showtime
+    ADD COLUMN IF NOT EXISTS online BOOLEAN NOT NULL DEFAULT FALSE;
+
+ALTER TABLE showtime
+    ALTER COLUMN cinema_room_id DROP NOT NULL;
+
+UPDATE showtime
+SET online = FALSE
+WHERE online IS NULL;

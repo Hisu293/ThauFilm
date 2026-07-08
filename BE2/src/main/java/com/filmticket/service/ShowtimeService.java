@@ -54,7 +54,11 @@ public class ShowtimeService {
         if (showtimes.isEmpty()) return List.of();
 
         List<UUID> movieIds = showtimes.stream().map(Showtime::getMovieId).distinct().toList();
-        List<UUID> roomIds = showtimes.stream().map(Showtime::getCinemaRoomId).distinct().toList();
+        List<UUID> roomIds = showtimes.stream()
+                .map(Showtime::getCinemaRoomId)
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .toList();
 
         Map<UUID, String> movieTitleByMovieId = movieRepository.findAllById(movieIds).stream()
                 .collect(Collectors.toMap(com.filmticket.entity.Movie::getId, com.filmticket.entity.Movie::getTitle));
@@ -69,10 +73,10 @@ public class ShowtimeService {
         return showtimes.stream()
                 .map(s -> {
                     com.filmticket.entity.CinemaRoom room = roomByRoomId.get(s.getCinemaRoomId());
-                    String cinemaRoomName = room != null ? room.getName() : null;
+                    String cinemaRoomName = s.isOnline() ? "Xem online" : (room != null ? room.getName() : null);
                     UUID theaterId = room != null ? room.getTheaterId() : null;
-                    String theaterName = theaterId != null && theaterById.containsKey(theaterId)
-                            ? theaterById.get(theaterId).getName() : null;
+                    String theaterName = s.isOnline() ? "Online" : (theaterId != null && theaterById.containsKey(theaterId)
+                            ? theaterById.get(theaterId).getName() : null);
                     return ShowtimeResponse.fromShowtimeContext(
                             s,
                             movieTitleByMovieId.get(s.getMovieId()),
@@ -111,27 +115,39 @@ public class ShowtimeService {
             throw new BadRequestException("Movie is not currently active");
         }
 
-        CinemaRoom room = cinemaRoomRepository.findById(request.getCinemaRoomId())
-                .orElseThrow(() -> new BadRequestException("CinemaRoom not found"));
-        if (room.getStatus() != RoomStatus.ACTIVE) {
-            throw new BadRequestException("Cinema room is not active");
+        boolean online = Boolean.TRUE.equals(request.getOnline());
+        if (online && (movie.getStreamKey() == null || movie.getStreamKey().trim().isBlank())) {
+            throw new BadRequestException("Online stream is not configured for this movie");
         }
-        if (room.getStatus() == RoomStatus.MAINTENANCE) {
-            throw new BadRequestException("Cannot create showtime in a room that is under maintenance");
+        if (!online) {
+            if (request.getCinemaRoomId() == null) {
+                throw new BadRequestException("Cinema room is required for theater showtimes");
+            }
+            CinemaRoom room = cinemaRoomRepository.findById(request.getCinemaRoomId())
+                    .orElseThrow(() -> new BadRequestException("CinemaRoom not found"));
+            if (room.getStatus() != RoomStatus.ACTIVE) {
+                throw new BadRequestException("Cinema room is not active");
+            }
+            if (room.getStatus() == RoomStatus.MAINTENANCE) {
+                throw new BadRequestException("Cannot create showtime in a room that is under maintenance");
+            }
         }
 
         LocalDateTime endTime = request.getStartTime()
                 .plusMinutes(movie.getDurationMinutes())
                 .plusMinutes(CLEANUP_MINUTES);
 
-        validateNoOverlap(request.getCinemaRoomId(), request.getStartTime(), endTime, null);
+        if (!online) {
+            validateNoOverlap(request.getCinemaRoomId(), request.getStartTime(), endTime, null);
+        }
 
         Showtime showtime = Showtime.builder()
                 .movieId(request.getMovieId())
-                .cinemaRoomId(request.getCinemaRoomId())
+                .cinemaRoomId(online ? null : request.getCinemaRoomId())
                 .startTime(request.getStartTime())
                 .endTime(endTime)
                 .status(request.getStatus())
+                .online(online)
                 .mystery(Boolean.TRUE.equals(request.getMystery()))
                 .mysteryUnlockAt(Boolean.TRUE.equals(request.getMystery())
                         ? (request.getMysteryUnlockAt() != null ? request.getMysteryUnlockAt() : request.getStartTime())
@@ -159,26 +175,38 @@ public class ShowtimeService {
             throw new BadRequestException("Movie is not currently active");
         }
 
-        CinemaRoom room = cinemaRoomRepository.findById(request.getCinemaRoomId())
-                .orElseThrow(() -> new BadRequestException("CinemaRoom not found"));
-        if (room.getStatus() != RoomStatus.ACTIVE) {
-            throw new BadRequestException("Cinema room is not active");
+        boolean online = Boolean.TRUE.equals(request.getOnline());
+        if (online && (movie.getStreamKey() == null || movie.getStreamKey().trim().isBlank())) {
+            throw new BadRequestException("Online stream is not configured for this movie");
         }
-        if (room.getStatus() == RoomStatus.MAINTENANCE) {
-            throw new BadRequestException("Cannot create showtime in a room that is under maintenance");
+        if (!online) {
+            if (request.getCinemaRoomId() == null) {
+                throw new BadRequestException("Cinema room is required for theater showtimes");
+            }
+            CinemaRoom room = cinemaRoomRepository.findById(request.getCinemaRoomId())
+                    .orElseThrow(() -> new BadRequestException("CinemaRoom not found"));
+            if (room.getStatus() != RoomStatus.ACTIVE) {
+                throw new BadRequestException("Cinema room is not active");
+            }
+            if (room.getStatus() == RoomStatus.MAINTENANCE) {
+                throw new BadRequestException("Cannot create showtime in a room that is under maintenance");
+            }
         }
 
         LocalDateTime endTime = request.getStartTime()
                 .plusMinutes(movie.getDurationMinutes())
                 .plusMinutes(CLEANUP_MINUTES);
 
-        validateNoOverlap(request.getCinemaRoomId(), request.getStartTime(), endTime, showtimeId);
+        if (!online) {
+            validateNoOverlap(request.getCinemaRoomId(), request.getStartTime(), endTime, showtimeId);
+        }
 
         showtime.setMovieId(request.getMovieId());
-        showtime.setCinemaRoomId(request.getCinemaRoomId());
+        showtime.setCinemaRoomId(online ? null : request.getCinemaRoomId());
         showtime.setStartTime(request.getStartTime());
         showtime.setEndTime(endTime);
         showtime.setStatus(request.getStatus());
+        showtime.setOnline(online);
         showtime.setMystery(Boolean.TRUE.equals(request.getMystery()));
         showtime.setMysteryUnlockAt(showtime.isMystery()
                 ? (request.getMysteryUnlockAt() != null ? request.getMysteryUnlockAt() : request.getStartTime())
@@ -277,6 +305,7 @@ public class ShowtimeService {
         }
         List<UUID> roomIds = showtimeRepository.findDistinctCinemaRoomIdsByMovieId(movieId);
         return roomIds.stream()
+                .filter(java.util.Objects::nonNull)
                 .map(cinemaRoomRepository::findById)
                 .filter(java.util.Optional::isPresent)
                 .map(java.util.Optional::get)
@@ -302,6 +331,10 @@ public class ShowtimeService {
     }
 
     private void ensureSeatAvailabilities(Showtime showtime) {
+        if (showtime.isOnline()) {
+            seatAvailabilityRepository.deleteByShowtimeId(showtime.getId());
+            return;
+        }
         List<SeatAvailability> existing = seatAvailabilityRepository.findByShowtimeIdOrderBySeatId(showtime.getId());
         if (existing.isEmpty()) {
             List<Seat> seats = seatRepository

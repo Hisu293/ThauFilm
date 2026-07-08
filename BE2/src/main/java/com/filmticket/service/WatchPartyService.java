@@ -1,6 +1,7 @@
 package com.filmticket.service;
 
 import com.filmticket.dto.WatchPartyDto;
+import com.filmticket.dto.MovieStreamResponse;
 import com.filmticket.entity.Movie;
 import com.filmticket.entity.Payment;
 import com.filmticket.entity.User;
@@ -30,6 +31,7 @@ public class WatchPartyService {
     private final UserRepository userRepository;
     private final RealtimeEventService realtimeEventService;
     private final PaymentGatewayService paymentGatewayService;
+    private final MovieStreamService movieStreamService;
     private final Map<UUID, WatchPartyRoom> rooms = new ConcurrentHashMap<>();
     private final Map<String, PendingWatchPartyPayment> pendingPayments = new ConcurrentHashMap<>();
 
@@ -123,6 +125,21 @@ public class WatchPartyService {
             WatchPartyDto.Response response = toResponse(room, userId);
             realtimeEventService.sendWatchPartyEvent(roomId, "WATCH_PARTY_PLAYBACK", response.getPlayback());
             return response;
+        }
+    }
+
+    public MovieStreamResponse getStream(UUID roomId, UUID userId) {
+        WatchPartyRoom room = requireRoom(roomId);
+        synchronized (room) {
+            WatchPartyMember member = ensureMember(room, userId);
+            if (!member.paid) {
+                throw new BadRequestException("Pay your watch party ticket before watching");
+            }
+            boolean readyToWatch = !room.members.isEmpty() && room.members.values().stream().allMatch(item -> item.paid);
+            if (!readyToWatch) {
+                throw new BadRequestException("Watch party is waiting for all members to pay");
+            }
+            return movieStreamService.buildResponse(room.movie);
         }
     }
 
