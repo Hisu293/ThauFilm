@@ -51,6 +51,9 @@ public class MovieStreamService {
     @Value("${app.streaming.s3.secret-key:}")
     private String s3SecretKey;
 
+    @Value("${app.streaming.public-base-url:}")
+    private String publicBaseUrl;
+
     @Value("${app.streaming.url-ttl-seconds:300}")
     private long ttlSeconds;
 
@@ -82,14 +85,35 @@ public class MovieStreamService {
         }
         String provider = blankToDefault(movie.getStreamProvider(), "S3");
         Instant expiresAt = Instant.now().plusSeconds(Math.max(60, ttlSeconds));
-        String streamUrl = isAbsoluteUrl(streamKey) ? streamKey : presignS3Url(streamKey, expiresAt);
+        boolean publicStream = !isAbsoluteUrl(streamKey) && !hasS3Credentials();
+        String streamUrl = isAbsoluteUrl(streamKey)
+                ? streamKey
+                : publicStream ? buildPublicS3Url(streamKey) : presignS3Url(streamKey, expiresAt);
         return MovieStreamResponse.builder()
                 .movieId(movie.getId())
                 .title(movie.getTitle())
                 .streamUrl(streamUrl)
-                .expiresAt(isAbsoluteUrl(streamKey) ? null : expiresAt)
+                .expiresAt(isAbsoluteUrl(streamKey) || publicStream ? null : expiresAt)
                 .provider(provider)
                 .build();
+    }
+
+    private boolean hasS3Credentials() {
+        return blankToNull(s3AccessKey) != null && blankToNull(s3SecretKey) != null;
+    }
+
+    private String buildPublicS3Url(String objectKey) {
+        String configuredBaseUrl = blankToNull(publicBaseUrl);
+        if (configuredBaseUrl != null) {
+            return configuredBaseUrl.replaceAll("/+$", "") + "/" + encodePath(objectKey);
+        }
+
+        String bucket = blankToNull(s3Bucket);
+        String region = blankToNull(s3Region);
+        if (bucket == null || region == null) {
+            throw new BadRequestException("S3 public streaming is not configured");
+        }
+        return "https://" + bucket + ".s3." + region + ".amazonaws.com/" + encodePath(objectKey);
     }
 
     private String presignS3Url(String objectKey, Instant expiresAt) {
