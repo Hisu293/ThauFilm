@@ -19,6 +19,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -29,6 +30,7 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 public class MovieStreamService {
+    private static final ZoneId VIETNAM_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
     private static final DateTimeFormatter AMZ_DATE = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'")
             .withZone(ZoneOffset.UTC);
     private static final DateTimeFormatter DATE_STAMP = DateTimeFormatter.ofPattern("yyyyMMdd")
@@ -64,10 +66,10 @@ public class MovieStreamService {
                     userId,
                     movieId,
                     BookingStatus.CONFIRMED,
-                    LocalDateTime.now()
+                    LocalDateTime.now(VIETNAM_ZONE)
             );
             if (eligibleBookings.isEmpty()) {
-                throw new BadRequestException("You can watch this movie only during your confirmed showtime");
+                throw new BadRequestException("Bạn chỉ có thể xem phim trong khung giờ suất chiếu đã đặt và đã thanh toán");
             }
         }
         return buildResponse(movie);
