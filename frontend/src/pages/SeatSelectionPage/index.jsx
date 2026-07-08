@@ -116,9 +116,23 @@ export const SeatSelectionPage = () => {
   const [queueReady, setQueueReady] = useState(false);
   const [queueBusy, setQueueBusy] = useState(false);
   const [queueLoading, setQueueLoading] = useState(true);
+  const activeBookingIdRef = useRef(editingBookingId);
+  const proceedingRef = useRef(false);
 
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [snackbarMessage, setSnackbarMessage] = useState('');
+
+  useEffect(() => {
+    activeBookingIdRef.current = editingBookingId;
+  }, [editingBookingId]);
+
+  useEffect(() => () => {
+    const bookingId = activeBookingIdRef.current;
+    if (!bookingId || proceedingRef.current) return;
+    bookingApi.cancelBooking(bookingId).catch(() => {});
+    removePendingBooking(bookingId);
+    sessionStorage.removeItem('tf_booking_id');
+  }, []);
 
   const refreshSeats = useCallback(async (cancelledRef = { current: false }, silent = false) => {
     if (!showtimeId) return;
@@ -147,6 +161,7 @@ export const SeatSelectionPage = () => {
       confirmationCode: booking.confirmationCode,
     });
 
+    proceedingRef.current = true;
     navigate('/booking/summary', {
       state: {
         bookingId: booking.id,
@@ -341,7 +356,7 @@ export const SeatSelectionPage = () => {
     const cancelledRef = { current: false };
     const timer = window.setInterval(() => {
       refreshSeats(cancelledRef, true);
-    }, 30000);
+    }, 3000);
     return () => {
       cancelledRef.current = true;
       window.clearInterval(timer);
@@ -401,31 +416,98 @@ export const SeatSelectionPage = () => {
     [seats],
   );
 
-  const handleToggleSelectSeat = (seat) => {
+  const syncSeatHold = useCallback(async (nextSeats) => {
+    if (!showtimeId) return null;
+
+    const seatIds = nextSeats.map((item) => item.id).filter(Boolean);
+    const currentBookingId = activeBookingIdRef.current;
+
+    if (seatIds.length === 0) {
+      if (currentBookingId) {
+        await cancel(currentBookingId);
+        removePendingBooking(currentBookingId);
+        sessionStorage.removeItem('tf_booking_id');
+        activeBookingIdRef.current = null;
+        setEditingBookingId(null);
+        setActiveBooking(null);
+      }
+      return null;
+    }
+
+    const bookingResult = currentBookingId
+      ? await updateSeats(currentBookingId, showtimeId, seatIds)
+      : await create(showtimeId, seatIds, 'ONLINE');
+
+    if (bookingResult?.id) {
+      activeBookingIdRef.current = bookingResult.id;
+      setEditingBookingId(bookingResult.id);
+      setActiveBooking(bookingResult);
+      sessionStorage.setItem('tf_booking_id', bookingResult.id);
+      editingSeatIdsRef.current = new Set(seatIds.map(String));
+      savePendingBooking({
+        id: bookingResult.id,
+        movie,
+        showtime,
+        selectedSeats: nextSeats,
+        holdExpiresAt: bookingResult.holdExpiresAt,
+        confirmationCode: bookingResult.confirmationCode,
+      });
+    }
+
+    return bookingResult;
+  }, [cancel, create, movie, showtime, showtimeId, updateSeats]);
+
+  const applySeatSelection = useCallback(async (nextSeats, options = {}) => {
+    if (apiLoading && !options.force) return false;
+
+    try {
+      await syncSeatHold(nextSeats);
+      setSelectedSeats(nextSeats);
+      const nextSeatIds = new Set(nextSeats.map((item) => String(item.id)));
+      setSeats((current) => current.map((item) => (
+        nextSeatIds.has(String(item.id))
+          ? { ...item, isSold: false, heldByMe: true, bookingStatus: 'HOLDING' }
+          : item
+      )));
+      updateBookingState({
+        selectedMovie: movie,
+        selectedShowtime: showtime,
+        selectedSeats: nextSeats,
+        bookingId: activeBookingIdRef.current,
+        paymentStatus: nextSeats.length > 0 ? 'HOLD' : 'SELECTING_SEATS',
+      });
+      return true;
+    } catch (err) {
+      setSnackbarMessage(err.message || 'Ghế này vừa được người khác giữ. Vui lòng chọn ghế khác.');
+      setSnackbarOpen(true);
+      await refreshSeats({ current: false }, true);
+      return false;
+    }
+  }, [apiLoading, movie, refreshSeats, showtime, syncSeatHold, updateBookingState]);
+
+  const handleToggleSelectSeat = async (seat) => {
+    if (apiLoading) return;
     setSeatSuggestion(null);
-    setSelectedSeats((prev) => {
-      const isAlreadySelected = prev.some((s) => s.id === seat.id);
-      if (isAlreadySelected) {
-        const next = prev.filter((s) => s.id !== seat.id);
-        return next;
-      }
 
-      if (prev.length >= 8) {
-        setSnackbarMessage('Bạn chỉ được chọn tối đa 8 ghế trong một giao dịch.');
-        setSnackbarOpen(true);
-        return prev;
-      }
+    const isAlreadySelected = selectedSeats.some((s) => s.id === seat.id);
+    if (isAlreadySelected) {
+      await applySeatSelection(selectedSeats.filter((s) => s.id !== seat.id));
+      return;
+    }
 
-      // Tránh chọn ghế đang bán/đang giữ
-      if (seat.isSold || soldSeatIds.has(seat.id)) {
-        setSnackbarMessage('Ghế này hiện không khả dụng.');
-        setSnackbarOpen(true);
-        return prev;
-      }
+    if (selectedSeats.length >= 8) {
+      setSnackbarMessage('Bạn chỉ được chọn tối đa 8 ghế trong một giao dịch.');
+      setSnackbarOpen(true);
+      return;
+    }
 
-      const next = [...prev, seat];
-      return next;
-    });
+    if (seat.isSold || soldSeatIds.has(seat.id)) {
+      setSnackbarMessage('Ghế này hiện không khả dụng.');
+      setSnackbarOpen(true);
+      return;
+    }
+
+    await applySeatSelection([...selectedSeats, seat]);
   };
 
   const handleSuggestGroupSeats = async () => {
@@ -436,7 +518,8 @@ export const SeatSelectionPage = () => {
 
     try {
       const suggestion = buildGroupSeatSuggestion(seats, count);
-      setSelectedSeats(suggestion.seats);
+      const held = await applySeatSelection(suggestion.seats, { force: true });
+      if (!held) return;
       setSeatSuggestion(suggestion);
       setSnackbarMessage(suggestion.message);
       setSnackbarOpen(true);
@@ -509,6 +592,7 @@ export const SeatSelectionPage = () => {
         ? await updateSeats(editingBookingId, showtimeId, seatIds)
         : await create(showtimeId, seatIds, 'ONLINE');
       if (bookingResult && bookingResult.id) {
+        proceedingRef.current = true;
         savePendingBooking({
           id: bookingResult.id,
           movie,
