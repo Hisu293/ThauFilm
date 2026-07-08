@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   AppBar,
-  Avatar,
   Box,
   CssBaseline,
   Drawer,
@@ -20,12 +20,15 @@ import { adminTheme, SIDEBAR_WIDTH } from '../admin/adminTheme';
 import AdminSidebar from '../admin/components/AdminSidebar';
 import AdminContent from '../admin/AdminContent';
 import { useAdminStore } from '../admin/useAdminStore';
+import { useAuth } from '../context/AuthContext';
 import './AdminPage.css';
 
 const AdminPage = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activeView, setActiveView] = useState(ADMIN_VIEWS.DASHBOARD);
   const [mode, setMode] = useState('dark');
+  const navigate = useNavigate();
+  const { logout } = useAuth();
   const store = useAdminStore();
 
   const toggleTheme = () => setMode((prev) => (prev === 'light' ? 'dark' : 'light'));
@@ -54,12 +57,16 @@ const AdminPage = () => {
   );
   const isDark = mode === 'dark';
   const meta = VIEW_META[activeView] || VIEW_META[ADMIN_VIEWS.DASHBOARD];
-  const me = store.me;
-  const adminInitials = (me?.fullName || me?.email || 'AD').charAt(0).toUpperCase();
 
   const handleViewChange = (view) => {
     setActiveView(view);
     setMobileOpen(false);
+  };
+
+  const handleLogout = async () => {
+    setMobileOpen(false);
+    await logout();
+    navigate('/login', { replace: true });
   };
 
   const sidebar = (
@@ -67,6 +74,7 @@ const AdminPage = () => {
       activeView={activeView}
       onViewChange={handleViewChange}
       onNavigate={() => setMobileOpen(false)}
+      onLogout={handleLogout}
     />
   );
 
@@ -137,28 +145,6 @@ const AdminPage = () => {
               <IconButton sx={{ color: 'text.secondary' }}>
                 <NotificationsNoneRoundedIcon />
               </IconButton>
-              {me && (
-                <Box sx={{ display: { xs: 'none', sm: 'block' }, textAlign: 'right', minWidth: 0 }}>
-                  <Typography variant="body2" fontWeight={700} noWrap>
-                    {me.fullName || me.email}
-                  </Typography>
-                  <Typography variant="caption" sx={{ color: 'text.secondary' }} noWrap>
-                    {me.role}
-                  </Typography>
-                </Box>
-              )}
-              <Avatar
-                src={me?.avatarUrl || undefined}
-                sx={{
-                  width: 36,
-                  height: 36,
-                  background: 'linear-gradient(135deg, #e50914, #7c3aed)',
-                  fontWeight: 700,
-                  fontSize: '0.85rem',
-                }}
-              >
-                {adminInitials}
-              </Avatar>
             </Toolbar>
           </AppBar>
 

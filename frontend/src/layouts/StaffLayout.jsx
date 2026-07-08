@@ -13,9 +13,6 @@ import {
   ListItemIcon,
   ListItemText,
   useMediaQuery,
-  Avatar,
-  Menu,
-  MenuItem,
   ThemeProvider,
   createTheme,
   CssBaseline,
@@ -33,7 +30,6 @@ import PeopleAltRoundedIcon from '@mui/icons-material/PeopleAltRounded';
 import LocalOfferRoundedIcon from '@mui/icons-material/LocalOfferRounded';
 import AssessmentRoundedIcon from '@mui/icons-material/AssessmentRounded';
 import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
-import AccountCircleRoundedIcon from '@mui/icons-material/AccountCircleRounded';
 import LightModeRoundedIcon from '@mui/icons-material/LightModeRounded';
 import DarkModeRoundedIcon from '@mui/icons-material/DarkModeRounded';
 import NotificationsNoneRoundedIcon from '@mui/icons-material/NotificationsNoneRounded';
@@ -61,12 +57,7 @@ const StaffLayout = () => {
   const [mode, setMode] = useState('dark');
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout } = useAuth();
-  
-  const userName = user?.fullName || user?.name || user?.email || 'Staff';
-  const userInitial = userName.charAt(0).toUpperCase();
-
-  const [anchorEl, setAnchorEl] = useState(null);
+  const { logout } = useAuth();
 
   const toggleTheme = () => {
     setMode((prevMode) => (prevMode === 'light' ? 'dark' : 'light'));
@@ -118,18 +109,10 @@ const StaffLayout = () => {
     setMobileOpen(!mobileOpen);
   };
 
-  const handleMenuClick = (event) => {
-    setAnchorEl(event.currentTarget);
-  };
-
-  const handleMenuClose = () => {
-    setAnchorEl(null);
-  };
-
-  const handleLogout = () => {
-    handleMenuClose();
-    logout();
-    navigate('/login');
+  const handleLogout = async () => {
+    setMobileOpen(false);
+    await logout();
+    navigate('/login', { replace: true });
   };
 
   // Find current menu item for breadcrumbs
@@ -195,7 +178,22 @@ const StaffLayout = () => {
         </List>
       </Box>
 
-      <Box sx={{ p: 2, flexShrink: 0, borderTop: `1px solid ${theme.palette.divider}` }}>
+      <Stack spacing={1} sx={{ p: 2, flexShrink: 0, borderTop: `1px solid ${theme.palette.divider}` }}>
+        <Button
+          startIcon={<LogoutRoundedIcon />}
+          fullWidth
+          variant="outlined"
+          size="small"
+          onClick={handleLogout}
+          sx={{
+            borderColor: 'rgba(229,9,20,0.4)',
+            color: 'error.main',
+            fontSize: '0.8rem',
+            '&:hover': { borderColor: '#e50914', bgcolor: 'rgba(229,9,20,0.08)' },
+          }}
+        >
+          Đăng xuất
+        </Button>
         <Button
           component={RouterLink}
           to="/"
@@ -213,7 +211,7 @@ const StaffLayout = () => {
         >
           Về trang chủ
         </Button>
-      </Box>
+      </Stack>
     </Box>
   );
 
@@ -311,55 +309,6 @@ const StaffLayout = () => {
                 <NotificationsNoneRoundedIcon />
               </IconButton>
               
-              <Box sx={{ display: { xs: 'none', sm: 'block' }, textAlign: 'right', minWidth: 0, ml: 1 }}>
-                <Typography variant="body2" fontWeight={700} noWrap>
-                  {userName}
-                </Typography>
-                <Typography variant="caption" sx={{ color: 'text.secondary' }} noWrap>
-                  Nhân viên
-                </Typography>
-              </Box>
-              
-              <IconButton onClick={handleMenuClick} size="small" sx={{ p: 0, ml: 1 }}>
-                <Avatar 
-                  src={user?.avatar || undefined}
-                  sx={{ 
-                    width: 36, 
-                    height: 36, 
-                    background: 'linear-gradient(135deg, #e50914, #7c3aed)',
-                    fontWeight: 700,
-                    fontSize: '0.85rem'
-                  }}
-                >
-                  {userInitial}
-                </Avatar>
-              </IconButton>
-              
-              <Menu
-                anchorEl={anchorEl}
-                open={Boolean(anchorEl)}
-                onClose={handleMenuClose}
-                PaperProps={{
-                  elevation: 0,
-                  sx: {
-                    overflow: 'visible',
-                    mt: 1.5,
-                    border: `1px solid ${theme.palette.divider}`,
-                    bgcolor: 'background.paper',
-                    boxShadow: mode === 'dark' ? '0 8px 32px rgba(0,0,0,0.5)' : '0 8px 24px rgba(0,0,0,0.1)',
-                  },
-                }}
-                transformOrigin={{ horizontal: 'right', vertical: 'top' }}
-                anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
-              >
-                <MenuItem onClick={handleMenuClose}>
-                  <AccountCircleRoundedIcon sx={{ mr: 2, color: 'text.secondary' }} /> Hồ sơ
-                </MenuItem>
-                <Divider />
-                <MenuItem onClick={handleLogout} sx={{ color: 'error.main' }}>
-                  <LogoutRoundedIcon sx={{ mr: 2, color: 'inherit' }} /> Đăng xuất
-                </MenuItem>
-              </Menu>
             </Toolbar>
           </AppBar>
 

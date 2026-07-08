@@ -19,6 +19,7 @@ import BookmarkRoundedIcon from '@mui/icons-material/BookmarkRounded';
 import ConfirmationNumberRoundedIcon from '@mui/icons-material/ConfirmationNumberRounded';
 import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded';
 import GroupsRoundedIcon from '@mui/icons-material/GroupsRounded';
+import DashboardRoundedIcon from '@mui/icons-material/DashboardRounded';
 import { useAuth } from '../context/AuthContext';
 
 const getInitials = (name = '') =>
@@ -57,6 +58,12 @@ const UserMenu = () => {
 
   const initials = getInitials(user.name);
   const bgColor = getAvatarColor(user.name);
+  const normalizedRole = String(user.role || '').toUpperCase();
+  const workspace = normalizedRole === 'ADMIN'
+    ? { label: 'Trang Admin', path: '/admin' }
+    : normalizedRole === 'STAFF'
+      ? { label: 'Trang Staff', path: '/staff/dashboard' }
+      : null;
 
   return (
     <>
@@ -173,7 +180,7 @@ const UserMenu = () => {
             </Box>
           </Box>
 
-          {user.role === 'admin' && (
+          {normalizedRole === 'ADMIN' && (
             <Chip
               label="Admin"
               size="small"
@@ -184,6 +191,24 @@ const UserMenu = () => {
         </Box>
 
         <Divider sx={{ borderColor: 'rgba(255,255,255,0.10)', mb: 0.5 }} />
+
+        {workspace && (
+          <>
+            <MenuItem
+              id="menu-workspace"
+              onClick={() => goTo(workspace.path)}
+              sx={{ px: 2.5, py: 1.2, gap: 1.5, '&:hover': { backgroundColor: 'rgba(229,9,20,0.10)' } }}
+            >
+              <ListItemIcon sx={{ color: '#ff5c64', minWidth: 0 }}>
+                <DashboardRoundedIcon fontSize="small" />
+              </ListItemIcon>
+              <Typography sx={{ fontSize: '0.9rem', color: '#ff8a80', fontWeight: 700 }}>
+                {workspace.label}
+              </Typography>
+            </MenuItem>
+            <Divider sx={{ borderColor: 'rgba(255,255,255,0.10)', my: 0.5 }} />
+          </>
+        )}
 
         <MenuItem
           id="menu-profile"

@@ -14,9 +14,10 @@ import {
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
+import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
 import { ADMIN_NAV_GROUPS } from '../adminNav';
 
-const AdminSidebar = ({ activeView, onViewChange, onNavigate }) => {
+const AdminSidebar = ({ activeView, onViewChange, onNavigate, onLogout }) => {
   const [openGroups, setOpenGroups] = useState(() =>
     ADMIN_NAV_GROUPS.filter((g) => g.label).reduce((acc, g) => ({ ...acc, [g.id]: g.defaultOpen ?? false }), {})
   );
@@ -111,7 +112,22 @@ const AdminSidebar = ({ activeView, onViewChange, onNavigate }) => {
         })}
       </Box>
 
-      <Box sx={{ p: 2, flexShrink: 0, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+      <Stack spacing={1} sx={{ p: 2, flexShrink: 0, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+        <Button
+          startIcon={<LogoutRoundedIcon />}
+          fullWidth
+          variant="outlined"
+          size="small"
+          onClick={onLogout}
+          sx={{
+            borderColor: 'rgba(229,9,20,0.4)',
+            color: '#ff5c64',
+            fontSize: '0.8rem',
+            '&:hover': { borderColor: '#e50914', bgcolor: 'rgba(229,9,20,0.08)' },
+          }}
+        >
+          Đăng xuất
+        </Button>
         <Button
           component={RouterLink}
           to="/"
@@ -129,7 +145,7 @@ const AdminSidebar = ({ activeView, onViewChange, onNavigate }) => {
         >
           Về trang chủ
         </Button>
-      </Box>
+      </Stack>
     </Box>
   );
 };
