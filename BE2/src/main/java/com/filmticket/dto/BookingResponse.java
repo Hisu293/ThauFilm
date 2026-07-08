@@ -22,6 +22,7 @@ public class BookingResponse {
     private String customerEmail;
     private String customerPhone;
     private UUID showtimeId;
+    private UUID movieId;
     private String movieTitle;
     private UUID cinemaRoomId;
     private String cinemaRoomName;
@@ -48,10 +49,16 @@ public class BookingResponse {
 
     public static BookingResponse fromBooking(Booking booking, List<ShowtimeSeatResponse> seats,
             String movieTitle, String cinemaRoomName) {
+        return fromBooking(booking, seats, null, movieTitle, cinemaRoomName);
+    }
+
+    public static BookingResponse fromBooking(Booking booking, List<ShowtimeSeatResponse> seats,
+            UUID movieId, String movieTitle, String cinemaRoomName) {
         return BookingResponse.builder()
                 .id(booking.getId())
                 .userId(booking.getUserId())
                 .showtimeId(booking.getShowtimeId())
+                .movieId(movieId)
                 .movieTitle(movieTitle)
                 .cinemaRoomName(cinemaRoomName)
                 .totalAmount(booking.getTotalAmount())

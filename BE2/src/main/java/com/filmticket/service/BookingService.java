@@ -752,10 +752,12 @@ public class BookingService {
 
         String movieTitle = null;
         String cinemaRoomName = null;
+        UUID movieId = null;
         if (booking.getShowtimeId() != null) {
             var optShowtime = showtimeRepository.findById(booking.getShowtimeId());
             if (optShowtime.isPresent()) {
                 Showtime showtime = optShowtime.get();
+                movieId = showtime.getMovieId();
                 movieTitle = movieRepository.findById(showtime.getMovieId())
                         .map(movie -> displayMovieTitle(showtime, movie.getTitle())).orElse(null);
                 cinemaRoomName = cinemaRoomRepository.findById(showtime.getCinemaRoomId())
@@ -763,7 +765,7 @@ public class BookingService {
             }
         }
 
-        return BookingResponse.fromBooking(booking, seatResponses, movieTitle, cinemaRoomName);
+        return BookingResponse.fromBooking(booking, seatResponses, movieId, movieTitle, cinemaRoomName);
     }
 
     private BookingResponse toBookingResponseWithoutSeats(Booking booking) {
@@ -786,10 +788,12 @@ public class BookingService {
 
         String movieTitle = null;
         String cinemaRoomName = null;
+        UUID movieId = null;
         if (booking.getShowtimeId() != null) {
             var optShowtime = showtimeRepository.findById(booking.getShowtimeId());
             if (optShowtime.isPresent()) {
                 Showtime showtime = optShowtime.get();
+                movieId = showtime.getMovieId();
                 movieTitle = movieRepository.findById(showtime.getMovieId())
                         .map(movie -> displayMovieTitle(showtime, movie.getTitle())).orElse(null);
                 cinemaRoomName = cinemaRoomRepository.findById(showtime.getCinemaRoomId())
@@ -797,7 +801,7 @@ public class BookingService {
             }
         }
 
-        return BookingResponse.fromBooking(booking, seatResponses, movieTitle, cinemaRoomName);
+        return BookingResponse.fromBooking(booking, seatResponses, movieId, movieTitle, cinemaRoomName);
     }
 
     private String formatMoney(BigDecimal value) {

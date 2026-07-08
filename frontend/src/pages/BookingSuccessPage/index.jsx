@@ -110,6 +110,7 @@ export const BookingSuccessPage = () => {
   }
 
   const { movie, showtime, selectedSeats, bookingCode, totalAmount, paymentMethod } = bookingData;
+  const movieId = movie?.id || movie?.movieId || showtime?.movieId || bookingData.movieId;
   const originalAmount = Number(bookingData.originalAmount ?? totalAmount) || 0;
   const discountAmount = Number(bookingData.discountAmount) || 0;
   const theaterName = showtime?.theaterName || showtime?.cinemaName || 'ThauFilm Cinema';
@@ -305,6 +306,15 @@ export const BookingSuccessPage = () => {
         >
           Xem vé của tôi
         </CustomButton>
+        {movieId && (
+          <CustomButton
+            variant="primary"
+            onClick={() => navigate(`/movies/${movieId}?watch=1`)}
+            sx={{ px: 4 }}
+          >
+            Xem phim online
+          </CustomButton>
+        )}
       </Stack>
 
       {/* Snackbar Alert for Errors */}

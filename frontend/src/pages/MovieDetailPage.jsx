@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect } from 'react';
-import { Link as RouterLink, useParams, useNavigate } from 'react-router-dom';
+import { Link as RouterLink, useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Box, Button, Chip, Container, Divider,
   Stack, Typography, Dialog, IconButton
@@ -91,6 +91,7 @@ const MovieNotFound = ({ message }) => (
    ===================================================== */
 const MovieDetailPage = () => {
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
   const navigate = useBookingNavigate();
   const { updateBookingState } = useBookingFlow();
   const [movie, setMovie] = useState(null);
@@ -101,6 +102,7 @@ const MovieDetailPage = () => {
   const [streamLoading, setStreamLoading] = useState(false);
   const [streamError, setStreamError] = useState('');
   const [creatingWatchParty, setCreatingWatchParty] = useState(false);
+  const [autoWatchStarted, setAutoWatchStarted] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -186,6 +188,12 @@ const MovieDetailPage = () => {
       setStreamLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!movie || autoWatchStarted || searchParams.get('watch') !== '1') return;
+    setAutoWatchStarted(true);
+    handleOpenOnlineMovie();
+  }, [autoWatchStarted, movie, searchParams]);
 
   const handleCreateWatchParty = async () => {
     setCreatingWatchParty(true);

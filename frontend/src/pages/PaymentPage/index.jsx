@@ -378,6 +378,7 @@ export const PaymentPage = () => {
     navigate('/booking/success', {
       state: {
         bookingId: paidBookingId,
+        movieId: confirmedBooking?.movieId || movie?.id || movie?.movieId || showtime?.movieId,
         movie,
         showtime,
       selectedSeats,

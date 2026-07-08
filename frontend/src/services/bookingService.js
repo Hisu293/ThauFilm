@@ -85,6 +85,7 @@ export const bookingService = {
       id: backendBooking.id,
       userId: backendBooking.userId,
       showtimeId: backendBooking.showtimeId,
+      movieId: backendBooking.movieId ?? null,
       movieTitle: backendBooking.movieTitle || 'Vé xem phim',
       roomName: backendBooking.cinemaRoomName || 'Phòng chiếu',
       startTime: backendBooking.startTime,

@@ -82,7 +82,7 @@ const isDoneTicket = (ticket) => ticket.rawStatus === 'CONFIRMED';
 const isCancelTicket = (ticket) => ['CANCELLED', 'EXPIRED'].includes(ticket.rawStatus);
 
 /* ─── Premium ticket card ─── */
-const TicketCard = ({ ticket, onResume }) => (
+const TicketCard = ({ ticket, onResume, onWatch }) => (
   <article className="pf-ticket">
     <div className="pf-ticket__left">
       <img className="pf-ticket__poster" src={ticket.poster} alt={ticket.movie} loading="lazy" />
@@ -128,6 +128,15 @@ const TicketCard = ({ ticket, onResume }) => (
           >
             <ConfirmationNumberRoundedIcon sx={{ fontSize: 16 }} />
             Tiếp tục thanh toán
+          </button>
+        ) : ticket.rawStatus === 'CONFIRMED' && ticket.movieId ? (
+          <button
+            type="button"
+            className="pf-btn pf-btn--sm pf-btn--pay"
+            onClick={() => onWatch(ticket)}
+          >
+            <ConfirmationNumberRoundedIcon sx={{ fontSize: 16 }} />
+            Xem phim online
           </button>
         ) : ticket.isExpired ? (
           <span className="pf-ticket__hold is-expired">Đã hết hạn giữ ghế</span>
@@ -258,6 +267,7 @@ const ProfilePage = () => {
             return {
               id: b.confirmationCode || b.id,
               bookingId: b.id,
+              movieId: b.movieId || showtimeInfo?.movieId || mergedShowtime?.movieId,
               movie: rawMovieTitle,
               poster,
               cinema: `ThauFilm Cinema • ${rawRoomName}`,
@@ -282,6 +292,8 @@ const ProfilePage = () => {
               canResume: isPending && !isExpired,
               moviePayload: {
                 ...mergedMovie,
+                id: b.movieId || showtimeInfo?.movieId || mergedShowtime?.movieId,
+                movieId: b.movieId || showtimeInfo?.movieId || mergedShowtime?.movieId,
                 title: rawMovieTitle,
                 posterUrl: poster,
               },
@@ -292,6 +304,7 @@ const ProfilePage = () => {
                 room: rawRoomName,
                 format: mergedShowtime?.format || '2D',
                 startTime: rawStartTime,
+                movieId: b.movieId || showtimeInfo?.movieId || mergedShowtime?.movieId,
               },
               selectedSeats,
             };
@@ -364,6 +377,9 @@ const ProfilePage = () => {
   const removeFavorite = (id) => setFavorites((list) => list.filter((m) => m.id !== id));
   const resumePayment = () => {
     navigate('/my-bookings');
+  };
+  const watchOnline = (ticket) => {
+    if (ticket?.movieId) navigate(`/movies/${ticket.movieId}?watch=1`);
   };
 
   const MembershipCard = (
@@ -481,7 +497,7 @@ const ProfilePage = () => {
                 </Box>
               ) : filteredHistory.length ? (
                 <div className="pf-tickets">
-                  {filteredHistory.map((t) => <TicketCard key={t.id} ticket={t} onResume={resumePayment} />)}
+                  {filteredHistory.map((t) => <TicketCard key={t.id} ticket={t} onResume={resumePayment} onWatch={watchOnline} />)}
                 </div>
               ) : (
                 <div className="pf-empty-state" style={{ minHeight: 200 }}>
