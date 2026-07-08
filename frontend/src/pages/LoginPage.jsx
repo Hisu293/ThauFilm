@@ -37,19 +37,6 @@ const fieldLabelSx = {
   color: '#fff',
 };
 
-const LOGIN_POSTER = {
-  tagline: 'ThauFilm',
-  heading: 'Welcome back. Your seat is waiting.',
-  body: "Sign in to book seats faster, manage your bookings, and discover what's trending now.",
-  features: [
-    'Instant e-ticket delivery',
-    'Real-time seat map',
-    'Member-only promotions',
-    'Multi-cinema support',
-  ],
-  pills: ['Premium Experience', 'Secure Checkout', 'Real-time Seats'],
-};
-
 const loadGoogleScript = () => {
   if (window.google?.accounts?.id) {
     return Promise.resolve();
@@ -88,6 +75,7 @@ const LoginPage = () => {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [serverError, setServerError] = useState('');
+  const [showForgotPasswordMessage, setShowForgotPasswordMessage] = useState(false);
 
   const completeLogin = useCallback((body) => {
     const { user, accessToken, refreshToken } = parseAuthResponse(body);
@@ -207,7 +195,7 @@ const LoginPage = () => {
   };
 
   return (
-    <AuthLayout poster={LOGIN_POSTER} maxFormWidth={420}>
+    <AuthLayout maxFormWidth={420}>
       <Stack direction="row" alignItems="center" spacing={1.2} sx={{ mb: 0.5 }}>
         <Box component="img" src="/logo-removebg-preview.png" alt="ThauFilm" sx={{ height: 36, width: 'auto', objectFit: 'contain' }} />
         <Typography
@@ -333,13 +321,24 @@ const LoginPage = () => {
               sx={{ '& .MuiFormControlLabel-label': { color: 'rgba(255,255,255,0.82)', fontSize: '0.9rem' } }}
             />
             <Button
+              type="button"
               variant="text"
               color="inherit"
+              onClick={() => setShowForgotPasswordMessage(true)}
               sx={{ textTransform: 'none', color: 'rgba(255,255,255,0.75)', fontSize: '0.88rem' }}
             >
               Quên mật khẩu?
             </Button>
           </Stack>
+
+          <Collapse in={showForgotPasswordMessage}>
+            <Typography
+              role="status"
+              sx={{ color: '#ffb3b8', textAlign: 'right', fontSize: '0.88rem', fontWeight: 700 }}
+            >
+              Vui lòng liên hệ admin!
+            </Typography>
+          </Collapse>
 
           <Button
             id="login-submit"

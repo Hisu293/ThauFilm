@@ -2,16 +2,12 @@ import { useMemo, useState } from 'react';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import VisibilityOffRoundedIcon from '@mui/icons-material/VisibilityOffRounded';
 import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded';
-import GoogleIcon from '@mui/icons-material/Google';
 import {
   Alert,
   Box,
   Button,
-  Checkbox,
   CircularProgress,
   Collapse,
-  Divider,
-  FormControlLabel,
   IconButton,
   InputAdornment,
   LinearProgress,
@@ -45,19 +41,6 @@ function getPasswordStrength(pw) {
 }
 
 /* ─── Left-panel copy (register-specific) ───────────────────────── */
-const REGISTER_POSTER = {
-  tagline: 'ThauFilm',
-  heading: 'Your front-row seat\u00a0starts here.',
-  body: 'Book your favourite movies anytime, anywhere. Get exclusive early access, member discounts, and real-time seat selection.',
-  features: [
-    'Instant e-ticket delivery',
-    'Real-time seat map',
-    'Member-only promotions',
-    'Multi-cinema support',
-  ],
-  pills: ['Premium Experience', 'Secure Checkout', 'Real-time Seats'],
-};
-
 /* ─── Component ─────────────────────────────────────────────────── */
 const RegisterPage = () => {
   const navigate = useNavigate();
@@ -71,8 +54,6 @@ const RegisterPage = () => {
   });
   const [showPw,        setShowPw]        = useState(false);
   const [showCpw,       setShowCpw]       = useState(false);
-  const [acceptTerms,   setAcceptTerms]   = useState(false);
-  const [subscribePromo, setSubscribePromo] = useState(false);
   const [submitted,     setSubmitted]     = useState(false);
   const [success,       setSuccess]       = useState(false);
   const [serverError,   setServerError]   = useState('');
@@ -106,10 +87,8 @@ const RegisterPage = () => {
       e.confirmPassword = 'Vui lòng xác nhận mật khẩu.';
     else if (form.password !== form.confirmPassword)
       e.confirmPassword = 'Mật khẩu xác nhận không khớp.';
-    if (!acceptTerms)
-      e.terms = 'Bạn phải đồng ý với Điều khoản và Điều kiện.';
     return e;
-  }, [submitted, form, acceptTerms]);
+  }, [submitted, form]);
 
   /* ── Live mismatch — shown before submit ── */
   const liveMismatch =
@@ -133,8 +112,7 @@ const RegisterPage = () => {
       !PHONE_RE.test(form.phone.trim()) ||
       !form.password ||
       form.password.length < 6 ||
-      form.password !== form.confirmPassword ||
-      !acceptTerms;
+      form.password !== form.confirmPassword;
 
     if (hasErrors) return;
 
@@ -167,7 +145,7 @@ const RegisterPage = () => {
   };
 
   return (
-    <AuthLayout poster={REGISTER_POSTER} maxFormWidth={460}>
+    <AuthLayout maxFormWidth={460}>
 
       <Stack direction="row" alignItems="center" spacing={1.2} sx={{ mb: 0.5 }}>
         <Box component="img" src="/logo-removebg-preview.png" alt="ThauFilm" sx={{ height: 36, width: 'auto', objectFit: 'contain' }} />
@@ -371,60 +349,6 @@ const RegisterPage = () => {
             }}
           />
 
-          {/* Checkboxes */}
-          <Stack spacing={0.5} sx={{ mt: -0.5 }}>
-            <FormControlLabel
-              control={
-                <Checkbox
-                  id="reg-terms"
-                  checked={acceptTerms}
-                  onChange={(e) => setAcceptTerms(e.target.checked)}
-                  color="primary"
-                  size="small"
-                />
-              }
-              label={
-                <Typography
-                  variant="body2"
-                  sx={{ color: errors.terms ? '#ff8a80' : 'rgba(255,255,255,0.82)' }}
-                >
-                  Tôi đồng ý với{' '}
-                  <Button
-                    variant="text"
-                    color="primary"
-                    sx={{ textTransform: 'none', p: 0, minWidth: 'unset', fontWeight: 700, fontSize: 'inherit' }}
-                  >
-                    Điều khoản và Điều kiện
-                  </Button>
-                  {' '}và{' '}
-                  <Button
-                    variant="text"
-                    color="primary"
-                    sx={{ textTransform: 'none', p: 0, minWidth: 'unset', fontWeight: 700, fontSize: 'inherit' }}
-                  >
-                    Chính sách bảo mật
-                  </Button>
-                </Typography>
-              }
-            />
-            <FormControlLabel
-              control={
-                <Checkbox
-                  id="reg-promo"
-                  checked={subscribePromo}
-                  onChange={(e) => setSubscribePromo(e.target.checked)}
-                  color="primary"
-                  size="small"
-                />
-              }
-              label={
-                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.72)' }}>
-                  Đăng ký nhận khuyến mãi và ưu đãi độc quyền
-                </Typography>
-              }
-            />
-          </Stack>
-
           {/* Register Button */}
           <Button
             id="reg-submit"
@@ -450,39 +374,11 @@ const RegisterPage = () => {
             {loading ? <CircularProgress size={22} color="inherit" /> : 'Tạo tài khoản'}
           </Button>
 
-          <Divider sx={{ color: 'rgba(255,255,255,0.42)', fontSize: '0.8rem' }}>hoặc</Divider>
-
-          {/* Google */}
-          <Button
-            id="reg-google"
-            type="button"
-            variant="outlined"
-            color="inherit"
-            size="large"
-            fullWidth
-            startIcon={<GoogleIcon />}
-            sx={{
-              textTransform: 'none',
-              fontWeight: 700,
-              borderColor: 'rgba(255,255,255,0.35)',
-              color: '#fff',
-              borderRadius: '10px',
-              py: 1.2,
-              '&:hover': {
-                borderColor: 'rgba(255,255,255,0.65)',
-                backgroundColor: 'rgba(255,255,255,0.05)',
-              },
-            }}
-          >
-            Tiếp tục với Google
-          </Button>
-
-          {/* Login link */}
           <Typography
             variant="body2"
             sx={{ color: 'rgba(255,255,255,0.75)', textAlign: 'center', mt: 0.5 }}
           >
-            Bạn đã có tài khoản?{' '}
+            Đã có tài khoản?{' '}
             <Button
               id="reg-login-link"
               component={RouterLink}
