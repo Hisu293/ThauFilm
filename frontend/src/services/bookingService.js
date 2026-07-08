@@ -23,8 +23,9 @@ export const bookingService = {
         const parsed = Number(seat.seatNumber);
         const col = Number.isFinite(parsed) ? parsed : 1;
 
+        const heldByMe = Boolean(seat.heldByMe ?? seat.isHeldByMe);
         const bookingStatus = String(seat.status || (seat.available ? 'AVAILABLE' : 'SOLD')).toUpperCase();
-        const isSold = seat.available === false || ['HOLDING', 'BOOKED', 'SOLD'].includes(bookingStatus);
+        const isSold = !heldByMe && (seat.available === false || ['HOLDING', 'BOOKED', 'SOLD'].includes(bookingStatus));
 
         return {
           id,
@@ -36,6 +37,7 @@ export const bookingService = {
           type: normalizeSeatType(seat.type),
           price: Number(seat.price) || 0,
           bookingStatus,
+          heldByMe,
           isSold,
         };
       })
