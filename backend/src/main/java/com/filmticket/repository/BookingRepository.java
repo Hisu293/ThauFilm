@@ -23,6 +23,14 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
     @Query("SELECT b FROM Booking b WHERE b.showtimeId = :showtimeId AND b.status = :status AND EXISTS (SELECT bs FROM BookingSeat bs WHERE bs.bookingId = b.id AND bs.seatId = :seatId)")
     boolean existsByShowtimeIdAndStatusAndSeatId(@Param("showtimeId") UUID showtimeId, @Param("status") BookingStatus status, @Param("seatId") UUID seatId);
 
+    @Query("SELECT CASE WHEN COUNT(b) > 0 THEN true ELSE false END " +
+            "FROM Booking b WHERE b.showtimeId = :showtimeId AND b.status = :status AND b.id <> :bookingId " +
+            "AND EXISTS (SELECT bs FROM BookingSeat bs WHERE bs.bookingId = b.id AND bs.seatId = :seatId)")
+    boolean existsByShowtimeIdAndStatusAndSeatIdAndIdNot(@Param("showtimeId") UUID showtimeId,
+                                                         @Param("status") BookingStatus status,
+                                                         @Param("seatId") UUID seatId,
+                                                         @Param("bookingId") UUID bookingId);
+
     @Query("SELECT b FROM Booking b WHERE b.status = :status AND b.holdExpiresAt < :now")
     List<Booking> findExpiredHolds(@Param("status") BookingStatus status, @Param("now") LocalDateTime now);
 

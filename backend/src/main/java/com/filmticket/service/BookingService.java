@@ -212,28 +212,12 @@ public class BookingService {
             throw new BadRequestException("Cannot book a past showtime");
         }
 
-        List<SeatAvailability> availabilities = new ArrayList<>();
-        List<Seat> seats = new ArrayList<>();
-        BigDecimal seatTotal = BigDecimal.ZERO;
-
-        for (UUID seatId : request.getSeatIds()) {
-            SeatAvailability av = seatAvailabilityRepository
-                    .findByShowtimeIdAndSeatId(request.getShowtimeId(), seatId)
-                    .orElseThrow(() -> new BadRequestException("Seat not found in this showtime: " + seatId));
-
-            if (av.getStatus() != SeatBookingStatus.AVAILABLE) {
-                Seat seat = seatRepository.findById(seatId).orElse(null);
-                String seatInfo = seat != null ? seat.getRowName() + seat.getSeatNumber() : seatId.toString();
-                throw new BadRequestException("Seat is already taken: " + seatInfo);
-            }
-
-            availabilities.add(av);
-            Seat seat = seatRepository.findById(seatId).orElse(null);
-            if (seat != null) {
-                seats.add(seat);
-            }
-            seatTotal = seatTotal.add(av.getPrice());
-        }
+        List<UUID> requestedSeatIds = normalizeSeatIds(request.getSeatIds());
+        List<SeatAvailability> availabilities = lockAvailableSeats(request.getShowtimeId(), requestedSeatIds);
+        List<Seat> seats = loadSeatsInOrder(requestedSeatIds);
+        BigDecimal seatTotal = availabilities.stream()
+                .map(SeatAvailability::getPrice)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         BigDecimal comboTotal = BigDecimal.ZERO;
         if (request.getComboIds() != null && !request.getComboIds().isEmpty()) {
@@ -247,11 +231,6 @@ public class BookingService {
         if (!"ONLINE".equalsIgnoreCase(request.getChannel()) && !"OFFLINE".equalsIgnoreCase(request.getChannel())) {
             throw new BadRequestException("Invalid booking channel: " + request.getChannel());
         }
-
-        for (SeatAvailability av : availabilities) {
-            av.setStatus(SeatBookingStatus.HOLDING);
-        }
-        seatAvailabilityRepository.saveAll(availabilities);
 
         Booking booking = Booking.builder()
                 .userId(userId)
@@ -332,33 +311,20 @@ public class BookingService {
         }
 
         // Nhả ghế cũ
+        if (!booking.getShowtimeId().equals(request.getShowtimeId())) {
+            throw new BadRequestException("Cannot change seats to a different showtime");
+        }
+
         releaseSeats(booking);
         bookingSeatRepository.deleteAll(bookingSeatRepository.findByBookingId(bookingId));
 
         // Khóa ghế mới
-        List<SeatAvailability> newAvailabilities = new ArrayList<>();
-        List<Seat> newSeats = new ArrayList<>();
-        BigDecimal seatTotal = BigDecimal.ZERO;
-
-        for (UUID seatId : request.getSeatIds()) {
-            SeatAvailability av = seatAvailabilityRepository
-                    .findByShowtimeIdAndSeatId(request.getShowtimeId(), seatId)
-                    .orElseThrow(() -> new BadRequestException("Seat not found: " + seatId));
-
-            if (av.getStatus() != SeatBookingStatus.AVAILABLE) {
-                throw new BadRequestException("Seat is already taken: " + seatId);
-            }
-
-            av.setStatus(SeatBookingStatus.HOLDING);
-            newAvailabilities.add(av);
-
-            Seat seat = seatRepository.findById(seatId).orElse(null);
-            if (seat != null) newSeats.add(seat);
-
-            seatTotal = seatTotal.add(av.getPrice());
-        }
-
-        seatAvailabilityRepository.saveAll(newAvailabilities);
+        List<UUID> requestedSeatIds = normalizeSeatIds(request.getSeatIds());
+        List<SeatAvailability> newAvailabilities = lockAvailableSeats(request.getShowtimeId(), requestedSeatIds);
+        List<Seat> newSeats = loadSeatsInOrder(requestedSeatIds);
+        BigDecimal seatTotal = newAvailabilities.stream()
+                .map(SeatAvailability::getPrice)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         for (int i = 0; i < newSeats.size(); i++) {
             BookingSeat bs = BookingSeat.builder()
@@ -509,9 +475,11 @@ public class BookingService {
 
         booking.setStatus(BookingStatus.CONFIRMED);
         booking.setConfirmedAt(now());
-        booking = bookingRepository.save(booking);
 
         List<BookingSeat> bookingSeats = bookingSeatRepository.findByBookingId(booking.getId());
+        markHeldSeatsSold(booking, bookingSeats);
+
+        booking = bookingRepository.save(booking);
         User user = userRepository.findById(booking.getUserId()).orElse(null);
 
         List<Ticket> tickets = ticketRepository.findByBookingId(booking.getId());
@@ -625,11 +593,93 @@ public class BookingService {
             SeatAvailability av = seatAvailabilityRepository
                     .findByShowtimeIdAndSeatId(booking.getShowtimeId(), bs.getSeatId())
                     .orElse(null);
-            if (av != null) {
+            if (av != null && av.getStatus() == SeatBookingStatus.HOLDING) {
                 av.setStatus(SeatBookingStatus.AVAILABLE);
                 seatAvailabilityRepository.save(av);
             }
         }
+    }
+
+    private List<UUID> normalizeSeatIds(List<UUID> seatIds) {
+        if (seatIds == null || seatIds.isEmpty()) {
+            throw new BadRequestException("Please select at least one seat");
+        }
+        LinkedHashSet<UUID> uniqueSeatIds = new LinkedHashSet<>(seatIds);
+        if (uniqueSeatIds.size() != seatIds.size()) {
+            throw new BadRequestException("Duplicate seats are not allowed");
+        }
+        return new ArrayList<>(uniqueSeatIds);
+    }
+
+    private List<SeatAvailability> lockAvailableSeats(UUID showtimeId, List<UUID> seatIds) {
+        List<SeatAvailability> locked = seatAvailabilityRepository.lockByShowtimeIdAndSeatIdIn(showtimeId, seatIds);
+        Map<UUID, SeatAvailability> availabilityBySeatId = locked.stream()
+                .collect(Collectors.toMap(SeatAvailability::getSeatId, availability -> availability));
+
+        List<SeatAvailability> ordered = new ArrayList<>();
+        for (UUID seatId : seatIds) {
+            SeatAvailability availability = availabilityBySeatId.get(seatId);
+            if (availability == null) {
+                throw new BadRequestException("Seat not found in this showtime: " + seatId);
+            }
+            if (availability.getStatus() != SeatBookingStatus.AVAILABLE) {
+                Seat seat = seatRepository.findById(seatId).orElse(null);
+                String seatInfo = seat != null ? seat.getRowName() + seat.getSeatNumber() : seatId.toString();
+                throw new BadRequestException("Seat is already taken: " + seatInfo);
+            }
+            availability.setStatus(SeatBookingStatus.HOLDING);
+            ordered.add(availability);
+        }
+
+        return seatAvailabilityRepository.saveAll(ordered);
+    }
+
+    private List<Seat> loadSeatsInOrder(List<UUID> seatIds) {
+        Map<UUID, Seat> seatById = seatRepository.findAllById(seatIds).stream()
+                .collect(Collectors.toMap(Seat::getId, seat -> seat));
+        List<Seat> seats = new ArrayList<>();
+        for (UUID seatId : seatIds) {
+            Seat seat = seatById.get(seatId);
+            if (seat == null) {
+                throw new BadRequestException("Seat not found: " + seatId);
+            }
+            seats.add(seat);
+        }
+        return seats;
+    }
+
+    private void markHeldSeatsSold(Booking booking, List<BookingSeat> bookingSeats) {
+        if (bookingSeats.isEmpty()) {
+            return;
+        }
+
+        List<UUID> seatIds = bookingSeats.stream()
+                .map(BookingSeat::getSeatId)
+                .toList();
+        List<SeatAvailability> locked = seatAvailabilityRepository.lockByShowtimeIdAndSeatIdIn(booking.getShowtimeId(), seatIds);
+        Map<UUID, SeatAvailability> availabilityBySeatId = locked.stream()
+                .collect(Collectors.toMap(SeatAvailability::getSeatId, availability -> availability));
+
+        for (BookingSeat bookingSeat : bookingSeats) {
+            SeatAvailability availability = availabilityBySeatId.get(bookingSeat.getSeatId());
+            if (availability == null) {
+                throw new BadRequestException("Seat not found in this showtime: " + bookingSeat.getSeatId());
+            }
+            if (bookingRepository.existsByShowtimeIdAndStatusAndSeatIdAndIdNot(
+                    booking.getShowtimeId(), BookingStatus.CONFIRMED, bookingSeat.getSeatId(), booking.getId())) {
+                Seat seat = seatRepository.findById(bookingSeat.getSeatId()).orElse(null);
+                String seatInfo = seat != null ? seat.getRowName() + seat.getSeatNumber() : bookingSeat.getSeatId().toString();
+                throw new BadRequestException("Seat has already been confirmed by another booking: " + seatInfo);
+            }
+            if (availability.getStatus() != SeatBookingStatus.HOLDING) {
+                Seat seat = seatRepository.findById(bookingSeat.getSeatId()).orElse(null);
+                String seatInfo = seat != null ? seat.getRowName() + seat.getSeatNumber() : bookingSeat.getSeatId().toString();
+                throw new BadRequestException("Seat is no longer held by this booking: " + seatInfo);
+            }
+            availability.setStatus(SeatBookingStatus.SOLD);
+        }
+
+        seatAvailabilityRepository.saveAll(locked);
     }
 
     private void sendTicketEmail(String to, Booking booking, List<Ticket> tickets, Payment payment,
