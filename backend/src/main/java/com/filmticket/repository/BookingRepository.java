@@ -36,7 +36,8 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
     @Query("SELECT CASE WHEN COUNT(b) > 0 THEN true ELSE false END " +
             "FROM Booking b, Showtime s WHERE b.showtimeId = s.id " +
             "AND b.userId = :userId AND b.status = :status " +
-            "AND s.movieId = :movieId AND s.endTime <= :now")
+            "AND s.movieId = :movieId " +
+            "AND ((s.online = true AND s.startTime <= :now) OR (s.online = false AND s.endTime <= :now))")
     boolean hasCompletedMovieBooking(@Param("userId") UUID userId,
                                      @Param("movieId") UUID movieId,
                                      @Param("status") BookingStatus status,
