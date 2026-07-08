@@ -1,5 +1,5 @@
 ﻿import { useState, useEffect, useCallback } from 'react';
-import { Link as RouterLink, useParams, useSearchParams } from 'react-router-dom';
+import { Link as RouterLink, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   Box, Button, Chip, Container, Divider,
   Stack, Typography, Dialog, IconButton
@@ -19,6 +19,7 @@ import ForumRoundedIcon from '@mui/icons-material/ForumRounded';
 import { fetchMovieById } from '../services/movieService';
 import movieStreamService from '../services/movieStreamService';
 import watchPartyService from '../services/watchPartyService';
+import { getAccessToken } from '../utils/authStorage';
 import { useBookingFlow } from '../context/BookingContext';
 import { useBookingNavigate } from '../context/BookingNavigationContext';
 import BookingStepper from '../components/BookingStepper';
@@ -93,6 +94,7 @@ const MovieDetailPage = () => {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useBookingNavigate();
+  const routeNavigate = useNavigate();
   const { updateBookingState } = useBookingFlow();
   const [movie, setMovie] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -148,6 +150,10 @@ const MovieDetailPage = () => {
 
   const handleOpenOnlineMovie = useCallback(async () => {
     if (!movie?.id) return;
+    if (!getAccessToken()) {
+      routeNavigate('/login', { state: { from: `/movies/${movie.id}` } });
+      return;
+    }
     setOpenOnlineMovie(true);
     setStreamLoading(true);
     setStreamError('');
@@ -156,11 +162,11 @@ const MovieDetailPage = () => {
       setOnlineStreamUrl(stream?.streamUrl || '');
     } catch (err) {
       setOnlineStreamUrl('');
-      setStreamError(err.message || 'Khong the lay link xem phim online.');
+      setStreamError(err.message || 'Không thể lấy link xem phim online.');
     } finally {
       setStreamLoading(false);
     }
-  }, [movie?.id]);
+  }, [movie?.id, routeNavigate]);
 
   useEffect(() => {
     if (!movie || autoWatchStarted || searchParams.get('watch') !== '1') return;
@@ -449,16 +455,23 @@ const MovieDetailPage = () => {
           >
             <CloseIcon />
           </IconButton>
-          <HlsVideoPlayer
-            key={onlineStreamUrl}
-            src={onlineStreamUrl}
-            title={`${movie.title} Online`}
-            poster={posterSrc}
-          />
+          {streamLoading && (
+            <Box sx={{ color: '#e5e7eb', fontWeight: 700, px: 1, py: 1.5 }}>
+              Đang lấy link xem phim online...
+            </Box>
+          )}
           {streamError && (
             <Box sx={{ color: '#fca5a5', fontWeight: 700, px: 1, py: 1.5 }}>
               {streamError}
             </Box>
+          )}
+          {!streamLoading && !streamError && onlineStreamUrl && (
+            <HlsVideoPlayer
+              key={onlineStreamUrl}
+              src={onlineStreamUrl}
+              title={`${movie.title} Online`}
+              poster={posterSrc}
+            />
           )}
         </Box>
       </Dialog>
