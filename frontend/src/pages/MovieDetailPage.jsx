@@ -1,5 +1,5 @@
-﻿import { useState, useEffect } from 'react';
-import { Link as RouterLink, useParams, useNavigate, useSearchParams } from 'react-router-dom';
+﻿import { useState, useEffect, useCallback } from 'react';
+import { Link as RouterLink, useParams, useSearchParams } from 'react-router-dom';
 import {
   Box, Button, Chip, Container, Divider,
   Stack, Typography, Dialog, IconButton
@@ -146,6 +146,28 @@ const MovieDetailPage = () => {
     return () => { cancelled = true; };
   }, [id]);
 
+  const handleOpenOnlineMovie = useCallback(async () => {
+    if (!movie?.id) return;
+    setOpenOnlineMovie(true);
+    setStreamLoading(true);
+    setStreamError('');
+    try {
+      const stream = await movieStreamService.getMovieStream(movie.id);
+      setOnlineStreamUrl(stream?.streamUrl || '');
+    } catch (err) {
+      setOnlineStreamUrl('');
+      setStreamError(err.message || 'Khong the lay link xem phim online.');
+    } finally {
+      setStreamLoading(false);
+    }
+  }, [movie?.id]);
+
+  useEffect(() => {
+    if (!movie || autoWatchStarted || searchParams.get('watch') !== '1') return;
+    setAutoWatchStarted(true);
+    handleOpenOnlineMovie();
+  }, [autoWatchStarted, handleOpenOnlineMovie, movie, searchParams]);
+
   if (loading) return <MovieDetailSkeleton />;
   if (error || !movie) return <MovieNotFound message={error} />;
 
@@ -173,27 +195,6 @@ const MovieDetailPage = () => {
       }
     });
   };
-
-  const handleOpenOnlineMovie = async () => {
-    setOpenOnlineMovie(true);
-    setStreamLoading(true);
-    setStreamError('');
-    try {
-      const stream = await movieStreamService.getMovieStream(movie.id);
-      setOnlineStreamUrl(stream?.streamUrl || '');
-    } catch (err) {
-      setOnlineStreamUrl('');
-      setStreamError(err.message || 'Khong the lay link xem phim online.');
-    } finally {
-      setStreamLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    if (!movie || autoWatchStarted || searchParams.get('watch') !== '1') return;
-    setAutoWatchStarted(true);
-    handleOpenOnlineMovie();
-  }, [autoWatchStarted, movie, searchParams]);
 
   const handleCreateWatchParty = async () => {
     setCreatingWatchParty(true);
