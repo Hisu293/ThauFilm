@@ -48,6 +48,7 @@ public class MovieChatbotService {
     );
 
     private final MovieRepository movieRepository;
+    private final S3PresignedUrlService s3PresignedUrlService;
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
@@ -447,7 +448,7 @@ public class MovieChatbotService {
                 .genre(movie.getGenre())
                 .durationMinutes(movie.getDurationMinutes())
                 .rating(movie.getRating())
-                .posterUrl(movie.getPosterUrl())
+                .posterUrl(s3PresignedUrlService.resolvePosterUrl(movie.getPosterUrl()))
                 .status(movie.getStatus() != null ? movie.getStatus().name() : null)
                 .reason(reason)
                 .build();

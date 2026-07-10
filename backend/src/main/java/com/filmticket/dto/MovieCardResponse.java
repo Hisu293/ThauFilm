@@ -19,10 +19,14 @@ public class MovieCardResponse {
     private Movie.Status status;
 
     public static MovieCardResponse fromMovie(Movie movie) {
+        return fromMovie(movie, movie.getPosterUrl());
+    }
+
+    public static MovieCardResponse fromMovie(Movie movie, String posterUrl) {
         return MovieCardResponse.builder()
                 .id(movie.getId())
                 .title(movie.getTitle())
-                .posterUrl(movie.getPosterUrl())
+                .posterUrl(posterUrl)
                 .status(movie.getStatus())
                 .build();
     }
