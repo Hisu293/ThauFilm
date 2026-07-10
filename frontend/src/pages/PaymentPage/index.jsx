@@ -148,7 +148,7 @@ const getDiscountAmount = (discount, subtotal) => {
 export const PaymentPage = () => {
   const location = useLocation();
   const navigate = useBookingNavigate();
-  const { loading: apiLoading, error: apiError, clearError, getDetail, getTickets, create, pay, cancel } = useBooking();
+  const { loading: apiLoading, error: apiError, clearError, getDetail, getTickets, create, pay, syncPayment, cancel } = useBooking();
   const { updateBookingState, clearBookingState } = useBookingFlow();
 
   const [bookingId, setBookingId] = useState(null);
@@ -531,6 +531,7 @@ export const PaymentPage = () => {
     setCheckingPayment(true);
     setCheckoutNotice('');
     try {
+      await syncPayment(payosCheckout.bookingId);
       const confirmedBooking = await getDetail(payosCheckout.bookingId);
       if (String(confirmedBooking?.status || '').toUpperCase() !== 'CONFIRMED') {
         setCheckoutNotice('Chưa nhận được xác nhận thanh toán từ PayOS. Vui lòng kiểm tra lại sau vài giây.');

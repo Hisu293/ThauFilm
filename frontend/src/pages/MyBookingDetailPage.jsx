@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   Alert,
   Box,
@@ -62,7 +62,8 @@ const canCancelBooking = (status) => ['HOLD', 'PENDING'].includes(String(status 
 const MyBookingDetailPage = () => {
   const { bookingId } = useParams();
   const navigate = useNavigate();
-  const { loading, error, clearError, getDetail, getTickets, cancel } = useBooking();
+  const [searchParams] = useSearchParams();
+  const { loading, error, clearError, getDetail, getTickets, syncPayment, cancel } = useBooking();
   const [booking, setBooking] = useState(null);
   const [tickets, setTickets] = useState([]);
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -72,8 +73,13 @@ const MyBookingDetailPage = () => {
 
   useEffect(() => {
     let active = true;
+    const payosReturnedPaid = String(searchParams.get('status') || '').toUpperCase() === 'PAID'
+      && String(searchParams.get('cancel') || '').toLowerCase() !== 'true';
+    const detailPromise = (payosReturnedPaid ? syncPayment(bookingId).catch(() => null) : Promise.resolve(null))
+      .then(() => getDetail(bookingId));
+
     Promise.all([
-      getDetail(bookingId),
+      detailPromise,
       getTickets(bookingId).catch(() => []),
       bookingApi.fetchShowtimes().catch(() => []),
     ])
@@ -84,8 +90,34 @@ const MyBookingDetailPage = () => {
           bookingService.normalizeShowtimes(Array.isArray(rawShowtimes) ? rawShowtimes : [])
             .map((showtime) => [String(showtime.id), showtime]),
         );
-        setBooking(enrichBooking(bookingDetail, showtimeMap));
-        setTickets(Array.isArray(ticketList) ? ticketList : []);
+        const enrichedBooking = enrichBooking(bookingDetail, showtimeMap);
+        const normalizedTickets = Array.isArray(ticketList) ? ticketList : [];
+        setBooking(enrichedBooking);
+        setTickets(normalizedTickets);
+        if (payosReturnedPaid && String(enrichedBooking?.status || '').toUpperCase() === 'CONFIRMED') {
+          navigate('/booking/success', {
+            replace: true,
+            state: {
+              bookingId,
+              movie: { title: enrichedBooking.movieTitle },
+              showtime: {
+                room: enrichedBooking.roomName,
+                theaterName: enrichedBooking.theaterName || 'ThauFilm Cinema',
+                startTime: enrichedBooking.startTime,
+                date: enrichedBooking.startTime ? String(enrichedBooking.startTime).slice(0, 10) : '',
+                time: enrichedBooking.startTime ? String(enrichedBooking.startTime).slice(11, 16) : '',
+                format: enrichedBooking.showtimeFormat || '2D',
+              },
+              selectedSeats: enrichedBooking.seats || [],
+              bookingCode: enrichedBooking.confirmationCode,
+              tickets: normalizedTickets,
+              originalAmount: enrichedBooking.originalAmount,
+              discountAmount: enrichedBooking.discountAmount,
+              totalAmount: enrichedBooking.totalAmount,
+              paymentMethod: enrichedBooking.paymentMethod || 'PAYOS',
+            },
+          });
+        }
       })
       .catch(() => {})
       .finally(() => {
@@ -94,7 +126,7 @@ const MyBookingDetailPage = () => {
     return () => {
       active = false;
     };
-  }, [bookingId, getDetail, getTickets]);
+  }, [bookingId, getDetail, getTickets, navigate, searchParams, syncPayment]);
 
   const seatLabels = useMemo(() => (booking?.seats || []).map((seat) => seat.label).join(', '), [booking]);
 

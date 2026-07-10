@@ -452,9 +452,45 @@ public class BookingService {
         confirmExternalPayment(payment);
     }
 
-    private void confirmExternalPayment(Payment payment) {
+    @Transactional
+    public BookingPaymentResponse syncPayosPayment(UUID bookingId, UUID userId) {
+        Booking booking = bookingRepository.findByIdAndUserId(bookingId, userId)
+                .orElseThrow(() -> new BadRequestException("Booking not found"));
+        Payment payment = paymentRepository.findByBookingId(bookingId)
+                .filter(item -> "PAYOS".equalsIgnoreCase(String.valueOf(item.getProvider()))
+                        || "PAYOS".equalsIgnoreCase(String.valueOf(item.getPaymentMethod())))
+                .orElseThrow(() -> new BadRequestException("PayOS payment not found for this booking"));
+
+        if (booking.getStatus() == BookingStatus.CONFIRMED && payment.getStatus() == PaymentStatus.PAID) {
+            List<TicketResponse> tickets = ticketRepository.findByBookingId(bookingId).stream()
+                    .map(TicketResponse::fromTicket)
+                    .toList();
+            BigDecimal originalAmount = booking.getTotalAmount();
+            BigDecimal discountAmount = originalAmount.subtract(payment.getAmount()).max(BigDecimal.ZERO);
+            return BookingPaymentResponse.fromPaymentResult(booking, payment, tickets, originalAmount, discountAmount, null);
+        }
+
+        PaymentGatewayService.PayosPaymentStatus status =
+                paymentGatewayService.getPayosPaymentStatus(payment.getProviderCheckoutId());
+        if (!status.paid()) {
+            throw new BadRequestException("PayOS payment is not paid yet");
+        }
+
+        payment.setProviderPaymentId(status.paymentId());
+        payment.setTransactionId(status.orderCode());
+        return confirmExternalPayment(payment);
+    }
+
+    private BookingPaymentResponse confirmExternalPayment(Payment payment) {
         if (payment.getStatus() == PaymentStatus.PAID) {
-            return;
+            Booking booking = bookingRepository.findById(payment.getBookingId())
+                    .orElseThrow(() -> new BadRequestException("Booking not found"));
+            List<TicketResponse> tickets = ticketRepository.findByBookingId(booking.getId()).stream()
+                    .map(TicketResponse::fromTicket)
+                    .toList();
+            BigDecimal originalAmount = booking.getTotalAmount();
+            BigDecimal discountAmount = originalAmount.subtract(payment.getAmount()).max(BigDecimal.ZERO);
+            return BookingPaymentResponse.fromPaymentResult(booking, payment, tickets, originalAmount, discountAmount, null);
         }
         Booking booking = bookingRepository.findById(payment.getBookingId())
                 .orElseThrow(() -> new BadRequestException("Booking not found"));

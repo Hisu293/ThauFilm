@@ -111,6 +111,10 @@ export const bookingApi = {
     return axiosClient.post(`/api/member/booking/${bookingId}/pay`, payload);
   },
 
+  syncPayment: (bookingId) => {
+    return axiosClient.post(`/api/member/booking/${bookingId}/sync-payment`);
+  },
+
   // Cancel a held booking and release seats: POST /api/member/booking/{bookingId}/cancel
   cancelBooking: (bookingId) => {
     return axiosClient.post(`/api/member/booking/${bookingId}/cancel`);
