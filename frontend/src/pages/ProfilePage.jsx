@@ -4,9 +4,6 @@ import PersonRoundedIcon from '@mui/icons-material/PersonRounded';
 import EventSeatRoundedIcon from '@mui/icons-material/EventSeatRounded';
 import FavoriteRoundedIcon from '@mui/icons-material/FavoriteRounded';
 import FavoriteBorderRoundedIcon from '@mui/icons-material/FavoriteBorderRounded';
-import LockRoundedIcon from '@mui/icons-material/LockRounded';
-import NotificationsRoundedIcon from '@mui/icons-material/NotificationsRounded';
-import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded';
 import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
 import WorkspacePremiumRoundedIcon from '@mui/icons-material/WorkspacePremiumRounded';
 import StarRoundedIcon from '@mui/icons-material/StarRounded';
@@ -27,8 +24,10 @@ import { profileUser, favoriteMovies } from '../data/profileMock';
 import { useBooking } from '../hooks/useBooking';
 import { bookingApi } from '../api/bookingApi';
 import { bookingService } from '../services/bookingService';
+import { fetchMovies } from '../services/movieService';
 import { MOCK_MOVIES } from '../mock/bookingData';
 import { getPendingBooking, mergeMovieContext, mergeShowtimeContext } from '../utils/pendingBookingStorage';
+import { buildMovieLookup, findMovie } from '../utils/movieLookup';
 import { CircularProgress } from '@mui/material';
 import Box from '@mui/material/Box';
 import './ProfilePage.css';
@@ -36,10 +35,6 @@ import './ProfilePage.css';
 const MENU = [
   { key: 'info', label: 'Thông Tin Cá Nhân', Icon: PersonRoundedIcon },
   { key: 'history', label: 'Vé Của Tôi', Icon: ConfirmationNumberRoundedIcon },
-  { key: 'favorites', label: 'Phim Đã Lưu', Icon: FavoriteRoundedIcon },
-  { key: 'password', label: 'Đổi Mật Khẩu', Icon: LockRoundedIcon },
-  { key: 'notifications', label: 'Thông Báo', Icon: NotificationsRoundedIcon },
-  { key: 'settings', label: 'Cài Đặt', Icon: SettingsRoundedIcon },
 ];
 
 const STATUS_CLASS = {
@@ -85,7 +80,16 @@ const isCancelTicket = (ticket) => ['CANCELLED', 'EXPIRED'].includes(ticket.rawS
 const TicketCard = ({ ticket, onResume, onWatch }) => (
   <article className="pf-ticket">
     <div className="pf-ticket__left">
-      <img className="pf-ticket__poster" src={ticket.poster} alt={ticket.movie} loading="lazy" />
+      <img
+        className="pf-ticket__poster"
+        src={ticket.poster}
+        alt={`Poster phim ${ticket.movie}`}
+        loading="lazy"
+        onError={(event) => {
+          event.currentTarget.onerror = null;
+          event.currentTarget.src = '/placeholder.svg';
+        }}
+      />
     </div>
     <div className="pf-ticket__body">
       <div className="pf-ticket__head">
@@ -218,13 +222,15 @@ const ProfilePage = () => {
       Promise.all([
         getHistory(),
         bookingApi.fetchShowtimes().catch(() => []),
+        fetchMovies().catch(() => ({ movies: [] })),
       ])
-        .then(([data, showtimeResponse]) => {
+        .then(([data, showtimeResponse, movieResponse]) => {
           const rawShowtimes = showtimeResponse?.data ?? showtimeResponse ?? [];
           const showtimeMap = new Map(
             bookingService.normalizeShowtimes(Array.isArray(rawShowtimes) ? rawShowtimes : [])
               .map((showtime) => [String(showtime.id), showtime]),
           );
+          const movieLookup = buildMovieLookup(movieResponse?.movies || []);
           const now = Date.now();
           const mapped = data.map((b) => {
             const pendingContext = getPendingBooking(b.id);
@@ -253,12 +259,20 @@ const ProfilePage = () => {
             else if (normStatus === 'CONFIRMED' && isPast) displayStatus = 'Đã xem';
             else if (normStatus === 'EXPIRED') displayStatus = 'Đã hủy';
 
-            // Lookup mock movie details to retrieve the correct image URL
+            const apiMovie = findMovie(
+              movieLookup,
+              b.movieId || showtimeInfo?.movieId || mergedShowtime?.movieId,
+              rawMovieTitle,
+            );
             const mockMovie = MOCK_MOVIES.find((m) =>
               m.title.toLowerCase().includes(rawMovieTitle.toLowerCase())
             );
             const mergedMovie = mergeMovieContext(
-              { title: rawMovieTitle, posterUrl: mockMovie?.posterUrl || '/placeholder.svg' },
+              {
+                ...apiMovie,
+                title: rawMovieTitle,
+                posterUrl: apiMovie?.posterUrl || apiMovie?.poster || mockMovie?.posterUrl || '/placeholder.svg',
+              },
               pendingMovie,
             );
             const poster = mergedMovie?.posterUrl || mergedMovie?.poster || '/placeholder.svg';
