@@ -129,23 +129,31 @@ public class AdminIntelligenceService {
                 List<ShowtimeSuggestion> choices = byMovie.get(movie.getId());
                 if (round >= choices.size()) continue;
                 ShowtimeSuggestion choice = choices.get(round);
-                boolean conflict = selected.stream().anyMatch(other -> other.getCinemaRoomId().equals(choice.getCinemaRoomId())
+                boolean conflict = selected.stream().anyMatch(other -> choice.getCinemaRoomId().equals(other.getCinemaRoomId())
                         && other.getStartTime().isBefore(choice.getEndTime()) && other.getEndTime().isAfter(choice.getStartTime()));
                 if (!conflict) selected.add(choice);
             }
         }
         Map<UUID, String> titles = movies.stream().collect(Collectors.toMap(Movie::getId, Movie::getTitle));
-        return selected.stream().sorted(Comparator.comparing(ShowtimeSuggestion::getStartTime))
+        List<Map<String, Object>> plan = selected.stream().sorted(Comparator.comparing(ShowtimeSuggestion::getStartTime))
                 .map(item -> map("movieId", item.getMovieId(), "movieTitle", titles.get(item.getMovieId()), "cinemaRoomId", item.getCinemaRoomId(),
+                        "online", false, "channel", "THEATER",
                         "roomName", item.getRoomName(), "startTime", item.getStartTime(), "endTime", item.getEndTime(),
-                        "predictedOccupancyPercent", item.getPredictedOccupancyPercent(), "reason", item.getReason())).toList();
+                        "predictedOccupancyPercent", item.getPredictedOccupancyPercent(), "reason", item.getReason())).collect(Collectors.toCollection(ArrayList::new));
+        plan.addAll(onlineWeeklyPlan(movies, start, titles));
+        plan.sort(Comparator.comparing(item -> (LocalDateTime) item.get("startTime")));
+        return plan;
     }
 
     @Transactional
     public List<ShowtimeResponse> applyWeeklyPlan(List<WeeklyShowtimeRequest> plan) {
         List<ShowtimeResponse> created = new ArrayList<>();
         for (WeeklyShowtimeRequest item : plan) {
-            if (item == null || item.movieId() == null || item.cinemaRoomId() == null || item.startTime() == null) {
+            if (item == null) {
+                continue;
+            }
+            boolean online = Boolean.TRUE.equals(item.online());
+            if (item.movieId() == null || (!online && item.cinemaRoomId() == null) || item.startTime() == null) {
                 continue;
             }
 
@@ -158,11 +166,13 @@ public class AdminIntelligenceService {
                 endTime = item.startTime().plusMinutes(movie.getDurationMinutes()).plusMinutes(15);
             }
 
-            boolean overlapsExisting = !showtimeRepository
-                    .findOverlappingShowtimes(item.cinemaRoomId(), item.startTime(), endTime)
-                    .isEmpty();
-            if (overlapsExisting) {
-                continue;
+            if (!online) {
+                boolean overlapsExisting = !showtimeRepository
+                        .findOverlappingShowtimes(item.cinemaRoomId(), item.startTime(), endTime)
+                        .isEmpty();
+                if (overlapsExisting) {
+                    continue;
+                }
             }
 
             try {
@@ -172,6 +182,7 @@ public class AdminIntelligenceService {
                         .startTime(item.startTime())
                         .endTime(endTime)
                         .status(ShowtimeStatus.SCHEDULED)
+                        .online(online)
                         .build()));
             } catch (BadRequestException ex) {
                 if (ex.getMessage() == null || !ex.getMessage().toLowerCase(Locale.ROOT).contains("overlap")) {
@@ -189,7 +200,29 @@ public class AdminIntelligenceService {
         bookingSeatRepository.findAll().forEach(item -> { UUID showtime = bookingShowtime.get(item.getBookingId()); if (showtime != null) result.put(showtime, result.getOrDefault(showtime, 0L) + 1); });
         return result;
     }
+    private List<Map<String, Object>> onlineWeeklyPlan(List<Movie> movies, LocalDate start, Map<UUID, String> titles) {
+        List<Movie> streamable = movies.stream()
+                .filter(movie -> movie.getStreamKey() != null && !movie.getStreamKey().trim().isBlank())
+                .toList();
+        if (streamable.isEmpty()) {
+            return List.of();
+        }
+
+        List<Map<String, Object>> items = new ArrayList<>();
+        List<java.time.LocalTime> onlineTimes = List.of(java.time.LocalTime.of(20, 0), java.time.LocalTime.of(22, 30));
+        int maxDays = Math.min(7, streamable.size() * 2);
+        for (int day = 0; day < maxDays; day++) {
+            Movie movie = streamable.get(day % streamable.size());
+            java.time.LocalTime time = onlineTimes.get(day % onlineTimes.size());
+            LocalDateTime startTime = LocalDateTime.of(start.plusDays(day), time);
+            LocalDateTime endTime = startTime.plusMinutes(movie.getDurationMinutes() == null ? 120 : movie.getDurationMinutes()).plusMinutes(15);
+            items.add(map("movieId", movie.getId(), "movieTitle", titles.get(movie.getId()), "cinemaRoomId", null,
+                    "online", true, "channel", "ONLINE", "roomName", "Xem online", "startTime", startTime, "endTime", endTime,
+                    "predictedOccupancyPercent", 70, "reason", "Suất online tự động cho phim có stream, không chiếm phòng chiếu"));
+        }
+        return items;
+    }
     private boolean isCentral(Seat seat, int max) { double center = (max + 1) / 2.0; return Math.abs(seat.getSeatNumber() - center) <= Math.max(1, max * .25); }
     private Map<String, Object> map(Object... values) { Map<String, Object> result = new LinkedHashMap<>(); for (int i=0;i<values.length;i+=2) result.put((String) values[i], values[i+1]); return result; }
-    public record WeeklyShowtimeRequest(UUID movieId, UUID cinemaRoomId, LocalDateTime startTime, LocalDateTime endTime) {}
+    public record WeeklyShowtimeRequest(UUID movieId, UUID cinemaRoomId, LocalDateTime startTime, LocalDateTime endTime, Boolean online) {}
 }
