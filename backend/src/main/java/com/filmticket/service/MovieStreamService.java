@@ -1,12 +1,11 @@
 package com.filmticket.service;
 
 import com.filmticket.dto.MovieStreamResponse;
-import com.filmticket.entity.Booking;
-import com.filmticket.entity.BookingStatus;
 import com.filmticket.entity.Movie;
+import com.filmticket.entity.Showtime;
 import com.filmticket.exception.BadRequestException;
-import com.filmticket.repository.BookingRepository;
 import com.filmticket.repository.MovieRepository;
+import com.filmticket.repository.ShowtimeRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -18,7 +17,6 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
-import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -37,7 +35,7 @@ public class MovieStreamService {
             .withZone(ZoneOffset.UTC);
 
     private final MovieRepository movieRepository;
-    private final BookingRepository bookingRepository;
+    private final ShowtimeRepository showtimeRepository;
 
     @Value("${app.streaming.s3.bucket:}")
     private String s3Bucket;
@@ -64,27 +62,35 @@ public class MovieStreamService {
         if (!movie.isActive()) {
             throw new BadRequestException("Movie is not available");
         }
+        Instant accessExpiresAt = null;
         if (!bypassPurchaseCheck) {
-            List<Booking> eligibleBookings = bookingRepository.findEligibleStreamingBookings(
+            List<Showtime> eligibleShowtimes = showtimeRepository.findEligibleStreamingShowtimes(
                     userId,
                     movieId,
-                    BookingStatus.CONFIRMED,
-                    LocalDateTime.now(VIETNAM_ZONE)
+                    java.time.LocalDateTime.now(VIETNAM_ZONE)
             );
-            if (eligibleBookings.isEmpty()) {
+            if (eligibleShowtimes.isEmpty()) {
                 throw new BadRequestException("Bạn chỉ có thể xem phim trong khung giờ suất chiếu đã đặt và đã thanh toán");
             }
+            accessExpiresAt = eligibleShowtimes.get(0).getEndTime().atZone(VIETNAM_ZONE).toInstant();
         }
-        return buildResponse(movie);
+        return buildResponse(movie, accessExpiresAt);
     }
 
     public MovieStreamResponse buildResponse(Movie movie) {
+        return buildResponse(movie, null);
+    }
+
+    public MovieStreamResponse buildResponse(Movie movie, Instant accessExpiresAt) {
         String streamKey = blankToNull(movie.getStreamKey());
         if (streamKey == null) {
             throw new BadRequestException("Online stream is not configured for this movie");
         }
         String provider = blankToDefault(movie.getStreamProvider(), "S3");
-        Instant expiresAt = Instant.now().plusSeconds(Math.max(60, ttlSeconds));
+        Instant ttlExpiresAt = Instant.now().plusSeconds(Math.max(60, ttlSeconds));
+        Instant expiresAt = accessExpiresAt == null || ttlExpiresAt.isBefore(accessExpiresAt)
+                ? ttlExpiresAt
+                : accessExpiresAt;
         boolean publicStream = !isAbsoluteUrl(streamKey) && !hasS3Credentials();
         String streamUrl = isAbsoluteUrl(streamKey)
                 ? streamKey
@@ -126,7 +132,7 @@ public class MovieStreamService {
         }
 
         Instant now = Instant.now();
-        long expires = Math.max(60, Math.min(604800, expiresAt.getEpochSecond() - now.getEpochSecond()));
+        long expires = Math.max(1, Math.min(604800, expiresAt.getEpochSecond() - now.getEpochSecond()));
         String amzDate = AMZ_DATE.format(now);
         String dateStamp = DATE_STAMP.format(now);
         String host = bucket + ".s3." + region + ".amazonaws.com";

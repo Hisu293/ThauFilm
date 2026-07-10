@@ -104,6 +104,7 @@ const MovieDetailPage = () => {
   const [error, setError] = useState(null);
   const [openOnlineMovie, setOpenOnlineMovie] = useState(false);
   const [onlineStreamUrl, setOnlineStreamUrl] = useState('');
+  const [streamExpiresAt, setStreamExpiresAt] = useState('');
   const [streamLoading, setStreamLoading] = useState(false);
   const [streamError, setStreamError] = useState('');
   const [creatingWatchParty, setCreatingWatchParty] = useState(false);
@@ -161,21 +162,45 @@ const MovieDetailPage = () => {
     setOpenOnlineMovie(true);
     setStreamLoading(true);
     setStreamError('');
+    setStreamExpiresAt('');
     try {
       const stream = await movieStreamService.getMovieStream(movie.id);
       setOnlineStreamUrl(stream?.streamUrl || '');
+      setStreamExpiresAt(stream?.expiresAt || '');
     } catch (err) {
       setOnlineStreamUrl('');
+      setStreamExpiresAt('');
       setStreamError(err.message || 'Không thể lấy link xem phim online.');
     } finally {
       setStreamLoading(false);
     }
-  }, [movie?.id, routeNavigate]);
+  }, [movie, routeNavigate]);
+
+  const handleCloseOnlineMovie = useCallback(() => {
+    setOpenOnlineMovie(false);
+    setOnlineStreamUrl('');
+    setStreamExpiresAt('');
+  }, []);
+
+  useEffect(() => {
+    if (!openOnlineMovie || !streamExpiresAt) return undefined;
+    const expiresMs = new Date(streamExpiresAt).getTime();
+    const remainingMs = expiresMs - Date.now();
+    const timeout = window.setTimeout(() => {
+      setOnlineStreamUrl('');
+      setStreamExpiresAt('');
+      setStreamError('Đã hết thời gian xem phim của suất chiếu này.');
+    }, Number.isFinite(expiresMs) ? Math.max(0, remainingMs) : 0);
+    return () => window.clearTimeout(timeout);
+  }, [openOnlineMovie, streamExpiresAt]);
 
   useEffect(() => {
     if (!movie || autoWatchStarted || searchParams.get('watch') !== '1') return;
-    setAutoWatchStarted(true);
-    handleOpenOnlineMovie();
+    const timeout = window.setTimeout(() => {
+      setAutoWatchStarted(true);
+      handleOpenOnlineMovie();
+    }, 0);
+    return () => window.clearTimeout(timeout);
   }, [autoWatchStarted, handleOpenOnlineMovie, movie, searchParams]);
 
   if (loading) return <MovieDetailSkeleton />;
@@ -483,7 +508,7 @@ const MovieDetailPage = () => {
       {/* Online movie player */}
       <Dialog
         open={openOnlineMovie}
-        onClose={() => setOpenOnlineMovie(false)}
+        onClose={handleCloseOnlineMovie}
         maxWidth="lg"
         fullWidth
         PaperProps={{
@@ -498,7 +523,7 @@ const MovieDetailPage = () => {
       >
         <Box sx={{ position: 'relative', p: { xs: 1, sm: 2 }, pt: { xs: 6, sm: 6 } }}>
           <IconButton
-            onClick={() => setOpenOnlineMovie(false)}
+            onClick={handleCloseOnlineMovie}
             sx={{
               position: 'absolute',
               top: 8,

@@ -8,7 +8,6 @@ import com.filmticket.service.MovieStreamService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -30,15 +29,8 @@ public class MemberMovieStreamController {
     public ResponseEntity<ApiResponse<MovieStreamResponse>> stream(@PathVariable UUID movieId) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Movie stream fetched",
-                movieStreamService.getMovieStream(movieId, userId(), hasStaffAccess())
+                movieStreamService.getMovieStream(movieId, userId(), false)
         ));
-    }
-
-    private boolean hasStaffAccess() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        return authentication.getAuthorities().stream()
-                .anyMatch(authority -> "ROLE_STAFF".equals(authority.getAuthority())
-                        || "ROLE_ADMIN".equals(authority.getAuthority()));
     }
 
     private UUID userId() {
