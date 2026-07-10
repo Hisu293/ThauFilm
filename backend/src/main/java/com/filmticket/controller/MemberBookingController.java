@@ -147,6 +147,16 @@ public class MemberBookingController {
         ));
     }
 
+    @Operation(summary = "Sync PayOS payment status and confirm booking")
+    @PostMapping("/{bookingId}/sync-payment")
+    public ResponseEntity<ApiResponse<BookingPaymentResponse>> syncPayment(@PathVariable UUID bookingId) {
+        UUID userId = getCurrentUserId();
+        return ResponseEntity.ok(ApiResponse.success(
+                "Payment status synced",
+                bookingService.syncPayosPayment(bookingId, userId)
+        ));
+    }
+
     @Operation(summary = "Get my bookings")
     @GetMapping
     public ResponseEntity<ApiResponse<List<BookingResponse>>> getMyBookings() {

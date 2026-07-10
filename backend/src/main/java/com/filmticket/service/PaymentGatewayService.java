@@ -9,7 +9,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -67,6 +69,46 @@ public class PaymentGatewayService {
                     "PayOS/VietQR refund must be processed manually or through your bank/provider dashboard");
         }
         return new GatewayRefund("mock-" + UUID.randomUUID(), PaymentStatus.REFUNDED, null);
+    }
+
+    public PayosPaymentStatus getPayosPaymentStatus(String orderCode) {
+        if (payosClientId == null || payosClientId.isBlank()
+                || payosApiKey == null || payosApiKey.isBlank()) {
+            throw new BadRequestException("PayOS credentials are not configured");
+        }
+        if (orderCode == null || orderCode.isBlank()) {
+            throw new BadRequestException("PayOS order code is required");
+        }
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("x-client-id", payosClientId);
+            headers.set("x-api-key", payosApiKey);
+
+            @SuppressWarnings("unchecked")
+            ResponseEntity<Map> response = restTemplate.exchange(
+                    "https://api-merchant.payos.vn/v2/payment-requests/" + orderCode.trim(),
+                    HttpMethod.GET,
+                    new HttpEntity<>(headers),
+                    Map.class
+            );
+
+            Map<?, ?> body = response.getBody();
+            if (body == null || !"00".equals(Objects.toString(body.get("code"), ""))) {
+                return new PayosPaymentStatus(false, orderCode, null);
+            }
+            Object dataObj = body.get("data");
+            if (!(dataObj instanceof Map<?, ?> data)) {
+                return new PayosPaymentStatus(false, orderCode, null);
+            }
+            String status = Objects.toString(data.get("status"), "");
+            boolean paid = "PAID".equalsIgnoreCase(status) || "00".equals(Objects.toString(data.get("code"), ""));
+            String paymentLinkId = Objects.toString(data.get("paymentLinkId"), orderCode);
+            return new PayosPaymentStatus(paid, orderCode, paymentLinkId);
+        } catch (BadRequestException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new BadRequestException("Cannot verify PayOS payment: " + ex.getMessage());
+        }
     }
 
     public PayosWebhookResult parsePayosWebhook(String payload) {
@@ -220,4 +262,5 @@ public class PaymentGatewayService {
     public record GatewayPayment(String provider, String checkoutId, String paymentId, String checkoutUrl, String qrCode) {}
     public record GatewayRefund(String refundId, PaymentStatus status, String failureReason) {}
     public record PayosWebhookResult(boolean paid, String orderCode, String paymentId) {}
+    public record PayosPaymentStatus(boolean paid, String orderCode, String paymentId) {}
 }

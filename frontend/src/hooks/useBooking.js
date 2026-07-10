@@ -205,6 +205,20 @@ export const useBooking = () => {
     }
   }, []);
 
+  const syncPayment = useCallback(async (bookingId) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await bookingApi.syncPayment(bookingId);
+      return response?.data ?? response ?? {};
+    } catch (err) {
+      setError(err.message || 'Chưa xác nhận được thanh toán.');
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const cancel = useCallback(async (bookingId) => {
     setLoading(true);
     setError(null);
@@ -235,6 +249,7 @@ export const useBooking = () => {
     getDiscounts,
     getCombos,
     pay,
+    syncPayment,
     cancel,
   };
 };
