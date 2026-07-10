@@ -502,7 +502,7 @@ public class BookingService {
         payment.setStatus(PaymentStatus.PAID);
         payment.setPaidAt(now());
         paymentRepository.save(payment);
-        confirmPaidBooking(booking, payment, originalAmount, discountAmount, null);
+        return confirmPaidBooking(booking, payment, originalAmount, discountAmount, null);
     }
 
     private BookingPaymentResponse confirmPaidBooking(Booking booking, Payment payment,
