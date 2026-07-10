@@ -90,6 +90,7 @@ public class DemandPredictionService {
         if (!movie.isActive() || movie.getStatus() != Movie.Status.NOW_SHOWING) {
             throw new BadRequestException("Movie is not currently active");
         }
+        int durationMinutes = movie.getDurationMinutes() == null ? 120 : movie.getDurationMinutes();
         LocalDate startDate = fromDate == null ? LocalDate.now() : fromDate;
         if (startDate.isBefore(LocalDate.now())) {
             throw new BadRequestException("Suggestion date cannot be in the past");
@@ -105,12 +106,13 @@ public class DemandPredictionService {
             LocalDate date = startDate.plusDays(day);
             for (LocalTime time : CANDIDATE_TIMES) {
                 LocalDateTime startsAt = LocalDateTime.of(date, time);
-                LocalDateTime endsAt = startsAt.plusMinutes(movie.getDurationMinutes() + CLEANUP_MINUTES);
+                LocalDateTime endsAt = startsAt.plusMinutes(durationMinutes + CLEANUP_MINUTES);
                 if (!startsAt.isAfter(now.plusMinutes(30))) continue;
                 for (CinemaRoom room : rooms) {
                     boolean occupied = existingShowtimes.stream()
-                            .filter(existing -> existing.getCinemaRoomId().equals(room.getId()))
+                            .filter(existing -> room.getId().equals(existing.getCinemaRoomId()))
                             .filter(existing -> existing.getStatus() != ShowtimeStatus.CANCELLED)
+                            .filter(existing -> existing.getStartTime() != null && existing.getEndTime() != null)
                             .anyMatch(existing -> existing.getStartTime().isBefore(endsAt)
                                     && existing.getEndTime().isAfter(startsAt));
                     if (occupied) continue;

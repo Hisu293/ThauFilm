@@ -233,11 +233,11 @@ const WeeklyManager = ({ onApplied }) => {
       {error && <Alert severity="error">{error}</Alert>}
       {plan.length > 0 && (
         <>
-          <Alert severity="info">AI đề xuất {plan.length} suất, đã loại các phòng trùng lịch.</Alert>
+          <Alert severity="info">AI đề xuất {plan.length} suất online/offline, đã loại các phòng trùng lịch.</Alert>
           {plan.map((item, index) => (
-            <Box key={`${item.cinemaRoomId}-${item.startTime}`} className="admin-panel" sx={{ p: 2 }}>
+            <Box key={`${item.online ? 'online' : item.cinemaRoomId}-${item.movieId}-${item.startTime}`} className="admin-panel" sx={{ p: 2 }}>
               <Typography fontWeight={800}>
-                #{index + 1} {item.movieTitle} · {item.roomName}
+                #{index + 1} {item.movieTitle} · {item.online ? 'Online' : item.roomName}
               </Typography>
               <Typography variant="body2">
                 {localDate(item.startTime)} · Dự kiến {item.predictedOccupancyPercent}% lấp đầy
