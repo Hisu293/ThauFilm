@@ -2,6 +2,7 @@ package com.filmticket.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.filmticket.dto.MovieChatRequest;
 import com.filmticket.dto.MovieChatResponse;
 import com.filmticket.entity.Movie;
 import com.filmticket.repository.MovieRepository;
@@ -60,6 +61,10 @@ public class MovieChatbotService {
     private String geminiModel;
 
     public MovieChatResponse chat(String message) {
+        return chat(message, List.of());
+    }
+
+    public MovieChatResponse chat(String message, List<MovieChatRequest.ChatTurn> history) {
         List<Movie> movies = movieRepository.findAllByActiveTrue();
         if (movies.isEmpty()) {
             return MovieChatResponse.builder()
@@ -68,7 +73,8 @@ public class MovieChatbotService {
                     .build();
         }
 
-        List<ScoredMovie> ranked = rankMovies(message, movies);
+        ConversationContext context = buildConversationContext(message, history);
+        List<ScoredMovie> ranked = rankMovies(context, movies);
         List<MovieChatResponse.MovieRecommendation> recommendations = ranked.stream()
                 .limit(5)
                 .map(item -> toRecommendation(item.movie(), item.reason()))
@@ -77,7 +83,7 @@ public class MovieChatbotService {
         String answer = buildFallbackAnswer(recommendations);
         if (hasText(geminiApiKey) && !recommendations.isEmpty() && System.currentTimeMillis() >= geminiRetryAfterMillis) {
             try {
-                answer = callGemini(message, recommendations);
+                answer = callGemini(context, recommendations);
             } catch (Exception exception) {
                 if (exception.getMessage() != null && exception.getMessage().contains("HTTP 429")) {
                     geminiRetryAfterMillis = System.currentTimeMillis() + Duration.ofMinutes(5).toMillis();
@@ -94,15 +100,36 @@ public class MovieChatbotService {
                 .build();
     }
 
-    private List<ScoredMovie> rankMovies(String message, List<Movie> movies) {
-        String query = normalize(message);
-        QueryIntent intent = parseIntent(query, movies);
+    private List<ScoredMovie> rankMovies(ConversationContext context, List<Movie> movies) {
+        QueryIntent currentIntent = parseIntent(context.currentQuery(), movies);
+        QueryIntent intent = currentIntent.hasCriteria()
+                ? currentIntent
+                : parseIntent(context.intentQuery(), movies);
 
         return movies.stream()
-                .map(movie -> scoreMovie(movie, query, intent))
+                .map(movie -> scoreMovie(movie, context.currentQuery(), intent))
                 .filter(item -> item.score() > 0)
                 .sorted(this::compareScoredMovies)
                 .toList();
+    }
+
+    private ConversationContext buildConversationContext(String message, List<MovieChatRequest.ChatTurn> history) {
+        String currentMessage = safe(message);
+        List<String> recentUserMessages = new ArrayList<>();
+        if (history != null) {
+            history.stream()
+                    .filter(turn -> turn != null && "user".equalsIgnoreCase(safe(turn.getRole())))
+                    .map(MovieChatRequest.ChatTurn::getMessage)
+                    .filter(this::hasText)
+                    .skip(Math.max(0, history.size() - 8))
+                    .forEach(recentUserMessages::add);
+        }
+        recentUserMessages.add(currentMessage);
+        return new ConversationContext(
+                currentMessage,
+                normalize(currentMessage),
+                normalize(String.join(" ", recentUserMessages))
+        );
     }
 
     private int compareScoredMovies(ScoredMovie left, ScoredMovie right) {
@@ -174,6 +201,12 @@ public class MovieChatbotService {
         }
 
         Set<String> movieGenres = tokens(movie.getGenre());
+        for (String excludedGenre : intent.excludedGenres()) {
+            if (movieGenres.contains(excludedGenre)) {
+                return new ScoredMovie(movie, 0, "");
+            }
+        }
+
         for (String genre : intent.genres()) {
             if (movieGenres.contains(genre)) {
                 score += 65;
@@ -208,6 +241,7 @@ public class MovieChatbotService {
                 extractNearDurationMinutes(query),
                 findReferenceMovie(query, movies),
                 detectGenres(query),
+                detectExcludedGenres(query),
                 detectStatus(query)
         );
     }
@@ -266,6 +300,23 @@ public class MovieChatbotService {
         return genres;
     }
 
+    private Set<String> detectExcludedGenres(String query) {
+        Set<String> genres = new LinkedHashSet<>();
+        addIfNegated(genres, query, "action", "hanh dong", "hanh");
+        addIfNegated(genres, query, "sci", "sci fi", "science fiction", "vien tuong", "khoa hoc");
+        addIfNegated(genres, query, "romance", "tinh cam", "lang man");
+        addIfNegated(genres, query, "comedy", "hai");
+        addIfNegated(genres, query, "horror", "kinh di");
+        addIfNegated(genres, query, "drama", "tam ly");
+        addIfNegated(genres, query, "animation", "hoat hinh");
+        addIfNegated(genres, query, "adventure", "phieu luu");
+        addIfNegated(genres, query, "family", "gia dinh");
+        addIfNegated(genres, query, "fantasy", "gia tuong", "ky ao");
+        addIfNegated(genres, query, "mystery", "bi an", "trinh tham");
+        addIfNegated(genres, query, "history", "lich su");
+        return genres;
+    }
+
     private void addIfContains(Set<String> genres, String query, String canonical, String... aliases) {
         if (query.contains(canonical)) {
             genres.add(canonical);
@@ -277,6 +328,34 @@ public class MovieChatbotService {
                 return;
             }
         }
+    }
+
+    private void addIfNegated(Set<String> genres, String query, String canonical, String... aliases) {
+        if (isNegated(query, canonical)) {
+            genres.add(canonical);
+            return;
+        }
+        for (String alias : aliases) {
+            if (isNegated(query, alias)) {
+                genres.add(canonical);
+                return;
+            }
+        }
+    }
+
+    private boolean isNegated(String query, String value) {
+        return query.contains("khong " + value)
+                || query.contains("ko " + value)
+                || query.contains("khong thich " + value)
+                || query.contains("khong thich phim " + value)
+                || query.contains("khong muon " + value)
+                || query.contains("khong muon xem " + value)
+                || query.contains("khong muon xem phim " + value)
+                || query.contains("khong xem " + value)
+                || query.contains("khong xem phim " + value)
+                || query.contains("tru " + value)
+                || query.contains("not " + value)
+                || query.contains("no " + value);
     }
 
     private Movie.Status detectStatus(String query) {
@@ -316,10 +395,10 @@ public class MovieChatbotService {
         return builder.toString();
     }
 
-    private String callGemini(String message, List<MovieChatResponse.MovieRecommendation> recommendations) throws Exception {
+    private String callGemini(ConversationContext context, List<MovieChatResponse.MovieRecommendation> recommendations) throws Exception {
         ObjectNode root = objectMapper.createObjectNode();
         ObjectNode content = root.putArray("contents").addObject();
-        content.putArray("parts").addObject().put("text", buildPrompt(message, recommendations));
+        content.putArray("parts").addObject().put("text", buildPrompt(context, recommendations));
         root.putObject("generationConfig")
                 .put("temperature", 0.35)
                 .put("maxOutputTokens", 350);
@@ -339,14 +418,17 @@ public class MovieChatbotService {
         return hasText(text) ? text.trim() : buildFallbackAnswer(recommendations);
     }
 
-    private String buildPrompt(String message, List<MovieChatResponse.MovieRecommendation> recommendations) {
+    private String buildPrompt(ConversationContext context, List<MovieChatResponse.MovieRecommendation> recommendations) {
         StringBuilder prompt = new StringBuilder("""
                 Bạn là chatbot tư vấn phim cho rạp ThauFilm. Trả lời bằng tiếng Việt, thân thiện, ngắn gọn.
                 Chỉ được gợi ý phim trong danh sách bên dưới, không bịa phim ngoài hệ thống.
                 Câu hỏi của khách: "%s"
 
                 Danh sách phim phù hợp:
-                """.formatted(message.replace("\"", "'")));
+                """.formatted(context.currentMessage().replace("\"", "'")));
+        prompt.append("Ngu canh gan day: ")
+                .append(context.intentQuery().replace("\"", "'"))
+                .append('\n');
         recommendations.forEach(movie -> prompt.append("- ")
                 .append(movie.getTitle())
                 .append(" | thể loại: ").append(safe(movie.getGenre()))
@@ -417,12 +499,15 @@ public class MovieChatbotService {
         };
     }
 
+    private record ConversationContext(String currentMessage, String currentQuery, String intentQuery) {}
+
     private record QueryIntent(
             Integer maxDurationMinutes,
             Integer minDurationMinutes,
             Integer nearDurationMinutes,
             Movie reference,
             Set<String> genres,
+            Set<String> excludedGenres,
             Movie.Status status
     ) {
         private boolean hasCriteria() {
@@ -431,6 +516,7 @@ public class MovieChatbotService {
                     || nearDurationMinutes != null
                     || reference != null
                     || !genres.isEmpty()
+                    || !excludedGenres.isEmpty()
                     || status != null;
         }
     }
