@@ -1,41 +1,27 @@
 package com.filmticket.service;
 
-import com.filmticket.dto.MovieStreamResponse;
-import com.filmticket.entity.Movie;
-import com.filmticket.entity.Showtime;
 import com.filmticket.exception.BadRequestException;
-import com.filmticket.repository.MovieRepository;
-import com.filmticket.repository.ShowtimeRepository;
-import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
+import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
-import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.UUID;
 
 @Service
-@RequiredArgsConstructor
-public class MovieStreamService {
-    private static final ZoneId VIETNAM_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
+public class S3PresignedUrlService {
     private static final DateTimeFormatter AMZ_DATE = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss'Z'")
             .withZone(ZoneOffset.UTC);
     private static final DateTimeFormatter DATE_STAMP = DateTimeFormatter.ofPattern("yyyyMMdd")
             .withZone(ZoneOffset.UTC);
-
-    private final MovieRepository movieRepository;
-    private final ShowtimeRepository showtimeRepository;
 
     @Value("${app.streaming.s3.bucket:}")
     private String s3Bucket;
@@ -52,87 +38,52 @@ public class MovieStreamService {
     @Value("${app.streaming.public-base-url:}")
     private String publicBaseUrl;
 
-    @Value("${app.streaming.url-ttl-seconds:300}")
-    private long ttlSeconds;
+    @Value("${app.poster.url-ttl-seconds:900}")
+    private long posterTtlSeconds;
 
-    @Transactional(readOnly = true)
-    public MovieStreamResponse getMovieStream(UUID movieId, UUID userId, boolean bypassPurchaseCheck) {
-        Movie movie = movieRepository.findById(movieId)
-                .orElseThrow(() -> new BadRequestException("Movie not found"));
-        if (!movie.isActive()) {
-            throw new BadRequestException("Movie is not available");
+    public String resolvePosterUrl(String value) {
+        String normalized = blankToNull(value);
+        if (normalized == null) return null;
+
+        String objectKey = extractObjectKey(normalized);
+        if (objectKey == null) {
+            return normalized;
         }
-        Instant accessExpiresAt = null;
-        if (!bypassPurchaseCheck) {
-            List<Showtime> eligibleShowtimes = showtimeRepository.findEligibleStreamingShowtimes(
-                    userId,
-                    movieId,
-                    java.time.LocalDateTime.now(VIETNAM_ZONE)
-            );
-            if (eligibleShowtimes.isEmpty()) {
-                throw new BadRequestException("Bạn chỉ có thể xem phim trong khung giờ suất chiếu đã đặt và đã thanh toán");
-            }
-            accessExpiresAt = eligibleShowtimes.get(0).getEndTime().atZone(VIETNAM_ZONE).toInstant();
+        if (hasS3Credentials()) {
+            return presignGetUrl(objectKey, posterTtlSeconds);
         }
-        return buildResponse(movie, accessExpiresAt);
+        return buildPublicS3Url(objectKey);
     }
 
-    public MovieStreamResponse buildResponse(Movie movie) {
-        return buildResponse(movie, null);
-    }
-
-    public MovieStreamResponse buildResponse(Movie movie, Instant accessExpiresAt) {
-        String streamKey = blankToNull(movie.getStreamKey());
-        if (streamKey == null) {
+    public String resolveStreamUrl(String streamKey, long ttlSeconds) {
+        String normalized = blankToNull(streamKey);
+        if (normalized == null) {
             throw new BadRequestException("Online stream is not configured for this movie");
         }
-        String provider = blankToDefault(movie.getStreamProvider(), "S3");
-        Instant ttlExpiresAt = Instant.now().plusSeconds(Math.max(60, ttlSeconds));
-        Instant expiresAt = accessExpiresAt == null || ttlExpiresAt.isBefore(accessExpiresAt)
-                ? ttlExpiresAt
-                : accessExpiresAt;
-        boolean publicStream = !isAbsoluteUrl(streamKey) && !hasS3Credentials();
-        String streamUrl = isAbsoluteUrl(streamKey)
-                ? streamKey
-                : publicStream ? buildPublicS3Url(streamKey) : presignS3Url(streamKey, expiresAt);
-        return MovieStreamResponse.builder()
-                .movieId(movie.getId())
-                .title(movie.getTitle())
-                .streamUrl(streamUrl)
-                .expiresAt(isAbsoluteUrl(streamKey) || publicStream ? null : expiresAt)
-                .provider(provider)
-                .build();
+        if (isAbsoluteUrl(normalized)) {
+            String objectKey = extractObjectKey(normalized);
+            return objectKey != null && hasS3Credentials()
+                    ? presignGetUrl(objectKey, ttlSeconds)
+                    : normalized;
+        }
+        return hasS3Credentials() ? presignGetUrl(normalized, ttlSeconds) : buildPublicS3Url(normalized);
     }
 
-    private boolean hasS3Credentials() {
+    public boolean hasS3Credentials() {
         return blankToNull(s3AccessKey) != null && blankToNull(s3SecretKey) != null;
     }
 
-    private String buildPublicS3Url(String objectKey) {
-        String configuredBaseUrl = blankToNull(publicBaseUrl);
-        if (configuredBaseUrl != null) {
-            return configuredBaseUrl.replaceAll("/+$", "") + "/" + encodePath(objectKey);
-        }
-
-        String bucket = blankToNull(s3Bucket);
-        String region = blankToNull(s3Region);
-        if (bucket == null || region == null) {
-            throw new BadRequestException("S3 public streaming is not configured");
-        }
-        return "https://" + bucket + ".s3." + region + ".amazonaws.com/" + encodePath(objectKey);
-    }
-
-    private String presignS3Url(String objectKey, Instant expiresAt) {
+    public String presignGetUrl(String objectKey, long ttlSeconds) {
         String bucket = blankToNull(s3Bucket);
         String region = blankToNull(s3Region);
         String accessKey = blankToNull(s3AccessKey);
         String secretKey = blankToNull(s3SecretKey);
         if (bucket == null || region == null || accessKey == null || secretKey == null) {
-            throw new BadRequestException("S3 streaming is not configured");
+            throw new BadRequestException("S3 is not configured");
         }
 
         Instant now = Instant.now();
-        long expires = Math.max(1, Math.min(604800, expiresAt.getEpochSecond() - now.getEpochSecond()));
+        long expires = Math.max(60, Math.min(604800, ttlSeconds));
         String amzDate = AMZ_DATE.format(now);
         String dateStamp = DATE_STAMP.format(now);
         String host = bucket + ".s3." + region + ".amazonaws.com";
@@ -156,6 +107,38 @@ public class MovieStreamService {
         return "https://" + host + canonicalUri + "?" + canonicalQuery + "&X-Amz-Signature=" + signature;
     }
 
+    public String buildPublicS3Url(String objectKey) {
+        String configuredBaseUrl = blankToNull(publicBaseUrl);
+        if (configuredBaseUrl != null) {
+            return configuredBaseUrl.replaceAll("/+$", "") + "/" + encodePath(objectKey);
+        }
+
+        String bucket = blankToNull(s3Bucket);
+        String region = blankToNull(s3Region);
+        if (bucket == null || region == null) {
+            throw new BadRequestException("S3 public URL is not configured");
+        }
+        return "https://" + bucket + ".s3." + region + ".amazonaws.com/" + encodePath(objectKey);
+    }
+
+    private String extractObjectKey(String value) {
+        if (!isAbsoluteUrl(value)) {
+            return value;
+        }
+        try {
+            URI uri = URI.create(value);
+            String bucket = blankToNull(s3Bucket);
+            String host = uri.getHost();
+            if (bucket == null || host == null || !host.equals(bucket + ".s3." + s3Region + ".amazonaws.com")) {
+                return null;
+            }
+            String path = blankToNull(uri.getPath());
+            return path == null ? null : path.replaceAll("^/+", "");
+        } catch (IllegalArgumentException ex) {
+            return null;
+        }
+    }
+
     private byte[] signingKey(String secretKey, String dateStamp, String region) {
         byte[] dateKey = hmac(("AWS4" + secretKey).getBytes(StandardCharsets.UTF_8), dateStamp);
         byte[] regionKey = hmac(dateKey, region);
@@ -169,7 +152,7 @@ public class MovieStreamService {
             mac.init(new SecretKeySpec(key, "HmacSHA256"));
             return mac.doFinal(data.getBytes(StandardCharsets.UTF_8));
         } catch (Exception ex) {
-            throw new BadRequestException("Cannot sign S3 stream URL");
+            throw new BadRequestException("Cannot sign S3 URL");
         }
     }
 
@@ -177,7 +160,7 @@ public class MovieStreamService {
         try {
             return MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
         } catch (Exception ex) {
-            throw new BadRequestException("Cannot sign S3 stream URL");
+            throw new BadRequestException("Cannot sign S3 URL");
         }
     }
 
@@ -221,10 +204,5 @@ public class MovieStreamService {
         if (value == null) return null;
         String trimmed = value.trim();
         return trimmed.isBlank() ? null : trimmed;
-    }
-
-    private String blankToDefault(String value, String defaultValue) {
-        String normalized = blankToNull(value);
-        return normalized == null ? defaultValue : normalized;
     }
 }

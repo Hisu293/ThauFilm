@@ -22,7 +22,7 @@ public class MovieChatbotController {
     public ResponseEntity<ApiResponse<MovieChatResponse>> chat(@Valid @RequestBody MovieChatRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Movie recommendations generated successfully",
-                movieChatbotService.chat(request.getMessage())
+                movieChatbotService.chat(request.getMessage(), request.getHistory())
         ));
     }
 }

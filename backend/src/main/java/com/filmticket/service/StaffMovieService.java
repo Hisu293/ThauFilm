@@ -17,17 +17,18 @@ import java.util.UUID;
 public class StaffMovieService {
 
     private final MovieRepository movieRepository;
+    private final S3PresignedUrlService s3PresignedUrlService;
 
     public List<MovieResponse> listMovies() {
         return movieRepository.findAll().stream()
-                .map(MovieResponse::fromMovieWithStream)
+                .map(movie -> MovieResponse.fromMovieWithStream(movie, resolvePosterUrl(movie)))
                 .toList();
     }
 
     public MovieResponse getMovie(UUID movieId) {
         Movie movie = movieRepository.findById(movieId)
                 .orElseThrow(() -> new BadRequestException("Movie not found"));
-        return MovieResponse.fromMovieWithStream(movie);
+        return MovieResponse.fromMovieWithStream(movie, resolvePosterUrl(movie));
     }
 
     @Transactional
@@ -64,12 +65,16 @@ public class StaffMovieService {
         }
 
         Movie saved = movieRepository.save(movie);
-        return MovieResponse.fromMovieWithStream(saved);
+        return MovieResponse.fromMovieWithStream(saved, resolvePosterUrl(saved));
     }
 
     private String normalizeNullable(String value) {
         if (value == null) return null;
         String normalized = value.trim();
         return normalized.isBlank() ? null : normalized;
+    }
+
+    private String resolvePosterUrl(Movie movie) {
+        return s3PresignedUrlService.resolvePosterUrl(movie.getPosterUrl());
     }
 }

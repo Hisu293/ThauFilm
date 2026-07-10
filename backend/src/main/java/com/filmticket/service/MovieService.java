@@ -30,32 +30,33 @@ public class MovieService {
 
     private final MovieRepository movieRepository;
     private final MovieEventService movieEventService;
+    private final S3PresignedUrlService s3PresignedUrlService;
 
     @Transactional(readOnly = true)
     public List<MovieResponse> getAllMovies() {
         return movieRepository.findAll().stream()
-                .map(MovieResponse::fromMovieWithStream)
+                .map(movie -> MovieResponse.fromMovieWithStream(movie, resolvePosterUrl(movie)))
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public List<MovieResponse> getActiveMovies() {
         return movieRepository.findAllByActiveTrue().stream()
-                .map(MovieResponse::fromMovie)
+                .map(movie -> MovieResponse.fromMovie(movie, resolvePosterUrl(movie)))
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public List<MovieCardResponse> getActiveMovieCards() {
         return movieRepository.findAllByActiveTrue().stream()
-                .map(MovieCardResponse::fromMovie)
+                .map(movie -> MovieCardResponse.fromMovie(movie, resolvePosterUrl(movie)))
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public List<MovieCardResponse> getActiveMovieCardsByStatus(Movie.Status status) {
         return movieRepository.findAllByActiveTrueAndStatus(status).stream()
-                .map(MovieCardResponse::fromMovie)
+                .map(movie -> MovieCardResponse.fromMovie(movie, resolvePosterUrl(movie)))
                 .toList();
     }
 
@@ -65,12 +66,13 @@ public class MovieService {
         if (!movie.isActive()) {
             throw new BadRequestException("Movie is not available");
         }
-        return MovieResponse.fromMovie(movie);
+        return MovieResponse.fromMovie(movie, resolvePosterUrl(movie));
     }
 
     @Transactional(readOnly = true)
     public MovieResponse getMovieById(UUID movieId) {
-        return MovieResponse.fromMovieWithStream(getMovieEntityOrThrow(movieId));
+        Movie movie = getMovieEntityOrThrow(movieId);
+        return MovieResponse.fromMovieWithStream(movie, resolvePosterUrl(movie));
     }
 
     @Transactional
@@ -96,7 +98,7 @@ public class MovieService {
                 .build();
 
         Movie saved = movieRepository.save(movie);
-        MovieResponse response = MovieResponse.fromMovieWithStream(saved);
+        MovieResponse response = MovieResponse.fromMovieWithStream(saved, resolvePosterUrl(saved));
         movieEventService.publishMovieCreated(response);
         return response;
     }
@@ -123,7 +125,7 @@ public class MovieService {
         movie.setStatus(request.getStatus() == null ? Movie.Status.COMING_SOON : request.getStatus());
 
         Movie saved = movieRepository.save(movie);
-        MovieResponse response = MovieResponse.fromMovieWithStream(saved);
+        MovieResponse response = MovieResponse.fromMovieWithStream(saved, resolvePosterUrl(saved));
         movieEventService.publishMovieUpdated(response);
         return response;
     }
@@ -158,6 +160,10 @@ public class MovieService {
     private String normalizeNullable(String value) {
         String normalized = normalize(value);
         return normalized == null || normalized.isBlank() ? null : normalized;
+    }
+
+    private String resolvePosterUrl(Movie movie) {
+        return s3PresignedUrlService.resolvePosterUrl(movie.getPosterUrl());
     }
 
     @Data

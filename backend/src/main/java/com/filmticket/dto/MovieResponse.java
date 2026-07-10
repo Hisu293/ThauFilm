@@ -36,8 +36,20 @@ public class MovieResponse {
         return fromMovie(movie, false);
     }
 
+    public static MovieResponse fromMovie(Movie movie, String posterUrl) {
+        MovieResponse response = fromMovie(movie, false);
+        response.setPosterUrl(posterUrl);
+        return response;
+    }
+
     public static MovieResponse fromMovieWithStream(Movie movie) {
         return fromMovie(movie, true);
+    }
+
+    public static MovieResponse fromMovieWithStream(Movie movie, String posterUrl) {
+        MovieResponse response = fromMovie(movie, true);
+        response.setPosterUrl(posterUrl);
+        return response;
     }
 
     private static MovieResponse fromMovie(Movie movie, boolean includeStream) {

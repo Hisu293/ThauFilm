@@ -49,13 +49,21 @@ const MovieChatbotPage = () => {
     const text = value.trim();
     if (!text || loading) return;
 
+    const history = messages
+      .filter((message) => message.text)
+      .slice(-8)
+      .map((message) => ({
+        role: message.role,
+        message: message.text,
+      }));
+
     setMessages((current) => [...current, { role: 'user', text }]);
     setInput('');
     setError('');
     setLoading(true);
 
     try {
-      const response = await movieChatbotService.chat(text);
+      const response = await movieChatbotService.chat(text, history);
       setMessages((current) => [
         ...current,
         {

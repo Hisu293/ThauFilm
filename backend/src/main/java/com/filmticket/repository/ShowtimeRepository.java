@@ -46,4 +46,13 @@ public interface ShowtimeRepository extends JpaRepository<Showtime, UUID> {
 
     @Query("SELECT DISTINCT s.cinemaRoomId FROM Showtime s WHERE s.movieId = :movieId")
     List<UUID> findDistinctCinemaRoomIdsByMovieId(@Param("movieId") UUID movieId);
+
+    @Query("SELECT s FROM Showtime s, Booking b WHERE b.showtimeId = s.id " +
+            "AND b.userId = :userId AND b.status = com.filmticket.entity.BookingStatus.CONFIRMED " +
+            "AND s.movieId = :movieId AND s.online = true " +
+            "AND s.startTime <= :now AND s.endTime >= :now " +
+            "ORDER BY s.endTime ASC")
+    List<Showtime> findEligibleStreamingShowtimes(@Param("userId") UUID userId,
+                                                  @Param("movieId") UUID movieId,
+                                                  @Param("now") LocalDateTime now);
 }
