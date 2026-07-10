@@ -135,8 +135,7 @@ public class WatchPartyService {
             if (!member.paid) {
                 throw new BadRequestException("Pay your watch party ticket before watching");
             }
-            boolean readyToWatch = !room.members.isEmpty() && room.members.values().stream().allMatch(item -> item.paid);
-            if (!readyToWatch) {
+            if (!isReadyToWatch(room)) {
                 throw new BadRequestException("Watch party is waiting for all members to pay");
             }
             return movieStreamService.buildResponse(room.movie);
@@ -234,7 +233,7 @@ public class WatchPartyService {
                         .paid(member.paid)
                         .build())
                 .toList();
-        boolean readyToWatch = !members.isEmpty() && members.stream().allMatch(WatchPartyDto.MemberResponse::isPaid);
+        boolean readyToWatch = isReadyToWatch(room);
         boolean currentUserPaid = room.members.get(currentUserId) != null && room.members.get(currentUserId).paid;
         return WatchPartyDto.Response.builder()
                 .id(room.id)
@@ -262,6 +261,16 @@ public class WatchPartyService {
                 .build();
     }
 
+    private boolean isReadyToWatch(WatchPartyRoom room) {
+        if (room.openedForWatch) return true;
+        boolean allCurrentMembersPaid = !room.members.isEmpty()
+                && room.members.values().stream().allMatch(member -> member.paid);
+        if (allCurrentMembersPaid) {
+            room.openedForWatch = true;
+        }
+        return room.openedForWatch;
+    }
+
     private String displayName(User user) {
         if (user.getFullName() != null && !user.getFullName().isBlank()) return user.getFullName();
         if (user.getEmail() != null && !user.getEmail().isBlank()) return user.getEmail().split("@")[0];
@@ -274,6 +283,7 @@ public class WatchPartyService {
         private final Map<UUID, WatchPartyMember> members = new LinkedHashMap<>();
         private final List<WatchPartyDto.ChatMessageResponse> messages = new ArrayList<>();
         private PlaybackState playback = new PlaybackState(0, true, Instant.now(), null);
+        private boolean openedForWatch;
 
         private WatchPartyRoom(UUID id, Movie movie) {
             this.id = id;

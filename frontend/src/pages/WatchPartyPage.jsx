@@ -40,6 +40,8 @@ export default function WatchPartyPage() {
   const videoRef = useRef(null);
   const realtime = useRef(null);
   const applyingRemote = useRef(false);
+  const playbackReady = useRef(false);
+  const latestPlayback = useRef(null);
   const [room, setRoom] = useState(null);
   const [messages, setMessages] = useState([]);
   const [messageText, setMessageText] = useState('');
@@ -71,8 +73,25 @@ export default function WatchPartyPage() {
   useEffect(() => { load(); }, [load]);
 
   useEffect(() => {
+    latestPlayback.current = room?.playback || null;
+  }, [room?.playback]);
+
+  const applyPlayback = useCallback((playback) => {
+    const video = videoRef.current;
+    if (!video || !playback) return;
+    applyingRemote.current = true;
+    const targetTime = Number(playback.currentTime || 0);
+    const drift = Math.abs(video.currentTime - targetTime);
+    if (drift > 1.2) video.currentTime = targetTime;
+    const action = playback.paused ? video.pause() : video.play();
+    Promise.resolve(action).catch(() => {});
+    window.setTimeout(() => { applyingRemote.current = false; }, 400);
+  }, []);
+
+  useEffect(() => {
     if (!room?.readyToWatch || !me?.paid) {
       setStreamUrl('');
+      playbackReady.current = false;
       return;
     }
     let cancelled = false;
@@ -111,6 +130,13 @@ export default function WatchPartyPage() {
 
     let hls;
     let cancelled = false;
+    playbackReady.current = false;
+    const applyInitialPlayback = () => {
+      if (cancelled) return;
+      applyPlayback(latestPlayback.current);
+      playbackReady.current = true;
+    };
+    video.addEventListener('loadedmetadata', applyInitialPlayback, { once: true });
     const init = async () => {
       if (!isHlsSource(streamUrl) || video.canPlayType(HLS_MIME_TYPE)) {
         video.src = streamUrl;
@@ -125,22 +151,13 @@ export default function WatchPartyPage() {
     init().catch(() => setError('Không thể phát video phòng xem nhóm.'));
     return () => {
       cancelled = true;
+      video.removeEventListener('loadedmetadata', applyInitialPlayback);
+      playbackReady.current = false;
       hls?.destroy();
       video.removeAttribute('src');
       video.load();
     };
-  }, [streamUrl]);
-
-  const applyPlayback = useCallback((playback) => {
-    const video = videoRef.current;
-    if (!video || !playback) return;
-    applyingRemote.current = true;
-    const drift = Math.abs(video.currentTime - Number(playback.currentTime || 0));
-    if (drift > 1.2) video.currentTime = Number(playback.currentTime || 0);
-    const action = playback.paused ? video.pause() : video.play();
-    Promise.resolve(action).catch(() => {});
-    window.setTimeout(() => { applyingRemote.current = false; }, 400);
-  }, []);
+  }, [applyPlayback, streamUrl]);
 
   useEffect(() => {
     if (!roomId) return undefined;
@@ -215,6 +232,7 @@ export default function WatchPartyPage() {
 
   const syncPlayback = () => {
     if (applyingRemote.current || !room?.readyToWatch) return;
+    if (!playbackReady.current) return;
     const video = videoRef.current;
     realtime.current?.syncPlayback({ currentTime: video?.currentTime || 0, paused: video?.paused ?? true });
   };
