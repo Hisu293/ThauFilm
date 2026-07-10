@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Box, Button, Chip, CircularProgress, Container, IconButton, Paper, Stack, TextField, Typography } from '@mui/material';
+import { Alert, Avatar, Box, Button, Chip, CircularProgress, Container, IconButton, Paper, Stack, TextField, Typography } from '@mui/material';
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
 import ContentCopyRoundedIcon from '@mui/icons-material/ContentCopyRounded';
 import FavoriteRoundedIcon from '@mui/icons-material/FavoriteRounded';
+import GroupsRoundedIcon from '@mui/icons-material/GroupsRounded';
 import InsertEmoticonRoundedIcon from '@mui/icons-material/InsertEmoticonRounded';
 import PlayArrowRoundedIcon from '@mui/icons-material/PlayArrowRounded';
 import SendRoundedIcon from '@mui/icons-material/SendRounded';
@@ -18,6 +19,12 @@ const REACTIONS = {
   laugh: '\uD83D\uDE02',
   wow: '\uD83D\uDE2E',
 };
+
+const REACTION_OPTIONS = [
+  { key: 'heart', label: 'Love', icon: <FavoriteRoundedIcon fontSize="small" />, value: REACTIONS.heart },
+  { key: 'laugh', label: 'Funny', icon: <InsertEmoticonRoundedIcon fontSize="small" />, value: REACTIONS.laugh },
+  { key: 'wow', label: 'Wow', icon: <SentimentVerySatisfiedRoundedIcon fontSize="small" />, value: REACTIONS.wow },
+];
 
 const money = (value) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(value) || 0);
 
@@ -226,8 +233,29 @@ export default function WatchPartyPage() {
   if (!room) return <Container sx={{ py: 6 }}><Alert severity="error">{error || 'Không tìm thấy phòng xem nhóm.'}</Alert></Container>;
 
   return (
-    <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
-      <Paper square sx={{ position: 'sticky', top: 0, zIndex: 20, px: { xs: 2, md: 4 }, py: 1.5, borderBottom: '1px solid rgba(148,163,184,0.16)' }}>
+    <Box
+      sx={{
+        minHeight: '100vh',
+        bgcolor: '#070b16',
+        background:
+          'radial-gradient(circle at 18% 8%, rgba(245,158,11,0.18), transparent 30%), radial-gradient(circle at 82% 18%, rgba(239,68,68,0.12), transparent 28%), linear-gradient(180deg, #0f172a 0%, #070b16 48%, #050814 100%)',
+      }}
+    >
+      <Paper
+        square
+        elevation={0}
+        sx={{
+          position: 'sticky',
+          top: 0,
+          zIndex: 20,
+          px: { xs: 2, md: 4 },
+          py: 1.5,
+          borderBottom: '1px solid rgba(255,255,255,0.08)',
+          bgcolor: 'rgba(8,12,24,0.82)',
+          backdropFilter: 'blur(18px)',
+          boxShadow: '0 18px 60px rgba(0,0,0,0.32)',
+        }}
+      >
         <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems={{ md: 'center' }} justifyContent="space-between">
           <Stack direction="row" spacing={1.5} alignItems="center" minWidth={0}>
             <IconButton onClick={() => navigate(`/movies/${room.movieId}`)}><ArrowBackRoundedIcon /></IconButton>
@@ -260,7 +288,7 @@ export default function WatchPartyPage() {
         />
       </Paper>
 
-      <Container maxWidth="xl" sx={{ py: 3 }}>
+      <Container maxWidth="xl" sx={{ py: { xs: 2.5, md: 4 } }}>
         <Stack direction={{ xs: 'column', lg: 'row' }} spacing={3}>
           <Box flex={1} minWidth={0}>
             {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
@@ -269,7 +297,27 @@ export default function WatchPartyPage() {
                 Mời bạn bè bằng link, mỗi người thanh toán {money(room.pricePerMember)}. Khi tất cả đã thanh toán, cả phòng có thể bấm xem và video sẽ đồng bộ.
               </Alert>
             )}
-            <Box sx={{ position: 'relative', bgcolor: '#000', borderRadius: 2, overflow: 'hidden' }}>
+            <Box
+              sx={{
+                position: 'relative',
+                bgcolor: '#000',
+                borderRadius: { xs: 3, md: 4 },
+                overflow: 'hidden',
+                border: '1px solid rgba(255,255,255,0.10)',
+                boxShadow: '0 34px 90px rgba(0,0,0,0.55), 0 0 0 1px rgba(251,191,36,0.08)',
+              }}
+            >
+              <Box
+                sx={{
+                  position: 'absolute',
+                  inset: 0,
+                  pointerEvents: 'none',
+                  background: room.readyToWatch
+                    ? 'linear-gradient(180deg, rgba(0,0,0,0.18), transparent 26%, rgba(0,0,0,0.38))'
+                    : 'radial-gradient(circle at center, rgba(15,23,42,0.18), rgba(0,0,0,0.82))',
+                  zIndex: 1,
+                }}
+              />
               <Box
                 component="video"
                 ref={videoRef}
@@ -279,33 +327,113 @@ export default function WatchPartyPage() {
                 onPlay={syncPlayback}
                 onPause={syncPlayback}
                 onSeeked={syncPlayback}
-                sx={{ display: 'block', width: '100%', aspectRatio: '16 / 9', opacity: room.readyToWatch ? 1 : 0.42 }}
+                sx={{ display: 'block', width: '100%', aspectRatio: '16 / 9', opacity: room.readyToWatch ? 1 : 0.55 }}
               />
               {!room.readyToWatch && (
-                <Box sx={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', textAlign: 'center', p: 3 }}>
-                  <Box>
+                <Box sx={{ position: 'absolute', inset: 0, zIndex: 2, display: 'grid', placeItems: 'center', textAlign: 'center', p: 3 }}>
+                  <Box
+                    sx={{
+                      px: { xs: 2.5, md: 4 },
+                      py: 3,
+                      borderRadius: 4,
+                      bgcolor: 'rgba(2,6,23,0.72)',
+                      border: '1px solid rgba(255,255,255,0.12)',
+                      boxShadow: '0 24px 70px rgba(0,0,0,0.42)',
+                      backdropFilter: 'blur(14px)',
+                    }}
+                  >
+                    <Avatar sx={{ mx: 'auto', mb: 1.5, width: 54, height: 54, bgcolor: 'rgba(251,191,36,0.16)', color: '#fbbf24' }}>
+                      <GroupsRoundedIcon />
+                    </Avatar>
                     <Typography variant="h5" fontWeight={900}>Chờ cả nhóm thanh toán</Typography>
                     <Typography color="text.secondary" mt={1}>Video sẽ mở khi mọi thành viên trong phòng đã trả phần của mình.</Typography>
                   </Box>
                 </Box>
               )}
-              <Box sx={{ pointerEvents: 'none', position: 'absolute', right: 18, bottom: 18 }}>
+              <Box sx={{ pointerEvents: 'none', position: 'absolute', right: 24, bottom: 24, zIndex: 3 }}>
                 <Stack spacing={1}>
                   {reactions.map((item) => (
-                    <Typography key={item.id} variant="h4" sx={{ textShadow: '0 8px 24px rgba(0,0,0,0.6)' }}>{item.reaction}</Typography>
+                    <Typography
+                      key={item.id}
+                      variant="h4"
+                      sx={{
+                        width: 56,
+                        height: 56,
+                        display: 'grid',
+                        placeItems: 'center',
+                        borderRadius: '50%',
+                        bgcolor: 'rgba(15,23,42,0.72)',
+                        border: '1px solid rgba(255,255,255,0.14)',
+                        boxShadow: '0 16px 40px rgba(0,0,0,0.38)',
+                        textShadow: '0 8px 24px rgba(0,0,0,0.7)',
+                        animation: 'watchPartyFloat 1.7s ease-out forwards',
+                        '@keyframes watchPartyFloat': {
+                          '0%': { opacity: 0, transform: 'translateY(18px) scale(0.72)' },
+                          '18%': { opacity: 1, transform: 'translateY(0) scale(1.12)' },
+                          '100%': { opacity: 0, transform: 'translateY(-96px) scale(0.92)' },
+                        },
+                      }}
+                    >
+                      {item.reaction}
+                    </Typography>
                   ))}
                 </Stack>
               </Box>
             </Box>
-            <Stack direction="row" spacing={1} mt={2}>
-              <Button variant="outlined" startIcon={<FavoriteRoundedIcon />} onClick={() => sendReaction(REACTIONS.heart)}>{REACTIONS.heart}</Button>
-              <Button variant="outlined" startIcon={<InsertEmoticonRoundedIcon />} onClick={() => sendReaction(REACTIONS.laugh)}>{REACTIONS.laugh}</Button>
-              <Button variant="outlined" startIcon={<SentimentVerySatisfiedRoundedIcon />} onClick={() => sendReaction(REACTIONS.wow)}>{REACTIONS.wow}</Button>
+            <Stack
+              direction="row"
+              spacing={1}
+              mt={2}
+              sx={{
+                width: 'fit-content',
+                p: 0.75,
+                borderRadius: 999,
+                bgcolor: 'rgba(15,23,42,0.74)',
+                border: '1px solid rgba(255,255,255,0.10)',
+                boxShadow: '0 18px 46px rgba(0,0,0,0.28)',
+                backdropFilter: 'blur(14px)',
+              }}
+            >
+              {REACTION_OPTIONS.map((reaction) => (
+                <Button
+                  key={reaction.key}
+                  variant="text"
+                  startIcon={reaction.icon}
+                  onClick={() => sendReaction(reaction.value)}
+                  sx={{
+                    minWidth: 0,
+                    px: { xs: 1.35, sm: 1.65 },
+                    py: 0.85,
+                    borderRadius: 999,
+                    color: '#e5e7eb',
+                    fontWeight: 900,
+                    textTransform: 'none',
+                    '& .MuiButton-startIcon': { mr: 0.55, color: '#fbbf24' },
+                    '&:hover': {
+                      bgcolor: 'rgba(255,255,255,0.10)',
+                      transform: 'translateY(-1px)',
+                    },
+                    transition: 'transform 160ms ease, background-color 160ms ease',
+                  }}
+                >
+                  <Box component="span" sx={{ mr: 0.5, fontSize: 18, lineHeight: 1 }}>{reaction.value}</Box>
+                  {reaction.label}
+                </Button>
+              ))}
             </Stack>
           </Box>
 
           <Stack sx={{ width: { lg: 360 } }} spacing={2}>
-            <Paper sx={{ p: 2 }}>
+            <Paper
+              elevation={0}
+              sx={{
+                p: 2,
+                borderRadius: 3,
+                bgcolor: 'rgba(30,41,59,0.84)',
+                border: '1px solid rgba(255,255,255,0.09)',
+                boxShadow: '0 24px 70px rgba(0,0,0,0.24)',
+              }}
+            >
               <Typography fontWeight={900} mb={1}>Thành viên</Typography>
               <Stack spacing={1}>
                 {(room.members || []).map((member) => (
@@ -320,12 +448,24 @@ export default function WatchPartyPage() {
               </Stack>
             </Paper>
 
-            <Paper sx={{ p: 2, height: 440, display: 'flex', flexDirection: 'column' }}>
+            <Paper
+              elevation={0}
+              sx={{
+                p: 2,
+                height: 440,
+                display: 'flex',
+                flexDirection: 'column',
+                borderRadius: 3,
+                bgcolor: 'rgba(30,41,59,0.84)',
+                border: '1px solid rgba(255,255,255,0.09)',
+                boxShadow: '0 24px 70px rgba(0,0,0,0.24)',
+              }}
+            >
               <Typography fontWeight={900} mb={1}>Chat phòng</Typography>
               <Box flex={1} overflow="auto" pr={0.5}>
                 <Stack spacing={1}>
                   {messages.map((message) => (
-                    <Box key={message.id} sx={{ bgcolor: 'action.hover', borderRadius: 2, p: 1 }}>
+                    <Box key={message.id} sx={{ bgcolor: 'rgba(15,23,42,0.72)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 2, p: 1 }}>
                       <Typography variant="caption" color="text.secondary">{message.senderName}</Typography>
                       <Typography variant="body2">{message.content}</Typography>
                     </Box>
