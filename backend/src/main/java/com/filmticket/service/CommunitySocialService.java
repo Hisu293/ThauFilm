@@ -1,15 +1,22 @@
 package com.filmticket.service;
 
 import com.filmticket.dto.CommunityFeedResponse;
+import com.filmticket.dto.CommunityPostCommentResponse;
+import com.filmticket.dto.CommunityPostEngagementResponse;
 import com.filmticket.dto.SocialConversationResponse;
 import com.filmticket.dto.SocialMessageResponse;
 import com.filmticket.entity.CommunityPost;
+import com.filmticket.entity.CommunityPostComment;
+import com.filmticket.entity.CommunityPostReaction;
+import com.filmticket.entity.CommunityReactionType;
 import com.filmticket.entity.Review;
 import com.filmticket.entity.SocialMessage;
 import com.filmticket.entity.User;
 import com.filmticket.exception.BadRequestException;
 import com.filmticket.repository.FollowRepository;
 import com.filmticket.repository.CommunityPostRepository;
+import com.filmticket.repository.CommunityPostCommentRepository;
+import com.filmticket.repository.CommunityPostReactionRepository;
 import com.filmticket.repository.MovieRepository;
 import com.filmticket.repository.ReviewRepository;
 import com.filmticket.repository.SocialMessageRepository;
@@ -23,9 +30,11 @@ import org.springframework.web.multipart.MultipartFile;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Locale;
 import java.util.UUID;
 
 @Service
@@ -33,9 +42,12 @@ import java.util.UUID;
 public class CommunitySocialService {
     private static final int MAX_MESSAGE_LENGTH = 2000;
     private static final int MAX_POST_LENGTH = 5000;
+    private static final int MAX_COMMENT_LENGTH = 1000;
 
     private final FollowRepository followRepository;
     private final CommunityPostRepository communityPostRepository;
+    private final CommunityPostCommentRepository communityPostCommentRepository;
+    private final CommunityPostReactionRepository communityPostReactionRepository;
     private final ReviewRepository reviewRepository;
     private final SocialMessageRepository socialMessageRepository;
     private final UserRepository userRepository;
@@ -45,14 +57,11 @@ public class CommunitySocialService {
 
     @Transactional(readOnly = true)
     public List<CommunityFeedResponse> feed(UUID userId) {
-        List<UUID> visibleUserIds = new ArrayList<>(followRepository.findFollowingIdsByFollowerId(userId));
-        visibleUserIds.add(userId);
-
         List<CommunityFeedResponse> items = new ArrayList<>();
-        reviewRepository.findTop50ByUserIdInOrderByCreatedAtDesc(visibleUserIds).stream()
+        reviewRepository.findTop50ByOrderByCreatedAtDesc().stream()
                 .map(review -> toReviewFeedItem(review, userId))
                 .forEach(items::add);
-        communityPostRepository.findTop50ByUserIdInOrderByCreatedAtDesc(visibleUserIds).stream()
+        communityPostRepository.findTop50ByOrderByCreatedAtDesc().stream()
                 .map(post -> toPostFeedItem(post, userId))
                 .forEach(items::add);
 
@@ -123,6 +132,75 @@ public class CommunitySocialService {
         CommunityPost post = ownedPost(userId, postId);
         communityPostRepository.delete(post);
         cloudinaryStorageService.deleteQuietly(post.getImagePublicId());
+    }
+
+    @Transactional(readOnly = true)
+    public List<CommunityPostCommentResponse> comments(UUID viewerId, UUID postId) {
+        requirePost(postId);
+        List<CommunityPostComment> comments = new ArrayList<>(
+                communityPostCommentRepository.findTop100ByPostIdOrderByCreatedAtDesc(postId));
+        Collections.reverse(comments);
+        return comments.stream().map(comment -> toComment(comment, viewerId)).toList();
+    }
+
+    @Transactional
+    public CommunityPostCommentResponse createComment(UUID userId, UUID postId, String rawContent) {
+        requirePost(postId);
+        String content = normalize(rawContent);
+        if (content == null) throw new BadRequestException("Nội dung bình luận không được để trống");
+        if (content.length() > MAX_COMMENT_LENGTH) {
+            throw new BadRequestException("Bình luận không được vượt quá 1000 ký tự");
+        }
+        CommunityPostComment comment = communityPostCommentRepository.save(CommunityPostComment.builder()
+                .postId(postId)
+                .userId(userId)
+                .content(content)
+                .build());
+        return toComment(comment, userId);
+    }
+
+    @Transactional
+    public void deleteComment(UUID userId, UUID postId, UUID commentId) {
+        CommunityPostComment comment = communityPostCommentRepository.findByIdAndUserId(commentId, userId)
+                .filter(candidate -> candidate.getPostId().equals(postId))
+                .orElseThrow(() -> new BadRequestException(
+                        "Không tìm thấy bình luận hoặc bạn không có quyền xóa"));
+        communityPostCommentRepository.delete(comment);
+    }
+
+    @Transactional
+    public CommunityPostEngagementResponse react(UUID userId, UUID postId, String rawType) {
+        CommunityPost post = requirePost(postId);
+        CommunityReactionType type;
+        try {
+            type = CommunityReactionType.valueOf(rawType == null ? "" : rawType.trim().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException exception) {
+            throw new BadRequestException("Biểu cảm không hợp lệ");
+        }
+
+        CommunityPostReaction reaction = communityPostReactionRepository
+                .findByPostIdAndUserId(postId, userId).orElse(null);
+        if (reaction != null && reaction.getType() == type) {
+            communityPostReactionRepository.delete(reaction);
+        } else if (reaction != null) {
+            reaction.setType(type);
+            communityPostReactionRepository.save(reaction);
+        } else {
+            communityPostReactionRepository.save(CommunityPostReaction.builder()
+                    .postId(postId)
+                    .userId(userId)
+                    .type(type)
+                    .build());
+        }
+        return engagement(post, userId);
+    }
+
+    @Transactional
+    public CommunityPostEngagementResponse share(UUID userId, UUID postId) {
+        CommunityPost post = requirePost(postId);
+        post.setShareCount(post.getShareCount() + 1);
+        communityPostRepository.save(post);
+        return engagement(post, userId);
     }
 
     @Transactional(readOnly = true)
@@ -219,6 +297,7 @@ public class CommunitySocialService {
 
     private CommunityFeedResponse toPostFeedItem(CommunityPost post, UUID viewerId) {
         User author = userRepository.findById(post.getUserId()).orElse(null);
+        CommunityPostEngagementResponse engagement = engagement(post, viewerId);
         return CommunityFeedResponse.builder()
                 .id(post.getId())
                 .itemType("POST")
@@ -228,10 +307,51 @@ public class CommunitySocialService {
                 .userAvatarUrl(author == null ? null : author.getAvatarUrl())
                 .content(post.getContent())
                 .imageUrl(post.getImageUrl())
+                .reactionCounts(engagement.getReactionCounts())
+                .myReaction(engagement.getMyReaction())
+                .commentCount(engagement.getCommentCount())
+                .shareCount(engagement.getShareCount())
                 .owner(post.getUserId().equals(viewerId))
                 .createdAt(post.getCreatedAt())
                 .updatedAt(post.getUpdatedAt())
                 .build();
+    }
+
+    private CommunityPostCommentResponse toComment(CommunityPostComment comment, UUID viewerId) {
+        User author = userRepository.findById(comment.getUserId()).orElse(null);
+        return CommunityPostCommentResponse.builder()
+                .id(comment.getId())
+                .postId(comment.getPostId())
+                .userId(comment.getUserId())
+                .userFullName(author == null ? "Thành viên" : author.getFullName())
+                .userAvatarUrl(author == null ? null : author.getAvatarUrl())
+                .content(comment.getContent())
+                .owner(comment.getUserId().equals(viewerId))
+                .createdAt(comment.getCreatedAt())
+                .build();
+    }
+
+    private CommunityPostEngagementResponse engagement(CommunityPost post, UUID viewerId) {
+        Map<String, Long> counts = new LinkedHashMap<>();
+        for (CommunityReactionType type : CommunityReactionType.values()) counts.put(type.name(), 0L);
+        for (Object[] row : communityPostReactionRepository.countByTypeForPost(post.getId())) {
+            counts.put(((CommunityReactionType) row[0]).name(), (Long) row[1]);
+        }
+        String myReaction = communityPostReactionRepository.findByPostIdAndUserId(post.getId(), viewerId)
+                .map(reaction -> reaction.getType().name())
+                .orElse(null);
+        return CommunityPostEngagementResponse.builder()
+                .postId(post.getId())
+                .reactionCounts(counts)
+                .myReaction(myReaction)
+                .commentCount(communityPostCommentRepository.countByPostId(post.getId()))
+                .shareCount(post.getShareCount())
+                .build();
+    }
+
+    private CommunityPost requirePost(UUID postId) {
+        return communityPostRepository.findById(postId)
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy bài viết"));
     }
 
     private CommunityPost ownedPost(UUID userId, UUID postId) {

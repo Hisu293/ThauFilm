@@ -6,7 +6,9 @@ import {
   Button,
   Card,
   CircularProgress,
+  Collapse,
   Container,
+  Divider,
   Dialog,
   DialogActions,
   DialogContent,
@@ -23,9 +25,12 @@ import {
 import AddPhotoAlternateOutlinedIcon from '@mui/icons-material/AddPhotoAlternateOutlined';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import CloseIcon from '@mui/icons-material/Close';
+import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
+import SendIcon from '@mui/icons-material/Send';
+import ShareOutlinedIcon from '@mui/icons-material/ShareOutlined';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { socialService } from '../services/socialService';
@@ -33,6 +38,18 @@ import { socialService } from '../services/socialService';
 const MAX_SOURCE_IMAGE_SIZE = 8 * 1024 * 1024;
 const MAX_IMAGE_DATA_LENGTH = 2_700_000;
 const MAX_POST_LENGTH = 5000;
+const MAX_COMMENT_LENGTH = 1000;
+
+const REACTIONS = [
+  { type: 'LIKE', emoji: '👍', label: 'Thích' },
+  { type: 'LOVE', emoji: '❤️', label: 'Yêu thích' },
+  { type: 'HAHA', emoji: '😂', label: 'Haha' },
+  { type: 'WOW', emoji: '😮', label: 'Wow' },
+  { type: 'SAD', emoji: '😢', label: 'Buồn' },
+  { type: 'ANGRY', emoji: '😡', label: 'Phẫn nộ' },
+];
+
+const reactionByType = (type) => REACTIONS.find((reaction) => reaction.type === type);
 
 const formatDate = (value) => (value ? new Date(value).toLocaleString('vi-VN') : '');
 
@@ -118,13 +135,90 @@ function ImagePicker({ imageUrl, onChange, disabled }) {
   );
 }
 
-function PostCard({ item, onEdit, onDelete }) {
+function PostCard({ item, onEdit, onDelete, onMetrics, onNotice }) {
   const [anchorEl, setAnchorEl] = useState(null);
+  const [reactionAnchor, setReactionAnchor] = useState(null);
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [comments, setComments] = useState([]);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [commentContent, setCommentContent] = useState('');
+  const [commentSaving, setCommentSaving] = useState(false);
   const isEdited = item.updatedAt && item.createdAt
     && new Date(item.updatedAt).getTime() - new Date(item.createdAt).getTime() > 1000;
+  const currentReaction = reactionByType(item.myReaction);
+  const totalReactions = Object.values(item.reactionCounts || {}).reduce((sum, count) => sum + Number(count || 0), 0);
+
+  const openComments = async () => {
+    const nextOpen = !commentsOpen;
+    setCommentsOpen(nextOpen);
+    if (!nextOpen || comments.length > 0) return;
+    setCommentsLoading(true);
+    try {
+      setComments(await socialService.getCommunityPostComments(item.postId) || []);
+    } catch (error) {
+      onNotice({ severity: 'error', text: error.message || 'Không thể tải bình luận.' });
+    } finally {
+      setCommentsLoading(false);
+    }
+  };
+
+  const sendComment = async () => {
+    const content = commentContent.trim();
+    if (!content) return;
+    setCommentSaving(true);
+    try {
+      const comment = await socialService.createCommunityPostComment(item.postId, content);
+      setComments((current) => [...current, comment]);
+      setCommentContent('');
+      onMetrics(item.id, { commentCount: Number(item.commentCount || 0) + 1 });
+    } catch (error) {
+      onNotice({ severity: 'error', text: error.message || 'Không thể gửi bình luận.' });
+    } finally {
+      setCommentSaving(false);
+    }
+  };
+
+  const removeComment = async (comment) => {
+    if (!window.confirm('Bạn chắc chắn muốn xóa bình luận này?')) return;
+    try {
+      await socialService.deleteCommunityPostComment(item.postId, comment.id);
+      setComments((current) => current.filter((candidate) => candidate.id !== comment.id));
+      onMetrics(item.id, { commentCount: Math.max(0, Number(item.commentCount || 0) - 1) });
+    } catch (error) {
+      onNotice({ severity: 'error', text: error.message || 'Không thể xóa bình luận.' });
+    }
+  };
+
+  const react = async (type) => {
+    setReactionAnchor(null);
+    try {
+      const engagement = await socialService.reactToCommunityPost(item.postId, type);
+      onMetrics(item.id, engagement);
+    } catch (error) {
+      onNotice({ severity: 'error', text: error.message || 'Không thể thả biểu cảm.' });
+    }
+  };
+
+  const share = async () => {
+    const shareUrl = `${window.location.origin}/community/feed?post=${item.postId}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: 'Bài viết cộng đồng ThauFilm', text: item.content || 'Xem bài viết này trên ThauFilm', url: shareUrl });
+      } else {
+        await navigator.clipboard.writeText(shareUrl);
+      }
+      const engagement = await socialService.shareCommunityPost(item.postId);
+      onMetrics(item.id, engagement);
+      onNotice({ severity: 'success', text: navigator.share ? 'Đã chia sẻ bài viết.' : 'Đã sao chép liên kết bài viết.' });
+    } catch (error) {
+      if (error?.name !== 'AbortError') {
+        onNotice({ severity: 'error', text: 'Không thể chia sẻ bài viết.' });
+      }
+    }
+  };
 
   return (
-    <Card sx={{ p: { xs: 2, md: 3 }, borderRadius: 4 }}>
+    <Card id={`post-${item.postId}`} sx={{ p: { xs: 2, md: 3 }, borderRadius: 4, scrollMarginTop: 90 }}>
       <Stack direction="row" spacing={1.5} alignItems="center">
         <Avatar src={item.userAvatarUrl}>{(item.userFullName || 'U')[0]}</Avatar>
         <Box flex={1} minWidth={0}>
@@ -158,6 +252,92 @@ function PostCard({ item, onEdit, onDelete }) {
           sx={{ display: 'block', width: '100%', maxHeight: 620, objectFit: 'contain', mt: 2, borderRadius: 3, bgcolor: 'action.hover' }}
         />
       )}
+
+      <Stack direction="row" justifyContent="space-between" mt={2} color="text.secondary">
+        <Typography variant="caption">{totalReactions > 0 ? `${totalReactions} lượt bày tỏ cảm xúc` : ''}</Typography>
+        <Typography variant="caption">
+          {Number(item.commentCount || 0)} bình luận · {Number(item.shareCount || 0)} lượt chia sẻ
+        </Typography>
+      </Stack>
+      <Divider sx={{ my: 1 }} />
+      <Stack direction="row" justifyContent="space-around">
+        <Button
+          color={currentReaction ? 'primary' : 'inherit'}
+          onClick={(event) => setReactionAnchor(event.currentTarget)}
+          sx={{ flex: 1 }}
+        >
+          {currentReaction ? `${currentReaction.emoji} ${currentReaction.label}` : '👍 Thích'}
+        </Button>
+        <Button startIcon={<ChatBubbleOutlineIcon />} onClick={openComments} color="inherit" sx={{ flex: 1 }}>
+          Bình luận
+        </Button>
+        <Button startIcon={<ShareOutlinedIcon />} onClick={share} color="inherit" sx={{ flex: 1 }}>
+          Chia sẻ
+        </Button>
+      </Stack>
+      <Menu anchorEl={reactionAnchor} open={Boolean(reactionAnchor)} onClose={() => setReactionAnchor(null)}>
+        <Stack direction="row" px={1}>
+          {REACTIONS.map((reaction) => (
+            <IconButton
+              key={reaction.type}
+              title={reaction.label}
+              onClick={() => react(reaction.type)}
+              sx={{ fontSize: 25, transform: item.myReaction === reaction.type ? 'scale(1.2)' : 'none' }}
+            >
+              {reaction.emoji}
+            </IconButton>
+          ))}
+        </Stack>
+      </Menu>
+
+      <Collapse in={commentsOpen}>
+        <Divider sx={{ my: 1.5 }} />
+        {commentsLoading ? (
+          <Box textAlign="center" py={2}><CircularProgress size={24} /></Box>
+        ) : (
+          <Stack spacing={1.5}>
+            {comments.map((comment) => (
+              <Stack key={comment.id} direction="row" spacing={1} alignItems="flex-start">
+                <Avatar src={comment.userAvatarUrl} sx={{ width: 32, height: 32 }}>
+                  {(comment.userFullName || 'U')[0]}
+                </Avatar>
+                <Box sx={{ bgcolor: 'action.hover', borderRadius: 2.5, px: 1.5, py: 1, flex: 1, minWidth: 0 }}>
+                  <Typography variant="body2" fontWeight={800}>{comment.userFullName || 'Thành viên'}</Typography>
+                  <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{comment.content}</Typography>
+                  <Typography variant="caption" color="text.secondary">{formatDate(comment.createdAt)}</Typography>
+                </Box>
+                {comment.owner && (
+                  <IconButton size="small" aria-label="Xóa bình luận" onClick={() => removeComment(comment)}>
+                    <DeleteOutlineIcon fontSize="small" />
+                  </IconButton>
+                )}
+              </Stack>
+            ))}
+            {comments.length === 0 && <Typography variant="body2" color="text.secondary">Chưa có bình luận.</Typography>}
+          </Stack>
+        )}
+        <Stack direction="row" spacing={1} mt={2} alignItems="flex-end">
+          <TextField
+            value={commentContent}
+            onChange={(event) => setCommentContent(event.target.value)}
+            placeholder="Viết bình luận..."
+            size="small"
+            multiline
+            maxRows={4}
+            fullWidth
+            inputProps={{ maxLength: MAX_COMMENT_LENGTH }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                sendComment();
+              }
+            }}
+          />
+          <IconButton color="primary" onClick={sendComment} disabled={commentSaving || !commentContent.trim()}>
+            {commentSaving ? <CircularProgress size={22} /> : <SendIcon />}
+          </IconButton>
+        </Stack>
+      </Collapse>
     </Card>
   );
 }
@@ -223,6 +403,20 @@ export default function CommunityFeedPage() {
     const timer = window.setTimeout(load, 0);
     return () => window.clearTimeout(timer);
   }, [isLoggedIn, load, navigate]);
+
+  useEffect(() => {
+    if (loading) return undefined;
+    const postId = new URLSearchParams(window.location.search).get('post');
+    if (!postId) return undefined;
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById(`post-${postId}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [items, loading]);
+
+  const updatePostMetrics = useCallback((postId, metrics) => {
+    setItems((current) => current.map((item) => item.id === postId ? { ...item, ...metrics } : item));
+  }, []);
 
   const createPost = async () => {
     if (!content.trim() && !imageUrl) return;
@@ -290,7 +484,7 @@ export default function CommunityFeedPage() {
       <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" gap={2} mb={4}>
         <Box>
           <Typography variant="h3" fontWeight={900}>Bảng tin cộng đồng</Typography>
-          <Typography color="text.secondary">Chia sẻ khoảnh khắc và cập nhật mới từ những người bạn theo dõi.</Typography>
+          <Typography color="text.secondary">Chia sẻ khoảnh khắc và khám phá cập nhật mới từ cộng đồng yêu phim.</Typography>
         </Box>
         <Button component={RouterLink} to="/community/connections" variant="outlined">Quản lý kết nối</Button>
       </Stack>
@@ -333,7 +527,16 @@ export default function CommunityFeedPage() {
       ) : (
         <Stack spacing={2.5}>
           {items.map((item) => item.itemType === 'POST'
-            ? <PostCard key={`post-${item.id}`} item={item} onEdit={openEdit} onDelete={deletePost} />
+            ? (
+              <PostCard
+                key={`post-${item.id}`}
+                item={item}
+                onEdit={openEdit}
+                onDelete={deletePost}
+                onMetrics={updatePostMetrics}
+                onNotice={setNotice}
+              />
+            )
             : <ReviewCard key={`review-${item.id || item.reviewId}`} item={item} />)}
         </Stack>
       )}

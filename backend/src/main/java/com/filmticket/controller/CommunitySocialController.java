@@ -2,6 +2,8 @@ package com.filmticket.controller;
 
 import com.filmticket.dto.ApiResponse;
 import com.filmticket.dto.CommunityFeedResponse;
+import com.filmticket.dto.CommunityPostCommentResponse;
+import com.filmticket.dto.CommunityPostEngagementResponse;
 import com.filmticket.dto.SocialConversationResponse;
 import com.filmticket.dto.SocialMessageResponse;
 import com.filmticket.service.CommunitySocialService;
@@ -78,6 +80,60 @@ public class CommunitySocialController {
         return ResponseEntity.noContent().build();
     }
 
+    @GetMapping("/posts/{postId}/comments")
+    public ResponseEntity<ApiResponse<List<CommunityPostCommentResponse>>> comments(
+            @AuthenticationPrincipal UserDetails principal,
+            @PathVariable UUID postId) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Đã tải bình luận",
+                communitySocialService.comments(currentUserService.requireUserId(principal), postId)
+        ));
+    }
+
+    @PostMapping("/posts/{postId}/comments")
+    public ResponseEntity<ApiResponse<CommunityPostCommentResponse>> createComment(
+            @AuthenticationPrincipal UserDetails principal,
+            @PathVariable UUID postId,
+            @RequestBody CommentRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.success(
+                "Đã bình luận",
+                communitySocialService.createComment(
+                        currentUserService.requireUserId(principal), postId, request.getContent())
+        ));
+    }
+
+    @DeleteMapping("/posts/{postId}/comments/{commentId}")
+    public ResponseEntity<Void> deleteComment(
+            @AuthenticationPrincipal UserDetails principal,
+            @PathVariable UUID postId,
+            @PathVariable UUID commentId) {
+        communitySocialService.deleteComment(
+                currentUserService.requireUserId(principal), postId, commentId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PutMapping("/posts/{postId}/reaction")
+    public ResponseEntity<ApiResponse<CommunityPostEngagementResponse>> react(
+            @AuthenticationPrincipal UserDetails principal,
+            @PathVariable UUID postId,
+            @RequestBody ReactionRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Đã cập nhật biểu cảm",
+                communitySocialService.react(
+                        currentUserService.requireUserId(principal), postId, request.getType())
+        ));
+    }
+
+    @PostMapping("/posts/{postId}/share")
+    public ResponseEntity<ApiResponse<CommunityPostEngagementResponse>> share(
+            @AuthenticationPrincipal UserDetails principal,
+            @PathVariable UUID postId) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Đã chia sẻ bài viết",
+                communitySocialService.share(currentUserService.requireUserId(principal), postId)
+        ));
+    }
+
     @GetMapping("/messages")
     public ResponseEntity<ApiResponse<List<SocialConversationResponse>>> conversations(
             @AuthenticationPrincipal UserDetails principal) {
@@ -115,6 +171,16 @@ public class CommunitySocialController {
     @Data
     public static class SendMessageRequest {
         private String content;
+    }
+
+    @Data
+    public static class CommentRequest {
+        private String content;
+    }
+
+    @Data
+    public static class ReactionRequest {
+        private String type;
     }
 
 }
