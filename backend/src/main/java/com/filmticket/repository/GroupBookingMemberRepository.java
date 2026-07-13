@@ -13,6 +13,7 @@ import java.util.UUID;
 public interface GroupBookingMemberRepository extends JpaRepository<GroupBookingMember, UUID> {
     List<GroupBookingMember> findByGroupBookingIdOrderByCreatedAtAsc(UUID groupBookingId);
     Optional<GroupBookingMember> findByGroupBookingIdAndUserId(UUID groupBookingId, UUID userId);
+    Optional<GroupBookingMember> findByBookingId(UUID bookingId);
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT member FROM GroupBookingMember member WHERE member.groupBookingId = :groupBookingId AND member.userId = :userId")
     Optional<GroupBookingMember> findLockedByGroupBookingIdAndUserId(UUID groupBookingId, UUID userId);

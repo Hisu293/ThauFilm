@@ -195,6 +195,27 @@ const MovieDetailPage = () => {
   }, [openOnlineMovie, streamExpiresAt]);
 
   useEffect(() => {
+    if (!openOnlineMovie || !onlineStreamUrl || !movie?.id) return undefined;
+
+    let active = true;
+    const heartbeat = () => {
+      movieStreamService.heartbeat(movie.id).catch((err) => {
+        if (!active) return;
+        setOnlineStreamUrl('');
+        setStreamExpiresAt('');
+        setStreamError(err.message || 'Phiên xem đã kết thúc. Vui lòng mở lại phim.');
+      });
+    };
+    const interval = window.setInterval(heartbeat, 25000);
+
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      movieStreamService.release(movie.id).catch(() => {});
+    };
+  }, [movie?.id, onlineStreamUrl, openOnlineMovie]);
+
+  useEffect(() => {
     if (!movie || autoWatchStarted || searchParams.get('watch') !== '1') return;
     const timeout = window.setTimeout(() => {
       setAutoWatchStarted(true);

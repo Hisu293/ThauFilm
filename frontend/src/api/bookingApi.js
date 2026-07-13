@@ -128,8 +128,12 @@ export const bookingApi = {
     return axiosClient.post(`/api/member/group-bookings/${groupId}/seats`, { seatIds });
   },
 
-  payGroupBooking: (groupId, paymentMethod = 'VNPAY') => {
+  payGroupBooking: (groupId, paymentMethod = 'PAYOS') => {
     return axiosClient.post(`/api/member/group-bookings/${groupId}/pay`, { paymentMethod });
+  },
+
+  syncGroupPayment: (groupId) => {
+    return axiosClient.post(`/api/member/group-bookings/${groupId}/sync-payment`);
   },
 };
 

@@ -5,11 +5,13 @@ import com.filmticket.entity.Booking;
 import com.filmticket.entity.BookingStatus;
 import com.filmticket.entity.Movie;
 import com.filmticket.entity.OnlineMovieView;
+import com.filmticket.entity.OnlineViewingSession;
 import com.filmticket.entity.Showtime;
 import com.filmticket.exception.BadRequestException;
 import com.filmticket.repository.BookingRepository;
 import com.filmticket.repository.MovieRepository;
 import com.filmticket.repository.OnlineMovieViewRepository;
+import com.filmticket.repository.OnlineViewingSessionRepository;
 import com.filmticket.repository.ShowtimeRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,6 +24,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
@@ -43,6 +46,10 @@ public class MovieStreamService {
     private final ShowtimeRepository showtimeRepository;
     private final BookingRepository bookingRepository;
     private final OnlineMovieViewRepository onlineMovieViewRepository;
+    private final OnlineViewingSessionRepository onlineViewingSessionRepository;
+
+    @Value("${app.streaming.session-timeout-seconds:90}")
+    private long sessionTimeoutSeconds;
 
     @Value("${app.streaming.s3.bucket:}")
     private String s3Bucket;
@@ -63,7 +70,12 @@ public class MovieStreamService {
     private long ttlSeconds;
 
     @Transactional
-    public MovieStreamResponse getMovieStream(UUID movieId, UUID userId, boolean bypassPurchaseCheck) {
+    public MovieStreamResponse getMovieStream(
+            UUID movieId,
+            UUID userId,
+            boolean bypassPurchaseCheck,
+            String deviceId) {
+        String normalizedDeviceId = requireDeviceId(deviceId);
         Movie movie = movieRepository.findById(movieId)
                 .orElseThrow(() -> new BadRequestException("Movie not found"));
         if (!movie.isActive()) {
@@ -83,15 +95,74 @@ public class MovieStreamService {
                 throw new BadRequestException("Bạn chỉ có thể xem phim trong khung giờ suất chiếu đã đặt và đã thanh toán");
             }
             streamingBooking = eligibleBookings.get(0);
+            streamingBooking = bookingRepository.findByIdForUpdate(streamingBooking.getId())
+                    .orElseThrow(() -> new BadRequestException("Booking not found"));
             streamingShowtime = showtimeRepository.findById(streamingBooking.getShowtimeId())
                     .orElseThrow(() -> new BadRequestException("Showtime not found"));
             accessExpiresAt = streamingShowtime.getEndTime().atZone(VIETNAM_ZONE).toInstant();
+            acquireViewingSession(streamingBooking, movieId, userId, normalizedDeviceId);
         }
         MovieStreamResponse response = buildResponse(movie, accessExpiresAt);
         if (streamingBooking != null && streamingShowtime != null) {
             recordView(userId, movieId, streamingBooking.getId(), streamingShowtime.getId());
         }
         return response;
+    }
+
+    @Transactional
+    public void heartbeat(UUID movieId, UUID userId, String deviceId) {
+        OnlineViewingSession session = onlineViewingSessionRepository
+                .findByUserIdAndMovieIdAndDeviceId(userId, movieId, requireDeviceId(deviceId))
+                .orElseThrow(() -> new BadRequestException(
+                        "Phiên xem không còn hiệu lực. Vui lòng mở lại phim."));
+        session.setLastHeartbeatAt(LocalDateTime.now(VIETNAM_ZONE));
+    }
+
+    @Transactional
+    public void release(UUID movieId, UUID userId, String deviceId) {
+        onlineViewingSessionRepository
+                .findByUserIdAndMovieIdAndDeviceId(userId, movieId, requireDeviceId(deviceId))
+                .ifPresent(onlineViewingSessionRepository::delete);
+    }
+
+    private void acquireViewingSession(Booking booking, UUID movieId, UUID userId, String deviceId) {
+        LocalDateTime now = LocalDateTime.now(VIETNAM_ZONE);
+        LocalDateTime staleBefore = now.minusSeconds(Math.max(30, sessionTimeoutSeconds));
+        OnlineViewingSession session = onlineViewingSessionRepository.findByBookingId(booking.getId())
+                .orElse(null);
+
+        if (session != null
+                && !session.getDeviceId().equals(deviceId)
+                && session.getLastHeartbeatAt().isAfter(staleBefore)) {
+            throw new BadRequestException(
+                    "Vé này đang được xem trên một thiết bị khác. Hãy đóng phiên đó hoặc thử lại sau.");
+        }
+
+        if (session == null) {
+            session = OnlineViewingSession.builder()
+                    .bookingId(booking.getId())
+                    .userId(userId)
+                    .movieId(movieId)
+                    .deviceId(deviceId)
+                    .startedAt(now)
+                    .lastHeartbeatAt(now)
+                    .build();
+        } else {
+            session.setUserId(userId);
+            session.setMovieId(movieId);
+            session.setDeviceId(deviceId);
+            session.setStartedAt(now);
+            session.setLastHeartbeatAt(now);
+        }
+        onlineViewingSessionRepository.save(session);
+    }
+
+    private String requireDeviceId(String deviceId) {
+        String normalized = blankToNull(deviceId);
+        if (normalized == null || normalized.length() > 100) {
+            throw new BadRequestException("Thiếu mã thiết bị xem phim hợp lệ");
+        }
+        return normalized;
     }
 
     public MovieStreamResponse buildResponseAndRecord(Movie movie, UUID userId) {

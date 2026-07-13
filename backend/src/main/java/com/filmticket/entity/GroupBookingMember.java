@@ -9,8 +9,7 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "group_booking_members", uniqueConstraints = {
-        @UniqueConstraint(name = "uk_group_booking_member", columnNames = {"group_booking_id", "user_id"}),
-        @UniqueConstraint(name = "uk_group_booking_seat", columnNames = {"group_booking_id", "seat_id"})
+        @UniqueConstraint(name = "uk_group_booking_member", columnNames = {"group_booking_id", "user_id"})
 }, indexes = {
         @Index(name = "idx_group_member_group", columnList = "group_booking_id"),
         @Index(name = "idx_group_member_user", columnList = "user_id"),
