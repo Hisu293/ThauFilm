@@ -10,7 +10,7 @@ import java.util.UUID;
 
 @Repository
 public interface CommunityPostRepository extends JpaRepository<CommunityPost, UUID> {
-    List<CommunityPost> findTop50ByUserIdInOrderByCreatedAtDesc(List<UUID> userIds);
+    List<CommunityPost> findTop50ByOrderByCreatedAtDesc();
 
     Optional<CommunityPost> findByIdAndUserId(UUID id, UUID userId);
 }

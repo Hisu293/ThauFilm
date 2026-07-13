@@ -4,6 +4,7 @@ import lombok.Builder;
 import lombok.Value;
 
 import java.time.LocalDateTime;
+import java.util.Map;
 import java.util.UUID;
 
 @Value
@@ -22,6 +23,10 @@ public class CommunityFeedResponse {
     Integer rating;
     String content;
     String imageUrl;
+    Map<String, Long> reactionCounts;
+    String myReaction;
+    long commentCount;
+    long shareCount;
     boolean owner;
     LocalDateTime createdAt;
     LocalDateTime updatedAt;

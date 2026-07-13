@@ -66,6 +66,16 @@ export const socialService = {
   updateCommunityPost: (postId, payload) =>
     api.put(`/api/member/community/posts/${postId}`, postFormData(payload), multipartConfig).then(data),
   deleteCommunityPost: (postId) => api.delete(`/api/member/community/posts/${postId}`),
+  getCommunityPostComments: (postId) =>
+    api.get(`/api/member/community/posts/${postId}/comments`).then(data),
+  createCommunityPostComment: (postId, content) =>
+    api.post(`/api/member/community/posts/${postId}/comments`, { content }).then(data),
+  deleteCommunityPostComment: (postId, commentId) =>
+    api.delete(`/api/member/community/posts/${postId}/comments/${commentId}`),
+  reactToCommunityPost: (postId, type) =>
+    api.put(`/api/member/community/posts/${postId}/reaction`, { type }).then(data),
+  shareCommunityPost: (postId) =>
+    api.post(`/api/member/community/posts/${postId}/share`).then(data),
   getConversations: () => api.get('/api/member/community/messages').then(data),
   getMessages: (partnerId) => api.get(`/api/member/community/messages/${partnerId}`).then(data),
   sendMessage: (recipientId, content) =>

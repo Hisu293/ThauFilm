@@ -5,7 +5,6 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.PrePersist;
-import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -17,51 +16,34 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "community_posts", indexes = {
-        @Index(name = "idx_community_post_user_created", columnList = "user_id,created_at")
+@Table(name = "community_post_comments", indexes = {
+        @Index(name = "idx_community_comment_post_created", columnList = "post_id,created_at")
 })
 @Getter
 @Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CommunityPost {
+public class CommunityPostComment {
     @Id
     @Column(nullable = false, updatable = false)
     private UUID id;
 
+    @Column(name = "post_id", nullable = false, updatable = false)
+    private UUID postId;
+
     @Column(name = "user_id", nullable = false, updatable = false)
     private UUID userId;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
-
-    @Column(name = "image_url", columnDefinition = "TEXT")
-    private String imageUrl;
-
-    @Column(name = "image_public_id")
-    private String imagePublicId;
-
-    @Builder.Default
-    @Column(name = "share_count", nullable = false)
-    private long shareCount = 0;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    @Column(name = "updated_at", nullable = false)
-    private LocalDateTime updatedAt;
-
     @PrePersist
     void prePersist() {
         if (id == null) id = UUID.randomUUID();
-        LocalDateTime now = LocalDateTime.now();
-        if (createdAt == null) createdAt = now;
-        if (updatedAt == null) updatedAt = now;
-    }
-
-    @PreUpdate
-    void preUpdate() {
-        updatedAt = LocalDateTime.now();
+        if (createdAt == null) createdAt = LocalDateTime.now();
     }
 }
