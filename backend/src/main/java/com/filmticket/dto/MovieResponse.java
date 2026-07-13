@@ -22,6 +22,8 @@ public class MovieResponse {
     private BigDecimal rating;
     private boolean active;
     private String posterUrl;
+    private String trailerUrl;
+    private String trailerKey;
     private String director;
     private String actors;
     private String genre;
@@ -42,6 +44,13 @@ public class MovieResponse {
         return response;
     }
 
+    public static MovieResponse fromMovie(Movie movie, String posterUrl, String trailerUrl) {
+        MovieResponse response = fromMovie(movie, false);
+        response.setPosterUrl(posterUrl);
+        response.setTrailerUrl(trailerUrl);
+        return response;
+    }
+
     public static MovieResponse fromMovieWithStream(Movie movie) {
         return fromMovie(movie, true);
     }
@@ -49,6 +58,13 @@ public class MovieResponse {
     public static MovieResponse fromMovieWithStream(Movie movie, String posterUrl) {
         MovieResponse response = fromMovie(movie, true);
         response.setPosterUrl(posterUrl);
+        return response;
+    }
+
+    public static MovieResponse fromMovieWithStream(Movie movie, String posterUrl, String trailerUrl) {
+        MovieResponse response = fromMovie(movie, true);
+        response.setPosterUrl(posterUrl);
+        response.setTrailerUrl(trailerUrl);
         return response;
     }
 
@@ -61,6 +77,8 @@ public class MovieResponse {
                 .rating(movie.getRating())
                 .active(movie.isActive())
                 .posterUrl(movie.getPosterUrl())
+                .trailerUrl(movie.getTrailerUrl())
+                .trailerKey(includeStream ? movie.getTrailerUrl() : null)
                 .director(movie.getDirector())
                 .actors(movie.getActors())
                 .genre(movie.getGenre())

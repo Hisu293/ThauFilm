@@ -21,6 +21,9 @@ public class StaffMovieRequest {
     @Size(max = 255, message = "Poster url is too long")
     private String posterUrl;
 
+    @Size(max = 1000, message = "Trailer url is too long")
+    private String trailerUrl;
+
     @Size(max = 5000, message = "Description is too long")
     private String description;
 

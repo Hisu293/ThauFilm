@@ -6,12 +6,22 @@ import LocalActivityRoundedIcon from '@mui/icons-material/LocalActivityRounded';
 import PlayCircleRoundedIcon from '@mui/icons-material/PlayCircleRounded';
 import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
 import { t } from '../i18n/labels';
+import HlsVideoPlayer from './HlsVideoPlayer';
 import './MovieCard.css';
 
 const formatScore = (movie) => {
   const score = movie.score ?? movie.popularity;
   if (typeof score === 'number' && Number.isFinite(score)) return score.toFixed(1);
   return '8.0';
+};
+
+const isYoutubeTrailer = (src) => {
+  try {
+    const host = new URL(src).hostname.replace(/^www\./, '');
+    return ['youtube.com', 'm.youtube.com', 'youtu.be'].includes(host);
+  } catch {
+    return false;
+  }
 };
 
 const MovieCard = ({ movie, variant = 'nowShowing' }) => {
@@ -111,19 +121,32 @@ const MovieCard = ({ movie, variant = 'nowShowing' }) => {
             <CloseRoundedIcon />
           </IconButton>
           {trailerSrc ? (
-            <iframe
-              src={trailerSrc}
-              title={`${movie.title} Trailer`}
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-              allowFullScreen
-              style={{
-                position: 'absolute',
-                inset: 0,
-                width: '100%',
-                height: '100%',
-                border: 0,
-              }}
-            />
+            isYoutubeTrailer(trailerSrc) ? (
+              <iframe
+                src={trailerSrc}
+                title={`${movie.title} Trailer`}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                style={{
+                  position: 'absolute',
+                  inset: 0,
+                  width: '100%',
+                  height: '100%',
+                  border: 0,
+                }}
+              />
+            ) : (
+              <Box
+                sx={{
+                  position: 'absolute',
+                  inset: 0,
+                  '& > div': { height: '100%' },
+                  '& video': { height: '100%', objectFit: 'contain' },
+                }}
+              >
+                <HlsVideoPlayer src={trailerSrc} title={`${movie.title} Trailer`} poster={poster} />
+              </Box>
+            )
           ) : (
             <Stack
               alignItems="center"

@@ -40,6 +40,7 @@ const emptyMovie = {
   rating: 0,
   active: true,
   posterUrl: '',
+  trailerUrl: '',
   director: '',
   actors: '',
   genre: '',
@@ -110,7 +111,8 @@ export const MoviesSection = ({ crud }) => {
     setEditLoadingId(row.id);
     try {
       const detail = await crud.getById(row.id);
-      setForm({ ...emptyMovie, ...(detail || row) });
+      const movie = detail || row;
+      setForm({ ...emptyMovie, ...movie, trailerUrl: movie?.trailerKey || movie?.trailerUrl || '' });
       setFormError(null);
       setDialog(row.id);
     } catch (err) {
@@ -320,6 +322,14 @@ export const MoviesSection = ({ crud }) => {
           </TextField>
         </Stack>
         <TextField label="Poster URL" fullWidth value={form.posterUrl} onChange={set('posterUrl')} />
+        <TextField
+          label="Trailer URL hoặc S3 object key"
+          fullWidth
+          value={form.trailerUrl || ''}
+          onChange={set('trailerUrl')}
+          placeholder="https://youtube.com/... hoặc trailer/example.mp4"
+          helperText="Nếu bucket S3 private, nhập object key như trailer/example.mp4; backend sẽ tự tạo presigned URL."
+        />
         <Stack direction="row" spacing={2}>
           <TextField label="Stream provider" value={form.streamProvider || 'S3'} onChange={set('streamProvider')} sx={{ flex: 1 }} />
           <TextField

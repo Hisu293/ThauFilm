@@ -16,6 +16,7 @@ public class MovieCardResponse {
     private UUID id;
     private String title;
     private String posterUrl;
+    private String trailerUrl;
     private Movie.Status status;
 
     public static MovieCardResponse fromMovie(Movie movie) {
@@ -23,10 +24,15 @@ public class MovieCardResponse {
     }
 
     public static MovieCardResponse fromMovie(Movie movie, String posterUrl) {
+        return fromMovie(movie, posterUrl, movie.getTrailerUrl());
+    }
+
+    public static MovieCardResponse fromMovie(Movie movie, String posterUrl, String trailerUrl) {
         return MovieCardResponse.builder()
                 .id(movie.getId())
                 .title(movie.getTitle())
                 .posterUrl(posterUrl)
+                .trailerUrl(trailerUrl)
                 .status(movie.getStatus())
                 .build();
     }

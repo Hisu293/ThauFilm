@@ -107,7 +107,7 @@ const StaffMovies = () => {
   };
 
   const openEdit = (movie) => {
-    setForm({ ...emptyForm, ...movie });
+    setForm({ ...emptyForm, ...movie, trailerUrl: movie?.trailerKey || movie?.trailerUrl || '' });
     setDialog({ mode: 'edit', movie });
   };
 
@@ -280,11 +280,12 @@ const StaffMovies = () => {
             </Stack>
 
             <TextField
-              label="Trailer URL"
+              label="Trailer URL hoặc S3 object key"
               fullWidth
-              placeholder="https://youtube.com/..."
+              placeholder="https://youtube.com/... hoặc trailer/example.mp4"
               value={form.trailerUrl}
               onChange={(e) => setForm({ ...form, trailerUrl: e.target.value })}
+              helperText="Với S3 private, nhập object key; backend sẽ trả presigned URL khi xem trailer."
               InputProps={{
                 endAdornment: form.trailerUrl ? (
                   <InputAdornment position="end">

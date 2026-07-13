@@ -41,6 +41,9 @@ public class S3PresignedUrlService {
     @Value("${app.poster.url-ttl-seconds:900}")
     private long posterTtlSeconds;
 
+    @Value("${app.trailer.url-ttl-seconds:900}")
+    private long trailerTtlSeconds;
+
     public String resolvePosterUrl(String value) {
         String normalized = blankToNull(value);
         if (normalized == null) return null;
@@ -67,6 +70,19 @@ public class S3PresignedUrlService {
                     : normalized;
         }
         return hasS3Credentials() ? presignGetUrl(normalized, ttlSeconds) : buildPublicS3Url(normalized);
+    }
+
+    public String resolveTrailerUrl(String value) {
+        String normalized = blankToNull(value);
+        if (normalized == null) return null;
+
+        if (isAbsoluteUrl(normalized)) {
+            String objectKey = extractObjectKey(normalized);
+            return objectKey != null && hasS3Credentials()
+                    ? presignGetUrl(objectKey, trailerTtlSeconds)
+                    : normalized;
+        }
+        return hasS3Credentials() ? presignGetUrl(normalized, trailerTtlSeconds) : buildPublicS3Url(normalized);
     }
 
     public boolean hasS3Credentials() {
