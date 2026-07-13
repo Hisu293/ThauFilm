@@ -25,6 +25,7 @@ public class FavoriteListService {
     private final FavoriteListItemRepository favoriteListItemRepository;
     private final MovieRepository movieRepository;
     private final UserRepository userRepository;
+    private final S3PresignedUrlService s3PresignedUrlService;
 
     @Transactional(readOnly = true)
     public List<FavoriteListResponse> getMyLists(UUID userId) {
@@ -138,7 +139,11 @@ public class FavoriteListService {
         List<FavoriteListItem> items = favoriteListItemRepository.findByFavoriteListIdOrderByAddedAtDesc(listId);
         return items.stream()
                 .map(item -> movieRepository.findById(item.getMovieId())
-                        .map(MovieCardResponse::fromMovie)
+                        .map(movie -> MovieCardResponse.fromMovie(
+                                movie,
+                                s3PresignedUrlService.resolvePosterUrl(movie.getPosterUrl()),
+                                s3PresignedUrlService.resolveTrailerUrl(movie.getTrailerUrl())
+                        ))
                         .orElse(null))
                 .filter(m -> m != null)
                 .collect(Collectors.toList());

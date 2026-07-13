@@ -52,6 +52,9 @@ public class Movie {
     @Column(length = 500)
     private String posterUrl;
 
+    @Column(length = 1000)
+    private String trailerUrl;
+
     @Column(length = 255)
     private String director;
 

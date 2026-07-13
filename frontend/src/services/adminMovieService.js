@@ -14,6 +14,7 @@ export const MOVIE_FIELDS = [
   'rating',
   'active',
   'posterUrl',
+  'trailerUrl',
   'director',
   'actors',
   'genre',

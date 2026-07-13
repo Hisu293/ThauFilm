@@ -35,28 +35,28 @@ public class MovieService {
     @Transactional(readOnly = true)
     public List<MovieResponse> getAllMovies() {
         return movieRepository.findAll().stream()
-                .map(movie -> MovieResponse.fromMovieWithStream(movie, resolvePosterUrl(movie)))
+                .map(movie -> MovieResponse.fromMovieWithStream(movie, resolvePosterUrl(movie), resolveTrailerUrl(movie)))
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public List<MovieResponse> getActiveMovies() {
         return movieRepository.findAllByActiveTrue().stream()
-                .map(movie -> MovieResponse.fromMovie(movie, resolvePosterUrl(movie)))
+                .map(movie -> MovieResponse.fromMovie(movie, resolvePosterUrl(movie), resolveTrailerUrl(movie)))
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public List<MovieCardResponse> getActiveMovieCards() {
         return movieRepository.findAllByActiveTrue().stream()
-                .map(movie -> MovieCardResponse.fromMovie(movie, resolvePosterUrl(movie)))
+                .map(movie -> MovieCardResponse.fromMovie(movie, resolvePosterUrl(movie), resolveTrailerUrl(movie)))
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public List<MovieCardResponse> getActiveMovieCardsByStatus(Movie.Status status) {
         return movieRepository.findAllByActiveTrueAndStatus(status).stream()
-                .map(movie -> MovieCardResponse.fromMovie(movie, resolvePosterUrl(movie)))
+                .map(movie -> MovieCardResponse.fromMovie(movie, resolvePosterUrl(movie), resolveTrailerUrl(movie)))
                 .toList();
     }
 
@@ -66,13 +66,13 @@ public class MovieService {
         if (!movie.isActive()) {
             throw new BadRequestException("Movie is not available");
         }
-        return MovieResponse.fromMovie(movie, resolvePosterUrl(movie));
+        return MovieResponse.fromMovie(movie, resolvePosterUrl(movie), resolveTrailerUrl(movie));
     }
 
     @Transactional(readOnly = true)
     public MovieResponse getMovieById(UUID movieId) {
         Movie movie = getMovieEntityOrThrow(movieId);
-        return MovieResponse.fromMovieWithStream(movie, resolvePosterUrl(movie));
+        return MovieResponse.fromMovieWithStream(movie, resolvePosterUrl(movie), resolveTrailerUrl(movie));
     }
 
     @Transactional
@@ -86,6 +86,7 @@ public class MovieService {
                 .rating(request.getRating())
                 .active(Boolean.TRUE.equals(request.getActive()))
                 .posterUrl(normalizeNullable(request.getPosterUrl()))
+                .trailerUrl(normalizeNullable(request.getTrailerUrl()))
                 .director(normalizeNullable(request.getDirector()))
                 .actors(normalizeNullable(request.getActors()))
                 .genre(normalizeNullable(request.getGenre()))
@@ -98,7 +99,7 @@ public class MovieService {
                 .build();
 
         Movie saved = movieRepository.save(movie);
-        MovieResponse response = MovieResponse.fromMovieWithStream(saved, resolvePosterUrl(saved));
+        MovieResponse response = MovieResponse.fromMovieWithStream(saved, resolvePosterUrl(saved), resolveTrailerUrl(saved));
         movieEventService.publishMovieCreated(response);
         return response;
     }
@@ -114,6 +115,7 @@ public class MovieService {
         movie.setRating(request.getRating());
         movie.setActive(Boolean.TRUE.equals(request.getActive()));
         movie.setPosterUrl(normalizeNullable(request.getPosterUrl()));
+        movie.setTrailerUrl(normalizeNullable(request.getTrailerUrl()));
         movie.setDirector(normalizeNullable(request.getDirector()));
         movie.setActors(normalizeNullable(request.getActors()));
         movie.setGenre(normalizeNullable(request.getGenre()));
@@ -125,7 +127,7 @@ public class MovieService {
         movie.setStatus(request.getStatus() == null ? Movie.Status.COMING_SOON : request.getStatus());
 
         Movie saved = movieRepository.save(movie);
-        MovieResponse response = MovieResponse.fromMovieWithStream(saved, resolvePosterUrl(saved));
+        MovieResponse response = MovieResponse.fromMovieWithStream(saved, resolvePosterUrl(saved), resolveTrailerUrl(saved));
         movieEventService.publishMovieUpdated(response);
         return response;
     }
@@ -166,6 +168,10 @@ public class MovieService {
         return s3PresignedUrlService.resolvePosterUrl(movie.getPosterUrl());
     }
 
+    private String resolveTrailerUrl(Movie movie) {
+        return s3PresignedUrlService.resolveTrailerUrl(movie.getTrailerUrl());
+    }
+
     @Data
     @Builder
     @NoArgsConstructor
@@ -189,6 +195,7 @@ public class MovieService {
         private Boolean active = true;
 
         private String posterUrl;
+        private String trailerUrl;
         private String director;
         private String actors;
         private String genre;
