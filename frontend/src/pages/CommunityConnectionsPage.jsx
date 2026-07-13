@@ -2,11 +2,12 @@ import { useCallback, useEffect, useState } from 'react';
 import { Alert, Avatar, Box, Button, Card, CircularProgress, Container, Grid, Snackbar, Stack, Tab, Tabs, Typography } from '@mui/material';
 import PersonAddRoundedIcon from '@mui/icons-material/PersonAddRounded';
 import PersonRemoveRoundedIcon from '@mui/icons-material/PersonRemoveRounded';
+import ChatRoundedIcon from '@mui/icons-material/ChatRounded';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { socialService } from '../services/socialService';
 
-const ConnectionCard = ({ person, knownFollowing, onChanged, onNotice }) => {
+const ConnectionCard = ({ person, knownFollowing, canMessage, onMessage, onChanged, onNotice }) => {
   const [following, setFollowing] = useState(Boolean(knownFollowing));
   const [busy, setBusy] = useState(!knownFollowing);
 
@@ -26,7 +27,7 @@ const ConnectionCard = ({ person, knownFollowing, onChanged, onNotice }) => {
     finally { setBusy(false); }
   };
 
-  return <Card sx={{ p: 2.5 }}><Stack direction="row" alignItems="center" spacing={2}><Avatar src={person.avatarUrl} sx={{ width: 52, height: 52 }}>{(person.fullName || 'U')[0]}</Avatar><Box flex={1}><Typography fontWeight={800}>{person.fullName || 'Thành viên'}</Typography><Typography variant="caption" color="text.secondary">Theo dõi từ {new Date(person.followedAt).toLocaleDateString('vi-VN')}</Typography></Box><Button variant={following ? 'outlined' : 'contained'} disabled={busy} onClick={toggle} startIcon={following ? <PersonRemoveRoundedIcon /> : <PersonAddRoundedIcon />}>{following ? 'Bỏ theo dõi' : 'Theo dõi'}</Button></Stack></Card>;
+  return <Card sx={{ p: 2.5 }}><Stack direction="row" alignItems="center" spacing={2}><Avatar src={person.avatarUrl} sx={{ width: 52, height: 52 }}>{(person.fullName || 'U')[0]}</Avatar><Box flex={1}><Typography fontWeight={800}>{person.fullName || 'Thành viên'}</Typography><Typography variant="caption" color="text.secondary">Theo dõi từ {new Date(person.followedAt).toLocaleDateString('vi-VN')}</Typography></Box><Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>{canMessage && <Button variant="contained" color="secondary" onClick={onMessage} startIcon={<ChatRoundedIcon />}>Nhắn tin</Button>}<Button variant={following ? 'outlined' : 'contained'} disabled={busy} onClick={toggle} startIcon={following ? <PersonRemoveRoundedIcon /> : <PersonAddRoundedIcon />}>{following ? 'Bỏ theo dõi' : 'Theo dõi'}</Button></Stack></Stack></Card>;
 };
 
 export default function CommunityConnectionsPage() {
@@ -56,5 +57,7 @@ export default function CommunityConnectionsPage() {
   }, [isLoggedIn, load, navigate]);
 
   const people = tab === 0 ? followers : following;
-  return <Container maxWidth="lg" sx={{ py: { xs: 4, md: 7 }, minHeight: '75vh' }}><Typography variant="h3" fontWeight={900}>Kết nối cộng đồng</Typography><Typography color="text.secondary" mb={3}>Quản lý những người bạn theo dõi trong cộng đồng yêu phim.</Typography><Tabs value={tab} onChange={(_, value) => setTab(value)} sx={{ mb: 3 }}><Tab label={`Người theo dõi (${followers.length})`} /><Tab label={`Đang theo dõi (${following.length})`} /></Tabs>{loading ? <Box textAlign="center" py={8}><CircularProgress /></Box> : people.length === 0 ? <Alert severity="info">Chưa có kết nối nào trong mục này.</Alert> : <Grid container spacing={2}>{people.map((person) => <Grid key={person.id} size={{ xs: 12, md: 6 }}><ConnectionCard person={person} knownFollowing={tab === 1} onChanged={load} onNotice={setNotice} /></Grid>)}</Grid>}<Snackbar open={Boolean(notice)} autoHideDuration={4000} onClose={() => setNotice(null)}>{notice ? <Alert severity={notice.severity} onClose={() => setNotice(null)}>{notice.text}</Alert> : undefined}</Snackbar></Container>;
+  const followerIds = new Set(followers.map((person) => String(person.id)));
+  const followingIds = new Set(following.map((person) => String(person.id)));
+  return <Container maxWidth="lg" sx={{ py: { xs: 4, md: 7 }, minHeight: '75vh' }}><Typography variant="h3" fontWeight={900}>Kết nối cộng đồng</Typography><Typography color="text.secondary" mb={3}>Quản lý những người bạn theo dõi trong cộng đồng yêu phim.</Typography><Stack direction="row" spacing={1} mb={2}><Button variant="outlined" onClick={() => navigate('/community/feed')}>Bảng tin</Button><Button variant="outlined" onClick={() => navigate('/community/messages')}>Hộp thư</Button></Stack><Tabs value={tab} onChange={(_, value) => setTab(value)} sx={{ mb: 3 }}><Tab label={`Người theo dõi (${followers.length})`} /><Tab label={`Đang theo dõi (${following.length})`} /></Tabs>{loading ? <Box textAlign="center" py={8}><CircularProgress /></Box> : people.length === 0 ? <Alert severity="info">Chưa có kết nối nào trong mục này.</Alert> : <Grid container spacing={2}>{people.map((person) => { const mutual = followerIds.has(String(person.id)) && followingIds.has(String(person.id)); return <Grid key={person.id} size={{ xs: 12, md: 6 }}><ConnectionCard person={person} knownFollowing={tab === 1} canMessage={mutual} onMessage={() => navigate(`/community/messages?userId=${person.id}&mutual=1`)} onChanged={load} onNotice={setNotice} /></Grid>; })}</Grid>}<Snackbar open={Boolean(notice)} autoHideDuration={4000} onClose={() => setNotice(null)}>{notice ? <Alert severity={notice.severity} onClose={() => setNotice(null)}>{notice.text}</Alert> : undefined}</Snackbar></Container>;
 }
