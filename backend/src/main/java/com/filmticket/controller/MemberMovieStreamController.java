@@ -13,6 +13,8 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
@@ -26,11 +28,29 @@ public class MemberMovieStreamController {
     private final UserRepository userRepository;
 
     @GetMapping("/{movieId}/stream")
-    public ResponseEntity<ApiResponse<MovieStreamResponse>> stream(@PathVariable UUID movieId) {
+    public ResponseEntity<ApiResponse<MovieStreamResponse>> stream(
+            @PathVariable UUID movieId,
+            @RequestHeader("X-Viewing-Device-Id") String deviceId) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Movie stream fetched",
-                movieStreamService.getMovieStream(movieId, userId(), false)
+                movieStreamService.getMovieStream(movieId, userId(), false, deviceId)
         ));
+    }
+
+    @PostMapping("/{movieId}/stream/heartbeat")
+    public ResponseEntity<ApiResponse<Void>> heartbeat(
+            @PathVariable UUID movieId,
+            @RequestHeader("X-Viewing-Device-Id") String deviceId) {
+        movieStreamService.heartbeat(movieId, userId(), deviceId);
+        return ResponseEntity.ok(ApiResponse.success("Viewing session refreshed", null));
+    }
+
+    @PostMapping("/{movieId}/stream/release")
+    public ResponseEntity<ApiResponse<Void>> release(
+            @PathVariable UUID movieId,
+            @RequestHeader("X-Viewing-Device-Id") String deviceId) {
+        movieStreamService.release(movieId, userId(), deviceId);
+        return ResponseEntity.ok(ApiResponse.success("Viewing session released", null));
     }
 
     private UUID userId() {
