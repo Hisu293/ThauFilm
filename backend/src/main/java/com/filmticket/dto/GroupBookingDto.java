@@ -14,7 +14,7 @@ public final class GroupBookingDto {
 
     @Data
     public static class SelectSeatsRequest {
-        @NotEmpty @Size(min = 2, max = 2) private List<UUID> seatIds;
+        @NotEmpty @Size(min = 1, max = 2) private List<UUID> seatIds;
     }
 
     @Data @Builder
@@ -41,5 +41,8 @@ public final class GroupBookingDto {
         private LocalDateTime expiresAt;
         private LocalDateTime confirmedAt;
         private List<MemberResponse> members;
+        private String checkoutUrl;
+        private String qrCode;
+        private boolean requiresRedirect;
     }
 }

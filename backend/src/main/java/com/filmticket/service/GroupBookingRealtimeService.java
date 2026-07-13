@@ -7,6 +7,7 @@ import com.filmticket.model.SeatBookingStatus;
 import com.filmticket.repository.GroupBookingMemberRepository;
 import com.filmticket.repository.GroupBookingRepository;
 import com.filmticket.repository.SeatAvailabilityRepository;
+import com.filmticket.repository.SeatRepository;
 import com.filmticket.websocket.RealtimeEventService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -21,6 +22,7 @@ public class GroupBookingRealtimeService {
     private final GroupBookingRepository groupBookingRepository;
     private final GroupBookingMemberRepository memberRepository;
     private final SeatAvailabilityRepository availabilityRepository;
+    private final SeatRepository seatRepository;
     private final RealtimeEventService realtimeEventService;
     private final Map<UUID, LinkedHashSet<UUID>> previews = new ConcurrentHashMap<>();
 
@@ -38,12 +40,24 @@ public class GroupBookingRealtimeService {
         if (availability.getStatus() != SeatBookingStatus.AVAILABLE) {
             throw new BadRequestException("Ghế đã được giữ hoặc đã bán");
         }
+        var seat = seatRepository.findById(seatId)
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy ghế"));
 
         LinkedHashSet<UUID> selected = previews.computeIfAbsent(groupId, ignored -> new LinkedHashSet<>());
         List<UUID> selectedSeatIds;
         synchronized (selected) {
             if (!selected.remove(seatId)) {
-                if (selected.size() >= 2) throw new BadRequestException("Chỉ được chọn tối đa 2 ghế");
+                if (seat.getType() == com.filmticket.entity.Seat.Type.COUPLE) {
+                    selected.clear();
+                } else if (selected.stream()
+                        .map(seatRepository::findById)
+                        .filter(Optional::isPresent)
+                        .map(Optional::get)
+                        .anyMatch(item -> item.getType() == com.filmticket.entity.Seat.Type.COUPLE)) {
+                    selected.clear();
+                } else if (selected.size() >= 2) {
+                    throw new BadRequestException("Chỉ được chọn tối đa 2 ghế");
+                }
                 selected.add(seatId);
             }
             selectedSeatIds = List.copyOf(selected);

@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.*;
 
@@ -32,6 +33,7 @@ public class GroupBookingService {
     private final UserRepository userRepository;
     private final RealtimeEventService realtimeEventService;
     private final BookingService bookingService;
+    private final PaymentGatewayService paymentGatewayService;
     private final GroupBookingRealtimeService groupBookingRealtimeService;
 
     @Transactional
@@ -69,22 +71,31 @@ public class GroupBookingService {
             throw new BadRequestException("Nhóm đã chọn ghế hoặc không còn hoạt động");
         }
         List<UUID> seatIds = requestedSeatIds == null ? List.of() : requestedSeatIds.stream().distinct().toList();
-        if (seatIds.size() != 2) throw new BadRequestException("Phải chọn đúng 2 ghế khác nhau");
+        if (seatIds.isEmpty() || seatIds.size() > 2) {
+            throw new BadRequestException("Hãy chọn một ghế đôi hoặc hai ghế thường/VIP liền nhau");
+        }
 
         List<Seat> seats = seatRepository.findAllById(seatIds);
-        if (seats.size() != 2) throw new BadRequestException("Không tìm thấy ghế");
+        if (seats.size() != seatIds.size()) throw new BadRequestException("Không tìm thấy ghế");
         seats.sort(Comparator.comparing(Seat::getRowName).thenComparing(Seat::getSeatNumber));
-        Seat first = seats.get(0);
-        Seat second = seats.get(1);
-        if (!first.getCinemaRoomId().equals(second.getCinemaRoomId())
-                || !first.getRowName().equalsIgnoreCase(second.getRowName())
-                || second.getSeatNumber() - first.getSeatNumber() != 1) {
-            throw new BadRequestException("Hai ghế phải nằm liền nhau trong cùng một hàng");
+        boolean coupleSelection = seats.size() == 1 && seats.get(0).getType() == Seat.Type.COUPLE;
+        if (!coupleSelection) {
+            if (seats.size() != 2 || seats.stream().anyMatch(seat -> seat.getType() == Seat.Type.COUPLE)) {
+                throw new BadRequestException("Ghế đôi chỉ cần chọn một; ghế thường/VIP phải chọn đúng hai ghế");
+            }
+            Seat first = seats.get(0);
+            Seat second = seats.get(1);
+            if (!first.getCinemaRoomId().equals(second.getCinemaRoomId())
+                    || !first.getRowName().equalsIgnoreCase(second.getRowName())
+                    || second.getSeatNumber() - first.getSeatNumber() != 1) {
+                throw new BadRequestException("Hai ghế phải nằm liền nhau trong cùng một hàng");
+            }
         }
 
         List<SeatAvailability> locked = availabilityRepository.lockByShowtimeIdAndSeatIdIn(group.getShowtimeId(), seatIds);
-        if (locked.size() != 2 || locked.stream().anyMatch(item -> item.getStatus() != SeatBookingStatus.AVAILABLE)) {
-            throw new BadRequestException("Một trong hai ghế đã được giữ hoặc đã bán");
+        if (locked.size() != seatIds.size()
+                || locked.stream().anyMatch(item -> item.getStatus() != SeatBookingStatus.AVAILABLE)) {
+            throw new BadRequestException("Ghế đã được giữ hoặc đã bán");
         }
         Map<UUID, SeatAvailability> availabilityBySeat = new HashMap<>();
         locked.forEach(item -> availabilityBySeat.put(item.getSeatId(), item));
@@ -92,13 +103,22 @@ public class GroupBookingService {
         List<GroupBookingMember> members = memberRepository.findByGroupBookingIdOrderByCreatedAtAsc(groupId);
         if (members.size() != 2) throw new BadRequestException("Booking nhóm phải có đúng 2 thành viên");
         members.sort(Comparator.comparing(member -> member.getUserId().equals(userId) ? 0 : 1));
-        List<Seat> assignedSeats = List.of(first, second);
+        List<Seat> assignedSeats = coupleSelection
+                ? List.of(seats.get(0), seats.get(0))
+                : List.copyOf(seats);
+        BigDecimal coupleHalf = coupleSelection
+                ? availabilityBySeat.get(seats.get(0).getId()).getPrice()
+                        .divide(BigDecimal.valueOf(2), 2, RoundingMode.HALF_UP)
+                : null;
         LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(PAYMENT_MINUTES);
 
         for (int index = 0; index < members.size(); index++) {
             GroupBookingMember member = members.get(index);
             Seat seat = assignedSeats.get(index);
-            BigDecimal price = availabilityBySeat.get(seat.getId()).getPrice();
+            BigDecimal fullPrice = availabilityBySeat.get(seat.getId()).getPrice();
+            BigDecimal price = coupleSelection
+                    ? (index == 0 ? coupleHalf : fullPrice.subtract(coupleHalf))
+                    : fullPrice;
             Booking booking = bookingRepository.save(Booking.builder()
                     .userId(member.getUserId()).showtimeId(group.getShowtimeId())
                     .totalAmount(price).status(BookingStatus.HOLD)
@@ -137,14 +157,122 @@ public class GroupBookingService {
             throw new BadRequestException("Bạn đã thanh toán phần của mình");
         }
 
-        paymentRepository.save(Payment.builder()
+        String paymentMethod = request.getPaymentMethod().trim().toUpperCase(Locale.ROOT);
+        if ("PAYOS".equals(paymentMethod) || "VIETQR".equals(paymentMethod)) {
+            Payment pendingPayment = paymentRepository.findByBookingId(member.getBookingId())
+                    .filter(payment -> payment.getStatus() == PaymentStatus.PENDING
+                            && payment.getCheckoutUrl() != null
+                            && !payment.getCheckoutUrl().isBlank())
+                    .orElse(null);
+            if (pendingPayment == null) {
+                pendingPayment = paymentRepository.save(Payment.builder()
+                        .bookingId(member.getBookingId())
+                        .amount(member.getAmount())
+                        .paymentMethod("PAYOS")
+                        .provider("PAYOS")
+                        .status(PaymentStatus.PENDING)
+                        .transactionId(UUID.randomUUID().toString())
+                        .build());
+                String groupPath = "/booking/group/" + groupId;
+                PaymentGatewayService.GatewayPayment gatewayPayment;
+                try {
+                    gatewayPayment = paymentGatewayService.createGatewayPayment(
+                            "PAYOS",
+                            pendingPayment,
+                            "ThauFilm " + group.getId().toString().substring(0, 8),
+                            groupPath + "?payment=return",
+                            groupPath + "?payment=cancel"
+                    );
+                } catch (RuntimeException ex) {
+                    paymentRepository.delete(pendingPayment);
+                    throw ex;
+                }
+                pendingPayment.setProviderCheckoutId(gatewayPayment.checkoutId());
+                pendingPayment.setProviderPaymentId(gatewayPayment.paymentId());
+                pendingPayment.setCheckoutUrl(gatewayPayment.checkoutUrl());
+                pendingPayment.setQrCode(gatewayPayment.qrCode());
+                pendingPayment.setTransactionId(gatewayPayment.checkoutId());
+                paymentRepository.save(pendingPayment);
+            }
+            return toResponse(group, userId);
+        }
+
+        Payment payment = paymentRepository.save(Payment.builder()
                 .bookingId(member.getBookingId()).amount(member.getAmount())
-                .paymentMethod(request.getPaymentMethod()).status(PaymentStatus.PAID)
+                .paymentMethod(paymentMethod).status(PaymentStatus.PAID)
                 .transactionId(UUID.randomUUID().toString()).paidAt(LocalDateTime.now()).build());
+        completeMemberPayment(group, member, payment);
+        return toResponse(group, userId);
+    }
+
+    @Transactional(noRollbackFor = BadRequestException.class)
+    public GroupBookingDto.Response syncPayosPayment(UUID groupId, UUID userId) {
+        GroupBooking group = requireLockedMember(groupId, userId);
+        if (isExpired(group)) {
+            expire(group);
+            throw new BadRequestException("Thời gian thanh toán nhóm đã hết");
+        }
+        GroupBookingMember member = memberRepository
+                .findLockedByGroupBookingIdAndUserId(groupId, userId)
+                .orElseThrow();
+        if (member.getPaymentStatus() == GroupMemberPaymentStatus.PAID) {
+            return toResponse(group, userId);
+        }
+        Payment payment = paymentRepository.findByBookingId(member.getBookingId())
+                .filter(item -> "PAYOS".equalsIgnoreCase(item.getProvider()))
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy thanh toán PayOS của bạn"));
+        PaymentGatewayService.PayosPaymentStatus status =
+                paymentGatewayService.getPayosPaymentStatus(payment.getProviderCheckoutId());
+        if (!status.paid()) {
+            throw new BadRequestException("PayOS chưa xác nhận thanh toán");
+        }
+        payment.setProviderPaymentId(status.paymentId());
+        payment.setTransactionId(status.orderCode());
+        completeMemberPayment(group, member, payment);
+        return toResponse(group, userId);
+    }
+
+    @Transactional
+    public boolean confirmPayosPaymentIfGroup(String orderCode, String paymentId) {
+        Payment payment = orderCode == null || orderCode.isBlank()
+                ? null
+                : paymentRepository.findByProviderCheckoutId(orderCode).orElse(null);
+        if (payment == null && paymentId != null && !paymentId.isBlank()) {
+            payment = paymentRepository.findByProviderPaymentId(paymentId).orElse(null);
+        }
+        if (payment == null) return false;
+        GroupBookingMember foundMember = memberRepository.findByBookingId(payment.getBookingId()).orElse(null);
+        if (foundMember == null) return false;
+
+        GroupBooking group = groupBookingRepository.findLockedById(foundMember.getGroupBookingId())
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy booking nhóm"));
+        GroupBookingMember member = memberRepository
+                .findLockedByGroupBookingIdAndUserId(group.getId(), foundMember.getUserId())
+                .orElseThrow();
+        if (!List.of(GroupBookingStatus.WAITING_PAYMENTS, GroupBookingStatus.PARTIALLY_PAID)
+                .contains(group.getStatus()) || isExpired(group)) {
+            payment.setStatus(PaymentStatus.REFUND_PENDING);
+            payment.setRefundReason("Group booking expired before PayOS confirmation");
+            paymentRepository.save(payment);
+            return true;
+        }
+        payment.setProviderPaymentId(paymentId);
+        payment.setTransactionId(orderCode);
+        completeMemberPayment(group, member, payment);
+        return true;
+    }
+
+    private void completeMemberPayment(GroupBooking group, GroupBookingMember member, Payment payment) {
+        if (member.getPaymentStatus() == GroupMemberPaymentStatus.PAID) return;
+        LocalDateTime now = LocalDateTime.now();
+        payment.setStatus(PaymentStatus.PAID);
+        payment.setPaidAt(now);
+        paymentRepository.save(payment);
         member.setPaymentStatus(GroupMemberPaymentStatus.PAID);
-        member.setPaidAt(LocalDateTime.now());
+        member.setPaidAt(now);
         memberRepository.save(member);
 
+        UUID groupId = group.getId();
         List<GroupBookingMember> members = memberRepository.findByGroupBookingIdOrderByCreatedAtAsc(groupId);
         boolean allPaid = members.stream().allMatch(item -> item.getPaymentStatus() == GroupMemberPaymentStatus.PAID);
         if (allPaid) {
@@ -155,7 +283,6 @@ public class GroupBookingService {
             broadcastUpdate(group);
             notifyMembers(groupId, "GROUP_PARTIALLY_PAID", "Đã nhận một khoản thanh toán", "Đang chờ người còn lại thanh toán.");
         }
-        return toResponse(group, userId);
     }
 
     @Transactional
@@ -249,12 +376,20 @@ public class GroupBookingService {
                             .bookingId(member.getBookingId()).currentUser(member.getUserId().equals(currentUserId)).build();
                 }).toList();
         GroupBookingMember me = memberRepository.findByGroupBookingIdAndUserId(group.getId(), currentUserId).orElseThrow();
+        Payment pendingPayment = me.getBookingId() == null ? null : paymentRepository.findByBookingId(me.getBookingId())
+                .filter(payment -> payment.getStatus() == PaymentStatus.PENDING)
+                .orElse(null);
         return GroupBookingDto.Response.builder().id(group.getId()).invitationId(group.getInvitationId())
                 .showtimeId(group.getShowtimeId()).status(group.getStatus().name()).selectorId(group.getSelectorId())
                 .canSelectSeats(group.getStatus() == GroupBookingStatus.WAITING_SELECTION)
                 .canPay(List.of(GroupBookingStatus.WAITING_PAYMENTS, GroupBookingStatus.PARTIALLY_PAID).contains(group.getStatus())
                         && me.getPaymentStatus() == GroupMemberPaymentStatus.PENDING)
-                .expiresAt(group.getExpiresAt()).confirmedAt(group.getConfirmedAt()).members(members).build();
+                .expiresAt(group.getExpiresAt()).confirmedAt(group.getConfirmedAt()).members(members)
+                .checkoutUrl(pendingPayment == null ? null : pendingPayment.getCheckoutUrl())
+                .qrCode(pendingPayment == null ? null : pendingPayment.getQrCode())
+                .requiresRedirect(pendingPayment != null && pendingPayment.getCheckoutUrl() != null
+                        && !pendingPayment.getCheckoutUrl().isBlank())
+                .build();
     }
 
     private void notifyMembers(UUID groupId, String type, String title, String body) {

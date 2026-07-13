@@ -39,6 +39,14 @@ public class GroupBookingController {
         return ResponseEntity.ok(ApiResponse.success("Đã ghi nhận thanh toán", groupBookingService.pay(groupId, userId(), request)));
     }
 
+    @PostMapping("/{groupId}/sync-payment")
+    public ResponseEntity<ApiResponse<GroupBookingDto.Response>> syncPayment(@PathVariable UUID groupId) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Đã đồng bộ trạng thái PayOS",
+                groupBookingService.syncPayosPayment(groupId, userId())
+        ));
+    }
+
     private UUID userId() {
         UserDetails principal = (UserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         return userRepository.findByEmail(principal.getUsername())

@@ -2,6 +2,7 @@ package com.filmticket.controller;
 
 import com.filmticket.service.BookingService;
 import com.filmticket.service.PaymentGatewayService;
+import com.filmticket.service.GroupBookingService;
 import com.filmticket.service.WatchPartyService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
@@ -14,6 +15,7 @@ public class PayosWebhookAliasController {
 
     private final PaymentGatewayService paymentGatewayService;
     private final BookingService bookingService;
+    private final GroupBookingService groupBookingService;
     private final WatchPartyService watchPartyService;
 
     @GetMapping(value = "/payos-webhook", produces = MediaType.TEXT_PLAIN_VALUE)
@@ -26,6 +28,9 @@ public class PayosWebhookAliasController {
         try {
             PaymentGatewayService.PayosWebhookResult result = paymentGatewayService.parsePayosWebhook(payload);
             if (result.paid()) {
+                if (groupBookingService.confirmPayosPaymentIfGroup(result.orderCode(), result.paymentId())) {
+                    return ResponseEntity.ok("OK");
+                }
                 try {
                     bookingService.confirmPayosPayment(result.orderCode(), result.paymentId());
                 } catch (Exception bookingPaymentNotFound) {
