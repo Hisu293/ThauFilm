@@ -149,7 +149,7 @@ public class WatchPartyService {
             if (!isReadyToWatch(room)) {
                 throw new BadRequestException("Watch party is waiting for all members to pay");
             }
-            return movieStreamService.buildResponse(room.movie);
+            return movieStreamService.buildResponseAndRecord(room.movie, userId);
         }
     }
 

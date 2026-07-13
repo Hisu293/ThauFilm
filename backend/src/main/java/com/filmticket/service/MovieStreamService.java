@@ -1,10 +1,15 @@
 package com.filmticket.service;
 
 import com.filmticket.dto.MovieStreamResponse;
+import com.filmticket.entity.Booking;
+import com.filmticket.entity.BookingStatus;
 import com.filmticket.entity.Movie;
+import com.filmticket.entity.OnlineMovieView;
 import com.filmticket.entity.Showtime;
 import com.filmticket.exception.BadRequestException;
+import com.filmticket.repository.BookingRepository;
 import com.filmticket.repository.MovieRepository;
+import com.filmticket.repository.OnlineMovieViewRepository;
 import com.filmticket.repository.ShowtimeRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -36,6 +41,8 @@ public class MovieStreamService {
 
     private final MovieRepository movieRepository;
     private final ShowtimeRepository showtimeRepository;
+    private final BookingRepository bookingRepository;
+    private final OnlineMovieViewRepository onlineMovieViewRepository;
 
     @Value("${app.streaming.s3.bucket:}")
     private String s3Bucket;
@@ -55,7 +62,7 @@ public class MovieStreamService {
     @Value("${app.streaming.url-ttl-seconds:300}")
     private long ttlSeconds;
 
-    @Transactional(readOnly = true)
+    @Transactional
     public MovieStreamResponse getMovieStream(UUID movieId, UUID userId, boolean bypassPurchaseCheck) {
         Movie movie = movieRepository.findById(movieId)
                 .orElseThrow(() -> new BadRequestException("Movie not found"));
@@ -63,18 +70,34 @@ public class MovieStreamService {
             throw new BadRequestException("Movie is not available");
         }
         Instant accessExpiresAt = null;
+        Booking streamingBooking = null;
+        Showtime streamingShowtime = null;
         if (!bypassPurchaseCheck) {
-            List<Showtime> eligibleShowtimes = showtimeRepository.findEligibleStreamingShowtimes(
+            List<Booking> eligibleBookings = bookingRepository.findEligibleStreamingBookings(
                     userId,
                     movieId,
+                    BookingStatus.CONFIRMED,
                     java.time.LocalDateTime.now(VIETNAM_ZONE)
             );
-            if (eligibleShowtimes.isEmpty()) {
+            if (eligibleBookings.isEmpty()) {
                 throw new BadRequestException("Bạn chỉ có thể xem phim trong khung giờ suất chiếu đã đặt và đã thanh toán");
             }
-            accessExpiresAt = eligibleShowtimes.get(0).getEndTime().atZone(VIETNAM_ZONE).toInstant();
+            streamingBooking = eligibleBookings.get(0);
+            streamingShowtime = showtimeRepository.findById(streamingBooking.getShowtimeId())
+                    .orElseThrow(() -> new BadRequestException("Showtime not found"));
+            accessExpiresAt = streamingShowtime.getEndTime().atZone(VIETNAM_ZONE).toInstant();
         }
-        return buildResponse(movie, accessExpiresAt);
+        MovieStreamResponse response = buildResponse(movie, accessExpiresAt);
+        if (streamingBooking != null && streamingShowtime != null) {
+            recordView(userId, movieId, streamingBooking.getId(), streamingShowtime.getId());
+        }
+        return response;
+    }
+
+    public MovieStreamResponse buildResponseAndRecord(Movie movie, UUID userId) {
+        MovieStreamResponse response = buildResponse(movie, null);
+        recordView(userId, movie.getId(), null, null);
+        return response;
     }
 
     public MovieStreamResponse buildResponse(Movie movie) {
@@ -102,6 +125,16 @@ public class MovieStreamService {
                 .expiresAt(isAbsoluteUrl(streamKey) || publicStream ? null : expiresAt)
                 .provider(provider)
                 .build();
+    }
+
+    private void recordView(UUID userId, UUID movieId, UUID bookingId, UUID showtimeId) {
+        onlineMovieViewRepository.save(OnlineMovieView.builder()
+                .userId(userId)
+                .movieId(movieId)
+                .showtimeId(showtimeId)
+                .bookingId(bookingId)
+                .viewedAt(java.time.LocalDateTime.now(VIETNAM_ZONE))
+                .build());
     }
 
     private boolean hasS3Credentials() {
