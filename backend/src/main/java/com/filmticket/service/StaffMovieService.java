@@ -21,14 +21,14 @@ public class StaffMovieService {
 
     public List<MovieResponse> listMovies() {
         return movieRepository.findAll().stream()
-                .map(movie -> MovieResponse.fromMovieWithStream(movie, resolvePosterUrl(movie)))
+                .map(movie -> MovieResponse.fromMovieWithStream(movie, resolvePosterUrl(movie), resolveTrailerUrl(movie)))
                 .toList();
     }
 
     public MovieResponse getMovie(UUID movieId) {
         Movie movie = movieRepository.findById(movieId)
                 .orElseThrow(() -> new BadRequestException("Movie not found"));
-        return MovieResponse.fromMovieWithStream(movie, resolvePosterUrl(movie));
+        return MovieResponse.fromMovieWithStream(movie, resolvePosterUrl(movie), resolveTrailerUrl(movie));
     }
 
     @Transactional
@@ -38,6 +38,9 @@ public class StaffMovieService {
 
         if (request.getPosterUrl() != null) {
             movie.setPosterUrl(request.getPosterUrl());
+        }
+        if (request.getTrailerUrl() != null) {
+            movie.setTrailerUrl(normalizeNullable(request.getTrailerUrl()));
         }
         if (request.getDescription() != null) {
             movie.setDescription(request.getDescription());
@@ -65,7 +68,7 @@ public class StaffMovieService {
         }
 
         Movie saved = movieRepository.save(movie);
-        return MovieResponse.fromMovieWithStream(saved, resolvePosterUrl(saved));
+        return MovieResponse.fromMovieWithStream(saved, resolvePosterUrl(saved), resolveTrailerUrl(saved));
     }
 
     private String normalizeNullable(String value) {
@@ -76,5 +79,9 @@ public class StaffMovieService {
 
     private String resolvePosterUrl(Movie movie) {
         return s3PresignedUrlService.resolvePosterUrl(movie.getPosterUrl());
+    }
+
+    private String resolveTrailerUrl(Movie movie) {
+        return s3PresignedUrlService.resolveTrailerUrl(movie.getTrailerUrl());
     }
 }

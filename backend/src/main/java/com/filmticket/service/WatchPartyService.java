@@ -78,6 +78,8 @@ public class WatchPartyService {
             );
             member.checkoutUrl = gatewayPayment.checkoutUrl();
             member.qrCode = gatewayPayment.qrCode();
+            member.checkoutId = gatewayPayment.checkoutId();
+            member.paymentId = gatewayPayment.paymentId();
             pendingPayments.put(gatewayPayment.checkoutId(), new PendingWatchPartyPayment(room.id, userId));
             pendingPayments.put(gatewayPayment.paymentId(), new PendingWatchPartyPayment(room.id, userId));
             WatchPartyDto.Response response = toResponse(room, userId);
@@ -97,7 +99,7 @@ public class WatchPartyService {
         synchronized (room) {
             WatchPartyMember member = room.members.get(pending.userId());
             if (member == null) return false;
-            member.paid = true;
+            markMemberPaid(member, orderCode, paymentId);
             realtimeEventService.sendWatchPartyEvent(room.id, "WATCH_PARTY_UPDATED", toResponse(room, pending.userId()));
             if (orderCode != null) pendingPayments.remove(orderCode);
             if (paymentId != null) pendingPayments.remove(paymentId);
@@ -109,8 +111,17 @@ public class WatchPartyService {
         WatchPartyRoom room = requireRoom(roomId);
         synchronized (room) {
             WatchPartyMember member = ensureMember(room, userId);
-            if (!member.paid && member.checkoutUrl != null && !member.checkoutUrl.isBlank()) {
-                member.paid = true;
+            if (!member.paid) {
+                String checkoutId = blankToNull(member.checkoutId);
+                if (checkoutId == null) {
+                    throw new BadRequestException("Create your watch party payment before syncing");
+                }
+                PaymentGatewayService.PayosPaymentStatus status =
+                        paymentGatewayService.getPayosPaymentStatus(checkoutId);
+                if (!status.paid()) {
+                    throw new BadRequestException("PayOS payment is not paid yet");
+                }
+                markMemberPaid(member, status.orderCode(), status.paymentId());
                 realtimeEventService.sendWatchPartyEvent(room.id, "WATCH_PARTY_UPDATED", toResponse(room, userId));
             }
             return toResponse(room, userId);
@@ -138,7 +149,7 @@ public class WatchPartyService {
             if (!isReadyToWatch(room)) {
                 throw new BadRequestException("Watch party is waiting for all members to pay");
             }
-            return movieStreamService.buildResponse(room.movie);
+            return movieStreamService.buildResponseAndRecord(room.movie, userId);
         }
     }
 
@@ -261,6 +272,23 @@ public class WatchPartyService {
                 .build();
     }
 
+    private void markMemberPaid(WatchPartyMember member, String checkoutId, String paymentId) {
+        member.paid = true;
+        if (checkoutId != null && !checkoutId.isBlank()) {
+            member.checkoutId = checkoutId;
+            pendingPayments.remove(checkoutId);
+        }
+        if (paymentId != null && !paymentId.isBlank()) {
+            member.paymentId = paymentId;
+            pendingPayments.remove(paymentId);
+        }
+    }
+
+    private String blankToNull(String value) {
+        String normalized = value == null ? "" : value.trim();
+        return normalized.isBlank() ? null : normalized;
+    }
+
     private boolean isReadyToWatch(WatchPartyRoom room) {
         if (room.openedForWatch) return true;
         boolean allCurrentMembersPaid = !room.members.isEmpty()
@@ -297,6 +325,8 @@ public class WatchPartyService {
         private boolean paid;
         private String checkoutUrl;
         private String qrCode;
+        private String checkoutId;
+        private String paymentId;
 
         private WatchPartyMember(User user, boolean creator) {
             this.user = user;

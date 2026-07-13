@@ -1,0 +1,2 @@
+ALTER TABLE movies
+    ADD COLUMN IF NOT EXISTS trailer_url VARCHAR(1000);

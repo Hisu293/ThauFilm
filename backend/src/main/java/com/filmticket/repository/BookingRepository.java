@@ -62,7 +62,7 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
 
     @Query("SELECT b FROM Booking b, Showtime s WHERE b.showtimeId = s.id " +
             "AND b.userId = :userId AND b.status = :status " +
-            "AND s.movieId = :movieId AND s.startTime <= :now AND s.endTime >= :now " +
+            "AND s.movieId = :movieId AND s.online = true AND s.startTime <= :now AND s.endTime >= :now " +
             "ORDER BY s.endTime ASC")
     List<Booking> findEligibleStreamingBookings(@Param("userId") UUID userId,
                                                 @Param("movieId") UUID movieId,

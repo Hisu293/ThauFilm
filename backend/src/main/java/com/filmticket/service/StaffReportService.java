@@ -4,6 +4,7 @@ import com.filmticket.entity.Booking;
 import com.filmticket.entity.BookingStatus;
 import com.filmticket.entity.CinemaRoom;
 import com.filmticket.entity.Movie;
+import com.filmticket.entity.OnlineMovieView;
 import com.filmticket.entity.Payment;
 import com.filmticket.entity.PaymentStatus;
 import com.filmticket.entity.Showtime;
@@ -13,6 +14,7 @@ import com.filmticket.model.ShowtimeStatus;
 import com.filmticket.repository.BookingRepository;
 import com.filmticket.repository.CinemaRoomRepository;
 import com.filmticket.repository.MovieRepository;
+import com.filmticket.repository.OnlineMovieViewRepository;
 import com.filmticket.repository.PaymentRepository;
 import com.filmticket.repository.ShowtimeRepository;
 import com.filmticket.repository.TicketRepository;
@@ -46,21 +48,33 @@ public class StaffReportService {
     private final MovieRepository movieRepository;
     private final CinemaRoomRepository cinemaRoomRepository;
     private final UserRepository userRepository;
+    private final OnlineMovieViewRepository onlineMovieViewRepository;
 
     public Map<String, Object> revenue(LocalDate from, LocalDate to) {
         DateRange range = range(from, to);
-        Map<LocalDate, BigDecimal> byDate = emptyMoneyDays(range);
-        paymentRepository.findAll().stream()
+        ReportContext context = context();
+        Map<LocalDate, BigDecimal> cinemaByDate = emptyMoneyDays(range);
+        Map<LocalDate, BigDecimal> onlineByDate = emptyMoneyDays(range);
+        context.payments.stream()
                 .filter(payment -> payment.getStatus() == PaymentStatus.PAID)
                 .filter(payment -> paymentDate(payment) != null && range.contains(paymentDate(payment)))
-                .forEach(payment -> byDate.merge(paymentDate(payment), payment.getAmount(), BigDecimal::add));
+                .forEach(payment -> {
+                    Booking booking = context.bookings.get(payment.getBookingId());
+                    Showtime showtime = booking == null ? null : context.showtimes.get(booking.getShowtimeId());
+                    Map<LocalDate, BigDecimal> target = showtime != null && showtime.isOnline() ? onlineByDate : cinemaByDate;
+                    target.merge(paymentDate(payment), payment.getAmount(), BigDecimal::add);
+                });
 
-        List<Map<String, Object>> daily = byDate.entrySet().stream().map(entry -> row(
-                "date", entry.getKey(), "cinema", entry.getValue(), "online", BigDecimal.ZERO,
-                "total", entry.getValue())).toList();
-        BigDecimal total = byDate.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+        List<Map<String, Object>> daily = range.days().stream().map(date -> {
+            BigDecimal cinema = cinemaByDate.getOrDefault(date, BigDecimal.ZERO);
+            BigDecimal online = onlineByDate.getOrDefault(date, BigDecimal.ZERO);
+            return row("date", date, "cinema", cinema, "online", online, "total", cinema.add(online));
+        }).toList();
+        BigDecimal cinemaTotal = cinemaByDate.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal onlineTotal = onlineByDate.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal total = cinemaTotal.add(onlineTotal);
         return row("from", range.from, "to", range.to, "totalRevenue", total,
-                "cinemaRevenue", total, "onlineRevenue", BigDecimal.ZERO, "daily", daily);
+                "cinemaRevenue", cinemaTotal, "onlineRevenue", onlineTotal, "daily", daily);
     }
 
     public Map<String, Object> ticketSales(LocalDate from, LocalDate to) {
@@ -85,11 +99,43 @@ public class StaffReportService {
 
     public Map<String, Object> onlineMovieSales(LocalDate from, LocalDate to) {
         DateRange range = range(from, to);
+        ReportContext context = context();
+        Map<LocalDate, Long> salesByDate = emptyCountDays(range);
+        Map<LocalDate, Long> viewsByDate = emptyCountDays(range);
+        Map<LocalDate, BigDecimal> revenueByDate = emptyMoneyDays(range);
+
+        context.payments.stream()
+                .filter(payment -> payment.getStatus() == PaymentStatus.PAID)
+                .filter(payment -> paymentDate(payment) != null && range.contains(paymentDate(payment)))
+                .forEach(payment -> {
+                    Booking booking = context.bookings.get(payment.getBookingId());
+                    Showtime showtime = booking == null ? null : context.showtimes.get(booking.getShowtimeId());
+                    if (booking == null || booking.getStatus() != BookingStatus.CONFIRMED || showtime == null || !showtime.isOnline()) {
+                        return;
+                    }
+                    LocalDate date = paymentDate(payment);
+                    salesByDate.merge(date, 1L, Long::sum);
+                    revenueByDate.merge(date, payment.getAmount(), BigDecimal::add);
+                });
+
+        onlineMovieViewRepository.findByViewedAtBetween(range.from.atStartOfDay(), range.to.plusDays(1).atStartOfDay().minusNanos(1)).stream()
+                .map(OnlineMovieView::getViewedAt)
+                .filter(viewedAt -> viewedAt != null && range.contains(viewedAt.toLocalDate()))
+                .forEach(viewedAt -> viewsByDate.merge(viewedAt.toLocalDate(), 1L, Long::sum));
+
         List<Map<String, Object>> daily = range.days().stream()
-                .map(date -> row("date", date, "sales", 0, "views", 0, "revenue", BigDecimal.ZERO)).toList();
-        return row("from", range.from, "to", range.to, "totalSales", 0, "totalViews", 0,
-                "onlineSales", 0, "viewCount", 0, "totalRevenue", BigDecimal.ZERO, "daily", daily,
-                "available", false);
+                .map(date -> {
+                    long sales = salesByDate.getOrDefault(date, 0L);
+                    long views = viewsByDate.getOrDefault(date, 0L);
+                    return row("date", date, "sales", sales, "views", views,
+                            "revenue", revenueByDate.getOrDefault(date, BigDecimal.ZERO));
+                }).toList();
+        long totalSales = salesByDate.values().stream().mapToLong(Long::longValue).sum();
+        long totalViews = viewsByDate.values().stream().mapToLong(Long::longValue).sum();
+        BigDecimal totalRevenue = revenueByDate.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+        return row("from", range.from, "to", range.to, "totalSales", totalSales, "totalViews", totalViews,
+                "onlineSales", totalSales, "viewCount", totalViews, "totalRevenue", totalRevenue, "daily", daily,
+                "available", true);
     }
 
     public Map<String, Object> topMovies(int limit) {
