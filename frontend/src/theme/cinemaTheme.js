@@ -315,7 +315,8 @@ export const NAV_LINKS = [
   { label: 'Rạp chiếu', to: '/cinemas' },
   { label: 'Khuyến mãi', to: '/promotions' },
   { label: 'AI Chatbot', to: '/movie-chatbot' },
-  { label: 'AI & Cộng đồng', to: '/intelligence' },
+  { label: 'Bảng tin cộng đồng', to: '/community/feed' },
+  { label: 'Tìm bạn xem phim', to: '/intelligence' },
 ];
 
 export default cinemaTheme;

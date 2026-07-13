@@ -38,4 +38,10 @@ export const socialService = {
   getFollowStatus: (userId) => api.get(`/api/users/${userId}/follow/status`).then(data),
   getFollowers: (userId) => api.get(`/api/users/${userId}/follow/followers`).then(data),
   getFollowing: (userId) => api.get(`/api/users/${userId}/follow/following`).then(data),
+
+  getCommunityFeed: () => api.get('/api/member/community/feed').then(data),
+  getConversations: () => api.get('/api/member/community/messages').then(data),
+  getMessages: (partnerId) => api.get(`/api/member/community/messages/${partnerId}`).then(data),
+  sendMessage: (recipientId, content) =>
+    api.post(`/api/member/community/messages/${recipientId}`, { content }).then(data),
 };

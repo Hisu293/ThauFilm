@@ -17,6 +17,8 @@ public interface ReviewRepository extends JpaRepository<Review, UUID> {
 
     List<Review> findByUserIdOrderByCreatedAtDesc(UUID userId);
 
+    List<Review> findTop50ByUserIdInOrderByCreatedAtDesc(List<UUID> userIds);
+
     Optional<Review> findByUserIdAndMovieId(UUID userId, UUID movieId);
 
     boolean existsByUserIdAndMovieId(UUID userId, UUID movieId);

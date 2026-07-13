@@ -20,6 +20,8 @@ import ConfirmationNumberRoundedIcon from '@mui/icons-material/ConfirmationNumbe
 import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded';
 import GroupsRoundedIcon from '@mui/icons-material/GroupsRounded';
 import DashboardRoundedIcon from '@mui/icons-material/DashboardRounded';
+import DynamicFeedRoundedIcon from '@mui/icons-material/DynamicFeedRounded';
+import ChatRoundedIcon from '@mui/icons-material/ChatRounded';
 import { useAuth } from '../context/AuthContext';
 
 const getInitials = (name = '') =>
@@ -246,6 +248,32 @@ const UserMenu = () => {
           </ListItemIcon>
           <Typography sx={{ fontSize: '0.9rem', color: 'rgba(255,255,255,0.88)' }}>
             Phim đã lưu
+          </Typography>
+        </MenuItem>
+
+        <MenuItem
+          id="menu-community-feed"
+          onClick={() => goTo('/community/feed')}
+          sx={{ px: 2.5, py: 1.2, gap: 1.5, '&:hover': { backgroundColor: 'rgba(255,255,255,0.06)' } }}
+        >
+          <ListItemIcon sx={{ color: 'rgba(255,255,255,0.7)', minWidth: 0 }}>
+            <DynamicFeedRoundedIcon fontSize="small" />
+          </ListItemIcon>
+          <Typography sx={{ fontSize: '0.9rem', color: 'rgba(255,255,255,0.88)' }}>
+            Bảng tin cộng đồng
+          </Typography>
+        </MenuItem>
+
+        <MenuItem
+          id="menu-community-messages"
+          onClick={() => goTo('/community/messages')}
+          sx={{ px: 2.5, py: 1.2, gap: 1.5, '&:hover': { backgroundColor: 'rgba(255,255,255,0.06)' } }}
+        >
+          <ListItemIcon sx={{ color: 'rgba(255,255,255,0.7)', minWidth: 0 }}>
+            <ChatRoundedIcon fontSize="small" />
+          </ListItemIcon>
+          <Typography sx={{ fontSize: '0.9rem', color: 'rgba(255,255,255,0.88)' }}>
+            Tin nhắn cộng đồng
           </Typography>
         </MenuItem>
 
