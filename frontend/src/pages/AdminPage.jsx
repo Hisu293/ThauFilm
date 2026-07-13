@@ -150,12 +150,6 @@ const AdminPage = () => {
 
           <Box className="admin-main-inner">
             <AdminContent view={activeView} store={store} />
-            <Typography
-              variant="caption"
-              sx={{ display: 'block', textAlign: 'center', mt: 4, color: 'rgba(255,255,255,0.22)' }}
-            >
-              Demo UI · Kết nối API backend để đồng bộ dữ liệu thực
-            </Typography>
           </Box>
         </Box>
       </Box>

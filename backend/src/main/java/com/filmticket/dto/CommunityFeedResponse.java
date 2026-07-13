@@ -9,7 +9,10 @@ import java.util.UUID;
 @Value
 @Builder
 public class CommunityFeedResponse {
+    UUID id;
+    String itemType;
     UUID reviewId;
+    UUID postId;
     UUID userId;
     String userFullName;
     String userAvatarUrl;
@@ -18,5 +21,8 @@ public class CommunityFeedResponse {
     String moviePosterUrl;
     Integer rating;
     String content;
+    String imageUrl;
+    boolean owner;
     LocalDateTime createdAt;
+    LocalDateTime updatedAt;
 }

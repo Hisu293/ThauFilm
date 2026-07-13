@@ -2,6 +2,27 @@ import api from './api';
 
 const data = (response) => response.data?.data;
 
+const dataUrlToBlob = (dataUrl) => {
+  const [metadata, encoded] = dataUrl.split(',');
+  const mimeType = metadata.match(/^data:([^;]+);base64$/)?.[1] || 'image/webp';
+  const binary = window.atob(encoded);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  return new Blob([bytes], { type: mimeType });
+};
+
+const postFormData = ({ content, imageUrl, removeImage = false }) => {
+  const formData = new FormData();
+  formData.append('content', content || '');
+  if (imageUrl?.startsWith('data:')) {
+    formData.append('image', dataUrlToBlob(imageUrl), 'community-post.webp');
+  }
+  formData.append('removeImage', String(removeImage));
+  return formData;
+};
+
+const multipartConfig = { headers: { 'Content-Type': 'multipart/form-data' } };
+
 export const socialService = {
   getReviews: (movieId) => api.get(`/api/movies/${movieId}/reviews`).then(data),
   getMyReview: (movieId) => api.get(`/api/movies/${movieId}/reviews/me`).then(data),
@@ -40,6 +61,11 @@ export const socialService = {
   getFollowing: (userId) => api.get(`/api/users/${userId}/follow/following`).then(data),
 
   getCommunityFeed: () => api.get('/api/member/community/feed').then(data),
+  createCommunityPost: (payload) =>
+    api.post('/api/member/community/posts', postFormData(payload), multipartConfig).then(data),
+  updateCommunityPost: (postId, payload) =>
+    api.put(`/api/member/community/posts/${postId}`, postFormData(payload), multipartConfig).then(data),
+  deleteCommunityPost: (postId) => api.delete(`/api/member/community/posts/${postId}`),
   getConversations: () => api.get('/api/member/community/messages').then(data),
   getMessages: (partnerId) => api.get(`/api/member/community/messages/${partnerId}`).then(data),
   sendMessage: (recipientId, content) =>
