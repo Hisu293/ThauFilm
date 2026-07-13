@@ -19,6 +19,8 @@ import SharedFavoriteListPage from '../pages/SharedFavoriteListPage';
 import MovieCommunityPage from '../pages/MovieCommunityPage';
 import FavoriteListsPage from '../pages/FavoriteListsPage';
 import CommunityConnectionsPage from '../pages/CommunityConnectionsPage';
+import CommunityFeedPage from '../pages/CommunityFeedPage';
+import CommunityMessagesPage from '../pages/CommunityMessagesPage';
 import CinemaIntelligencePage from '../pages/CinemaIntelligencePage';
 import MovieChatbotPage from '../pages/MovieChatbotPage';
 
@@ -57,6 +59,8 @@ const AppRoutes = () => {
         <Route path="/lists/:listId" element={<SharedFavoriteListPage />} />
         <Route path="/favorite-lists" element={<FavoriteListsPage />} />
         <Route path="/community/connections" element={<CommunityConnectionsPage />} />
+        <Route path="/community/feed" element={<CommunityFeedPage />} />
+        <Route path="/community/messages" element={<CommunityMessagesPage />} />
         <Route path="/intelligence" element={<CinemaIntelligencePage />} />
         <Route path="/movie-chatbot" element={<MovieChatbotPage />} />
         <Route path="/dashboard" element={<DashboardPage />} />
