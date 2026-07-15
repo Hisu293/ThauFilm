@@ -53,6 +53,14 @@ export const adminService = {
 
   getMonthlyRevenue: (year, month) =>
     api.get('/api/admin/reports/revenue/monthly', { params: { year, month } }).then(unwrap),
+
+  getWorkforceStaff: () => api.get('/api/admin/workforce/staff').then(unwrap),
+  getShiftSchedule: (year, month) => api.get('/api/admin/workforce/shifts', { params: { year, month } }).then(unwrap),
+  assignShift: (payload) => api.post('/api/admin/workforce/shifts', payload).then(unwrap),
+  deleteShift: (assignmentId) => api.delete(`/api/admin/workforce/shifts/${assignmentId}`),
+  updateEmploymentProfile: (staffId, payload) => api.put(`/api/admin/workforce/staff/${staffId}`, payload).then(unwrap),
+  getPayroll: (year, month) => api.get('/api/admin/workforce/payroll', { params: { year, month } }).then(unwrap),
+  updatePayroll: (payrollId, payload) => api.put(`/api/admin/workforce/payroll/${payrollId}`, payload).then(unwrap),
 };
 
 export default adminService;

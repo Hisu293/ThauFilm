@@ -3,9 +3,12 @@ package com.filmticket.service;
 import com.filmticket.dto.StaffAttendanceResponse;
 import com.filmticket.dto.UpdateStaffAttendanceRequest;
 import com.filmticket.entity.StaffAttendance;
+import com.filmticket.entity.StaffShiftAssignment;
 import com.filmticket.entity.User;
+import com.filmticket.entity.WorkShiftType;
 import com.filmticket.exception.BadRequestException;
 import com.filmticket.repository.StaffAttendanceRepository;
+import com.filmticket.repository.StaffShiftAssignmentRepository;
 import com.filmticket.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -29,19 +32,23 @@ import java.util.stream.Collectors;
 public class StaffAttendanceService {
     private final StaffAttendanceRepository attendanceRepository;
     private final UserRepository userRepository;
+    private final StaffShiftAssignmentRepository shiftRepository;
 
     @Transactional
     public StaffAttendanceResponse checkIn(UUID staffId) {
         User staff = requireStaff(staffId);
-        LocalDate today = LocalDate.now();
-        if (attendanceRepository.findByStaffIdAndWorkDate(staffId, today).isPresent()) {
+        LocalDateTime now = LocalDateTime.now();
+        StaffShiftAssignment assignment = resolveCurrentAssignment(staffId, now);
+        if (assignment == null) throw new BadRequestException("Bạn chưa được phân ca làm việc hôm nay");
+        LocalDate workDate = assignment.getWorkDate();
+        if (attendanceRepository.findByStaffIdAndWorkDate(staffId, workDate).isPresent()) {
             throw new BadRequestException("Bạn đã check-in hôm nay");
         }
-        LocalDateTime now = LocalDateTime.now();
         StaffAttendance attendance = StaffAttendance.builder()
                 .staffId(staffId)
-                .workDate(today)
+                .workDate(workDate)
                 .checkInAt(now)
+                .shiftAssignmentId(assignment.getId())
                 .build();
         return toResponse(attendanceRepository.save(attendance), staff, now);
     }
@@ -49,7 +56,7 @@ public class StaffAttendanceService {
     @Transactional
     public StaffAttendanceResponse checkOut(UUID staffId) {
         User staff = requireStaff(staffId);
-        StaffAttendance attendance = attendanceRepository.findByStaffIdAndWorkDate(staffId, LocalDate.now())
+        StaffAttendance attendance = attendanceRepository.findFirstByStaffIdAndCheckOutAtIsNullOrderByCheckInAtDesc(staffId)
                 .orElseThrow(() -> new BadRequestException("Bạn cần check-in trước khi check-out"));
         if (attendance.getCheckOutAt() != null) {
             throw new BadRequestException("Bạn đã check-out hôm nay");
@@ -62,9 +69,12 @@ public class StaffAttendanceService {
     @Transactional(readOnly = true)
     public StaffAttendanceResponse today(UUID staffId) {
         User staff = requireStaff(staffId);
-        return attendanceRepository.findByStaffIdAndWorkDate(staffId, LocalDate.now())
-                .map(item -> toResponse(item, staff, LocalDateTime.now()))
-                .orElse(null);
+        LocalDateTime now = LocalDateTime.now();
+        return attendanceRepository.findFirstByStaffIdAndCheckOutAtIsNullOrderByCheckInAtDesc(staffId)
+                .or(() -> attendanceRepository.findByStaffIdAndWorkDate(staffId, now.toLocalDate()))
+                .or(() -> attendanceRepository.findFirstByStaffIdOrderByCheckInAtDesc(staffId)
+                        .filter(item -> item.getCheckOutAt() != null && item.getCheckOutAt().toLocalDate().equals(now.toLocalDate())))
+                .map(item -> toResponse(item, staff, now)).orElse(null);
     }
 
     @Transactional(readOnly = true)
@@ -144,10 +154,14 @@ public class StaffAttendanceService {
     }
 
     private StaffAttendanceResponse toResponse(StaffAttendance attendance, User staff, LocalDateTime now) {
-        boolean missingCheckOut = attendance.getCheckOutAt() == null && attendance.getWorkDate().isBefore(now.toLocalDate());
+        StaffShiftAssignment assignment = attendance.getShiftAssignmentId() == null ? null
+                : shiftRepository.findById(attendance.getShiftAssignmentId()).orElse(null);
+        boolean missingCheckOut = attendance.getCheckOutAt() == null && (assignment == null
+                ? attendance.getWorkDate().isBefore(now.toLocalDate())
+                : assignment.getScheduledEnd().isBefore(now));
         LocalDateTime end = attendance.getCheckOutAt() != null
                 ? attendance.getCheckOutAt()
-                : missingCheckOut ? attendance.getWorkDate().atTime(23, 59, 59) : now;
+                : missingCheckOut ? assignment == null ? attendance.getWorkDate().atTime(23, 59, 59) : assignment.getScheduledEnd() : now;
         long minutes = Math.max(0, Duration.between(attendance.getCheckInAt(), end).toMinutes());
         return StaffAttendanceResponse.builder()
                 .id(attendance.getId())
@@ -157,9 +171,31 @@ public class StaffAttendanceService {
                 .workDate(attendance.getWorkDate())
                 .checkInAt(attendance.getCheckInAt())
                 .checkOutAt(attendance.getCheckOutAt())
+                .shiftAssignmentId(attendance.getShiftAssignmentId())
+                .shiftType(assignment == null ? null : assignment.getShiftType().name())
+                .shiftName(assignment == null ? null : shiftName(assignment.getShiftType()))
+                .scheduledStart(assignment == null ? null : assignment.getScheduledStart())
+                .scheduledEnd(assignment == null ? null : assignment.getScheduledEnd())
                 .durationMinutes(minutes)
                 .status(attendance.getCheckOutAt() != null ? "COMPLETED" : missingCheckOut ? "MISSING_CHECK_OUT" : "WORKING")
                 .note(attendance.getNote())
                 .build();
+    }
+
+    private StaffShiftAssignment resolveCurrentAssignment(UUID staffId, LocalDateTime now) {
+        StaffShiftAssignment previous = shiftRepository.findByStaffIdAndWorkDate(staffId, now.toLocalDate().minusDays(1)).orElse(null);
+        if (previous != null && previous.getShiftType() == WorkShiftType.LATE && now.isBefore(previous.getScheduledEnd())) {
+            return previous;
+        }
+        return shiftRepository.findByStaffIdAndWorkDate(staffId, now.toLocalDate()).orElse(null);
+    }
+
+    private String shiftName(WorkShiftType type) {
+        return switch (type) {
+            case MORNING -> "Ca sáng";
+            case AFTERNOON -> "Ca chiều";
+            case EVENING -> "Ca tối";
+            case LATE -> "Ca khuya";
+        };
     }
 }

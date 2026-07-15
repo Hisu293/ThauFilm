@@ -49,6 +49,9 @@ public class StaffAttendance {
     @Column(name = "check_out_at")
     private LocalDateTime checkOutAt;
 
+    @Column(name = "shift_assignment_id")
+    private UUID shiftAssignmentId;
+
     @Column(length = 500)
     private String note;
 

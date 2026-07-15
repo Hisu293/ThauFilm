@@ -17,6 +17,11 @@ public class StaffAttendanceResponse {
     private LocalDate workDate;
     private LocalDateTime checkInAt;
     private LocalDateTime checkOutAt;
+    private UUID shiftAssignmentId;
+    private String shiftType;
+    private String shiftName;
+    private LocalDateTime scheduledStart;
+    private LocalDateTime scheduledEnd;
     private long durationMinutes;
     private String status;
     private String note;

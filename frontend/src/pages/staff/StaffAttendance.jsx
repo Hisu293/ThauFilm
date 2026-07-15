@@ -18,6 +18,8 @@ const StaffAttendance = () => {
   const [month, setMonth] = useState(selectedMonth);
   const [now, setNow] = useState(new Date());
   const [today, setToday] = useState(null);
+  const [todayShift, setTodayShift] = useState(null);
+  const [schedule, setSchedule] = useState([]);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -27,12 +29,16 @@ const StaffAttendance = () => {
     const [year, selected] = month.split('-').map(Number);
     setLoading(true);
     try {
-      const [todayData, historyData] = await Promise.all([
+      const [todayData, historyData, shiftData, scheduleData] = await Promise.all([
         staffAttendanceService.today(),
         staffAttendanceService.history(year, selected),
+        staffAttendanceService.todayShift(),
+        staffAttendanceService.schedule(year, selected),
       ]);
       setToday(todayData);
       setHistory(Array.isArray(historyData) ? historyData : []);
+      setTodayShift(shiftData);
+      setSchedule(Array.isArray(scheduleData) ? scheduleData : []);
       if (clearNotice) setNotice({ type: '', message: '' });
     } catch (error) {
       setNotice({ type: 'error', message: error.message || 'Không tải được dữ liệu chấm công.' });
@@ -85,16 +91,29 @@ const StaffAttendance = () => {
               <Typography color="text.secondary">{now.toLocaleDateString('vi-VN', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })}</Typography>
             </Box>
             <Stack spacing={1.5} sx={{ minWidth: { md: 270 } }}>
-              {!today && <Button size="large" variant="contained" startIcon={<LoginRoundedIcon />} disabled={busy} onClick={() => action('in')}>Check-in bắt đầu ca</Button>}
+              {!today && <Button size="large" variant="contained" startIcon={<LoginRoundedIcon />} disabled={busy || !todayShift} onClick={() => action('in')}>{todayShift ? 'Check-in bắt đầu ca' : 'Chưa được phân ca hôm nay'}</Button>}
               {today?.status === 'WORKING' && <Button size="large" variant="contained" color="warning" startIcon={<LogoutRoundedIcon />} disabled={busy} onClick={() => action('out')}>Check-out kết thúc ca</Button>}
               {today?.status === 'COMPLETED' && <Button size="large" variant="outlined" startIcon={<WorkHistoryRoundedIcon />} disabled>Ca hôm nay đã hoàn tất</Button>}
               <Stack direction="row" justifyContent="space-between"><Typography color="text.secondary">Check-in</Typography><Typography fontWeight={800}>{time(today?.checkInAt)}</Typography></Stack>
               <Stack direction="row" justifyContent="space-between"><Typography color="text.secondary">Check-out</Typography><Typography fontWeight={800}>{time(today?.checkOutAt)}</Typography></Stack>
               <Stack direction="row" justifyContent="space-between"><Typography color="text.secondary">Thời gian ca</Typography><Typography fontWeight={800} color="primary.main">{today ? duration(today.durationMinutes) : '0h 0p'}</Typography></Stack>
+              <Stack direction="row" justifyContent="space-between"><Typography color="text.secondary">Ca được phân</Typography><Typography fontWeight={800}>{todayShift ? `${todayShift.shiftName} · ${todayShift.shiftTime}` : 'Chưa có lịch'}</Typography></Stack>
             </Stack>
           </Stack>
         </CardContent>
       </Card>
+
+      <Box>
+        <Typography variant="h5" fontWeight={850}>Lịch ca làm việc</Typography>
+        <Typography color="text.secondary">Lịch được admin phân trong tháng đã chọn.</Typography>
+      </Box>
+      <Card><TableContainer><Table>
+        <TableHead><TableRow><TableCell>Ngày</TableCell><TableCell>Ca</TableCell><TableCell>Thời gian</TableCell><TableCell>Công việc chính</TableCell><TableCell>Ghi chú</TableCell></TableRow></TableHead>
+        <TableBody>
+          {schedule.map((item) => <TableRow key={item.id}><TableCell sx={{ fontWeight: 750 }}>{date(item.workDate)}</TableCell><TableCell><Chip size="small" color="primary" label={item.shiftName} /></TableCell><TableCell>{item.shiftTime}</TableCell><TableCell>{item.description}</TableCell><TableCell>{item.note || '—'}</TableCell></TableRow>)}
+          {!schedule.length && <TableRow><TableCell colSpan={5} align="center" sx={{ py: 5, color: 'text.secondary' }}>Chưa có lịch ca trong tháng này.</TableCell></TableRow>}
+        </TableBody>
+      </Table></TableContainer></Card>
 
       <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} spacing={2}>
         <Box><Typography variant="h5" fontWeight={850}>Lịch sử chấm công</Typography><Typography color="text.secondary">{history.length} ngày công · Tổng {duration(totalMinutes)}</Typography></Box>
@@ -102,10 +121,10 @@ const StaffAttendance = () => {
       </Stack>
       <Card>
         <TableContainer><Table>
-          <TableHead><TableRow><TableCell>Ngày làm việc</TableCell><TableCell>Check-in</TableCell><TableCell>Check-out</TableCell><TableCell>Thời gian</TableCell><TableCell>Trạng thái</TableCell></TableRow></TableHead>
+          <TableHead><TableRow><TableCell>Ngày làm việc</TableCell><TableCell>Ca</TableCell><TableCell>Check-in</TableCell><TableCell>Check-out</TableCell><TableCell>Thời gian</TableCell><TableCell>Trạng thái</TableCell></TableRow></TableHead>
           <TableBody>
-            {history.map((item) => <TableRow key={item.id}><TableCell sx={{ fontWeight: 750 }}>{date(item.workDate)}</TableCell><TableCell>{time(item.checkInAt)}</TableCell><TableCell>{time(item.checkOutAt)}</TableCell><TableCell>{duration(item.durationMinutes)}</TableCell><TableCell><Chip size="small" color={item.status === 'COMPLETED' ? 'success' : 'warning'} label={item.status === 'COMPLETED' ? 'Hoàn tất' : item.status === 'MISSING_CHECK_OUT' ? 'Thiếu check-out' : 'Đang làm'} /></TableCell></TableRow>)}
-            {!history.length && <TableRow><TableCell colSpan={5} align="center" sx={{ py: 6, color: 'text.secondary' }}>Chưa có dữ liệu trong tháng này.</TableCell></TableRow>}
+            {history.map((item) => <TableRow key={item.id}><TableCell sx={{ fontWeight: 750 }}>{date(item.workDate)}</TableCell><TableCell>{item.shiftName || '—'}</TableCell><TableCell>{time(item.checkInAt)}</TableCell><TableCell>{time(item.checkOutAt)}</TableCell><TableCell>{duration(item.durationMinutes)}</TableCell><TableCell><Chip size="small" color={item.status === 'COMPLETED' ? 'success' : 'warning'} label={item.status === 'COMPLETED' ? 'Hoàn tất' : item.status === 'MISSING_CHECK_OUT' ? 'Thiếu check-out' : 'Đang làm'} /></TableCell></TableRow>)}
+            {!history.length && <TableRow><TableCell colSpan={6} align="center" sx={{ py: 6, color: 'text.secondary' }}>Chưa có dữ liệu trong tháng này.</TableCell></TableRow>}
           </TableBody>
         </Table></TableContainer>
       </Card>

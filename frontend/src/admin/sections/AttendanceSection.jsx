@@ -127,6 +127,7 @@ const AttendanceSection = () => {
                 <TableHead><TableRow>
                   <TableCell>Nhân viên</TableCell>
                   <TableCell>Ngày</TableCell>
+                  <TableCell>Ca làm</TableCell>
                   <TableCell>Check-in</TableCell>
                   <TableCell>Check-out</TableCell>
                   <TableCell>Thời gian</TableCell>
@@ -138,6 +139,7 @@ const AttendanceSection = () => {
                     <TableRow key={record.id} className="admin-table-row">
                       <TableCell><Typography fontWeight={800}>{record.staffName || 'Nhân viên'}</Typography><Typography variant="caption" color="text.secondary">{record.staffEmail}</Typography></TableCell>
                       <TableCell>{new Date(`${record.workDate}T00:00:00`).toLocaleDateString('vi-VN')}</TableCell>
+                      <TableCell>{record.shiftName ? <Chip size="small" label={record.shiftName} color="primary" /> : '—'}</TableCell>
                       <TableCell>{formatDateTime(record.checkInAt)}</TableCell>
                       <TableCell>{formatDateTime(record.checkOutAt)}</TableCell>
                       <TableCell>{hours(record.durationMinutes)}</TableCell>
@@ -145,7 +147,7 @@ const AttendanceSection = () => {
                       <TableCell align="right"><Button size="small" startIcon={<EditCalendarRoundedIcon />} onClick={() => openEdit(record)}>Chỉnh sửa</Button></TableCell>
                     </TableRow>
                   ))}
-                  {!records.length && <TableRow><TableCell colSpan={7} align="center" sx={{ py: 7, color: 'text.secondary' }}>Chưa có dữ liệu chấm công trong tháng này.</TableCell></TableRow>}
+                  {!records.length && <TableRow><TableCell colSpan={8} align="center" sx={{ py: 7, color: 'text.secondary' }}>Chưa có dữ liệu chấm công trong tháng này.</TableCell></TableRow>}
                 </TableBody>
               </Table>
             </TableContainer>
