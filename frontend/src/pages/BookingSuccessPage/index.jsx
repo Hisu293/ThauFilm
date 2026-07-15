@@ -118,7 +118,7 @@ export const BookingSuccessPage = () => {
   const [bookingData, setBookingData] = useState(null);
   const [tickets, setTickets] = useState([]);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
-  const [ticketQr, setTicketQr] = useState('');
+  const [ticketQrs, setTicketQrs] = useState([]);
   const [calendarNotice, setCalendarNotice] = useState({ open: false, message: '', severity: 'success' });
 
   const isOnlineBooking = Boolean(
@@ -169,24 +169,31 @@ export const BookingSuccessPage = () => {
 
   useEffect(() => {
     let activeRequest = true;
-    if (isOnlineBooking || !bookingData?.bookingId) return () => { activeRequest = false; };
+    const validTickets = tickets.filter((ticket) => ticket?.ticketCode);
+    if (isOnlineBooking || validTickets.length === 0) {
+      Promise.resolve().then(() => { if (activeRequest) setTicketQrs([]); });
+      return () => { activeRequest = false; };
+    }
 
-    const detailUrl = `${window.location.origin}/my-bookings/${encodeURIComponent(bookingData.bookingId)}`;
-    QRCode.toDataURL(detailUrl, {
-      width: 240,
-      margin: 1,
-      errorCorrectionLevel: 'M',
-      color: { dark: '#0F172A', light: '#FFFFFF' },
-    })
-      .then((dataUrl) => {
-        if (activeRequest) setTicketQr(dataUrl);
+    Promise.all(validTickets.map(async (ticket, index) => ({
+      ticket,
+      index,
+      dataUrl: await QRCode.toDataURL(ticket.ticketCode, {
+        width: 240,
+        margin: 1,
+        errorCorrectionLevel: 'M',
+        color: { dark: '#0F172A', light: '#FFFFFF' },
+      }),
+    })))
+      .then((items) => {
+        if (activeRequest) setTicketQrs(items);
       })
       .catch(() => {
         if (activeRequest) setSnackbarOpen(true);
       });
 
     return () => { activeRequest = false; };
-  }, [bookingData?.bookingId, isOnlineBooking]);
+  }, [isOnlineBooking, tickets]);
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('vi-VN', {
@@ -369,52 +376,37 @@ export const BookingSuccessPage = () => {
           </Typography>
         </Box>
 
-        {!isOnlineBooking && bookingData?.bookingId && (
+        {!isOnlineBooking && ticketQrs.length > 0 && (
           <Box
             sx={{
               mb: 4,
-              display: 'flex',
-              flexDirection: { xs: 'column', sm: 'row' },
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 2.5,
-              textAlign: { xs: 'center', sm: 'left' },
+              p: 2.5,
+              borderRadius: 3,
+              bgcolor: 'rgba(15, 23, 42, 0.26)',
             }}
           >
-            <Box
-              sx={{
-                width: 176,
-                height: 176,
-                p: 1,
-                borderRadius: 3,
-                bgcolor: '#fff',
-                display: 'grid',
-                placeItems: 'center',
-                boxShadow: '0 12px 30px rgba(0, 0, 0, 0.28)',
-              }}
-            >
-              {ticketQr ? (
+            <Stack direction="row" spacing={1} alignItems="center" justifyContent="center">
+              <QrCode2RoundedIcon sx={{ color: 'primary.main' }} />
+              <Typography variant="h6" sx={{ fontWeight: 850 }}>QR check-in từng vé</Typography>
+            </Stack>
+            <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ mt: .75, mb: 2.5 }}>
+              Mỗi QR chứa ticket code riêng. Nhân viên quét đúng mã này để check-in vé tại rạp.
+            </Typography>
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: ticketQrs.length === 1 ? '1fr' : 'repeat(2, minmax(0, 1fr))' }, gap: 2 }}>
+              {ticketQrs.map(({ ticket, dataUrl, index }) => {
+                const seat = ticket.seatLabel || selectedSeats?.[index]?.label || selectedSeats?.[index]?.id || '—';
+                return <Box key={ticket.id || ticket.ticketCode} sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: 'center', justifyContent: 'center', gap: 2, p: 2, borderRadius: 3, border: '1px solid rgba(251,191,36,.2)', bgcolor: 'rgba(251,191,36,.04)' }}>
+                <Box sx={{ width: 160, height: 160, p: 1, flexShrink: 0, borderRadius: 3, bgcolor: '#fff', display: 'grid', placeItems: 'center', boxShadow: '0 12px 30px rgba(0, 0, 0, 0.28)' }}>
                 <Box
                   component="img"
-                  src={ticketQr}
-                  alt={`Mã QR vé điện tử ${bookingCode}`}
+                  src={dataUrl}
+                  alt={`Mã QR ticket ${ticket.ticketCode}`}
                   sx={{ width: '100%', height: '100%', display: 'block' }}
                 />
-              ) : (
-                <QrCode2RoundedIcon sx={{ fontSize: 96, color: '#CBD5E1' }} />
-              )}
-            </Box>
-            <Box sx={{ maxWidth: 290 }}>
-              <Stack direction="row" spacing={1} alignItems="center" justifyContent={{ xs: 'center', sm: 'flex-start' }}>
-                <QrCode2RoundedIcon sx={{ color: 'primary.main' }} />
-                <Typography variant="h6" sx={{ fontWeight: 800 }}>QR vé điện tử</Typography>
-              </Stack>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                Quét mã để mở chi tiết vé sau khi mua vé thành công. Bạn cần đăng nhập đúng tài khoản đã mua vé.
-              </Typography>
-              <Typography variant="caption" sx={{ display: 'block', mt: 1.25, color: 'primary.main', fontWeight: 800, letterSpacing: '0.08em' }}>
-                {bookingCode}
-              </Typography>
+                </Box>
+                <Box sx={{ textAlign: { xs: 'center', sm: 'left' } }}><Typography variant="caption" color="text.secondary">TICKET CODE</Typography><Typography fontWeight={950} color="primary.main" sx={{ letterSpacing: '.08em', wordBreak: 'break-all' }}>{ticket.ticketCode}</Typography><Typography variant="body2" color="text.secondary" sx={{ mt: .75 }}>Ghế <b>{seat}</b></Typography></Box>
+              </Box>;
+              })}
             </Box>
           </Box>
         )}
