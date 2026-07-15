@@ -13,6 +13,10 @@ import java.util.UUID;
 public interface StaffAttendanceRepository extends JpaRepository<StaffAttendance, UUID> {
     Optional<StaffAttendance> findByStaffIdAndWorkDate(UUID staffId, LocalDate workDate);
 
+    Optional<StaffAttendance> findFirstByStaffIdAndCheckOutAtIsNullOrderByCheckInAtDesc(UUID staffId);
+
+    Optional<StaffAttendance> findFirstByStaffIdOrderByCheckInAtDesc(UUID staffId);
+
     List<StaffAttendance> findByStaffIdAndWorkDateBetweenOrderByWorkDateDesc(
             UUID staffId,
             LocalDate from,
@@ -20,4 +24,6 @@ public interface StaffAttendanceRepository extends JpaRepository<StaffAttendance
     );
 
     List<StaffAttendance> findByWorkDateBetweenOrderByWorkDateDescCheckInAtDesc(LocalDate from, LocalDate to);
+
+    List<StaffAttendance> findByStaffIdInAndWorkDateBetween(List<UUID> staffIds, LocalDate from, LocalDate to);
 }

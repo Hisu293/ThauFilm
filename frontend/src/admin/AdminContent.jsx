@@ -6,6 +6,7 @@ import { UserAccountsSection, UserRolesSection } from './sections/UserSections';
 import { RevenueReportSection, TicketsReportSection, CustomersReportSection } from './sections/ReportSections';
 import IntelligenceSection from './sections/IntelligenceSection';
 import AttendanceSection from './sections/AttendanceSection';
+import WorkforceSection from './sections/WorkforceSection';
 
 const AdminContent = ({ view, store }) => {
   const { crud, dashboard, getTheaterName, movieList } = store;
@@ -40,6 +41,8 @@ const AdminContent = ({ view, store }) => {
       return <UserRolesSection crud={crud.users} />;
     case ADMIN_VIEWS.STAFF_ATTENDANCE:
       return <AttendanceSection />;
+    case ADMIN_VIEWS.WORKFORCE:
+      return <WorkforceSection />;
     case ADMIN_VIEWS.REPORT_REVENUE:
       return <RevenueReportSection />;
     case ADMIN_VIEWS.REPORT_TICKETS:
