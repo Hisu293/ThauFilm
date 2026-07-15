@@ -15,6 +15,7 @@ import PsychologyRoundedIcon from '@mui/icons-material/PsychologyRounded';
 import PunchClockRoundedIcon from '@mui/icons-material/PunchClockRounded';
 import WorkHistoryRoundedIcon from '@mui/icons-material/WorkHistoryRounded';
 import Inventory2RoundedIcon from '@mui/icons-material/Inventory2Rounded';
+import CurrencyExchangeRoundedIcon from '@mui/icons-material/CurrencyExchangeRounded';
 
 export const ADMIN_VIEWS = {
   DASHBOARD: 'dashboard',
@@ -30,6 +31,7 @@ export const ADMIN_VIEWS = {
   STAFF_ATTENDANCE: 'staff-attendance',
   WORKFORCE: 'workforce',
   INVENTORY: 'inventory',
+  REFUNDS: 'refunds',
   REPORT_REVENUE: 'report-revenue',
   REPORT_TICKETS: 'report-tickets',
   REPORT_CUSTOMERS: 'report-customers',
@@ -79,6 +81,7 @@ export const ADMIN_NAV_GROUPS = [
       { id: ADMIN_VIEWS.STAFF_ATTENDANCE, label: 'Chấm công nhân viên', icon: PunchClockRoundedIcon },
       { id: ADMIN_VIEWS.WORKFORCE, label: 'Ca làm & bảng lương', icon: WorkHistoryRoundedIcon },
       { id: ADMIN_VIEWS.INVENTORY, label: 'Dự đoán tồn kho', icon: Inventory2RoundedIcon },
+      { id: ADMIN_VIEWS.REFUNDS, label: 'Duyệt hoàn tiền', icon: CurrencyExchangeRoundedIcon },
     ],
   },
   {
@@ -107,6 +110,7 @@ export const VIEW_META = {
   [ADMIN_VIEWS.STAFF_ATTENDANCE]: { title: 'Chấm công nhân viên', subtitle: 'Quản lý check-in, check-out và giờ làm việc' },
   [ADMIN_VIEWS.WORKFORCE]: { title: 'Ca làm & bảng lương', subtitle: 'Phân ca và tính lương Part-time / Full-time' },
   [ADMIN_VIEWS.INVENTORY]: { title: 'Dự đoán sắp hết hàng', subtitle: 'Theo dõi tốc độ bán combo và cảnh báo tồn kho theo thời gian thực' },
+  [ADMIN_VIEWS.REFUNDS]: { title: 'Duyệt hoàn tiền', subtitle: 'Xử lý yêu cầu từ 200.000đ do staff trưởng chuyển lên' },
   [ADMIN_VIEWS.REPORT_REVENUE]: { title: 'Báo cáo doanh thu', subtitle: 'Theo ngày, tháng và phim' },
   [ADMIN_VIEWS.REPORT_TICKETS]: { title: 'Thống kê vé', subtitle: 'Vé bán ra và vé hủy' },
   [ADMIN_VIEWS.REPORT_CUSTOMERS]: { title: 'Thống kê khách hàng', subtitle: 'Khách mới và khách thân thiết' },

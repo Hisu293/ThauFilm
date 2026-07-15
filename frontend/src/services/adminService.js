@@ -74,6 +74,9 @@ export const adminService = {
   createInventoryItem: (payload) => api.post('/api/admin/inventory/items', payload).then(unwrap),
   updateInventoryItem: (id, payload) => api.put(`/api/admin/inventory/items/${id}`, payload).then(unwrap),
   saveInventoryRecipe: (payload) => api.post('/api/admin/inventory/recipes', payload).then(unwrap),
+  getRefundRequests: () => api.get('/api/admin/refunds').then(unwrap),
+  approveRefund: (id) => api.post(`/api/admin/refunds/${id}/approve`).then(unwrap),
+  rejectRefund: (id, reason) => api.post(`/api/admin/refunds/${id}/reject`, { reason }).then(unwrap),
 };
 
 export default adminService;

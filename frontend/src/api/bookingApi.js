@@ -125,6 +125,13 @@ export const bookingApi = {
     return axiosClient.post(`/api/member/booking/${bookingId}/cancel`);
   },
 
+  requestRefund: (bookingId, ticketCode, reason) =>
+    axiosClient.post(`/api/member/booking/${bookingId}/refund-requests`, { ticketCode, reason }),
+
+  fetchMyRefundRequests: () => axiosClient.get('/api/member/booking/refund-requests/me'),
+  fetchRefundMessages: (requestId) => axiosClient.get(`/api/member/booking/refund-requests/${requestId}/messages`),
+  sendRefundMessage: (requestId, content) => axiosClient.post(`/api/member/booking/refund-requests/${requestId}/messages`, { content }),
+
   fetchGroupBooking: (groupId) => {
     return axiosClient.get(`/api/member/group-bookings/${groupId}`);
   },

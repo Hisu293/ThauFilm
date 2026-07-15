@@ -6,7 +6,6 @@ export const staffBookingApi = {
   fetchPayment: (bookingId) => axiosClient.get(`/api/staff/bookings/${bookingId}/payment`),
   fetchPurchasedMoviesByUser: (userId) => axiosClient.get(`/api/staff/bookings/users/${userId}/purchased-movies`),
   regrantAccess: (bookingId) => axiosClient.post(`/api/staff/bookings/${bookingId}/regrant-access`),
-  refund: (bookingId) => axiosClient.post(`/api/staff/bookings/${bookingId}/refund`),
   cancel: (bookingId) => axiosClient.post(`/api/staff/bookings/${bookingId}/cancel`),
 };
 

@@ -34,7 +34,6 @@ import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded';
 import PaymentRoundedIcon from '@mui/icons-material/PaymentRounded';
 import LockOpenRoundedIcon from '@mui/icons-material/LockOpenRounded';
 import ReplayRoundedIcon from '@mui/icons-material/ReplayRounded';
-import CurrencyExchangeRoundedIcon from '@mui/icons-material/CurrencyExchangeRounded';
 import CancelRoundedIcon from '@mui/icons-material/CancelRounded';
 import { staffBookingApi } from '../../api/staffBookingApi';
 
@@ -154,15 +153,6 @@ const StaffBookings = () => {
         await staffBookingApi.regrantAccess(booking.id).then(unwrap);
         setToast({ severity: 'success', message: 'Đã cấp lại quyền xem cho khách.' });
         await refreshDetail(booking.id);
-      } else if (action === 'refund') {
-        await staffBookingApi.refund(booking.id).then(unwrap);
-        setToast({
-          severity: 'success',
-          message: 'Đã ghi nhận yêu cầu hoàn tiền. Cần xử lý chuyển khoản thủ công theo thông tin khách.',
-        });
-        patchBooking({ id: booking.id, status: 'REFUND_PENDING' });
-        const pay = await staffBookingApi.fetchPayment(booking.id).then(unwrap).catch(() => null);
-        setPayment(pay);
       } else if (action === 'cancel') {
         const dto = await staffBookingApi.cancel(booking.id).then(unwrap);
         setToast({ severity: 'success', message: 'Đã hủy đơn hàng.' });
@@ -193,7 +183,6 @@ const StaffBookings = () => {
 
   const confirmText = {
     regrant: { title: 'Cấp lại quyền xem?', body: 'Cấp lại quyền xem phim online cho khách của đơn này?', btn: 'Cấp lại quyền', color: 'primary' },
-    refund: { title: 'Ghi nhận yêu cầu hoàn tiền?', body: 'Hệ thống không có QR chuyển khoản của khách. Thao tác này chỉ đánh dấu chờ hoàn tiền thủ công để nhân viên kế toán xử lý.', btn: 'Ghi nhận', color: 'warning' },
     cancel: { title: 'Hủy đơn hàng?', body: 'Hủy đơn sẽ giải phóng ghế và thu hồi quyền xem. Tiếp tục?', btn: 'Hủy đơn', color: 'error' },
   };
 
@@ -380,14 +369,6 @@ const StaffBookings = () => {
                 disabled={busy || detail.status === 'CANCELLED' || detail.accessGranted}
               >
                 Cấp lại quyền
-              </Button>
-              <Button
-                color="warning"
-                startIcon={<CurrencyExchangeRoundedIcon />}
-                onClick={() => setConfirm({ action: 'refund', booking: detail })}
-                disabled={busy || paymentStatusOf(payment, detail) !== 'PAID'}
-              >
-                Hoàn tiền
               </Button>
               <Button
                 color="error"

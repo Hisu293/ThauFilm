@@ -45,6 +45,7 @@ import StaffPromotions from '../pages/staff/StaffPromotions';
 import StaffReports from '../pages/staff/StaffReports';
 import StaffAttendance from '../pages/staff/StaffAttendance';
 import StaffAttendanceDisplay from '../pages/staff/StaffAttendanceDisplay';
+import StaffRefunds from '../pages/staff/StaffRefunds';
 
 const AppRoutes = () => {
   return (
@@ -114,6 +115,7 @@ const AppRoutes = () => {
         <Route path="reports" element={<StaffReports />} />
         <Route path="attendance" element={<StaffAttendance />} />
         <Route path="attendance-display" element={<StaffAttendanceDisplay />} />
+        <Route path="refunds" element={<StaffRefunds />} />
       </Route>
 
       <Route path="*" element={<NotFoundPage />} />

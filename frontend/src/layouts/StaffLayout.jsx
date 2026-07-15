@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Outlet, useNavigate, useLocation, Link as RouterLink } from 'react-router-dom';
 import { 
   Box, 
@@ -36,20 +36,23 @@ import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
 import DashboardRoundedIcon from '@mui/icons-material/DashboardRounded';
 import PunchClockRoundedIcon from '@mui/icons-material/PunchClockRounded';
 import QrCode2RoundedIcon from '@mui/icons-material/QrCode2Rounded';
+import CurrencyExchangeRoundedIcon from '@mui/icons-material/CurrencyExchangeRounded';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import { useAuth } from '../context/AuthContext';
 import cinemaTheme from '../theme/cinemaTheme';
+import refundService from '../services/refundService';
 
 const drawerWidth = 280;
 
 const menuItems = [
   { text: 'Tổng quan', icon: <DashboardRoundedIcon />, path: '/staff/dashboard' },
-  { text: 'Màn hình QR chấm công', icon: <QrCode2RoundedIcon />, path: '/staff/attendance-display' },
+  { text: 'Màn hình QR chấm công', icon: <QrCode2RoundedIcon />, path: '/staff/attendance-display', leaderOnly: true },
   { text: 'Chấm công', icon: <PunchClockRoundedIcon />, path: '/staff/attendance' },
   { text: 'Quản lý phim', icon: <LocalMoviesRoundedIcon />, path: '/staff/movies' },
   { text: 'Quản lý suất chiếu', icon: <ScheduleRoundedIcon />, path: '/staff/showtimes-manage' },
   { text: 'Quản lý vé', icon: <ConfirmationNumberRoundedIcon />, path: '/staff/tickets' },
   { text: 'Quản lý đơn hàng', icon: <ReceiptLongRoundedIcon />, path: '/staff/bookings' },
+  { text: 'Yêu cầu hoàn tiền', icon: <CurrencyExchangeRoundedIcon />, path: '/staff/refunds', leaderOnly: true },
   { text: 'Quản lý khách hàng', icon: <PeopleAltRoundedIcon />, path: '/staff/customers' },
   { text: 'Quản lý khuyến mãi', icon: <LocalOfferRoundedIcon />, path: '/staff/promotions' },
   { text: 'Báo cáo', icon: <AssessmentRoundedIcon />, path: '/staff/reports' },
@@ -58,9 +61,23 @@ const menuItems = [
 const StaffLayout = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [mode, setMode] = useState('dark');
+  const [isShiftLeader, setIsShiftLeader] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const { logout } = useAuth();
+
+  useEffect(() => {
+    let active = true;
+    refundService.staffAccess()
+      .then((data) => { if (active) setIsShiftLeader(Boolean(data?.shiftLeader)); })
+      .catch(() => { if (active) setIsShiftLeader(false); });
+    return () => { active = false; };
+  }, []);
+
+  const visibleMenuItems = useMemo(
+    () => menuItems.filter((item) => !item.leaderOnly || isShiftLeader),
+    [isShiftLeader],
+  );
 
   const toggleTheme = () => {
     setMode((prevMode) => (prevMode === 'light' ? 'dark' : 'light'));
@@ -119,7 +136,7 @@ const StaffLayout = () => {
   };
 
   // Find current menu item for breadcrumbs
-  const currentItem = menuItems.find(item => location.pathname.startsWith(item.path)) || menuItems[0];
+  const currentItem = visibleMenuItems.find(item => location.pathname.startsWith(item.path)) || visibleMenuItems[0];
 
   const drawer = (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', bgcolor: 'background.paper' }}>
@@ -137,7 +154,7 @@ const StaffLayout = () => {
 
       <Box sx={{ flex: 1, overflowY: 'auto', px: 1.5, pb: 2 }}>
         <List dense disablePadding>
-          {menuItems.map((item) => {
+          {visibleMenuItems.map((item) => {
             const isSelected = location.pathname.startsWith(item.path);
             return (
               <ListItemButton
