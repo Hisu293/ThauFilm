@@ -47,5 +47,12 @@ public class StaffWorkforceController {
                 currentUserService.requireUserId(principal), request.workDate(), request.shiftType(), request.note())));
     }
 
+    @PostMapping("/attendance-display/dynamic-qr")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> dynamicQr(
+            @AuthenticationPrincipal UserDetails principal) {
+        return ResponseEntity.ok(ApiResponse.success("Dynamic attendance QR fetched",
+                workforceService.dynamicAttendanceCode(currentUserService.requireUserId(principal))));
+    }
+
     public record RegisterShiftRequest(LocalDate workDate, WorkShiftType shiftType, String note) {}
 }

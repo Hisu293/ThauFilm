@@ -92,7 +92,7 @@ class WorkforceServiceTest {
     private WorkforceService service(UserRepository users, StaffShiftAssignmentRepository shifts,
                                      StaffEmploymentProfileRepository profiles, StaffAttendanceRepository attendance,
                                      PayrollRecordRepository payroll) {
-        return new WorkforceService(users, profiles, shifts, attendance, payroll);
+        return new WorkforceService(users, profiles, shifts, attendance, payroll, mock(AttendanceAccessCodeService.class));
     }
 
     private User staff(String name) {

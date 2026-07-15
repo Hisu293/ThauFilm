@@ -36,6 +36,10 @@ public class StaffEmploymentProfile {
     @Builder.Default
     private BigDecimal defaultAllowance = BigDecimal.ZERO;
 
+    @Column(name = "shift_leader", nullable = false)
+    @Builder.Default
+    private boolean shiftLeader = false;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 

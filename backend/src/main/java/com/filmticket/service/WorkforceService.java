@@ -28,6 +28,7 @@ public class WorkforceService {
     private final StaffShiftAssignmentRepository shiftRepository;
     private final StaffAttendanceRepository attendanceRepository;
     private final PayrollRecordRepository payrollRepository;
+    private final AttendanceAccessCodeService attendanceAccessCodeService;
 
     public List<Map<String, Object>> shiftDefinitions() {
         return Arrays.stream(WorkShiftType.values()).map(type -> {
@@ -49,7 +50,7 @@ public class WorkforceService {
     @Transactional
     public Map<String, Object> updateProfile(UUID staffId, EmploymentType employmentType, BigDecimal hourlyRate,
                                               BigDecimal monthlySalary, BigDecimal overtimeHourlyRate,
-                                              BigDecimal defaultAllowance) {
+                                              BigDecimal defaultAllowance, Boolean shiftLeader) {
         User staff = requireStaff(staffId);
         StaffEmploymentProfile profile = profileRepository.findById(staffId)
                 .orElseGet(() -> defaultProfile(staffId));
@@ -58,7 +59,24 @@ public class WorkforceService {
         profile.setMonthlySalary(nonNegative(monthlySalary, "Lương tháng"));
         profile.setOvertimeHourlyRate(nonNegative(overtimeHourlyRate, "Lương OT"));
         profile.setDefaultAllowance(nonNegative(defaultAllowance, "Phụ cấp"));
+        if (shiftLeader != null) profile.setShiftLeader(shiftLeader);
         return profileRow(staff, profileRepository.save(profile));
+    }
+
+    @Transactional
+    public Map<String, Object> dynamicAttendanceCode(UUID staffId) {
+        User staff = requireStaff(staffId);
+        StaffEmploymentProfile profile = profileRepository.findById(staffId)
+                .orElseThrow(() -> new BadRequestException("Nhân viên chưa có hồ sơ nhân sự"));
+        if (!profile.isShiftLeader()) throw new BadRequestException("Chỉ staff trưởng mới được mở màn hình QR chấm công");
+        LocalDateTime now = LocalDateTime.now();
+        StaffShiftAssignment assignment = currentApprovedAssignment(staffId, now);
+        if (assignment == null) throw new BadRequestException("Staff trưởng chưa có ca được duyệt tại thời điểm này");
+        Map<String, Object> code = new LinkedHashMap<>(attendanceAccessCodeService.dynamicCode(staff.getId(), assignment));
+        code.put("leaderName", staff.getFullName());
+        code.put("shiftName", shiftName(assignment.getShiftType()));
+        code.put("shiftTime", shiftTime(assignment.getShiftType()));
+        return code;
     }
 
     @Transactional(readOnly = true)
@@ -90,13 +108,8 @@ public class WorkforceService {
     public Map<String, Object> todayShift(UUID staffId) {
         User staff = requireStaff(staffId);
         LocalDateTime now = LocalDateTime.now();
-        StaffShiftAssignment previous = shiftRepository.findByStaffIdAndWorkDate(staffId, now.toLocalDate().minusDays(1)).orElse(null);
-        if (previous != null && previous.getShiftType() == WorkShiftType.LATE && now.isBefore(previous.getScheduledEnd())) {
-            return previous.getApprovalStatus() == ShiftApprovalStatus.APPROVED ? assignmentRow(previous, staff) : null;
-        }
-        return shiftRepository.findByStaffIdAndWorkDate(staffId, now.toLocalDate())
-                .filter(item -> item.getApprovalStatus() == ShiftApprovalStatus.APPROVED)
-                .map(item -> assignmentRow(item, staff)).orElse(null);
+        StaffShiftAssignment assignment = currentApprovedAssignment(staffId, now);
+        return assignment == null ? null : assignmentRow(assignment, staff);
     }
 
     @Transactional
@@ -301,7 +314,18 @@ public class WorkforceService {
         return row("staffId", staff.getId(), "staffName", staff.getFullName(), "staffEmail", staff.getEmail(),
                 "employmentType", value.getEmploymentType(), "hourlyRate", value.getHourlyRate(),
                 "monthlySalary", value.getMonthlySalary(), "overtimeHourlyRate", value.getOvertimeHourlyRate(),
-                "defaultAllowance", value.getDefaultAllowance());
+                "defaultAllowance", value.getDefaultAllowance(), "shiftLeader", value.isShiftLeader());
+    }
+
+    private StaffShiftAssignment currentApprovedAssignment(UUID staffId, LocalDateTime now) {
+        StaffShiftAssignment previous = shiftRepository.findByStaffIdAndWorkDate(staffId, now.toLocalDate().minusDays(1)).orElse(null);
+        if (previous != null && previous.getApprovalStatus() == ShiftApprovalStatus.APPROVED
+                && previous.getShiftType() == WorkShiftType.LATE && now.isBefore(previous.getScheduledEnd().plusMinutes(120))) return previous;
+        return shiftRepository.findByStaffIdAndWorkDate(staffId, now.toLocalDate())
+                .filter(item -> item.getApprovalStatus() == ShiftApprovalStatus.APPROVED
+                        && !now.isBefore(item.getScheduledStart().minusMinutes(60))
+                        && !now.isAfter(item.getScheduledEnd().plusMinutes(120)))
+                .orElse(null);
     }
 
     private Map<String, Object> payrollRow(PayrollRecord record, User staff, StaffEmploymentProfile profile) {

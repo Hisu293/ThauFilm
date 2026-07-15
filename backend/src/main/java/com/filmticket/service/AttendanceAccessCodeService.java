@@ -13,11 +13,13 @@ import java.security.SecureRandom;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Map;
+import java.util.List;
 import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 public class AttendanceAccessCodeService {
+    private static final int DYNAMIC_QR_SECONDS = 60;
     private final AttendanceAccessCodeRepository repository;
     private final SecureRandom random = new SecureRandom();
 
@@ -26,6 +28,7 @@ public class AttendanceAccessCodeService {
         if (workDate == null || shiftType == null) throw new BadRequestException("Ngày làm và ca làm là bắt buộc");
         repository.findByWorkDateAndShiftTypeOrderByCreatedAtDesc(workDate, shiftType)
                 .forEach(code -> { code.setActive(false); repository.save(code); });
+        repository.flush();
         Window window = window(workDate, shiftType);
         AttendanceAccessCode code = repository.save(AttendanceAccessCode.builder()
                 .workDate(workDate).shiftType(shiftType).qrToken(UUID.randomUUID())
@@ -39,6 +42,36 @@ public class AttendanceAccessCodeService {
     public Map<String, Object> latest(LocalDate workDate, WorkShiftType shiftType) {
         return repository.findByWorkDateAndShiftTypeOrderByCreatedAtDesc(workDate, shiftType).stream()
                 .filter(AttendanceAccessCode::isActive).findFirst().map(this::row).orElse(null);
+    }
+
+    @Transactional
+    public Map<String, Object> dynamicCode(UUID leaderId, StaffShiftAssignment assignment) {
+        LocalDateTime now = LocalDateTime.now();
+        List<AttendanceAccessCode> activeCodes = repository.findActiveForUpdate(
+                assignment.getWorkDate(), assignment.getShiftType());
+        AttendanceAccessCode code = activeCodes.stream().findFirst().orElseGet(() -> AttendanceAccessCode.builder()
+                .workDate(assignment.getWorkDate()).shiftType(assignment.getShiftType())
+                .createdBy(leaderId).active(true).build());
+        activeCodes.stream().skip(1).forEach(duplicate -> {
+            duplicate.setActive(false);
+            repository.save(duplicate);
+        });
+        boolean notDynamic = code.getValidFrom() == null || code.getValidUntil() == null
+                || java.time.Duration.between(code.getValidFrom(), code.getValidUntil()).toSeconds() > DYNAMIC_QR_SECONDS + 5;
+        if (notDynamic || !code.getValidUntil().isAfter(now.plusSeconds(2))) {
+            code.setQrToken(UUID.randomUUID());
+            code.setPinCode(String.format("%06d", random.nextInt(1_000_000)));
+            code.setValidFrom(now);
+            code.setValidUntil(now.plusSeconds(DYNAMIC_QR_SECONDS));
+            code.setCreatedBy(leaderId);
+            code.setActive(true);
+            code = repository.save(code);
+        }
+        Map<String, Object> result = new java.util.LinkedHashMap<>(row(code));
+        result.put("serverTime", now);
+        result.put("expiresInSeconds", Math.max(0, java.time.Duration.between(now, code.getValidUntil()).toSeconds()));
+        result.put("dynamic", true);
+        return result;
     }
 
     @Transactional(readOnly = true)

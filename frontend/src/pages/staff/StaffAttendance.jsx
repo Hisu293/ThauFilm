@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert, Box, Button, Card, CardContent, Chip, CircularProgress, Stack,
-  Dialog, DialogContent, DialogTitle, FormControl, InputLabel, MenuItem, Select,
+  FormControl, InputLabel, MenuItem, Select,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow, TextField, Typography,
 } from '@mui/material';
 import AccessTimeRoundedIcon from '@mui/icons-material/AccessTimeRounded';
@@ -10,23 +10,13 @@ import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
 import WorkHistoryRoundedIcon from '@mui/icons-material/WorkHistoryRounded';
 import QrCodeScannerRoundedIcon from '@mui/icons-material/QrCodeScannerRounded';
 import EventAvailableRoundedIcon from '@mui/icons-material/EventAvailableRounded';
-import { Html5QrcodeScanner } from 'html5-qrcode';
 import { staffAttendanceService } from '../../services/staffAttendanceService';
+import QrScannerDialog from '../../components/QrScannerDialog';
 
 const selectedMonth = () => new Date().toISOString().slice(0, 7);
 const time = (value) => value ? new Date(value).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '—';
 const date = (value) => new Date(`${value}T00:00:00`).toLocaleDateString('vi-VN');
 const duration = (minutes = 0) => `${Math.floor(Number(minutes) / 60)}h ${Number(minutes) % 60}p`;
-
-const QrScannerDialog = ({ open, onClose, onScan }) => {
-  useEffect(() => {
-    if (!open) return undefined;
-    const scanner = new Html5QrcodeScanner('attendance-qr-reader', { fps: 10, qrbox: { width: 220, height: 220 } }, false);
-    scanner.render((value) => { onScan(value); scanner.clear().catch(() => {}); }, () => {});
-    return () => { scanner.clear().catch(() => {}); };
-  }, [open, onClose, onScan]);
-  return <Dialog open={open} onClose={onClose} fullWidth maxWidth="xs"><DialogTitle>Quét QR chấm công</DialogTitle><DialogContent><Box id="attendance-qr-reader" sx={{ overflow: 'hidden' }} /></DialogContent></Dialog>;
-};
 
 const StaffAttendance = () => {
   const [month, setMonth] = useState(selectedMonth);
@@ -74,11 +64,11 @@ const StaffAttendance = () => {
   }, []);
 
   const totalMinutes = useMemo(() => history.reduce((sum, item) => sum + Number(item.durationMinutes || 0), 0), [history]);
-  const action = async (type) => {
-    if (!credential.trim()) { setNotice({ type: 'warning', message: 'Vui lòng quét QR hoặc nhập mã PIN trước khi chấm công.' }); return; }
+  const action = async (type, scannedCredential = credential) => {
+    if (!scannedCredential.trim()) { setNotice({ type: 'warning', message: 'Vui lòng quét QR hoặc nhập mã PIN trước khi chấm công.' }); return; }
     setBusy(true);
     try {
-      const result = type === 'in' ? await staffAttendanceService.checkIn(credential) : await staffAttendanceService.checkOut(credential);
+      const result = type === 'in' ? await staffAttendanceService.checkIn(scannedCredential) : await staffAttendanceService.checkOut(scannedCredential);
       setToday(result);
       setNotice({ type: 'success', message: type === 'in' ? 'Check-in thành công. Chúc bạn một ca làm việc hiệu quả!' : 'Check-out thành công. Ca làm việc đã được ghi nhận.' });
       await load(false);
@@ -157,7 +147,7 @@ const StaffAttendance = () => {
           </TableBody>
         </Table></TableContainer>
       </Card>
-      <QrScannerDialog open={scannerOpen} onClose={() => setScannerOpen(false)} onScan={(value) => { setCredential(value); setScannerOpen(false); setNotice({ type: 'success', message: 'Đã quét QR. Bạn có thể bấm check-in/check-out.' }); }} />
+      <QrScannerDialog title="Quét QR chấm công" open={scannerOpen} onClose={() => setScannerOpen(false)} onScan={(value) => { setCredential(value); setScannerOpen(false); if (!today) action('in', value); else if (today.status === 'WORKING') action('out', value); else setNotice({ type: 'info', message: 'Ca hôm nay đã hoàn tất.' }); }} />
     </Stack>
   );
 };
