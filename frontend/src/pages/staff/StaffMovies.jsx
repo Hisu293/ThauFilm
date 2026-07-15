@@ -21,6 +21,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TablePagination,
   TextField,
   Typography,
   Avatar,
@@ -35,6 +36,7 @@ import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
 import MovieFilterRoundedIcon from '@mui/icons-material/MovieFilterRounded';
 import OpenInNewRoundedIcon from '@mui/icons-material/OpenInNewRounded';
 import { staffMovieService } from '../../services/staffMovieService';
+import useStaffList from '../../hooks/useStaffList';
 
 // Nhãn tiếng Việt + màu cho trạng thái phát hành
 const STATUS_META = {
@@ -45,6 +47,11 @@ const STATUS_META = {
 const STATUS_OPTIONS = Object.entries(STATUS_META).map(([value, m]) => ({ value, label: m.label }));
 
 const RATED_OPTIONS = ['P', 'K', 'T13', 'T16', 'T18', 'C'];
+const MOVIE_DATE_FIELDS = ['createdAt', 'updatedAt', 'releaseDate'];
+const matchesMovieSearch = (movie, query) =>
+  [movie.title, movie.director, movie.actors, movie.genre]
+    .filter(Boolean)
+    .some((value) => String(value).toLowerCase().includes(query));
 
 const emptyForm = {
   title: '',
@@ -69,7 +76,6 @@ const StaffMovies = () => {
   const [movies, setMovies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [search, setSearch] = useState('');
 
   // dialog: { mode: 'view' | 'edit', movie }
   const [dialog, setDialog] = useState(null);
@@ -130,12 +136,19 @@ const StaffMovies = () => {
     }
   };
 
-  const q = search.trim().toLowerCase();
-  const filtered = q
-    ? movies.filter((m) =>
-        [m.title, m.director, m.actors, m.genre].filter(Boolean).some((v) => String(v).toLowerCase().includes(q)),
-      )
-    : movies;
+  const {
+    search,
+    page,
+    setPage,
+    handleSearchChange,
+    filteredItems,
+    paginatedItems,
+    rowsPerPage,
+  } = useStaffList({
+    items: movies,
+    matchesSearch: matchesMovieSearch,
+    dateFields: MOVIE_DATE_FIELDS,
+  });
 
   return (
     <Box>
@@ -159,8 +172,8 @@ const StaffMovies = () => {
           size="small"
           placeholder="Tìm theo tên, đạo diễn, diễn viên…"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          sx={{ minWidth: 280 }}
+          onChange={(e) => handleSearchChange(e.target.value)}
+          sx={{ width: { xs: '100%', sm: 'auto' }, minWidth: { sm: 280 } }}
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
@@ -182,7 +195,7 @@ const StaffMovies = () => {
               <Typography color="error" sx={{ mb: 2 }}>{error}</Typography>
               <Button variant="outlined" onClick={loadMovies}>Thử lại</Button>
             </Box>
-          ) : filtered.length === 0 ? (
+          ) : filteredItems.length === 0 ? (
             <Box sx={{ textAlign: 'center', py: 6, color: 'text.secondary' }}>
               Không có phim nào khớp.
             </Box>
@@ -200,7 +213,7 @@ const StaffMovies = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {filtered.map((m) => {
+                  {paginatedItems.map((m) => {
                     const meta = STATUS_META[m.status] || { label: m.status, color: 'default' };
                     return (
                       <TableRow key={m.id} hover>
@@ -243,6 +256,16 @@ const StaffMovies = () => {
                 </TableBody>
               </Table>
             </TableContainer>
+          )}
+          {!loading && !error && filteredItems.length > 0 && (
+            <TablePagination
+              component="div"
+              count={filteredItems.length}
+              page={page}
+              rowsPerPage={rowsPerPage}
+              rowsPerPageOptions={[rowsPerPage]}
+              onPageChange={(_event, nextPage) => setPage(nextPage)}
+            />
           )}
         </CardContent>
       </Card>

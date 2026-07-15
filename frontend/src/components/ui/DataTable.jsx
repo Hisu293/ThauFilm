@@ -67,9 +67,9 @@ const DataTable = ({
           </TableBody>
         </Table>
       </TableContainer>
-      {onPageChange && onRowsPerPageChange && (
+      {onPageChange && (
         <TablePagination
-          rowsPerPageOptions={[5, 10, 25]}
+          rowsPerPageOptions={onRowsPerPageChange ? [5, 10, 25] : [rowsPerPage]}
           component="div"
           count={totalCount !== undefined ? totalCount : data.length}
           rowsPerPage={rowsPerPage}

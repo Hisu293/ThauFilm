@@ -18,6 +18,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TablePagination,
   TextField,
   Typography,
   Alert,
@@ -40,6 +41,13 @@ import {
   SEAT_BOOKING_STATUS,
   enumLabel,
 } from '../../constants/enums';
+import useStaffList from '../../hooks/useStaffList';
+
+const SHOWTIME_DATE_FIELDS = ['createdAt', 'updatedAt', 'startTime'];
+const matchesShowtimeSearch = (showtime, query) =>
+  [showtime.movieTitle, showtime.cinemaRoomName, showtime.roomName, showtime.theaterName, showtime.status]
+    .filter(Boolean)
+    .some((value) => String(value).toLowerCase().includes(query));
 
 const emptyForm = { movieId: '', cinemaRoomId: '', startTime: '', endTime: '', status: 'SCHEDULED', online: false, mystery: false, mysteryUnlockAt: '' };
 
@@ -210,6 +218,20 @@ const StaffShowtimes = () => {
     }
   };
 
+  const {
+    search,
+    page,
+    setPage,
+    handleSearchChange,
+    filteredItems,
+    paginatedItems,
+    rowsPerPage,
+  } = useStaffList({
+    items: showtimes,
+    matchesSearch: matchesShowtimeSearch,
+    dateFields: SHOWTIME_DATE_FIELDS,
+  });
+
   return (
     <Box>
       <Stack
@@ -232,6 +254,16 @@ const StaffShowtimes = () => {
         </Button>
       </Stack>
 
+      <Stack direction="row" justifyContent="flex-end" sx={{ mb: 2 }}>
+        <TextField
+          size="small"
+          placeholder="Tìm theo phim, phòng, rạp hoặc trạng thái…"
+          value={search}
+          onChange={(event) => handleSearchChange(event.target.value)}
+          sx={{ width: { xs: '100%', sm: 'auto' }, minWidth: { sm: 280 } }}
+        />
+      </Stack>
+
       <Card>
         <CardContent sx={{ p: 0 }}>
           {loading ? (
@@ -243,9 +275,9 @@ const StaffShowtimes = () => {
               <Typography color="error" sx={{ mb: 2 }}>{error}</Typography>
               <Button variant="outlined" onClick={loadAll}>Thử lại</Button>
             </Box>
-          ) : showtimes.length === 0 ? (
+          ) : filteredItems.length === 0 ? (
             <Box sx={{ textAlign: 'center', py: 6, color: 'text.secondary' }}>
-              Chưa có suất chiếu nào. Nhấn "Tạo suất chiếu" để thêm mới.
+              {search ? 'Không có suất chiếu nào phù hợp.' : 'Chưa có suất chiếu nào. Nhấn "Tạo suất chiếu" để thêm mới.'}
             </Box>
           ) : (
             <TableContainer>
@@ -261,7 +293,7 @@ const StaffShowtimes = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {showtimes.map((s) => (
+                  {paginatedItems.map((s) => (
                     <TableRow key={s.id} hover>
                       <TableCell>
                         <Typography fontWeight={700}>{s.movieTitle || '—'}</Typography>
@@ -307,6 +339,16 @@ const StaffShowtimes = () => {
                 </TableBody>
               </Table>
             </TableContainer>
+          )}
+          {!loading && !error && filteredItems.length > 0 && (
+            <TablePagination
+              component="div"
+              count={filteredItems.length}
+              page={page}
+              rowsPerPage={rowsPerPage}
+              rowsPerPageOptions={[rowsPerPage]}
+              onPageChange={(_event, nextPage) => setPage(nextPage)}
+            />
           )}
         </CardContent>
       </Card>

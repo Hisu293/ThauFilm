@@ -185,11 +185,8 @@ const StaffBookings = () => {
       )
     : bookings;
   const sortedFiltered = [...filtered].sort((a, b) => latestTime(b) - latestTime(a));
-  const pagedBookings = sortedFiltered.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
-
-  useEffect(() => {
-    setPage(0);
-  }, [search, bookings.length]);
+  const currentPage = Math.min(page, Math.max(0, Math.ceil(sortedFiltered.length / PAGE_SIZE) - 1));
+  const pagedBookings = sortedFiltered.slice(currentPage * PAGE_SIZE, currentPage * PAGE_SIZE + PAGE_SIZE);
 
   const confirmText = {
     regrant: { title: 'Cấp lại quyền xem?', body: 'Cấp lại quyền xem phim online cho khách của đơn này?', btn: 'Cấp lại quyền', color: 'primary' },
@@ -214,8 +211,11 @@ const StaffBookings = () => {
           size="small"
           placeholder="Tìm theo mã đơn, phim, khách…"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          sx={{ minWidth: 280 }}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setPage(0);
+          }}
+          sx={{ width: { xs: '100%', sm: 'auto' }, minWidth: { sm: 280 } }}
         />
       </Stack>
 
@@ -271,7 +271,7 @@ const StaffBookings = () => {
               <TablePagination
                 component="div"
                 count={sortedFiltered.length}
-                page={page}
+                page={currentPage}
                 onPageChange={(_, nextPage) => setPage(nextPage)}
                 rowsPerPage={PAGE_SIZE}
                 rowsPerPageOptions={[PAGE_SIZE]}
