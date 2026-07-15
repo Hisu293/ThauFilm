@@ -3,6 +3,8 @@ import { useLocation } from 'react-router-dom';
 import { Container, Box, Typography, Stack, Divider, Snackbar, Alert } from '@mui/material';
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import ConfirmationNumberRoundedIcon from '@mui/icons-material/ConfirmationNumberRounded';
+import QrCode2RoundedIcon from '@mui/icons-material/QrCode2Rounded';
+import QRCode from 'qrcode';
 
 import BookingStepper from '../../components/BookingStepper';
 import SectionCard from '../../components/common/SectionCard';
@@ -22,6 +24,17 @@ export const BookingSuccessPage = () => {
   const [bookingData, setBookingData] = useState(null);
   const [tickets, setTickets] = useState([]);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [onlineTicketQr, setOnlineTicketQr] = useState('');
+
+  const isOnlineBooking = Boolean(
+    bookingData && (
+      bookingData.showtime?.online ||
+      bookingData.showtime?.theaterName === 'Online' ||
+      bookingData.showtime?.cinemaName === 'Online' ||
+      bookingData.showtime?.room === 'Xem online' ||
+      bookingData.showtime?.format === 'Online'
+    )
+  );
 
   useEffect(() => {
     if (location.state) {
@@ -58,6 +71,27 @@ export const BookingSuccessPage = () => {
       paymentMethod: bookingData.paymentMethod,
     });
   }, [bookingData]);
+
+  useEffect(() => {
+    let activeRequest = true;
+    if (!isOnlineBooking || !bookingData?.bookingId) return () => { activeRequest = false; };
+
+    const detailUrl = `${window.location.origin}/my-bookings/${encodeURIComponent(bookingData.bookingId)}`;
+    QRCode.toDataURL(detailUrl, {
+      width: 240,
+      margin: 1,
+      errorCorrectionLevel: 'M',
+      color: { dark: '#0F172A', light: '#FFFFFF' },
+    })
+      .then((dataUrl) => {
+        if (activeRequest) setOnlineTicketQr(dataUrl);
+      })
+      .catch(() => {
+        if (activeRequest) setSnackbarOpen(true);
+      });
+
+    return () => { activeRequest = false; };
+  }, [bookingData?.bookingId, isOnlineBooking]);
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('vi-VN', {
@@ -214,6 +248,56 @@ export const BookingSuccessPage = () => {
             {bookingCode}
           </Typography>
         </Box>
+
+        {isOnlineBooking && (
+          <Box
+            sx={{
+              mb: 4,
+              display: 'flex',
+              flexDirection: { xs: 'column', sm: 'row' },
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 2.5,
+              textAlign: { xs: 'center', sm: 'left' },
+            }}
+          >
+            <Box
+              sx={{
+                width: 176,
+                height: 176,
+                p: 1,
+                borderRadius: 3,
+                bgcolor: '#fff',
+                display: 'grid',
+                placeItems: 'center',
+                boxShadow: '0 12px 30px rgba(0, 0, 0, 0.28)',
+              }}
+            >
+              {onlineTicketQr ? (
+                <Box
+                  component="img"
+                  src={onlineTicketQr}
+                  alt={`Mã QR vé online ${bookingCode}`}
+                  sx={{ width: '100%', height: '100%', display: 'block' }}
+                />
+              ) : (
+                <QrCode2RoundedIcon sx={{ fontSize: 96, color: '#CBD5E1' }} />
+              )}
+            </Box>
+            <Box sx={{ maxWidth: 290 }}>
+              <Stack direction="row" spacing={1} alignItems="center" justifyContent={{ xs: 'center', sm: 'flex-start' }}>
+                <QrCode2RoundedIcon sx={{ color: 'primary.main' }} />
+                <Typography variant="h6" sx={{ fontWeight: 800 }}>QR vé xem online</Typography>
+              </Stack>
+              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                Quét mã để mở chi tiết vé trên thiết bị khác. Bạn cần đăng nhập đúng tài khoản đã mua vé.
+              </Typography>
+              <Typography variant="caption" sx={{ display: 'block', mt: 1.25, color: 'primary.main', fontWeight: 800, letterSpacing: '0.08em' }}>
+                {bookingCode}
+              </Typography>
+            </Box>
+          </Box>
+        )}
 
         <Stack spacing={3} sx={{ position: 'relative', zIndex: 1, alignItems: 'center' }}>
           {/* Tên phim — căn giữa khung, nổi bật */}
