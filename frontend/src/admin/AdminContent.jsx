@@ -7,6 +7,7 @@ import { RevenueReportSection, TicketsReportSection, CustomersReportSection } fr
 import IntelligenceSection from './sections/IntelligenceSection';
 import AttendanceSection from './sections/AttendanceSection';
 import WorkforceSection from './sections/WorkforceSection';
+import InventorySection from './sections/InventorySection';
 
 const AdminContent = ({ view, store }) => {
   const { crud, dashboard, getTheaterName, movieList } = store;
@@ -43,6 +44,8 @@ const AdminContent = ({ view, store }) => {
       return <AttendanceSection />;
     case ADMIN_VIEWS.WORKFORCE:
       return <WorkforceSection />;
+    case ADMIN_VIEWS.INVENTORY:
+      return <InventorySection />;
     case ADMIN_VIEWS.REPORT_REVENUE:
       return <RevenueReportSection />;
     case ADMIN_VIEWS.REPORT_TICKETS:

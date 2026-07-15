@@ -52,6 +52,18 @@ public class StaffAttendance {
     @Column(name = "shift_assignment_id")
     private UUID shiftAssignmentId;
 
+    @Column(name = "late_minutes", nullable = false)
+    private long lateMinutes;
+
+    @Column(name = "early_leave_minutes", nullable = false)
+    private long earlyLeaveMinutes;
+
+    @Column(name = "check_in_method", length = 20)
+    private String checkInMethod;
+
+    @Column(name = "check_out_method", length = 20)
+    private String checkOutMethod;
+
     @Column(length = 500)
     private String note;
 

@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.RequestBody;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -40,21 +41,21 @@ public class StaffAttendanceController {
 
     @PostMapping("/check-in")
     public ResponseEntity<ApiResponse<StaffAttendanceResponse>> checkIn(
-            @AuthenticationPrincipal UserDetails principal
+            @AuthenticationPrincipal UserDetails principal, @RequestBody CredentialRequest request
     ) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Checked in successfully",
-                attendanceService.checkIn(currentUserService.requireUserId(principal))
+                attendanceService.checkIn(currentUserService.requireUserId(principal), request.credential())
         ));
     }
 
     @PostMapping("/check-out")
     public ResponseEntity<ApiResponse<StaffAttendanceResponse>> checkOut(
-            @AuthenticationPrincipal UserDetails principal
+            @AuthenticationPrincipal UserDetails principal, @RequestBody CredentialRequest request
     ) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Checked out successfully",
-                attendanceService.checkOut(currentUserService.requireUserId(principal))
+                attendanceService.checkOut(currentUserService.requireUserId(principal), request.credential())
         ));
     }
 
@@ -74,4 +75,6 @@ public class StaffAttendanceController {
                 )
         ));
     }
+
+    public record CredentialRequest(String credential) {}
 }

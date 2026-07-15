@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import com.filmticket.entity.WorkShiftType;
 
 @RestController
 @RequestMapping("/api/staff/workforce")
@@ -38,4 +39,13 @@ public class StaffWorkforceController {
                 currentUserService.requireUserId(principal), year == null ? today.getYear() : year,
                 month == null ? today.getMonthValue() : month)));
     }
+
+    @PostMapping("/schedule/register")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> register(
+            @AuthenticationPrincipal UserDetails principal, @RequestBody RegisterShiftRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Shift registration submitted", workforceService.registerShift(
+                currentUserService.requireUserId(principal), request.workDate(), request.shiftType(), request.note())));
+    }
+
+    public record RegisterShiftRequest(LocalDate workDate, WorkShiftType shiftType, String note) {}
 }

@@ -22,6 +22,8 @@ import java.util.UUID;
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminWorkforceController {
     private final WorkforceService workforceService;
+    private final com.filmticket.service.AttendanceAccessCodeService attendanceAccessCodeService;
+    private final com.filmticket.service.CurrentUserService currentUserService;
 
     @GetMapping("/shift-definitions")
     public ResponseEntity<ApiResponse<List<Map<String, Object>>>> definitions() {
@@ -56,6 +58,26 @@ public class AdminWorkforceController {
         return ResponseEntity.noContent().build();
     }
 
+    @PutMapping("/shifts/{assignmentId}/status")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> status(@PathVariable UUID assignmentId, @RequestBody StatusRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Shift registration updated",
+                workforceService.updateShiftStatus(assignmentId, request.status())));
+    }
+
+    @PostMapping("/attendance-codes")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> generateAttendanceCode(
+            @org.springframework.security.core.annotation.AuthenticationPrincipal org.springframework.security.core.userdetails.UserDetails principal,
+            @RequestBody AttendanceCodeRequest request) {
+        return ResponseEntity.ok(ApiResponse.success("Attendance code generated", attendanceAccessCodeService.generate(
+                currentUserService.requireUserId(principal), request.workDate(), request.shiftType())));
+    }
+
+    @GetMapping("/attendance-codes")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> attendanceCode(@RequestParam LocalDate workDate,
+                                                                            @RequestParam WorkShiftType shiftType) {
+        return ResponseEntity.ok(ApiResponse.success("Attendance code fetched", attendanceAccessCodeService.latest(workDate, shiftType)));
+    }
+
     @GetMapping("/payroll")
     public ResponseEntity<ApiResponse<Map<String, Object>>> payroll(@RequestParam int year, @RequestParam int month) {
         return ResponseEntity.ok(ApiResponse.success("Payroll calculated", workforceService.monthlyPayroll(year, month)));
@@ -71,4 +93,6 @@ public class AdminWorkforceController {
     public record ProfileRequest(EmploymentType employmentType, BigDecimal hourlyRate, BigDecimal monthlySalary,
                                  BigDecimal overtimeHourlyRate, BigDecimal defaultAllowance) {}
     public record PayrollRequest(BigDecimal allowance, BigDecimal bonus, BigDecimal deduction, PayrollStatus status, String note) {}
+    public record StatusRequest(com.filmticket.entity.ShiftApprovalStatus status) {}
+    public record AttendanceCodeRequest(LocalDate workDate, WorkShiftType shiftType) {}
 }

@@ -61,6 +61,15 @@ export const adminService = {
   updateEmploymentProfile: (staffId, payload) => api.put(`/api/admin/workforce/staff/${staffId}`, payload).then(unwrap),
   getPayroll: (year, month) => api.get('/api/admin/workforce/payroll', { params: { year, month } }).then(unwrap),
   updatePayroll: (payrollId, payload) => api.put(`/api/admin/workforce/payroll/${payrollId}`, payload).then(unwrap),
+  updateShiftStatus: (assignmentId, status) => api.put(`/api/admin/workforce/shifts/${assignmentId}/status`, { status }).then(unwrap),
+  generateAttendanceCode: (payload) => api.post('/api/admin/workforce/attendance-codes', payload).then(unwrap),
+  getAttendanceCode: (workDate, shiftType) => api.get('/api/admin/workforce/attendance-codes', { params: { workDate, shiftType } }).then(unwrap),
+  getInventoryForecast: () => api.get('/api/admin/inventory/forecast').then(unwrap),
+  getInventoryRecipes: () => api.get('/api/admin/inventory/recipes').then(unwrap),
+  getInventoryCombos: () => api.get('/api/admin/inventory/combos').then(unwrap),
+  createInventoryItem: (payload) => api.post('/api/admin/inventory/items', payload).then(unwrap),
+  updateInventoryItem: (id, payload) => api.put(`/api/admin/inventory/items/${id}`, payload).then(unwrap),
+  saveInventoryRecipe: (payload) => api.post('/api/admin/inventory/recipes', payload).then(unwrap),
 };
 
 export default adminService;

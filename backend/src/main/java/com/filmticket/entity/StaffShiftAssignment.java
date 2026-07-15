@@ -34,6 +34,14 @@ public class StaffShiftAssignment {
     @Column(length = 500)
     private String note;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "assignment_source", nullable = false, length = 20)
+    private ShiftAssignmentSource assignmentSource;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "approval_status", nullable = false, length = 20)
+    private ShiftApprovalStatus approvalStatus;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -45,6 +53,8 @@ public class StaffShiftAssignment {
         LocalDateTime now = LocalDateTime.now();
         if (id == null) id = UUID.randomUUID();
         if (createdAt == null) createdAt = now;
+        if (assignmentSource == null) assignmentSource = ShiftAssignmentSource.ADMIN;
+        if (approvalStatus == null) approvalStatus = ShiftApprovalStatus.APPROVED;
         updatedAt = now;
     }
 

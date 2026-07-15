@@ -20,6 +20,9 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class WorkforceService {
+    private static final Map<WorkShiftType, Integer> MINIMUM_STAFF = Map.of(
+            WorkShiftType.MORNING, 2, WorkShiftType.AFTERNOON, 3,
+            WorkShiftType.EVENING, 5, WorkShiftType.LATE, 2);
     private final UserRepository userRepository;
     private final StaffEmploymentProfileRepository profileRepository;
     private final StaffShiftAssignmentRepository shiftRepository;
@@ -66,7 +69,12 @@ public class WorkforceService {
                 .findByWorkDateBetweenOrderByWorkDateAscScheduledStartAsc(selected.atDay(1), selected.atEndOfMonth())
                 .stream().filter(item -> users.containsKey(item.getStaffId()))
                 .map(item -> assignmentRow(item, users.get(item.getStaffId()))).toList();
-        return row("year", year, "month", month, "definitions", shiftDefinitions(), "assignments", assignments);
+        List<StaffShiftAssignment> monthAssignments = shiftRepository
+                .findByWorkDateBetweenOrderByWorkDateAscScheduledStartAsc(selected.atDay(1), selected.atEndOfMonth());
+        List<Map<String, Object>> coverage = coverage(selected, monthAssignments);
+        long warningCount = coverage.stream().filter(item -> Boolean.TRUE.equals(item.get("understaffed"))).count();
+        return row("year", year, "month", month, "definitions", shiftDefinitions(), "assignments", assignments,
+                "coverage", coverage, "warningCount", warningCount);
     }
 
     @Transactional(readOnly = true)
@@ -84,9 +92,11 @@ public class WorkforceService {
         LocalDateTime now = LocalDateTime.now();
         StaffShiftAssignment previous = shiftRepository.findByStaffIdAndWorkDate(staffId, now.toLocalDate().minusDays(1)).orElse(null);
         if (previous != null && previous.getShiftType() == WorkShiftType.LATE && now.isBefore(previous.getScheduledEnd())) {
-            return assignmentRow(previous, staff);
+            return previous.getApprovalStatus() == ShiftApprovalStatus.APPROVED ? assignmentRow(previous, staff) : null;
         }
-        return shiftRepository.findByStaffIdAndWorkDate(staffId, now.toLocalDate()).map(item -> assignmentRow(item, staff)).orElse(null);
+        return shiftRepository.findByStaffIdAndWorkDate(staffId, now.toLocalDate())
+                .filter(item -> item.getApprovalStatus() == ShiftApprovalStatus.APPROVED)
+                .map(item -> assignmentRow(item, staff)).orElse(null);
     }
 
     @Transactional
@@ -100,7 +110,37 @@ public class WorkforceService {
         assignment.setScheduledStart(window.start);
         assignment.setScheduledEnd(window.end);
         assignment.setNote(note == null ? null : note.trim());
+        assignment.setAssignmentSource(ShiftAssignmentSource.ADMIN);
+        assignment.setApprovalStatus(ShiftApprovalStatus.APPROVED);
         return assignmentRow(shiftRepository.save(assignment), staff);
+    }
+
+    @Transactional
+    public Map<String, Object> registerShift(UUID staffId, LocalDate workDate, WorkShiftType shiftType, String note) {
+        User staff = requireStaff(staffId);
+        if (workDate == null || shiftType == null || workDate.isBefore(LocalDate.now()))
+            throw new BadRequestException("Chỉ có thể đăng ký ca từ hôm nay trở đi");
+        StaffShiftAssignment assignment = shiftRepository.findByStaffIdAndWorkDate(staffId, workDate)
+                .orElseGet(() -> StaffShiftAssignment.builder().staffId(staffId).workDate(workDate).build());
+        if (assignment.getId() != null && assignment.getApprovalStatus() == ShiftApprovalStatus.APPROVED)
+            throw new BadRequestException("Ngày này đã có ca được quản lý phê duyệt");
+        ShiftWindow selected = window(shiftType, workDate);
+        assignment.setShiftType(shiftType);
+        assignment.setScheduledStart(selected.start);
+        assignment.setScheduledEnd(selected.end);
+        assignment.setNote(note == null ? null : note.trim());
+        assignment.setAssignmentSource(ShiftAssignmentSource.EMPLOYEE);
+        assignment.setApprovalStatus(ShiftApprovalStatus.PENDING);
+        return assignmentRow(shiftRepository.save(assignment), staff);
+    }
+
+    @Transactional
+    public Map<String, Object> updateShiftStatus(UUID assignmentId, ShiftApprovalStatus status) {
+        if (status == null || status == ShiftApprovalStatus.PENDING) throw new BadRequestException("Trạng thái duyệt không hợp lệ");
+        StaffShiftAssignment assignment = shiftRepository.findById(assignmentId)
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy đăng ký ca"));
+        assignment.setApprovalStatus(status);
+        return assignmentRow(shiftRepository.save(assignment), requireStaff(assignment.getStaffId()));
     }
 
     @Transactional
@@ -234,7 +274,26 @@ public class WorkforceService {
                 "staffEmail", staff.getEmail(), "workDate", item.getWorkDate(), "shiftType", item.getShiftType(),
                 "shiftName", shiftName(item.getShiftType()), "shiftTime", shiftTime(item.getShiftType()),
                 "scheduledStart", item.getScheduledStart(), "scheduledEnd", item.getScheduledEnd(),
-                "description", shiftDescription(item.getShiftType()), "note", item.getNote());
+                "description", shiftDescription(item.getShiftType()), "note", item.getNote(),
+                "assignmentSource", item.getAssignmentSource(), "approvalStatus", item.getApprovalStatus());
+    }
+
+    private List<Map<String, Object>> coverage(YearMonth month, List<StaffShiftAssignment> assignments) {
+        Map<String, Long> counts = assignments.stream()
+                .filter(item -> item.getApprovalStatus() == ShiftApprovalStatus.APPROVED)
+                .collect(Collectors.groupingBy(item -> item.getWorkDate() + "|" + item.getShiftType(), Collectors.counting()));
+        List<Map<String, Object>> result = new ArrayList<>();
+        LocalDate from = month.atDay(1).isBefore(LocalDate.now()) ? LocalDate.now() : month.atDay(1);
+        for (LocalDate day = from; !day.isAfter(month.atEndOfMonth()); day = day.plusDays(1)) {
+            for (WorkShiftType type : WorkShiftType.values()) {
+                int required = MINIMUM_STAFF.get(type);
+                int assigned = counts.getOrDefault(day + "|" + type, 0L).intValue();
+                result.add(row("workDate", day, "shiftType", type, "shiftName", shiftName(type),
+                        "minimumRequired", required, "assigned", assigned, "shortage", Math.max(0, required - assigned),
+                        "understaffed", assigned < required));
+            }
+        }
+        return result;
     }
 
     private Map<String, Object> profileRow(User staff, StaffEmploymentProfile profile) {
