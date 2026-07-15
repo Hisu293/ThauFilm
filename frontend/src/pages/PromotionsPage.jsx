@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
-import { Alert, Box, Button, Chip, Container, Paper, Snackbar, Stack, Tab, Tabs, Typography } from '@mui/material';
+import { Alert, Box, Button, Chip, CircularProgress, Container, Dialog, DialogActions, DialogContent, DialogTitle, Paper, Snackbar, Stack, Tab, Tabs, Typography } from '@mui/material';
 import LocalOfferRoundedIcon from '@mui/icons-material/LocalOfferRounded';
 import ContentCopyRoundedIcon from '@mui/icons-material/ContentCopyRounded';
 import CheckRoundedIcon from '@mui/icons-material/CheckRounded';
@@ -36,6 +36,7 @@ const PromotionsPage = () => {
   const [loyalty, setLoyalty] = useState(null);
   const [copiedCode, setCopiedCode] = useState('');
   const [redeemingId, setRedeemingId] = useState('');
+  const [confirmReward, setConfirmReward] = useState(null);
   const [notice, setNotice] = useState({ open: false, message: '', severity: 'info' });
 
   useEffect(() => {
@@ -98,12 +99,22 @@ const PromotionsPage = () => {
     } catch { setNotice({ open: true, severity: 'error', message: 'Không thể sao chép mã.' }); }
   };
 
-  const redeem = async (reward) => {
-    if (!reward.affordable || redeemingId) return;
-    if (!window.confirm(`Dùng ${reward.pointsCost.toLocaleString('vi-VN')} điểm để đổi ${reward.name}?`)) return;
+  const openRedeemConfirmation = (reward) => {
+    if (!reward?.affordable || redeemingId) return;
+    setConfirmReward(reward);
+  };
+
+  const closeRedeemConfirmation = () => {
+    if (!redeemingId) setConfirmReward(null);
+  };
+
+  const redeem = async () => {
+    const reward = confirmReward;
+    if (!reward?.affordable || redeemingId) return;
     setRedeemingId(reward.id);
     try {
       const redemption = unwrap(await bookingApi.redeemLoyaltyReward(reward.id));
+      setConfirmReward(null);
       setNotice({ open: true, severity: 'success', message: `Đổi quà thành công. Mã: ${redemption.redemptionCode}` });
       await loadLoyalty();
     } catch (error) {
@@ -139,7 +150,7 @@ const PromotionsPage = () => {
               return <Paper key={reward.id} sx={{ p: 3, borderRadius: 4, bgcolor: 'rgba(15,23,42,.78)', border: '1px solid rgba(148,163,184,.14)', display: 'flex', flexDirection: 'column', minHeight: 285 }}>
                 <Stack direction="row" justifyContent="space-between" alignItems="center"><Box sx={{ width: 48, height: 48, borderRadius: 3, display: 'grid', placeItems: 'center', bgcolor: 'rgba(251,191,36,.15)', color: 'primary.main' }}>{iconFor(reward.rewardType)}</Box><Chip label={`${reward.pointsCost.toLocaleString('vi-VN')} điểm`} color="primary" /></Stack>
                 <Typography variant="h6" fontWeight={850} sx={{ mt: 2 }}>{reward.name}</Typography><Typography variant="body2" color="text.secondary" sx={{ mt: 1, flex: 1 }}>{reward.description}</Typography><Typography variant="caption" color="text.secondary" sx={{ my: 1.5 }}>Mã có hạn {reward.validityDays} ngày sau khi đổi</Typography>
-                <Button variant={reward.affordable ? 'contained' : 'outlined'} disabled={!reward.affordable || Boolean(redeemingId)} onClick={() => redeem(reward)}>{redeemingId === reward.id ? 'Đang đổi...' : reward.affordable ? 'Đổi ngay' : `Cần thêm ${missing.toLocaleString('vi-VN')} điểm`}</Button>
+                <Button variant={reward.affordable ? 'contained' : 'outlined'} disabled={!reward.affordable || Boolean(redeemingId)} onClick={() => openRedeemConfirmation(reward)}>{redeemingId === reward.id ? 'Đang đổi...' : reward.affordable ? 'Đổi ngay' : `Cần thêm ${missing.toLocaleString('vi-VN')} điểm`}</Button>
               </Paper>;
             })}
           </Box>
@@ -158,6 +169,52 @@ const PromotionsPage = () => {
     <Container maxWidth="xl" sx={{ mt: 4 }}><Paper sx={{ p: { xs: 2, md: 3 }, borderRadius: 4, border: '1px solid rgba(148,163,184,.08)' }}><Tabs value={tab} onChange={(_, value) => setTab(value)} variant="scrollable" sx={{ mb: 3 }}><Tab value={TABS.ALL} label="Tất cả" /><Tab value={TABS.DISCOUNTS} label="Khuyến mãi vé" /><Tab value={TABS.COMBOS} label="Combo bắp nước" /><Tab value={TABS.REWARDS} label="Đổi điểm" /></Tabs>
       {tab === TABS.REWARDS ? renderRewards() : cards.length === 0 && !loading ? <EmptyState title="Chưa có ưu đãi phù hợp" description="Hiện chưa có ưu đãi trong nhóm này." /> : <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(2,minmax(0,1fr))', xl: 'repeat(3,minmax(0,1fr))' }, gap: 3 }}>{cards.map((item) => <Paper key={item.id} sx={{ p: 3, borderRadius: 4, bgcolor: 'rgba(15,23,42,.78)', border: '1px solid rgba(148,163,184,.12)', minHeight: 240, display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}><Stack spacing={2}><Stack direction="row" justifyContent="space-between" spacing={2}><Stack direction="row" spacing={1.25}><Box sx={{ width: 44, height: 44, borderRadius: 3, display: 'grid', placeItems: 'center', bgcolor: 'rgba(251,191,36,.16)', color: 'primary.main' }}>{item.type === 'combo' ? <FastfoodRoundedIcon /> : <LocalOfferRoundedIcon />}</Box><Box><Typography variant="overline" color="text.secondary">{item.type === 'combo' ? 'COMBO' : 'KHUYẾN MÃI'}</Typography><Typography variant="h6" fontWeight={800}>{item.title}</Typography></Box></Stack><Chip label={item.badge} color="primary" size="small" /></Stack><Box><Typography variant="body2" color="text.secondary">{item.note}</Typography><Typography variant="body2" color="text.secondary">{item.extra}</Typography></Box></Stack><Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1}><Button variant="outlined" startIcon={copiedCode === item.code ? <CheckRoundedIcon /> : <ContentCopyRoundedIcon />} onClick={() => copyCode(item.code)}>{item.code}</Button><Stack direction="row" spacing={.5}><CalendarTodayRoundedIcon sx={{ fontSize: 16, color: 'text.secondary' }} /><Typography variant="caption" color="text.secondary">HSD: {dateText(item.validTo)}</Typography></Stack></Stack></Paper>)}</Box>}
     </Paper></Container>
+    <Dialog
+      open={Boolean(confirmReward)}
+      onClose={closeRedeemConfirmation}
+      fullWidth
+      maxWidth="xs"
+      PaperProps={{
+        sx: {
+          borderRadius: 4,
+          bgcolor: '#111827',
+          backgroundImage: 'linear-gradient(145deg, rgba(124,58,237,.14), rgba(17,24,39,.98))',
+          border: '1px solid rgba(196,181,253,.18)',
+        },
+      }}
+    >
+      <DialogTitle sx={{ pt: 3, pb: 1 }}>
+        <Stack direction="row" spacing={1.5} alignItems="center">
+          <Box sx={{ width: 44, height: 44, borderRadius: 3, display: 'grid', placeItems: 'center', bgcolor: 'rgba(251,191,36,.15)', color: 'primary.main' }}>
+            <CardGiftcardRoundedIcon />
+          </Box>
+          <Box>
+            <Typography variant="h6" fontWeight={850}>Xác nhận đổi điểm</Typography>
+            <Typography variant="caption" color="text.secondary">Kiểm tra thông tin trước khi đổi quà</Typography>
+          </Box>
+        </Stack>
+      </DialogTitle>
+      <DialogContent sx={{ pt: '16px !important' }}>
+        <Paper sx={{ p: 2, borderRadius: 3, bgcolor: 'rgba(15,23,42,.66)', border: '1px solid rgba(148,163,184,.12)' }}>
+          <Typography fontWeight={850}>{confirmReward?.name}</Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: .75 }}>{confirmReward?.description}</Typography>
+          <Stack spacing={1.25} sx={{ mt: 2, pt: 2, borderTop: '1px dashed rgba(148,163,184,.18)' }}>
+            <Stack direction="row" justifyContent="space-between"><Typography color="text.secondary">Điểm hiện có</Typography><Typography fontWeight={800}>{(loyalty?.pointsBalance || 0).toLocaleString('vi-VN')} điểm</Typography></Stack>
+            <Stack direction="row" justifyContent="space-between"><Typography color="text.secondary">Điểm sử dụng</Typography><Typography color="primary.main" fontWeight={850}>-{(confirmReward?.pointsCost || 0).toLocaleString('vi-VN')} điểm</Typography></Stack>
+            <Stack direction="row" justifyContent="space-between"><Typography color="text.secondary">Còn lại</Typography><Typography fontWeight={850}>{Math.max((loyalty?.pointsBalance || 0) - (confirmReward?.pointsCost || 0), 0).toLocaleString('vi-VN')} điểm</Typography></Stack>
+          </Stack>
+        </Paper>
+        <Alert severity="info" sx={{ mt: 2, borderRadius: 2.5 }}>
+          Điểm sẽ được trừ ngay sau khi xác nhận và không thể hoàn lại.
+        </Alert>
+      </DialogContent>
+      <DialogActions sx={{ px: 3, pb: 3, gap: 1 }}>
+        <Button onClick={closeRedeemConfirmation} disabled={Boolean(redeemingId)} color="inherit">Hủy</Button>
+        <Button onClick={redeem} disabled={Boolean(redeemingId)} variant="contained" startIcon={redeemingId ? <CircularProgress size={17} color="inherit" /> : <CardGiftcardRoundedIcon />}>
+          {redeemingId ? 'Đang đổi...' : 'Xác nhận đổi'}
+        </Button>
+      </DialogActions>
+    </Dialog>
     <Snackbar open={notice.open} autoHideDuration={4000} onClose={() => setNotice((current) => ({ ...current, open: false }))} anchorOrigin={{ vertical: 'top', horizontal: 'center' }}><Alert severity={notice.severity} variant="filled">{notice.message}</Alert></Snackbar>
   </Box>;
 };
