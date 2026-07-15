@@ -37,6 +37,24 @@ const MENU = [
   { key: 'history', label: 'Vé Của Tôi', Icon: ConfirmationNumberRoundedIcon },
 ];
 
+const MEMBERSHIP_TIERS = [
+  { name: 'V-Star', min: 0, next: 'V-Diamond', nextAt: 5000 },
+  { name: 'V-Diamond', min: 5000, next: 'V-Platinum', nextAt: 10000 },
+  { name: 'V-Platinum', min: 10000, next: null, nextAt: null },
+];
+
+const getMembership = (lifetimePoints = 0) => {
+  const safePoints = Math.max(0, Number(lifetimePoints) || 0);
+  const tier = [...MEMBERSHIP_TIERS].reverse().find((item) => safePoints >= item.min) || MEMBERSHIP_TIERS[0];
+  const range = tier.nextAt ? tier.nextAt - tier.min : 1;
+  return {
+    tier: tier.name,
+    nextTier: tier.next,
+    pointsToNext: tier.nextAt ? Math.max(0, tier.nextAt - safePoints) : 0,
+    progress: tier.nextAt ? Math.min(100, Math.round(((safePoints - tier.min) / range) * 100)) : 100,
+  };
+};
+
 const STATUS_CLASS = {
   'Đã xem': 'is-done',
   'Đã hủy': 'is-cancel',
@@ -202,10 +220,35 @@ const ProfilePage = () => {
   const [history, setHistory] = useState([]);
   const [subTab, setSubTab] = useState('all');
   const [nowTs, setNowTs] = useState(0);
+  const [loyalty, setLoyalty] = useState(null);
+  const [loyaltyLoading, setLoyaltyLoading] = useState(true);
+  const [loyaltyError, setLoyaltyError] = useState('');
 
   useEffect(() => {
     Promise.resolve().then(() => setNowTs(Date.now()));
   }, []);
+
+  useEffect(() => {
+    let activeRequest = true;
+    if (!user) return () => { activeRequest = false; };
+
+    bookingApi.fetchLoyaltyOverview()
+      .then((response) => {
+        if (!activeRequest) return;
+        setLoyalty(response?.data ?? response ?? null);
+        setLoyaltyError('');
+      })
+      .catch((error) => {
+        if (!activeRequest) return;
+        setLoyalty(null);
+        setLoyaltyError(error.message || 'Không thể tải điểm thưởng');
+      })
+      .finally(() => {
+        if (activeRequest) setLoyaltyLoading(false);
+      });
+
+    return () => { activeRequest = false; };
+  }, [user]);
 
   useEffect(() => {
     if (active !== 'history' && active !== 'upcoming') return undefined;
@@ -371,17 +414,18 @@ const ProfilePage = () => {
   const [autoPlay, setAutoPlay] = useState(true);
   const [adultContent, setAdultContent] = useState(false);
 
+  const membership = useMemo(() => getMembership(loyalty?.lifetimeEarned), [loyalty?.lifetimeEarned]);
   const data = useMemo(
     () => ({
       ...profileUser,
       name: user?.name || profileUser.name,
       email: user?.email || profileUser.email,
+      points: Math.max(0, Number(loyalty?.pointsBalance) || 0),
+      lifetimeEarned: Math.max(0, Number(loyalty?.lifetimeEarned) || 0),
+      tier: membership.tier,
     }),
-    [user]
+    [loyalty, membership.tier, user]
   );
-
-  const progress = Math.min(100, Math.round((data.points / data.nextTierAt) * 100));
-  const pointsToNext = Math.max(0, data.nextTierAt - data.points);
 
   const handleLogout = () => {
     logout();
@@ -404,16 +448,25 @@ const ProfilePage = () => {
           <h3 className="pf-membership__tier">{data.tier}</h3>
         </div>
         <div className="pf-membership__points">
-          <span>{data.points.toLocaleString('vi-VN')}</span>
-          <small>điểm tích lũy</small>
+          <span>{loyaltyLoading ? '...' : data.points.toLocaleString('vi-VN')}</span>
+          <small>điểm khả dụng</small>
         </div>
       </div>
       <div className="pf-progress">
-        <div className="pf-progress__bar" style={{ width: `${progress}%` }} />
+        <div className="pf-progress__bar" style={{ width: `${membership.progress}%` }} />
       </div>
       <p className="pf-membership__hint">
-        Còn <b>{pointsToNext.toLocaleString('vi-VN')}</b> điểm để lên hạng <b>{data.nextTier}</b>
+        {loyaltyError ? (
+          <span className="pf-membership__error">{loyaltyError}</span>
+        ) : membership.nextTier ? (
+          <>Đã tích <b>{data.lifetimeEarned.toLocaleString('vi-VN')}</b> điểm · Còn <b>{membership.pointsToNext.toLocaleString('vi-VN')}</b> điểm để lên hạng <b>{membership.nextTier}</b></>
+        ) : (
+          <>Bạn đang ở hạng thành viên cao nhất với <b>{data.lifetimeEarned.toLocaleString('vi-VN')}</b> điểm đã tích.</>
+        )}
       </p>
+      <button type="button" className="pf-membership__redeem" onClick={() => navigate('/promotions')}>
+        Đổi điểm nhận quà
+      </button>
     </div>
   );
 
@@ -430,7 +483,7 @@ const ProfilePage = () => {
             <span className="pf-user__tier"><WorkspacePremiumRoundedIcon sx={{ fontSize: 15 }} />{data.tier}</span>
             <div className="pf-user__points">
               <StarRoundedIcon sx={{ fontSize: 18, color: '#ffce3a' }} />
-              {data.points.toLocaleString('vi-VN')} điểm
+              {loyaltyLoading ? 'Đang tải điểm...' : loyaltyError ? 'Chưa tải được điểm' : `${data.points.toLocaleString('vi-VN')} điểm`}
             </div>
           </div>
 
