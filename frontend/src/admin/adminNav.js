@@ -12,6 +12,7 @@ import PaidRoundedIcon from '@mui/icons-material/PaidRounded';
 import ConfirmationNumberRoundedIcon from '@mui/icons-material/ConfirmationNumberRounded';
 import LoyaltyRoundedIcon from '@mui/icons-material/LoyaltyRounded';
 import PsychologyRoundedIcon from '@mui/icons-material/PsychologyRounded';
+import PunchClockRoundedIcon from '@mui/icons-material/PunchClockRounded';
 
 export const ADMIN_VIEWS = {
   DASHBOARD: 'dashboard',
@@ -24,6 +25,7 @@ export const ADMIN_VIEWS = {
   SHOWTIMES: 'showtimes',
   USER_ACCOUNTS: 'user-accounts',
   USER_ROLES: 'user-roles',
+  STAFF_ATTENDANCE: 'staff-attendance',
   REPORT_REVENUE: 'report-revenue',
   REPORT_TICKETS: 'report-tickets',
   REPORT_CUSTOMERS: 'report-customers',
@@ -70,6 +72,7 @@ export const ADMIN_NAV_GROUPS = [
     items: [
       { id: ADMIN_VIEWS.USER_ACCOUNTS, label: 'Tài khoản', icon: ManageAccountsRoundedIcon },
       { id: ADMIN_VIEWS.USER_ROLES, label: 'Phân quyền', icon: AdminPanelSettingsRoundedIcon },
+      { id: ADMIN_VIEWS.STAFF_ATTENDANCE, label: 'Chấm công nhân viên', icon: PunchClockRoundedIcon },
     ],
   },
   {
@@ -95,6 +98,7 @@ export const VIEW_META = {
   [ADMIN_VIEWS.SHOWTIMES]: { title: 'Suất chiếu', subtitle: 'Tạo suất và phân công phòng' },
   [ADMIN_VIEWS.USER_ACCOUNTS]: { title: 'Tài khoản người dùng', subtitle: 'Xem danh sách, khóa / mở khóa' },
   [ADMIN_VIEWS.USER_ROLES]: { title: 'Phân quyền', subtitle: 'Customer · Staff · Admin' },
+  [ADMIN_VIEWS.STAFF_ATTENDANCE]: { title: 'Chấm công nhân viên', subtitle: 'Quản lý check-in, check-out và giờ làm việc' },
   [ADMIN_VIEWS.REPORT_REVENUE]: { title: 'Báo cáo doanh thu', subtitle: 'Theo ngày, tháng và phim' },
   [ADMIN_VIEWS.REPORT_TICKETS]: { title: 'Thống kê vé', subtitle: 'Vé bán ra và vé hủy' },
   [ADMIN_VIEWS.REPORT_CUSTOMERS]: { title: 'Thống kê khách hàng', subtitle: 'Khách mới và khách thân thiết' },

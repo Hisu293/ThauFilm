@@ -44,6 +44,15 @@ export const adminService = {
   /** PUT /api/admin/users/{userId}/access — đổi vai trò + trạng thái cùng lúc */
   updateAccess: (userId, { role, enabled }) =>
     api.put(`/api/admin/users/${userId}/access`, { role, enabled }).then(unwrap),
+
+  getAttendance: (year, month) =>
+    api.get('/api/admin/attendance', { params: { year, month } }).then(unwrap),
+
+  updateAttendance: (attendanceId, payload) =>
+    api.put(`/api/admin/attendance/${attendanceId}`, payload).then(unwrap),
+
+  getMonthlyRevenue: (year, month) =>
+    api.get('/api/admin/reports/revenue/monthly', { params: { year, month } }).then(unwrap),
 };
 
 export default adminService;

@@ -26,6 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -75,6 +76,99 @@ public class StaffReportService {
         BigDecimal total = cinemaTotal.add(onlineTotal);
         return row("from", range.from, "to", range.to, "totalRevenue", total,
                 "cinemaRevenue", cinemaTotal, "onlineRevenue", onlineTotal, "daily", daily);
+    }
+
+    public Map<String, Object> monthlyRevenue(int year, int month) {
+        YearMonth selected;
+        try {
+            selected = YearMonth.of(year, month);
+        } catch (RuntimeException exception) {
+            throw new IllegalArgumentException("Invalid revenue month");
+        }
+        YearMonth previous = selected.minusMonths(1);
+        ReportContext context = context();
+        Map<LocalDate, BigDecimal> dailyRevenue = selected.atDay(1).datesUntil(selected.atEndOfMonth().plusDays(1))
+                .collect(Collectors.toMap(Function.identity(), ignored -> BigDecimal.ZERO, (a, b) -> a, LinkedHashMap::new));
+        Map<UUID, MutableAggregate> movieRevenue = new HashMap<>();
+        BigDecimal allTimeRevenue = BigDecimal.ZERO;
+        BigDecimal monthRevenue = BigDecimal.ZERO;
+        BigDecimal previousMonthRevenue = BigDecimal.ZERO;
+        BigDecimal cinemaRevenue = BigDecimal.ZERO;
+        BigDecimal onlineRevenue = BigDecimal.ZERO;
+        long paidOrders = 0;
+
+        for (Payment payment : context.payments) {
+            if (payment.getStatus() != PaymentStatus.PAID || paymentDate(payment) == null) continue;
+            allTimeRevenue = allTimeRevenue.add(payment.getAmount());
+            YearMonth paymentMonth = YearMonth.from(paymentDate(payment));
+            if (paymentMonth.equals(previous)) {
+                previousMonthRevenue = previousMonthRevenue.add(payment.getAmount());
+            }
+            if (!paymentMonth.equals(selected)) continue;
+
+            paidOrders += 1;
+            monthRevenue = monthRevenue.add(payment.getAmount());
+            dailyRevenue.merge(paymentDate(payment), payment.getAmount(), BigDecimal::add);
+            Booking booking = context.bookings.get(payment.getBookingId());
+            Showtime showtime = booking == null ? null : context.showtimes.get(booking.getShowtimeId());
+            if (showtime != null && showtime.isOnline()) {
+                onlineRevenue = onlineRevenue.add(payment.getAmount());
+            } else {
+                cinemaRevenue = cinemaRevenue.add(payment.getAmount());
+            }
+            if (showtime != null) {
+                MutableAggregate aggregate = movieRevenue.computeIfAbsent(showtime.getMovieId(), ignored -> new MutableAggregate());
+                aggregate.revenue = aggregate.revenue.add(payment.getAmount());
+                aggregate.orders += 1;
+            }
+        }
+
+        Map<UUID, Long> ticketsByMovie = new HashMap<>();
+        context.tickets.stream()
+                .filter(ticket -> ticket.getCreatedAt() != null && YearMonth.from(ticket.getCreatedAt()).equals(selected))
+                .forEach(ticket -> {
+                    Booking booking = context.bookings.get(ticket.getBookingId());
+                    Showtime showtime = booking == null ? null : context.showtimes.get(booking.getShowtimeId());
+                    if (booking != null && booking.getStatus() == BookingStatus.CONFIRMED && showtime != null) {
+                        ticketsByMovie.merge(showtime.getMovieId(), 1L, Long::sum);
+                    }
+                });
+
+        BigDecimal growthPercent = previousMonthRevenue.signum() == 0
+                ? (monthRevenue.signum() == 0 ? BigDecimal.ZERO : BigDecimal.valueOf(100))
+                : monthRevenue.subtract(previousMonthRevenue)
+                        .multiply(BigDecimal.valueOf(100))
+                        .divide(previousMonthRevenue, 1, java.math.RoundingMode.HALF_UP);
+        List<Map<String, Object>> daily = dailyRevenue.entrySet().stream()
+                .map(entry -> row("date", entry.getKey(), "revenue", entry.getValue()))
+                .toList();
+        List<Map<String, Object>> movies = movieRevenue.entrySet().stream()
+                .sorted((left, right) -> right.getValue().revenue.compareTo(left.getValue().revenue))
+                .map(entry -> {
+                    Movie movie = context.movies.get(entry.getKey());
+                    return row(
+                            "movieId", entry.getKey(),
+                            "movieTitle", movie == null ? "Không rõ" : movie.getTitle(),
+                            "revenue", entry.getValue().revenue,
+                            "orders", entry.getValue().orders,
+                            "tickets", ticketsByMovie.getOrDefault(entry.getKey(), 0L)
+                    );
+                })
+                .toList();
+
+        return row(
+                "year", year,
+                "month", month,
+                "allTimeRevenue", allTimeRevenue,
+                "monthRevenue", monthRevenue,
+                "previousMonthRevenue", previousMonthRevenue,
+                "growthPercent", growthPercent,
+                "cinemaRevenue", cinemaRevenue,
+                "onlineRevenue", onlineRevenue,
+                "paidOrders", paidOrders,
+                "daily", daily,
+                "movies", movies
+        );
     }
 
     public Map<String, Object> ticketSales(LocalDate from, LocalDate to) {
@@ -314,7 +408,11 @@ public class StaffReportService {
         return result;
     }
 
-    private static class MutableAggregate { long count; BigDecimal revenue = BigDecimal.ZERO; }
+    private static class MutableAggregate {
+        long count;
+        long orders;
+        BigDecimal revenue = BigDecimal.ZERO;
+    }
     private record DateRange(LocalDate from, LocalDate to) {
         boolean contains(LocalDate date) { return !date.isBefore(from) && !date.isAfter(to); }
         List<LocalDate> days() {
