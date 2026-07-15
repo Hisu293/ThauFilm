@@ -11,6 +11,7 @@ import com.filmticket.repository.UserRepository;
 import org.junit.jupiter.api.Test;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
@@ -36,10 +37,13 @@ class StaffAttendanceServiceTest {
         UserRepository userRepository = mock(UserRepository.class);
         StaffAttendanceRepository attendanceRepository = mock(StaffAttendanceRepository.class);
         StaffShiftAssignmentRepository shiftRepository = mock(StaffShiftAssignmentRepository.class);
+        AttendanceAccessCodeService accessCodeService = mock(AttendanceAccessCodeService.class);
         AtomicReference<StaffAttendance> stored = new AtomicReference<>();
+        LocalDateTime now = LocalDateTime.now();
         StaffShiftAssignment shift = StaffShiftAssignment.builder()
                 .id(UUID.randomUUID()).staffId(staffId).workDate(LocalDate.now()).shiftType(WorkShiftType.MORNING)
-                .scheduledStart(LocalDate.now().atTime(7, 30)).scheduledEnd(LocalDate.now().atTime(12, 0)).build();
+                .approvalStatus(com.filmticket.entity.ShiftApprovalStatus.APPROVED)
+                .scheduledStart(now.minusMinutes(30)).scheduledEnd(now.plusHours(4)).build();
 
         when(userRepository.findById(staffId)).thenReturn(Optional.of(staff));
         when(attendanceRepository.findByStaffIdAndWorkDate(staffId, LocalDate.now()))
@@ -48,6 +52,7 @@ class StaffAttendanceServiceTest {
                 .thenAnswer(ignored -> Optional.ofNullable(stored.get()).filter(item -> item.getCheckOutAt() == null));
         when(shiftRepository.findByStaffIdAndWorkDate(staffId, LocalDate.now())).thenReturn(Optional.of(shift));
         when(shiftRepository.findById(shift.getId())).thenReturn(Optional.of(shift));
+        when(accessCodeService.validate(any(), any(), any())).thenReturn(new AttendanceAccessCodeService.Validation("PIN", UUID.randomUUID()));
         when(attendanceRepository.save(any(StaffAttendance.class))).thenAnswer(invocation -> {
             StaffAttendance attendance = invocation.getArgument(0);
             if (attendance.getId() == null) attendance.setId(UUID.randomUUID());
@@ -55,14 +60,14 @@ class StaffAttendanceServiceTest {
             return attendance;
         });
 
-        StaffAttendanceService service = new StaffAttendanceService(attendanceRepository, userRepository, shiftRepository);
+        StaffAttendanceService service = new StaffAttendanceService(attendanceRepository, userRepository, shiftRepository, accessCodeService);
 
-        StaffAttendanceResponse checkedIn = service.checkIn(staffId);
+        StaffAttendanceResponse checkedIn = service.checkIn(staffId, "123456");
         assertEquals("WORKING", checkedIn.getStatus());
         assertNotNull(checkedIn.getCheckInAt());
         assertNull(checkedIn.getCheckOutAt());
 
-        StaffAttendanceResponse checkedOut = service.checkOut(staffId);
+        StaffAttendanceResponse checkedOut = service.checkOut(staffId, "123456");
         assertEquals("COMPLETED", checkedOut.getStatus());
         assertNotNull(checkedOut.getCheckOutAt());
     }

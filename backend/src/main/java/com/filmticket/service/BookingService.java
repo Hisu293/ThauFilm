@@ -51,6 +51,7 @@ public class BookingService {
     private final ApplicationEventPublisher eventPublisher;
     private final PaymentGatewayService paymentGatewayService;
     private final LoyaltyService loyaltyService;
+    private final BookingComboItemRepository bookingComboItemRepository;
 
     @Value("${app.mail.from:onboarding@resend.dev}")
     private String mailFrom;
@@ -243,6 +244,7 @@ public class BookingService {
                 .build();
 
         booking = bookingRepository.save(booking);
+        replaceBookingCombos(booking.getId(), request.getComboIds());
 
         for (int i = 0; i < seats.size(); i++) {
             BookingSeat bs = BookingSeat.builder()
@@ -348,6 +350,7 @@ public class BookingService {
         // Reset thời gian giữ ghế thêm 10 phút tính từ lúc update
         booking.setHoldExpiresAt(now().plusMinutes(HOLD_MINUTES));
         booking = bookingRepository.save(booking);
+        replaceBookingCombos(booking.getId(), request.getComboIds());
 
         return toBookingResponse(booking, newSeats);
     }
@@ -565,6 +568,15 @@ public class BookingService {
         Booking booking = bookingRepository.findByIdAndUserId(bookingId, userId)
                 .orElseThrow(() -> new BadRequestException("Booking not found"));
         return toBookingResponseWithoutSeats(booking);
+    }
+
+    private void replaceBookingCombos(UUID bookingId, List<UUID> comboIds) {
+        bookingComboItemRepository.deleteByBookingId(bookingId);
+        if (comboIds == null || comboIds.isEmpty()) return;
+        Map<UUID, Long> quantities = comboIds.stream().filter(Objects::nonNull)
+                .collect(Collectors.groupingBy(id -> id, LinkedHashMap::new, Collectors.counting()));
+        quantities.forEach((comboId, quantity) -> bookingComboItemRepository.save(BookingComboItem.builder()
+                .bookingId(bookingId).comboId(comboId).quantity(quantity.intValue()).build()));
     }
 
     @Transactional

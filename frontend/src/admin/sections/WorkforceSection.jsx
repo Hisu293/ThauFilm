@@ -9,6 +9,9 @@ import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import PaymentsRoundedIcon from '@mui/icons-material/PaymentsRounded';
 import ScheduleRoundedIcon from '@mui/icons-material/ScheduleRounded';
+import QrCode2RoundedIcon from '@mui/icons-material/QrCode2Rounded';
+import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded';
+import QRCode from 'qrcode';
 import SectionHeader from '../components/SectionHeader';
 import { adminService } from '../../services/adminService';
 
@@ -27,6 +30,9 @@ const WorkforceSection = () => {
   const [busy, setBusy] = useState(false);
   const [profile, setProfile] = useState(null);
   const [payroll, setPayroll] = useState(null);
+  const [codeForm, setCodeForm] = useState({ workDate: today(), shiftType: 'MORNING' });
+  const [attendanceCode, setAttendanceCode] = useState(null);
+  const [qrImage, setQrImage] = useState('');
 
   const load = useCallback(async () => {
     const [year, selectedMonth] = month.split('-').map(Number);
@@ -54,6 +60,7 @@ const WorkforceSection = () => {
   const partTimeCount = state.staff.filter((item) => item.employmentType === 'PART_TIME').length;
   const fullTimeCount = state.staff.length - partTimeCount;
   const assignedDays = useMemo(() => new Set(assignments.map((item) => `${item.staffId}-${item.workDate}`)).size, [assignments]);
+  const shortages = useMemo(() => (state.schedule?.coverage || []).filter((item) => item.understaffed), [state.schedule]);
 
   const assign = async () => {
     setBusy(true);
@@ -70,6 +77,23 @@ const WorkforceSection = () => {
     setBusy(true);
     try { await adminService.deleteShift(id); await load(); }
     catch (error) { setState((old) => ({ ...old, error: error.message || 'Không xóa được ca làm.' })); }
+    finally { setBusy(false); }
+  };
+
+  const updateStatus = async (id, status) => {
+    setBusy(true);
+    try { await adminService.updateShiftStatus(id, status); await load(); }
+    catch (error) { setState((old) => ({ ...old, error: error.message || 'Không cập nhật được đăng ký ca.' })); }
+    finally { setBusy(false); }
+  };
+
+  const generateCode = async () => {
+    setBusy(true);
+    try {
+      const code = await adminService.generateAttendanceCode(codeForm);
+      setAttendanceCode(code);
+      setQrImage(await QRCode.toDataURL(String(code.qrToken), { width: 240, margin: 2, errorCorrectionLevel: 'H' }));
+    } catch (error) { setState((old) => ({ ...old, error: error.message || 'Không tạo được mã chấm công.' })); }
     finally { setBusy(false); }
   };
 
@@ -108,8 +132,15 @@ const WorkforceSection = () => {
       {state.error && <Alert severity="error" sx={{ mb: 2 }} action={<Button onClick={load}>Thử lại</Button>}>{state.error}</Alert>}
       {state.loading ? <Box sx={{ display: 'grid', placeItems: 'center', py: 10 }}><CircularProgress /></Box> : tab === 0 ? (
         <Stack spacing={2}>
+          {shortages.length > 0 && <Alert severity="warning" icon={<WarningAmberRoundedIcon />}><b>{shortages.length} ca đang thiếu người trong tháng.</b> Gần nhất: {shortages.slice(0, 3).map((item) => `${new Date(`${item.workDate}T00:00:00`).toLocaleDateString('vi-VN')} ${item.shiftName} thiếu ${item.shortage}`).join(' · ')}</Alert>}
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'repeat(4, 1fr)' }, gap: 1.5 }}>
             {definitions.map((item, index) => <Box key={item.type} className="admin-panel admin-stat-card" sx={{ p: 2.25, '--accent': ['#fbbf24', '#38bdf8', '#a78bfa', '#fb7185'][index] }}><Typography variant="overline" color="text.secondary">{item.name}</Typography><Typography variant="h6" fontWeight={900}>{item.time}</Typography><Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>{item.description}</Typography></Box>)}
+          </Box>
+          <Box className="admin-panel" sx={{ p: 2.5 }}>
+            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2.5} alignItems={{ md: 'center' }}>
+              <Box sx={{ flex: 1 }}><Typography variant="h6" fontWeight={850}>Mã chấm công QR / PIN theo ca</Typography><Typography color="text.secondary" sx={{ mb: 2 }}>Mỗi lần tạo sẽ vô hiệu mã cũ của cùng ngày và ca.</Typography><Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}><TextField type="date" size="small" label="Ngày" value={codeForm.workDate} onChange={(e) => setCodeForm((old) => ({ ...old, workDate: e.target.value }))} slotProps={{ inputLabel: { shrink: true } }} /><FormControl size="small" sx={{ minWidth: 150 }}><InputLabel>Ca</InputLabel><Select label="Ca" value={codeForm.shiftType} onChange={(e) => setCodeForm((old) => ({ ...old, shiftType: e.target.value }))}>{definitions.map((item) => <MenuItem key={item.type} value={item.type}>{item.name}</MenuItem>)}</Select></FormControl><Button variant="contained" startIcon={<QrCode2RoundedIcon />} onClick={generateCode} disabled={busy}>Tạo mã</Button></Stack></Box>
+              {attendanceCode && <Stack direction="row" spacing={2} alignItems="center"><Box component="img" src={qrImage} alt="QR chấm công" sx={{ width: 132, bgcolor: 'white', borderRadius: 2, p: 1 }} /><Box><Typography color="text.secondary">Mã PIN</Typography><Typography variant="h3" fontWeight={950} letterSpacing={5}>{attendanceCode.pinCode}</Typography><Typography variant="caption" color="text.secondary">Hiệu lực đến {new Date(attendanceCode.validUntil).toLocaleString('vi-VN')}</Typography></Box></Stack>}
+            </Stack>
           </Box>
           <Box className="admin-panel" sx={{ p: 2.5 }}>
             <Typography variant="h6" fontWeight={850} sx={{ mb: 2 }}>Phân ca cho nhân viên</Typography>
@@ -124,7 +155,7 @@ const WorkforceSection = () => {
           <Box className="admin-panel" sx={{ overflow: 'hidden' }}>
             <Box sx={{ p: 2.5, pb: 1 }}><Typography variant="h6" fontWeight={850}>Lịch phân ca tháng</Typography><Typography variant="body2" color="text.secondary">{assignedDays} ngày công đã được xếp lịch</Typography></Box>
             <TableContainer><Table><TableHead><TableRow><TableCell>Ngày</TableCell><TableCell>Nhân viên</TableCell><TableCell>Loại nhân sự</TableCell><TableCell>Ca</TableCell><TableCell>Thời gian</TableCell><TableCell>Ghi chú</TableCell><TableCell align="right" /></TableRow></TableHead><TableBody>
-              {assignments.map((item) => { const staff = state.staff.find((candidate) => candidate.staffId === item.staffId); return <TableRow key={item.id} className="admin-table-row"><TableCell>{new Date(`${item.workDate}T00:00:00`).toLocaleDateString('vi-VN')}</TableCell><TableCell><Typography fontWeight={800}>{item.staffName}</Typography><Typography variant="caption" color="text.secondary">{item.staffEmail}</Typography></TableCell><TableCell><Chip size="small" label={employmentLabel(staff?.employmentType)} color={staff?.employmentType === 'FULL_TIME' ? 'primary' : 'info'} /></TableCell><TableCell>{item.shiftName}</TableCell><TableCell>{item.shiftTime}</TableCell><TableCell>{item.note || '—'}</TableCell><TableCell align="right"><Button color="error" size="small" onClick={() => removeAssignment(item.id)} disabled={busy}><DeleteOutlineRoundedIcon fontSize="small" /></Button></TableCell></TableRow>; })}
+              {assignments.map((item) => { const staff = state.staff.find((candidate) => candidate.staffId === item.staffId); return <TableRow key={item.id} className="admin-table-row"><TableCell>{new Date(`${item.workDate}T00:00:00`).toLocaleDateString('vi-VN')}</TableCell><TableCell><Typography fontWeight={800}>{item.staffName}</Typography><Typography variant="caption" color="text.secondary">{item.staffEmail}</Typography></TableCell><TableCell><Chip size="small" label={employmentLabel(staff?.employmentType)} color={staff?.employmentType === 'FULL_TIME' ? 'primary' : 'info'} /></TableCell><TableCell>{item.shiftName}</TableCell><TableCell>{item.shiftTime}</TableCell><TableCell><Stack spacing={.5}><Typography variant="body2">{item.note || '—'}</Typography><Chip size="small" variant="outlined" color={item.approvalStatus === 'APPROVED' ? 'success' : item.approvalStatus === 'REJECTED' ? 'error' : 'warning'} label={item.assignmentSource === 'EMPLOYEE' ? `Nhân viên đăng ký · ${item.approvalStatus}` : 'Quản lý phân ca'} /></Stack></TableCell><TableCell align="right">{item.approvalStatus === 'PENDING' && <><Button color="success" size="small" onClick={() => updateStatus(item.id, 'APPROVED')}>Duyệt</Button><Button color="warning" size="small" onClick={() => updateStatus(item.id, 'REJECTED')}>Từ chối</Button></>}<Button color="error" size="small" onClick={() => removeAssignment(item.id)} disabled={busy}><DeleteOutlineRoundedIcon fontSize="small" /></Button></TableCell></TableRow>; })}
               {!assignments.length && <TableRow><TableCell colSpan={7} align="center" sx={{ py: 6, color: 'text.secondary' }}>Chưa phân ca trong tháng này.</TableCell></TableRow>}
             </TableBody></Table></TableContainer>
           </Box>

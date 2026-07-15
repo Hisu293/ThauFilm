@@ -23,6 +23,10 @@ public class StaffAttendanceResponse {
     private LocalDateTime scheduledStart;
     private LocalDateTime scheduledEnd;
     private long durationMinutes;
+    private long lateMinutes;
+    private long earlyLeaveMinutes;
+    private String checkInMethod;
+    private String checkOutMethod;
     private String status;
     private String note;
 }

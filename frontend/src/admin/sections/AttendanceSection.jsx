@@ -140,8 +140,8 @@ const AttendanceSection = () => {
                       <TableCell><Typography fontWeight={800}>{record.staffName || 'Nhân viên'}</Typography><Typography variant="caption" color="text.secondary">{record.staffEmail}</Typography></TableCell>
                       <TableCell>{new Date(`${record.workDate}T00:00:00`).toLocaleDateString('vi-VN')}</TableCell>
                       <TableCell>{record.shiftName ? <Chip size="small" label={record.shiftName} color="primary" /> : '—'}</TableCell>
-                      <TableCell>{formatDateTime(record.checkInAt)}</TableCell>
-                      <TableCell>{formatDateTime(record.checkOutAt)}</TableCell>
+                      <TableCell>{formatDateTime(record.checkInAt)}{record.lateMinutes > 0 && <Typography variant="caption" display="block" color="error.main">Muộn {record.lateMinutes} phút · {record.checkInMethod}</Typography>}</TableCell>
+                      <TableCell>{formatDateTime(record.checkOutAt)}{record.earlyLeaveMinutes > 0 && <Typography variant="caption" display="block" color="warning.main">Về sớm {record.earlyLeaveMinutes} phút · {record.checkOutMethod}</Typography>}</TableCell>
                       <TableCell>{hours(record.durationMinutes)}</TableCell>
                       <TableCell><Chip size="small" color={record.status === 'COMPLETED' ? 'success' : 'warning'} label={record.status === 'COMPLETED' ? 'Đã hoàn tất' : record.status === 'MISSING_CHECK_OUT' ? 'Thiếu check-out' : 'Đang làm việc'} /></TableCell>
                       <TableCell align="right"><Button size="small" startIcon={<EditCalendarRoundedIcon />} onClick={() => openEdit(record)}>Chỉnh sửa</Button></TableCell>
