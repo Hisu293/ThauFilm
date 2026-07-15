@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Container, Box, Typography, Stack, Divider, Snackbar, Alert } from '@mui/material';
+import { Container, Box, Typography, Stack, Divider, Snackbar, Alert, Button } from '@mui/material';
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import ConfirmationNumberRoundedIcon from '@mui/icons-material/ConfirmationNumberRounded';
 import QrCode2RoundedIcon from '@mui/icons-material/QrCode2Rounded';
+import CalendarMonthRoundedIcon from '@mui/icons-material/CalendarMonthRounded';
+import AppleIcon from '@mui/icons-material/Apple';
+import EventAvailableRoundedIcon from '@mui/icons-material/EventAvailableRounded';
 import QRCode from 'qrcode';
 
 import BookingStepper from '../../components/BookingStepper';
@@ -15,6 +18,97 @@ import { useBooking } from '../../hooks/useBooking';
 import { useBookingNavigate } from '../../context/BookingNavigationContext';
 import { savePaidBookingSummary } from '../../utils/paidBookingStorage';
 
+const CALENDAR_TIME_ZONE = 'Asia/Ho_Chi_Minh';
+
+const parseCalendarDate = (value) => {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const resolveShowtimeStart = (showtime) => {
+  const fromStartTime = parseCalendarDate(showtime?.startTime);
+  if (fromStartTime) return fromStartTime;
+  if (!showtime?.date || !showtime?.time) return null;
+  return parseCalendarDate(`${showtime.date}T${showtime.time}:00`);
+};
+
+const toCalendarUtc = (date) => date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}Z$/, 'Z');
+const escapeIcs = (value) => String(value || '')
+  .replace(/\\/g, '\\\\')
+  .replace(/\r?\n/g, '\\n')
+  .replace(/,/g, '\\,')
+  .replace(/;/g, '\\;');
+
+const createCalendarEvent = ({ bookingData, theaterName, isOnlineBooking }) => {
+  const start = resolveShowtimeStart(bookingData?.showtime);
+  if (!start) return null;
+
+  const explicitEnd = parseCalendarDate(bookingData?.showtime?.endTime);
+  const durationMinutes = Number(bookingData?.movie?.durationMinutes || bookingData?.movie?.duration) || 120;
+  const end = explicitEnd && explicitEnd > start
+    ? explicitEnd
+    : new Date(start.getTime() + durationMinutes * 60 * 1000);
+  const detailUrl = `${window.location.origin}/my-bookings/${encodeURIComponent(bookingData.bookingId)}`;
+  const seatLabels = (bookingData.selectedSeats || []).map((seat) => seat.label || seat.id).filter(Boolean).join(', ');
+  const location = isOnlineBooking
+    ? 'ThauFilm Online'
+    : [theaterName, bookingData.showtime?.room].filter(Boolean).join(' - ');
+  const description = [
+    `Mã đặt vé: ${bookingData.bookingCode}`,
+    seatLabels ? `Ghế: ${seatLabels}` : null,
+    isOnlineBooking ? 'Vé xem phim online trên ThauFilm.' : null,
+    `Chi tiết vé: ${detailUrl}`,
+  ].filter(Boolean).join('\n');
+
+  return {
+    title: `ThauFilm - ${bookingData.movie?.title || 'Lịch chiếu phim'}`,
+    start,
+    end,
+    location,
+    description,
+    detailUrl,
+  };
+};
+
+const googleCalendarUrl = (event) => `https://calendar.google.com/calendar/render?${new URLSearchParams({
+  action: 'TEMPLATE',
+  text: event.title,
+  dates: `${toCalendarUtc(event.start)}/${toCalendarUtc(event.end)}`,
+  details: event.description,
+  location: event.location,
+  ctz: CALENDAR_TIME_ZONE,
+}).toString()}`;
+
+const outlookCalendarUrl = (event) => `https://outlook.live.com/calendar/0/deeplink/compose?${new URLSearchParams({
+  path: '/calendar/action/compose',
+  rru: 'addevent',
+  subject: event.title,
+  startdt: event.start.toISOString(),
+  enddt: event.end.toISOString(),
+  body: event.description,
+  location: event.location,
+}).toString()}`;
+
+const createIcsContent = (event, bookingId) => [
+  'BEGIN:VCALENDAR',
+  'VERSION:2.0',
+  'PRODID:-//ThauFilm//Movie Booking//VI',
+  'CALSCALE:GREGORIAN',
+  'METHOD:PUBLISH',
+  'BEGIN:VEVENT',
+  `UID:${escapeIcs(bookingId)}@thaufilm.app`,
+  `DTSTAMP:${toCalendarUtc(new Date())}`,
+  `DTSTART:${toCalendarUtc(event.start)}`,
+  `DTEND:${toCalendarUtc(event.end)}`,
+  `SUMMARY:${escapeIcs(event.title)}`,
+  `DESCRIPTION:${escapeIcs(event.description)}`,
+  `LOCATION:${escapeIcs(event.location)}`,
+  `URL:${escapeIcs(event.detailUrl)}`,
+  'END:VEVENT',
+  'END:VCALENDAR',
+].join('\r\n');
+
 export const BookingSuccessPage = () => {
   const location = useLocation();
   const navigate = useBookingNavigate();
@@ -25,6 +119,7 @@ export const BookingSuccessPage = () => {
   const [tickets, setTickets] = useState([]);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
   const [onlineTicketQr, setOnlineTicketQr] = useState('');
+  const [calendarNotice, setCalendarNotice] = useState({ open: false, message: '', severity: 'success' });
 
   const isOnlineBooking = Boolean(
     bookingData && (
@@ -148,6 +243,31 @@ export const BookingSuccessPage = () => {
   const originalAmount = Number(bookingData.originalAmount ?? totalAmount) || 0;
   const discountAmount = Number(bookingData.discountAmount) || 0;
   const theaterName = showtime?.theaterName || showtime?.cinemaName || 'ThauFilm Cinema';
+  const calendarEvent = createCalendarEvent({ bookingData, theaterName, isOnlineBooking });
+
+  const openExternalCalendar = (url, calendarName) => {
+    const popup = window.open(url, '_blank');
+    if (!popup) {
+      setCalendarNotice({ open: true, severity: 'error', message: `Trình duyệt đã chặn cửa sổ ${calendarName}. Vui lòng cho phép popup và thử lại.` });
+      return;
+    }
+    popup.opener = null;
+  };
+
+  const addToAppleCalendar = () => {
+    if (!calendarEvent) return;
+    const content = createIcsContent(calendarEvent, bookingData.bookingId);
+    const blob = new Blob([content], { type: 'text/calendar;charset=utf-8' });
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = `thaufilm-${bookingCode || bookingData.bookingId}.ics`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(objectUrl);
+    setCalendarNotice({ open: true, severity: 'success', message: 'Đã tải lịch chiếu. Hãy mở file .ics để thêm vào Apple Calendar.' });
+  };
 
   const showDate = showtime?.date || (showtime?.startTime ? String(showtime.startTime).slice(0, 10) : '');
   const formattedDate = showDate
@@ -374,6 +494,56 @@ export const BookingSuccessPage = () => {
         </Stack>
       </SectionCard>
 
+      <SectionCard sx={{ mt: 3, border: '1px solid rgba(96, 165, 250, 0.2)' }}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2.5} alignItems={{ xs: 'flex-start', sm: 'center' }}>
+          <Box sx={{ width: 52, height: 52, flexShrink: 0, borderRadius: 3, display: 'grid', placeItems: 'center', bgcolor: 'rgba(96,165,250,.14)', color: '#93C5FD' }}>
+            <EventAvailableRoundedIcon sx={{ fontSize: 30 }} />
+          </Box>
+          <Box sx={{ flex: 1 }}>
+            <Typography variant="h6" sx={{ fontWeight: 850 }}>Đồng bộ lịch chiếu</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: .5 }}>
+              Thêm lịch xem phim vào ứng dụng bạn đang dùng để không bỏ lỡ suất chiếu.
+            </Typography>
+          </Box>
+        </Stack>
+
+        <Box sx={{ mt: 2.5, display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, minmax(0, 1fr))' }, gap: 1.5 }}>
+          <Button
+            variant="outlined"
+            disabled={!calendarEvent}
+            startIcon={<CalendarMonthRoundedIcon />}
+            onClick={() => openExternalCalendar(googleCalendarUrl(calendarEvent), 'Google Calendar')}
+            sx={{ py: 1.25, borderRadius: 3, fontWeight: 800 }}
+          >
+            Google Calendar
+          </Button>
+          <Button
+            variant="outlined"
+            disabled={!calendarEvent}
+            startIcon={<AppleIcon />}
+            onClick={addToAppleCalendar}
+            sx={{ py: 1.25, borderRadius: 3, fontWeight: 800 }}
+          >
+            Apple Calendar
+          </Button>
+          <Button
+            variant="outlined"
+            disabled={!calendarEvent}
+            startIcon={<EventAvailableRoundedIcon />}
+            onClick={() => openExternalCalendar(outlookCalendarUrl(calendarEvent), 'Outlook')}
+            sx={{ py: 1.25, borderRadius: 3, fontWeight: 800 }}
+          >
+            Outlook
+          </Button>
+        </Box>
+
+        {!calendarEvent && (
+          <Alert severity="warning" sx={{ mt: 2, borderRadius: 2.5 }}>
+            Vé chưa có đủ ngày giờ suất chiếu để tạo sự kiện lịch.
+          </Alert>
+        )}
+      </SectionCard>
+
       {/* Home / ticket list navigation */}
       <Stack direction="row" spacing={2} justifyContent="center" sx={{ mt: 5 }}>
         <CustomButton 
@@ -415,6 +585,22 @@ export const BookingSuccessPage = () => {
           sx={{ borderRadius: 3, fontWeight: 600 }}
         >
           {apiError || 'Có lỗi xảy ra khi đồng bộ danh sách vé.'}
+        </Alert>
+      </Snackbar>
+
+      <Snackbar
+        open={calendarNotice.open}
+        autoHideDuration={4500}
+        onClose={() => setCalendarNotice((current) => ({ ...current, open: false }))}
+        anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
+      >
+        <Alert
+          severity={calendarNotice.severity}
+          variant="filled"
+          onClose={() => setCalendarNotice((current) => ({ ...current, open: false }))}
+          sx={{ borderRadius: 3, fontWeight: 600 }}
+        >
+          {calendarNotice.message}
         </Alert>
       </Snackbar>
     </Container>
