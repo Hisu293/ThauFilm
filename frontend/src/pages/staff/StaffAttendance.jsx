@@ -11,7 +11,7 @@ import WorkHistoryRoundedIcon from '@mui/icons-material/WorkHistoryRounded';
 import QrCodeScannerRoundedIcon from '@mui/icons-material/QrCodeScannerRounded';
 import EventAvailableRoundedIcon from '@mui/icons-material/EventAvailableRounded';
 import { staffAttendanceService } from '../../services/staffAttendanceService';
-import QrScannerDialog from '../../components/QrScannerDialog';
+import AttendanceQrScanner from '../../components/AttendanceQrScanner';
 
 const selectedMonth = () => new Date().toISOString().slice(0, 7);
 const time = (value) => value ? new Date(value).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' }) : '—';
@@ -119,6 +119,7 @@ const StaffAttendance = () => {
           </Stack>
         </CardContent>
       </Card>
+      {scannerOpen && <AttendanceQrScanner onClose={() => setScannerOpen(false)} onScan={(value) => { setCredential(value); setScannerOpen(false); if (!today) action('in', value); else if (today.status === 'WORKING') action('out', value); else setNotice({ type: 'info', message: 'Ca hôm nay đã hoàn tất.' }); }} />}
 
       <Card><CardContent><Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems={{ md: 'center' }}><Box sx={{ flex: 1 }}><Typography variant="h6" fontWeight={850}>Đăng ký ca làm</Typography><Typography color="text.secondary">Ca đăng ký sẽ ở trạng thái chờ cho đến khi quản lý duyệt.</Typography></Box><TextField type="date" size="small" label="Ngày" value={registerForm.workDate} onChange={(e) => setRegisterForm((old) => ({ ...old, workDate: e.target.value }))} slotProps={{ inputLabel: { shrink: true } }} /><FormControl size="small" sx={{ minWidth: 140 }}><InputLabel>Ca</InputLabel><Select label="Ca" value={registerForm.shiftType} onChange={(e) => setRegisterForm((old) => ({ ...old, shiftType: e.target.value }))}><MenuItem value="MORNING">Ca sáng</MenuItem><MenuItem value="AFTERNOON">Ca chiều</MenuItem><MenuItem value="EVENING">Ca tối</MenuItem><MenuItem value="LATE">Ca khuya</MenuItem></Select></FormControl><TextField size="small" label="Ghi chú" value={registerForm.note} onChange={(e) => setRegisterForm((old) => ({ ...old, note: e.target.value }))} /><Button variant="contained" startIcon={<EventAvailableRoundedIcon />} disabled={busy} onClick={registerShift}>Đăng ký</Button></Stack></CardContent></Card>
 
@@ -147,7 +148,6 @@ const StaffAttendance = () => {
           </TableBody>
         </Table></TableContainer>
       </Card>
-      <QrScannerDialog title="Quét QR chấm công" open={scannerOpen} onClose={() => setScannerOpen(false)} onScan={(value) => { setCredential(value); setScannerOpen(false); if (!today) action('in', value); else if (today.status === 'WORKING') action('out', value); else setNotice({ type: 'info', message: 'Ca hôm nay đã hoàn tất.' }); }} />
     </Stack>
   );
 };

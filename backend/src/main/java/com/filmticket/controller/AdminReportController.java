@@ -35,4 +35,22 @@ public class AdminReportController {
                 reportService.monthlyRevenue(selectedYear, selectedMonth)
         ));
     }
+
+    @GetMapping("/tickets/monthly")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> monthlyTickets(
+            @RequestParam(required = false) Integer year, @RequestParam(required = false) Integer month) {
+        LocalDate today = LocalDate.now();
+        return ResponseEntity.ok(ApiResponse.success("Monthly ticket analytics fetched",
+                reportService.monthlyTicketAnalytics(year == null ? today.getYear() : year,
+                        month == null ? today.getMonthValue() : month)));
+    }
+
+    @GetMapping("/customers/monthly")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> monthlyCustomers(
+            @RequestParam(required = false) Integer year, @RequestParam(required = false) Integer month) {
+        LocalDate today = LocalDate.now();
+        return ResponseEntity.ok(ApiResponse.success("Monthly customer analytics fetched",
+                reportService.monthlyCustomerAnalytics(year == null ? today.getYear() : year,
+                        month == null ? today.getMonthValue() : month)));
+    }
 }
