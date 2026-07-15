@@ -34,6 +34,7 @@ import ShareOutlinedIcon from '@mui/icons-material/ShareOutlined';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { socialService } from '../services/socialService';
+import TopMovieFansWidget from '../components/TopMovieFansWidget';
 
 const MAX_SOURCE_IMAGE_SIZE = 8 * 1024 * 1024;
 const MAX_IMAGE_DATA_LENGTH = 2_700_000;
@@ -488,6 +489,8 @@ export default function CommunityFeedPage() {
         </Box>
         <Button component={RouterLink} to="/community/connections" variant="outlined">Quản lý kết nối</Button>
       </Stack>
+
+      <TopMovieFansWidget />
 
       <Card sx={{ p: { xs: 2, md: 3 }, mb: 3, borderRadius: 4 }}>
         <Stack direction="row" spacing={1.5} alignItems="flex-start">

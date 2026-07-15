@@ -231,8 +231,8 @@ export default function MovieMatchingPanel() {
   const activePerson = candidates[0];
   return <Box sx={{ borderRadius: { md: 6 }, p: { xs: 1, md: 3 }, background: 'radial-gradient(circle at 20% 0%, rgba(255,63,129,.13), transparent 32%), linear-gradient(145deg, rgba(23,20,34,.98), rgba(12,11,18,.98))' }}>
     <Stack spacing={2.5}>
-      <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ md: 'center' }} gap={1}>
-        <Box><Typography variant="h4" fontWeight={1000} color="white">Movie Dating</Typography><Typography color="rgba(255,255,255,.62)">Một bộ phim hay có thể là khởi đầu của một câu chuyện đẹp.</Typography></Box>
+      <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" alignItems={{ sm: 'center' }} gap={1}>
+        <Box><Typography variant="h5" fontWeight={950} color="white">Không gian hẹn hò của bạn</Typography><Typography color="rgba(255,255,255,.62)">Quản lý hồ sơ, khám phá và trò chuyện tại cùng một nơi.</Typography></Box>
         <Chip icon={<LocalMoviesRoundedIcon />} label="Chỉ match khi cả hai cùng thích" sx={{ color: 'white', bgcolor: 'rgba(255,255,255,.1)' }} />
       </Stack>
       <Tabs value={tab} onChange={changeTab} variant="scrollable" scrollButtons="auto" sx={{ '& .MuiTab-root': { color: 'rgba(255,255,255,.56)', fontWeight: 800 }, '& .Mui-selected': { color: '#ff6b9d !important' } }}>

@@ -316,7 +316,7 @@ export const NAV_LINKS = [
   { label: 'Khuyến mãi', to: '/promotions' },
   { label: 'AI Chatbot', to: '/movie-chatbot' },
   { label: 'Bảng tin cộng đồng', to: '/community/feed' },
-  { label: 'Tìm bạn xem phim', to: '/intelligence' },
+  { label: 'Tìm bạn xem phim', to: '/dating' },
 ];
 
 export default cinemaTheme;
