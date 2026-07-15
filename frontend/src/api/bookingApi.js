@@ -104,6 +104,11 @@ export const bookingApi = {
     return axiosClient.get('/api/member/booking/combos');
   },
 
+  fetchLoyaltyOverview: () => axiosClient.get('/api/member/loyalty'),
+
+  redeemLoyaltyReward: (rewardId) =>
+    axiosClient.post(`/api/member/loyalty/rewards/${rewardId}/redeem`),
+
   // Confirm payment: POST /api/member/booking/{bookingId}/pay
   payBooking: (bookingId, paymentMethod = 'VNPAY', discountCode = '') => {
     const payload = { paymentMethod };

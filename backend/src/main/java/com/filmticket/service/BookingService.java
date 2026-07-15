@@ -50,6 +50,7 @@ public class BookingService {
     private final RealtimeEventService realtimeEventService;
     private final ApplicationEventPublisher eventPublisher;
     private final PaymentGatewayService paymentGatewayService;
+    private final LoyaltyService loyaltyService;
 
     @Value("${app.mail.from:onboarding@resend.dev}")
     private String mailFrom;
@@ -538,6 +539,8 @@ public class BookingService {
 
         BookingPaymentResponse response = BookingPaymentResponse.fromPaymentResult(
                 booking, payment, ticketResponses, originalAmount, discountAmount, discountCode);
+
+        loyaltyService.awardBookingPoints(booking.getId(), booking.getUserId(), payment.getAmount());
 
         realtimeEventService.notifyUser(booking.getUserId(), "BOOKING_CONFIRMED", "Đặt vé thành công",
                 "Vé " + booking.getConfirmationCode() + " đã được xác nhận", "/my-bookings/" + booking.getId());

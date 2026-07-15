@@ -35,6 +35,7 @@ public class GroupBookingService {
     private final BookingService bookingService;
     private final PaymentGatewayService paymentGatewayService;
     private final GroupBookingRealtimeService groupBookingRealtimeService;
+    private final LoyaltyService loyaltyService;
 
     @Transactional
     public GroupBooking createForAcceptedInvitation(MovieMatchInvitation invitation) {
@@ -300,6 +301,7 @@ public class GroupBookingService {
             booking.setConfirmedAt(now);
             bookingRepository.save(booking);
             confirmedBookings.add(booking);
+            loyaltyService.awardBookingPoints(booking.getId(), member.getUserId(), member.getAmount());
             availabilityRepository.findByShowtimeIdAndSeatId(group.getShowtimeId(), member.getSeatId()).ifPresent(item -> {
                 item.setStatus(SeatBookingStatus.SOLD);
                 availabilityRepository.save(item);
