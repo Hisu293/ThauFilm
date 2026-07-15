@@ -9,12 +9,15 @@ import {
   ThemeProvider,
   Toolbar,
   Typography,
+  Breadcrumbs,
+  Link,
   createTheme,
 } from '@mui/material';
 import MenuRoundedIcon from '@mui/icons-material/MenuRounded';
 import NotificationsNoneRoundedIcon from '@mui/icons-material/NotificationsNoneRounded';
 import LightModeRoundedIcon from '@mui/icons-material/LightModeRounded';
 import DarkModeRoundedIcon from '@mui/icons-material/DarkModeRounded';
+import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import { ADMIN_VIEWS, VIEW_META } from '../admin/adminNav';
 import { adminTheme, SIDEBAR_WIDTH } from '../admin/adminTheme';
 import AdminSidebar from '../admin/components/AdminSidebar';
@@ -131,13 +134,26 @@ const AdminPage = () => {
               >
                 <MenuRoundedIcon />
               </IconButton>
-              <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Typography variant="h6" noWrap sx={{ fontWeight: 700 }}>
-                  {meta.title}
-                </Typography>
-                <Typography variant="caption" sx={{ color: 'text.secondary' }} noWrap>
-                  {meta.subtitle}
-                </Typography>
+              <Box sx={{ flex: 1, minWidth: 0, display: { xs: 'none', sm: 'block' } }}>
+                <Breadcrumbs
+                  separator={<NavigateNextIcon fontSize="small" />}
+                  aria-label="breadcrumb"
+                  sx={{ '& .MuiBreadcrumbs-ol': { flexWrap: 'nowrap' } }}
+                >
+                  <Link
+                    component="button"
+                    type="button"
+                    underline="hover"
+                    color="text.secondary"
+                    onClick={() => handleViewChange(ADMIN_VIEWS.DASHBOARD)}
+                    sx={{ font: 'inherit', whiteSpace: 'nowrap' }}
+                  >
+                    Quản trị
+                  </Link>
+                  <Typography color="text.primary" fontWeight="medium" noWrap>
+                    {meta.title}
+                  </Typography>
+                </Breadcrumbs>
               </Box>
               <IconButton onClick={toggleTheme} sx={{ color: 'text.secondary' }} aria-label="Đổi giao diện sáng/tối">
                 {isDark ? <LightModeRoundedIcon /> : <DarkModeRoundedIcon />}
