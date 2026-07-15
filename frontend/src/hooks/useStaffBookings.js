@@ -35,7 +35,6 @@ export const useStaffBookings = () => {
     payment: (bookingId) => run(async () => unwrap(await staffBookingApi.fetchPayment(bookingId)), 'Không thể tải thanh toán.'),
     purchasedMovies: (userId) => run(async () => unwrap(await staffBookingApi.fetchPurchasedMoviesByUser(userId)), 'Không thể kiểm tra phim đã mua.'),
     regrantAccess: (bookingId) => run(async () => unwrap(await staffBookingApi.regrantAccess(bookingId)), 'Không thể cấp lại quyền.'),
-    refund: (bookingId) => run(async () => unwrap(await staffBookingApi.refund(bookingId)), 'Không thể hoàn tiền.'),
     cancel: (bookingId) => run(async () => unwrap(await staffBookingApi.cancel(bookingId)), 'Không thể hủy booking.'),
   };
 };

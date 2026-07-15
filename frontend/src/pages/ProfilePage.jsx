@@ -19,6 +19,7 @@ import NotificationsActiveRoundedIcon from '@mui/icons-material/NotificationsAct
 import PaletteRoundedIcon from '@mui/icons-material/PaletteRounded';
 import SecurityRoundedIcon from '@mui/icons-material/SecurityRounded';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
+import MilitaryTechRoundedIcon from '@mui/icons-material/MilitaryTechRounded';
 import { useAuth } from '../context/AuthContext';
 import { profileUser, favoriteMovies } from '../data/profileMock';
 import { useBooking } from '../hooks/useBooking';
@@ -30,10 +31,12 @@ import { getPendingBooking, mergeMovieContext, mergeShowtimeContext } from '../u
 import { buildMovieLookup, findMovie } from '../utils/movieLookup';
 import { CircularProgress } from '@mui/material';
 import Box from '@mui/material/Box';
+import AchievementsPanel from '../components/AchievementsPanel';
 import './ProfilePage.css';
 
 const MENU = [
   { key: 'info', label: 'Thông Tin Cá Nhân', Icon: PersonRoundedIcon },
+  { key: 'badges', label: 'Huy Hiệu Của Tôi', Icon: MilitaryTechRoundedIcon },
   { key: 'history', label: 'Vé Của Tôi', Icon: ConfirmationNumberRoundedIcon },
 ];
 
@@ -520,6 +523,17 @@ const ProfilePage = () => {
               </div>
               {MembershipCard}
             </>
+          )}
+
+          {/* ── HUY HIỆU CỦA TÔI ── */}
+          {active === 'badges' && (
+            <div className="pf-badges-page">
+              <div className="pf-card">
+                <h2 className="pf-section__title">Huy hiệu của tôi</h2>
+                <p className="pf-empty" style={{ textAlign: 'left', margin: 0 }}>Theo dõi hành trình yêu phim, cấp độ hiện tại và những cột mốc bạn đã chinh phục.</p>
+              </div>
+              <AchievementsPanel />
+            </div>
           )}
 
           {/* ── VÉ CỦA TÔI ── */}

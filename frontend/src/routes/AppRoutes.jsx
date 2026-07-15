@@ -1,4 +1,4 @@
-import { Routes, Route } from 'react-router-dom';
+import { Navigate, Routes, Route } from 'react-router-dom';
 import MainLayout from '../layouts/MainLayout';
 import PublicLayout from '../layouts/PublicLayout';
 import StaffLayout from '../layouts/StaffLayout';
@@ -21,7 +21,7 @@ import FavoriteListsPage from '../pages/FavoriteListsPage';
 import CommunityConnectionsPage from '../pages/CommunityConnectionsPage';
 import CommunityFeedPage from '../pages/CommunityFeedPage';
 import CommunityMessagesPage from '../pages/CommunityMessagesPage';
-import CinemaIntelligencePage from '../pages/CinemaIntelligencePage';
+import MovieDatingPage from '../pages/MovieDatingPage';
 import MovieChatbotPage from '../pages/MovieChatbotPage';
 
 // Booking Pages
@@ -45,6 +45,7 @@ import StaffPromotions from '../pages/staff/StaffPromotions';
 import StaffReports from '../pages/staff/StaffReports';
 import StaffAttendance from '../pages/staff/StaffAttendance';
 import StaffAttendanceDisplay from '../pages/staff/StaffAttendanceDisplay';
+import StaffRefunds from '../pages/staff/StaffRefunds';
 
 const AppRoutes = () => {
   return (
@@ -63,7 +64,8 @@ const AppRoutes = () => {
         <Route path="/community/connections" element={<CommunityConnectionsPage />} />
         <Route path="/community/feed" element={<CommunityFeedPage />} />
         <Route path="/community/messages" element={<CommunityMessagesPage />} />
-        <Route path="/intelligence" element={<CinemaIntelligencePage />} />
+        <Route path="/dating" element={<MovieDatingPage />} />
+        <Route path="/intelligence" element={<Navigate to="/dating" replace />} />
         <Route path="/movie-chatbot" element={<MovieChatbotPage />} />
         <Route path="/dashboard" element={<DashboardPage />} />
          
@@ -114,6 +116,7 @@ const AppRoutes = () => {
         <Route path="reports" element={<StaffReports />} />
         <Route path="attendance" element={<StaffAttendance />} />
         <Route path="attendance-display" element={<StaffAttendanceDisplay />} />
+        <Route path="refunds" element={<StaffRefunds />} />
       </Route>
 
       <Route path="*" element={<NotFoundPage />} />

@@ -33,12 +33,14 @@ public final class MovieMatchingDto {
         private UUID userId;
         private String fullName;
         private String avatarUrl;
+        private boolean customDatingPhoto;
         private String bio;
         private List<String> favoriteGenres;
         private String preferredTheater;
         private String availableTimes;
         private boolean active;
         private int compatibilityPercent;
+        private LocalDateTime lastInteractedAt;
     }
 
     @Data @Builder

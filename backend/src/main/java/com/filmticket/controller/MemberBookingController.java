@@ -7,6 +7,7 @@ import com.filmticket.service.BookingService;
 import com.filmticket.service.ComboService;
 import com.filmticket.service.DiscountService;
 import com.filmticket.service.TicketQueueService;
+import com.filmticket.service.RefundRequestService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
@@ -34,6 +35,7 @@ public class MemberBookingController {
     private final ComboService comboService;
     private final DiscountService discountService;
     private final TicketQueueService ticketQueueService;
+    private final RefundRequestService refundRequestService;
 
     // ĐÃ SỬA: Lấy thêm userId để truyền xuống Service nhận diện cờ isHeldByMe
     @Operation(summary = "Get available seats for a showtime")
@@ -219,6 +221,37 @@ public class MemberBookingController {
                 bookingService.getBookingDetail(bookingId, userId)
         ));
     }
+
+    @Operation(summary = "Submit a refund support request")
+    @PostMapping("/{bookingId}/refund-requests")
+    public ResponseEntity<ApiResponse<RefundRequestDto>> requestRefund(
+            @PathVariable UUID bookingId, @RequestBody RefundRequestBody request) {
+        return ResponseEntity.ok(ApiResponse.success("Refund request submitted",
+                refundRequestService.requestByCustomer(getCurrentUserId(), bookingId, request.ticketCode(), request.reason())));
+    }
+
+    @Operation(summary = "List my refund requests")
+    @GetMapping("/refund-requests/me")
+    public ResponseEntity<ApiResponse<List<RefundRequestDto>>> myRefundRequests() {
+        return ResponseEntity.ok(ApiResponse.success("Refund requests fetched",
+                refundRequestService.customerRequests(getCurrentUserId())));
+    }
+
+    @GetMapping("/refund-requests/{requestId}/messages")
+    public ResponseEntity<ApiResponse<List<RefundMessageDto>>> refundMessages(@PathVariable UUID requestId) {
+        return ResponseEntity.ok(ApiResponse.success("Refund conversation fetched",
+                refundRequestService.customerMessages(getCurrentUserId(), requestId)));
+    }
+
+    @PostMapping("/refund-requests/{requestId}/messages")
+    public ResponseEntity<ApiResponse<RefundMessageDto>> sendRefundMessage(@PathVariable UUID requestId,
+                                                                            @RequestBody RefundMessageBody body) {
+        return ResponseEntity.ok(ApiResponse.success("Message sent",
+                refundRequestService.customerMessage(getCurrentUserId(), requestId, body.content())));
+    }
+
+    public record RefundRequestBody(String ticketCode, String reason) {}
+    public record RefundMessageBody(String content) {}
 
     private UUID getCurrentUserId() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();

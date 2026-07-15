@@ -9,11 +9,20 @@ import {
   Chip,
   Container,
   Divider,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  MenuItem,
   Snackbar,
   Stack,
+  TextField,
   Typography,
 } from '@mui/material';
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
+import ChatRoundedIcon from '@mui/icons-material/ChatRounded';
+import SendRoundedIcon from '@mui/icons-material/SendRounded';
+import { useAuth } from '../context/AuthContext';
 import { useBooking } from '../hooks/useBooking';
 import ConfirmationDialog from '../components/common/ConfirmationDialog';
 import EmptyState from '../components/common/EmptyState';
@@ -61,6 +70,7 @@ const canCancelBooking = (status) => ['HOLD', 'PENDING'].includes(String(status 
 
 const MyBookingDetailPage = () => {
   const { bookingId } = useParams();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { loading, error, clearError, getDetail, getTickets, syncPayment, cancel } = useBooking();
@@ -70,6 +80,13 @@ const MyBookingDetailPage = () => {
   const [snackbar, setSnackbar] = useState('');
   const [dataLoading, setDataLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [refundOpen, setRefundOpen] = useState(false);
+  const [refundReason, setRefundReason] = useState('');
+  const [refundTicketCode, setRefundTicketCode] = useState('');
+  const [refundRequest, setRefundRequest] = useState(null);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [messages, setMessages] = useState([]);
+  const [messageText, setMessageText] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -82,8 +99,9 @@ const MyBookingDetailPage = () => {
       detailPromise,
       getTickets(bookingId).catch(() => []),
       bookingApi.fetchShowtimes().catch(() => []),
+      bookingApi.fetchMyRefundRequests().catch(() => null),
     ])
-      .then(([bookingDetail, ticketList, showtimeResponse]) => {
+      .then(([bookingDetail, ticketList, showtimeResponse, refundResponse]) => {
         if (!active) return;
         const rawShowtimes = showtimeResponse?.data ?? showtimeResponse ?? [];
         const showtimeMap = new Map(
@@ -94,6 +112,11 @@ const MyBookingDetailPage = () => {
         const normalizedTickets = Array.isArray(ticketList) ? ticketList : [];
         setBooking(enrichedBooking);
         setTickets(normalizedTickets);
+        const refundList = refundResponse?.data?.data ?? refundResponse?.data ?? [];
+        setRefundRequest(Array.isArray(refundList)
+          ? refundList.find((item) => String(item.bookingId) === String(bookingId)) || null
+          : null);
+        if (normalizedTickets[0]?.ticketCode) setRefundTicketCode(normalizedTickets[0].ticketCode);
         if (payosReturnedPaid && String(enrichedBooking?.status || '').toUpperCase() === 'CONFIRMED') {
           navigate('/booking/success', {
             replace: true,
@@ -142,6 +165,39 @@ const MyBookingDetailPage = () => {
     } finally {
       setActionLoading(false);
     }
+  };
+
+  const handleRefundRequest = async () => {
+    setActionLoading(true);
+    try {
+      const response = await bookingApi.requestRefund(bookingId, refundTicketCode, refundReason);
+      const created = response?.data?.data ?? response?.data ?? null;
+      setRefundRequest(created);
+      setRefundOpen(false);
+      setRefundReason('');
+      setSnackbar('Đã gửi yêu cầu hoàn tiền đến staff trưởng.');
+    } catch (err) {
+      clearError();
+      setSnackbar(err?.message || 'Không thể gửi yêu cầu hoàn tiền.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const openRefundChat = async () => {
+    if (!refundRequest?.id) return;
+    setChatOpen(true);
+    const response = await bookingApi.fetchRefundMessages(refundRequest.id).catch(() => null);
+    setMessages(response?.data?.data ?? response?.data ?? []);
+  };
+
+  const sendRefundMessage = async () => {
+    const content = messageText.trim();
+    if (!content || !refundRequest?.id) return;
+    const response = await bookingApi.sendRefundMessage(refundRequest.id, content);
+    const message = response?.data?.data ?? response?.data;
+    setMessages((list) => [...list, message]);
+    setMessageText('');
   };
 
   if (dataLoading && !booking) {
@@ -250,6 +306,11 @@ const MyBookingDetailPage = () => {
                 Mở vé thành công
               </Button>
             )}
+            {booking.status === 'CONFIRMED' && !refundRequest && (
+              <Button color="warning" variant="outlined" onClick={() => setRefundOpen(true)}>
+                Yêu cầu hoàn tiền
+              </Button>
+            )}
             {canCancelBooking(booking.status) && (
               <>
                 <Button color="error" variant="outlined" onClick={() => setConfirmOpen(true)}>
@@ -261,8 +322,52 @@ const MyBookingDetailPage = () => {
               </>
             )}
           </Stack>
+          {refundRequest && (
+            <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ sm: 'center' }} spacing={1.5} sx={{ mt: 3 }}>
+              <Alert severity={refundRequest.status === 'REJECTED' ? 'error' : refundRequest.status === 'APPROVED' ? 'success' : 'info'} sx={{ flex: 1 }}>
+                Yêu cầu hoàn tiền: <b>{refundRequest.status}</b>{refundRequest.rejectionReason ? ` · ${refundRequest.rejectionReason}` : ''}
+              </Alert>
+              <Button variant="contained" startIcon={<ChatRoundedIcon />} onClick={openRefundChat}>Chat với staff trưởng</Button>
+            </Stack>
+          )}
         </CardContent>
       </Card>
+
+      <Dialog open={refundOpen} onClose={() => !actionLoading && setRefundOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Gửi yêu cầu hoàn tiền</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ pt: 1 }}>
+            <Alert severity="info">Staff trưởng sẽ kiểm tra mã vé, trạng thái check-in và điều kiện hoàn. Yêu cầu từ 200.000đ trở lên cần Admin duyệt.</Alert>
+            <TextField select label="Mã vé" value={refundTicketCode} onChange={(event) => setRefundTicketCode(event.target.value)}>
+              {tickets.map((ticket) => <MenuItem key={ticket.ticketCode || ticket.id} value={ticket.ticketCode}>{ticket.ticketCode}</MenuItem>)}
+            </TextField>
+            <TextField multiline minRows={4} label="Lý do hoàn tiền" value={refundReason} onChange={(event) => setRefundReason(event.target.value)} helperText="Nhập ít nhất 10 ký tự để staff trưởng có đủ thông tin kiểm tra." />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRefundOpen(false)}>Hủy</Button>
+          <Button variant="contained" onClick={handleRefundRequest} disabled={actionLoading || refundReason.trim().length < 10 || !refundTicketCode}>Gửi yêu cầu</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={chatOpen} onClose={() => setChatOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle><ChatRoundedIcon sx={{ mr: 1, verticalAlign: 'middle' }} />Hỗ trợ hoàn tiền</DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={1.2} sx={{ minHeight: 300, maxHeight: 430, overflowY: 'auto' }}>
+            {messages.map((message) => {
+              const mine = String(message.senderId) === String(user?.id);
+              return <Box key={message.id} alignSelf={mine ? 'flex-end' : 'flex-start'} sx={{ maxWidth: '78%', bgcolor: mine ? 'primary.main' : 'action.hover', color: mine ? 'primary.contrastText' : 'text.primary', px: 2, py: 1.2, borderRadius: mine ? '18px 18px 4px 18px' : '18px 18px 18px 4px' }}>
+                <Typography variant="caption" sx={{ opacity: 0.75 }}>{mine ? 'Bạn' : message.senderName || 'Staff trưởng'}</Typography>
+                <Typography variant="body2">{message.content}</Typography>
+              </Box>;
+            })}
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <TextField fullWidth size="small" placeholder="Nhắn cho staff trưởng..." value={messageText} onChange={(event) => setMessageText(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendRefundMessage(); } }} />
+          <Button variant="contained" onClick={sendRefundMessage} disabled={!messageText.trim()}><SendRoundedIcon /></Button>
+        </DialogActions>
+      </Dialog>
 
       <ConfirmationDialog
         open={confirmOpen}

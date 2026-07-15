@@ -52,12 +52,6 @@ public class StaffBookingController {
         return ResponseEntity.ok(ApiResponse.success("Access regranted successfully", staffBookingService.regrantAccess(bookingId)));
     }
 
-    @Operation(summary = "Refund an order")
-    @PostMapping("/{bookingId}/refund")
-    public ResponseEntity<ApiResponse<?>> refund(@PathVariable UUID bookingId) {
-        return ResponseEntity.ok(ApiResponse.success("Refund request recorded successfully", staffBookingService.refund(bookingId)));
-    }
-
     @Operation(summary = "Cancel a booking (release seats if in HOLD status)")
     @PostMapping("/{bookingId}/cancel")
     public ResponseEntity<ApiResponse<BookingResponse>> cancelBooking(@PathVariable UUID bookingId) {

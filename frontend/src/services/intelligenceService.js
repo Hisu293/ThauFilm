@@ -15,7 +15,17 @@ export const memberIntelligenceService = {
   dating: (payload) => api.post('/api/member/intelligence/dating', payload).then(unwrap),
   matchingProfile: () => api.get('/api/member/matching/profile').then(unwrap),
   saveMatchingProfile: (payload) => api.put('/api/member/matching/profile', payload).then(unwrap),
+  uploadMatchingPhoto: (image) => {
+    const formData = new FormData();
+    formData.append('image', image);
+    return api.post('/api/member/matching/profile/photo', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }).then(unwrap);
+  },
+  removeMatchingPhoto: () => api.delete('/api/member/matching/profile/photo').then(unwrap),
   matchingCandidates: () => api.get('/api/member/matching/candidates').then(unwrap),
+  passedMatchingCandidates: () => api.get('/api/member/matching/candidates/passed').then(unwrap),
+  restoreMatchingCandidate: (targetId) => api.delete(`/api/member/matching/candidates/${targetId}/action`).then(unwrap),
   matchingAction: (targetId, decision) => api.post(`/api/member/matching/candidates/${targetId}/action`, { decision }).then(unwrap),
   matches: () => api.get('/api/member/matching/matches').then(unwrap),
   matchMessages: (matchId) => api.get(`/api/member/matching/matches/${matchId}/messages`).then(unwrap),

@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   Avatar,
   Box,
   Button,
   Card,
+  Chip,
   CircularProgress,
   Collapse,
   Container,
@@ -13,10 +14,13 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControl,
   IconButton,
+  InputLabel,
   Menu,
   MenuItem,
   Rating,
+  Select,
   Snackbar,
   Stack,
   TextField,
@@ -31,9 +35,15 @@ import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import MoreHorizIcon from '@mui/icons-material/MoreHoriz';
 import SendIcon from '@mui/icons-material/Send';
 import ShareOutlinedIcon from '@mui/icons-material/ShareOutlined';
+import ChatRoundedIcon from '@mui/icons-material/ChatRounded';
+import DynamicFeedRoundedIcon from '@mui/icons-material/DynamicFeedRounded';
+import PersonAddRoundedIcon from '@mui/icons-material/PersonAddRounded';
+import PersonRemoveRoundedIcon from '@mui/icons-material/PersonRemoveRounded';
+import ReviewsRoundedIcon from '@mui/icons-material/ReviewsRounded';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { socialService } from '../services/socialService';
+import TopMovieFansWidget from '../components/TopMovieFansWidget';
 
 const MAX_SOURCE_IMAGE_SIZE = 8 * 1024 * 1024;
 const MAX_IMAGE_DATA_LENGTH = 2_700_000;
@@ -135,7 +145,30 @@ function ImagePicker({ imageUrl, onChange, disabled }) {
   );
 }
 
-function PostCard({ item, onEdit, onDelete, onMetrics, onNotice }) {
+function AuthorActions({ userId, following, onFollowingChange, onMessage, onNotice }) {
+  const [busy, setBusy] = useState(false);
+
+  const toggleFollow = async () => {
+    setBusy(true);
+    try {
+      if (following) await socialService.unfollow(userId);
+      else await socialService.follow(userId);
+      onFollowingChange(!following);
+      onNotice({ severity: 'success', text: following ? 'Đã bỏ theo dõi.' : 'Đã theo dõi người dùng.' });
+    } catch (error) {
+      onNotice({ severity: 'error', text: error.message || 'Không thể cập nhật theo dõi.' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return <Stack direction="row" spacing={.6} alignItems="center" flexWrap="wrap" justifyContent="flex-end">
+    <Button size="small" variant={following ? 'outlined' : 'contained'} disabled={busy} onClick={toggleFollow} startIcon={following ? <PersonRemoveRoundedIcon /> : <PersonAddRoundedIcon />} sx={{ borderRadius: 99, whiteSpace: 'nowrap' }}>{following ? 'Đang theo dõi' : 'Theo dõi'}</Button>
+    <Button size="small" variant="text" onClick={onMessage} startIcon={<ChatRoundedIcon />} sx={{ borderRadius: 99, whiteSpace: 'nowrap' }}>Nhắn tin</Button>
+  </Stack>;
+}
+
+function PostCard({ item, following, onFollowingChange, onEdit, onDelete, onMetrics, onNotice, onMessage }) {
   const [anchorEl, setAnchorEl] = useState(null);
   const [reactionAnchor, setReactionAnchor] = useState(null);
   const [commentsOpen, setCommentsOpen] = useState(false);
@@ -219,7 +252,7 @@ function PostCard({ item, onEdit, onDelete, onMetrics, onNotice }) {
 
   return (
     <Card id={`post-${item.postId}`} sx={{ p: { xs: 2, md: 3 }, borderRadius: 4, scrollMarginTop: 90 }}>
-      <Stack direction="row" spacing={1.5} alignItems="center">
+      <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
         <Avatar src={item.userAvatarUrl}>{(item.userFullName || 'U')[0]}</Avatar>
         <Box flex={1} minWidth={0}>
           <Typography fontWeight={900}>{item.userFullName || 'Thành viên'}</Typography>
@@ -227,6 +260,7 @@ function PostCard({ item, onEdit, onDelete, onMetrics, onNotice }) {
             {formatDate(item.createdAt)}{isEdited ? ' · Đã chỉnh sửa' : ''}
           </Typography>
         </Box>
+        {!item.owner && item.userId && <AuthorActions userId={item.userId} following={following} onFollowingChange={onFollowingChange} onMessage={onMessage} onNotice={onNotice} />}
         {item.owner && (
           <>
             <IconButton aria-label="Tùy chọn bài viết" onClick={(event) => setAnchorEl(event.currentTarget)}>
@@ -342,15 +376,16 @@ function PostCard({ item, onEdit, onDelete, onMetrics, onNotice }) {
   );
 }
 
-function ReviewCard({ item }) {
+function ReviewCard({ item, following, onFollowingChange, onNotice, onMessage }) {
   return (
     <Card sx={{ p: { xs: 2, md: 3 }, borderRadius: 4 }}>
-      <Stack direction="row" spacing={1.5} alignItems="center">
+      <Stack direction="row" spacing={1.5} alignItems="center" flexWrap="wrap">
         <Avatar src={item.userAvatarUrl}>{(item.userFullName || 'U')[0]}</Avatar>
         <Box flex={1}>
           <Typography fontWeight={900}>{item.userFullName || 'Thành viên'}</Typography>
           <Typography variant="caption" color="text.secondary">{formatDate(item.createdAt)} · Đánh giá phim</Typography>
         </Box>
+        {!item.owner && item.userId && <AuthorActions userId={item.userId} following={following} onFollowingChange={onFollowingChange} onMessage={onMessage} onNotice={onNotice} />}
       </Stack>
       <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2.5} mt={2.5}>
         {item.moviePosterUrl && (
@@ -370,7 +405,11 @@ function ReviewCard({ item }) {
 export default function CommunityFeedPage() {
   const navigate = useNavigate();
   const { isLoggedIn, user } = useAuth();
+  const userId = user?.id;
   const [items, setItems] = useState([]);
+  const [followingIds, setFollowingIds] = useState(() => new Set());
+  const [feedMode, setFeedMode] = useState('all');
+  const [reviewMovieId, setReviewMovieId] = useState('all');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -382,18 +421,34 @@ export default function CommunityFeedPage() {
   const [editContent, setEditContent] = useState('');
   const [editImageUrl, setEditImageUrl] = useState('');
   const [editImageError, setEditImageError] = useState('');
+  const reviewMovies = useMemo(() => {
+    const movies = new Map();
+    items.filter((item) => item.itemType === 'REVIEW' && item.movieId)
+      .forEach((item) => movies.set(String(item.movieId), item.movieTitle || 'Phim chưa đặt tên'));
+    return Array.from(movies, ([id, title]) => ({ id, title })).sort((left, right) => left.title.localeCompare(right.title, 'vi'));
+  }, [items]);
+  const visibleItems = useMemo(() => {
+    if (feedMode !== 'reviews') return items;
+    return items.filter((item) => item.itemType === 'REVIEW'
+      && (reviewMovieId === 'all' || String(item.movieId) === reviewMovieId));
+  }, [feedMode, items, reviewMovieId]);
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      setItems(await socialService.getCommunityFeed() || []);
+      const [feedItems, following] = await Promise.all([
+        socialService.getCommunityFeed(),
+        userId ? socialService.getFollowing(userId) : Promise.resolve([]),
+      ]);
+      setItems(feedItems || []);
+      setFollowingIds(new Set((following || []).map((person) => String(person.id))));
       setError('');
     } catch (requestError) {
       setError(requestError.message || 'Không thể tải bảng tin cộng đồng.');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [userId]);
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -472,8 +527,21 @@ export default function CommunityFeedPage() {
     }
   };
 
+  const openMessage = (item) => {
+    navigate(`/community/messages?userId=${item.userId}`);
+  };
+
+  const updateFollowing = (userId, following) => {
+    setFollowingIds((current) => {
+      const next = new Set(current);
+      if (following) next.add(String(userId));
+      else next.delete(String(userId));
+      return next;
+    });
+  };
+
   return (
-    <Container maxWidth="md" sx={{ py: { xs: 4, md: 7 }, minHeight: '75vh' }}>
+    <Container maxWidth="xl" sx={{ py: { xs: 4, md: 7 }, minHeight: '75vh' }}>
       <Button
         startIcon={<ArrowBackIcon />}
         onClick={() => window.history.length > 1 ? navigate(-1) : navigate('/')}
@@ -489,6 +557,8 @@ export default function CommunityFeedPage() {
         <Button component={RouterLink} to="/community/connections" variant="outlined">Quản lý kết nối</Button>
       </Stack>
 
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0,1fr)', lg: 'minmax(0,900px) minmax(290px,360px)' }, gap: 3, alignItems: 'start' }}>
+        <Box minWidth={0}>
       <Card sx={{ p: { xs: 2, md: 3 }, mb: 3, borderRadius: 4 }}>
         <Stack direction="row" spacing={1.5} alignItems="flex-start">
           <Avatar src={user?.avatar}>{(user?.fullName || user?.name || 'U')[0]}</Avatar>
@@ -519,27 +589,35 @@ export default function CommunityFeedPage() {
         </Stack>
       </Card>
 
-      {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
-      {loading ? (
-        <Box textAlign="center" py={10}><CircularProgress /></Box>
-      ) : items.length === 0 ? (
-        <Alert severity="info">Chưa có bài viết. Hãy đăng bài đầu tiên hoặc theo dõi thêm bạn bè.</Alert>
-      ) : (
-        <Stack spacing={2.5}>
-          {items.map((item) => item.itemType === 'POST'
-            ? (
-              <PostCard
-                key={`post-${item.id}`}
-                item={item}
-                onEdit={openEdit}
-                onDelete={deletePost}
-                onMetrics={updatePostMetrics}
-                onNotice={setNotice}
-              />
-            )
-            : <ReviewCard key={`review-${item.id || item.reviewId}`} item={item} />)}
-        </Stack>
-      )}
+          <Card sx={{ p: 1.25, mb: 2.5, borderRadius: 4 }}>
+            <Stack direction={{ xs: 'column', sm: 'row' }} gap={1.2} alignItems={{ sm: 'center' }}>
+              <Stack direction="row" spacing={1} flex={1}>
+                <Button fullWidth variant={feedMode === 'all' ? 'contained' : 'text'} startIcon={<DynamicFeedRoundedIcon />} onClick={() => { setFeedMode('all'); setReviewMovieId('all'); }}>Bảng tin</Button>
+                <Button fullWidth variant={feedMode === 'reviews' ? 'contained' : 'text'} startIcon={<ReviewsRoundedIcon />} onClick={() => setFeedMode('reviews')}>Review theo phim</Button>
+              </Stack>
+              {feedMode === 'reviews' && <FormControl size="small" sx={{ minWidth: { xs: '100%', sm: 230 } }}><InputLabel>Chọn phim</InputLabel><Select label="Chọn phim" value={reviewMovieId} onChange={(event) => setReviewMovieId(event.target.value)}><MenuItem value="all">Tất cả phim ({items.filter((item) => item.itemType === 'REVIEW').length})</MenuItem>{reviewMovies.map((movie) => <MenuItem key={movie.id} value={movie.id}>{movie.title}</MenuItem>)}</Select></FormControl>}
+            </Stack>
+            {feedMode === 'reviews' && <Stack direction="row" spacing={1} alignItems="center" mt={1.25} px={.5}><Chip size="small" icon={<ReviewsRoundedIcon />} label={`${visibleItems.length} review`} color="primary" variant="outlined" /><Typography variant="caption" color="text.secondary">Review từ những thành viên đã xem và đánh giá phim.</Typography></Stack>}
+          </Card>
+
+          {error && <Alert severity="error" sx={{ mb: 3 }}>{error}</Alert>}
+          {loading ? (
+            <Box textAlign="center" py={10}><CircularProgress /></Box>
+          ) : visibleItems.length === 0 ? (
+            <Alert severity="info">{feedMode === 'reviews' ? 'Chưa có review nào cho phim đã chọn.' : 'Chưa có bài viết. Hãy đăng bài đầu tiên hoặc theo dõi thêm bạn bè.'}</Alert>
+          ) : (
+            <Stack spacing={2.5}>
+              {visibleItems.map((item) => item.itemType === 'POST'
+                ? <PostCard key={`post-${item.id}`} item={item} following={followingIds.has(String(item.userId))} onFollowingChange={(following) => updateFollowing(item.userId, following)} onEdit={openEdit} onDelete={deletePost} onMetrics={updatePostMetrics} onNotice={setNotice} onMessage={() => openMessage(item)} />
+                : <ReviewCard key={`review-${item.id || item.reviewId}`} item={item} following={followingIds.has(String(item.userId))} onFollowingChange={(following) => updateFollowing(item.userId, following)} onNotice={setNotice} onMessage={() => openMessage(item)} />)}
+            </Stack>
+          )}
+        </Box>
+
+        <Box sx={{ position: { lg: 'sticky' }, top: { lg: 92 } }}>
+          <TopMovieFansWidget />
+        </Box>
+      </Box>
 
       <Dialog open={Boolean(editing)} onClose={() => !saving && setEditing(null)} fullWidth maxWidth="sm">
         <DialogTitle>Sửa bài viết</DialogTitle>
