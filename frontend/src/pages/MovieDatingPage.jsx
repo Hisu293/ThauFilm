@@ -1,18 +1,21 @@
-import { Box, Chip, Container, Stack, Typography } from '@mui/material';
+import { Box, Container, IconButton, Paper, Stack, Typography } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
+import ArrowBackIosNewRoundedIcon from '@mui/icons-material/ArrowBackIosNewRounded';
+import MoreHorizRoundedIcon from '@mui/icons-material/MoreHorizRounded';
 import FavoriteRoundedIcon from '@mui/icons-material/FavoriteRounded';
-import SwipeRoundedIcon from '@mui/icons-material/SwipeRounded';
-import LocalMoviesRoundedIcon from '@mui/icons-material/LocalMoviesRounded';
 import MovieMatchingPanel from '../components/MovieMatchingPanel';
 
 export default function MovieDatingPage() {
-  return <Box sx={{ minHeight: '82vh', py: { xs: 3, md: 6 }, background: 'radial-gradient(circle at 10% 10%, rgba(255,63,129,.12), transparent 28%), radial-gradient(circle at 90% 5%, rgba(123,92,255,.12), transparent 30%)' }}>
-    <Container maxWidth="xl">
-      <Stack alignItems="center" textAlign="center" spacing={1.5} mb={{ xs: 3, md: 5 }}>
-        <Chip icon={<FavoriteRoundedIcon />} label="THẤU FILM DATING" color="secondary" variant="outlined" sx={{ fontWeight: 900, letterSpacing: 1 }} />
-        <Typography variant="h2" fontWeight={1000} sx={{ fontSize: { xs: '2.35rem', md: '4rem' }, maxWidth: 900 }}>Tìm một người cùng gu,<br />bắt đầu bằng một bộ phim.</Typography>
-        <Typography color="text.secondary" sx={{ maxWidth: 680, fontSize: { md: '1.08rem' } }}>Khám phá từng hồ sơ, vuốt để thể hiện cảm xúc và trò chuyện khi cả hai cùng thích nhau.</Typography>
-        <Stack direction="row" gap={1} flexWrap="wrap" justifyContent="center" pt={1}><Chip icon={<SwipeRoundedIcon />} label="Vuốt để khám phá" /><Chip icon={<LocalMoviesRoundedIcon />} label="Hẹn lịch xem phim" /><Chip icon={<FavoriteRoundedIcon />} label="Match hai chiều" /></Stack>
-      </Stack>
+  const navigate = useNavigate();
+  return <Box sx={{ minHeight: '84vh', py: { xs: 1.5, md: 4 }, bgcolor: '#f4f5f7' }}>
+    <Container maxWidth="md">
+      <Paper elevation={0} sx={{ mb: 2.5, px: { xs: 1, sm: 2 }, py: 1.4, borderRadius: 4, bgcolor: '#fff', border: '1px solid #ececef' }}>
+        <Stack direction="row" alignItems="center" justifyContent="space-between">
+          <IconButton onClick={() => navigate(-1)} sx={{ color: '#17151b' }}><ArrowBackIosNewRoundedIcon /></IconButton>
+          <Stack direction="row" spacing={1} alignItems="center"><FavoriteRoundedIcon sx={{ color: '#6f45db' }} /><Box textAlign="center"><Typography variant="h5" fontWeight={1000} color="#111">Hẹn hò xem phim</Typography><Typography variant="caption" color="#77737e">Thấu Film Dating</Typography></Box></Stack>
+          <IconButton sx={{ color: '#17151b', border: '1px solid #e7e5ea' }}><MoreHorizRoundedIcon /></IconButton>
+        </Stack>
+      </Paper>
       <MovieMatchingPanel />
     </Container>
   </Box>;
