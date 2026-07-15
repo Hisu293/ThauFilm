@@ -118,7 +118,7 @@ export const BookingSuccessPage = () => {
   const [bookingData, setBookingData] = useState(null);
   const [tickets, setTickets] = useState([]);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
-  const [onlineTicketQr, setOnlineTicketQr] = useState('');
+  const [ticketQr, setTicketQr] = useState('');
   const [calendarNotice, setCalendarNotice] = useState({ open: false, message: '', severity: 'success' });
 
   const isOnlineBooking = Boolean(
@@ -169,7 +169,7 @@ export const BookingSuccessPage = () => {
 
   useEffect(() => {
     let activeRequest = true;
-    if (!isOnlineBooking || !bookingData?.bookingId) return () => { activeRequest = false; };
+    if (isOnlineBooking || !bookingData?.bookingId) return () => { activeRequest = false; };
 
     const detailUrl = `${window.location.origin}/my-bookings/${encodeURIComponent(bookingData.bookingId)}`;
     QRCode.toDataURL(detailUrl, {
@@ -179,7 +179,7 @@ export const BookingSuccessPage = () => {
       color: { dark: '#0F172A', light: '#FFFFFF' },
     })
       .then((dataUrl) => {
-        if (activeRequest) setOnlineTicketQr(dataUrl);
+        if (activeRequest) setTicketQr(dataUrl);
       })
       .catch(() => {
         if (activeRequest) setSnackbarOpen(true);
@@ -369,7 +369,7 @@ export const BookingSuccessPage = () => {
           </Typography>
         </Box>
 
-        {isOnlineBooking && (
+        {!isOnlineBooking && bookingData?.bookingId && (
           <Box
             sx={{
               mb: 4,
@@ -393,11 +393,11 @@ export const BookingSuccessPage = () => {
                 boxShadow: '0 12px 30px rgba(0, 0, 0, 0.28)',
               }}
             >
-              {onlineTicketQr ? (
+              {ticketQr ? (
                 <Box
                   component="img"
-                  src={onlineTicketQr}
-                  alt={`Mã QR vé online ${bookingCode}`}
+                  src={ticketQr}
+                  alt={`Mã QR vé điện tử ${bookingCode}`}
                   sx={{ width: '100%', height: '100%', display: 'block' }}
                 />
               ) : (
@@ -407,10 +407,10 @@ export const BookingSuccessPage = () => {
             <Box sx={{ maxWidth: 290 }}>
               <Stack direction="row" spacing={1} alignItems="center" justifyContent={{ xs: 'center', sm: 'flex-start' }}>
                 <QrCode2RoundedIcon sx={{ color: 'primary.main' }} />
-                <Typography variant="h6" sx={{ fontWeight: 800 }}>QR vé xem online</Typography>
+                <Typography variant="h6" sx={{ fontWeight: 800 }}>QR vé điện tử</Typography>
               </Stack>
               <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                Quét mã để mở chi tiết vé trên thiết bị khác. Bạn cần đăng nhập đúng tài khoản đã mua vé.
+                Quét mã để mở chi tiết vé sau khi mua vé thành công. Bạn cần đăng nhập đúng tài khoản đã mua vé.
               </Typography>
               <Typography variant="caption" sx={{ display: 'block', mt: 1.25, color: 'primary.main', fontWeight: 800, letterSpacing: '0.08em' }}>
                 {bookingCode}

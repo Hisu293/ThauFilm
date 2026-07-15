@@ -13,6 +13,7 @@ import com.lowagie.text.Image;
 import com.lowagie.text.pdf.PdfPCell;
 import com.lowagie.text.pdf.PdfPTable;
 import com.lowagie.text.pdf.PdfWriter;
+import com.lowagie.text.pdf.BaseFont;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -21,6 +22,7 @@ import java.awt.*;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.net.URI;
@@ -36,6 +38,8 @@ import java.util.Locale;
 public class TicketPdfGenerator {
 
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
+    private static final String UNICODE_FONT_RESOURCE = "font-fallback/LiberationSans-Regular.ttf";
+    private static final BaseFont UNICODE_BASE_FONT = loadUnicodeBaseFont();
 
     private final ShowtimeRepository showtimeRepository;
     private final MovieRepository movieRepository;
@@ -61,7 +65,7 @@ public class TicketPdfGenerator {
     }
 
     private void addBrandHeader(Document document, Booking booking) throws Exception {
-        Paragraph paragraph = new Paragraph("VE XEM PHIM", createHeaderFont());
+        Paragraph paragraph = new Paragraph("VÉ XEM PHIM", createHeaderFont());
         paragraph.setAlignment(Element.ALIGN_CENTER);
         paragraph.setSpacingAfter(6);
         document.add(paragraph);
@@ -144,14 +148,18 @@ public class TicketPdfGenerator {
     }
 
     private void addMetaTable(Document document, Booking booking) throws Exception {
-        String cinemaName = "Rap";
+        String cinemaName = "ThauFilm Cinema";
         String showtimeStr = "";
 
         Showtime s = showtimeRepository.findById(booking.getShowtimeId()).orElse(null);
         if (s != null) {
-            CinemaRoom room = cinemaRoomRepository.findById(s.getCinemaRoomId()).orElse(null);
-            if (room != null) {
-                cinemaName = room.getName();
+            if (s.isOnline()) {
+                cinemaName = "ThauFilm Online";
+            } else if (s.getCinemaRoomId() != null) {
+                CinemaRoom room = cinemaRoomRepository.findById(s.getCinemaRoomId()).orElse(null);
+                if (room != null) {
+                    cinemaName = room.getName();
+                }
             }
             showtimeStr = s.getStartTime().format(DATE_TIME_FORMATTER);
         }
@@ -164,11 +172,11 @@ public class TicketPdfGenerator {
         table.getDefaultCell().setBorder(Rectangle.NO_BORDER);
         table.getDefaultCell().setPadding(5);
 
-        table.addCell(createLabelCell("RAP"));
+        table.addCell(createLabelCell("RẠP / PHÒNG CHIẾU"));
         table.addCell(createValueCell(cinemaName));
-        table.addCell(createLabelCell("SUAT CHIEU"));
+        table.addCell(createLabelCell("SUẤT CHIẾU"));
         table.addCell(createValueCell(showtimeStr));
-        table.addCell(createLabelCell("MA DAT VE"));
+        table.addCell(createLabelCell("MÃ ĐẶT VÉ"));
         table.addCell(createValueCell(booking.getConfirmationCode()));
 
         document.add(table);
@@ -182,10 +190,10 @@ public class TicketPdfGenerator {
         table.setSpacingAfter(10);
 
         table.addCell(createHeaderCell("STT"));
-        table.addCell(createHeaderCell("GHE"));
-        table.addCell(createHeaderCell("MA VE"));
-        table.addCell(createHeaderCell("LOAI"));
-        table.addCell(createHeaderCell("GIA"));
+        table.addCell(createHeaderCell("GHẾ"));
+        table.addCell(createHeaderCell("MÃ VÉ"));
+        table.addCell(createHeaderCell("LOẠI GHẾ"));
+        table.addCell(createHeaderCell("GIÁ"));
 
         java.util.Map<java.util.UUID, BigDecimal> seatPriceById = bookingSeatRepository
                 .findByBookingId(booking.getId())
@@ -201,13 +209,13 @@ public class TicketPdfGenerator {
             String seatInfo = seat != null
                     ? seat.getRowName() + seat.getSeatNumber()
                     : ticket.getSeatId().toString();
-            String seatType = seat != null ? getSeatTypeLabel(seat.getType()) : "Khong ro";
+            String seatType = seat != null ? getSeatTypeLabel(seat.getType()) : "Không rõ";
 
             table.addCell(createDataCell(String.valueOf(i + 1)));
             table.addCell(createDataCell(seatInfo));
             table.addCell(createDataCell(ticket.getTicketCode()));
             table.addCell(createDataCell(seatType));
-            table.addCell(createDataCell(formatMoney(seatPriceById.getOrDefault(ticket.getSeatId(), BigDecimal.ZERO)) + " VND"));
+            table.addCell(createDataCell(formatMoney(seatPriceById.getOrDefault(ticket.getSeatId(), BigDecimal.ZERO)) + " đ"));
 
             if (i == 0) {
                 table.setHeaderRows(1);
@@ -227,6 +235,9 @@ public class TicketPdfGenerator {
                 .map(bs -> bs.getPriceAtBooking() != null ? bs.getPriceAtBooking() : BigDecimal.ZERO)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal comboTotal = booking.getTotalAmount().subtract(seatTotal).max(BigDecimal.ZERO);
+        boolean onlineBooking = showtimeRepository.findById(booking.getShowtimeId())
+                .map(Showtime::isOnline)
+                .orElse(false);
 
         PdfPTable table = new PdfPTable(2);
         table.setWidthPercentage(100);
@@ -236,25 +247,25 @@ public class TicketPdfGenerator {
         table.getDefaultCell().setBorder(Rectangle.NO_BORDER);
         table.getDefaultCell().setPadding(5);
 
-        table.addCell(createLabelCell("TIEN GHE"));
-        table.addCell(createValueCell(formatMoney(seatTotal) + " VND"));
+        table.addCell(createLabelCell(onlineBooking ? "VÉ XEM ONLINE" : "TIỀN GHẾ"));
+        table.addCell(createValueCell(formatMoney(onlineBooking ? booking.getTotalAmount() : seatTotal) + " đ"));
 
-        if (comboTotal.compareTo(BigDecimal.ZERO) > 0) {
-            table.addCell(createLabelCell("COMBO BAP NUOC"));
-            table.addCell(createValueCell(formatMoney(comboTotal) + " VND"));
+        if (!onlineBooking && comboTotal.compareTo(BigDecimal.ZERO) > 0) {
+            table.addCell(createLabelCell("COMBO BẮP NƯỚC"));
+            table.addCell(createValueCell(formatMoney(comboTotal) + " đ"));
         }
 
-        table.addCell(createLabelCell("TONG TRUOC GIAM"));
-        table.addCell(createValueCell(formatMoney(booking.getTotalAmount()) + " VND"));
+        table.addCell(createLabelCell("TỔNG TRƯỚC GIẢM"));
+        table.addCell(createValueCell(formatMoney(booking.getTotalAmount()) + " đ"));
 
         if (discountAmount.compareTo(BigDecimal.ZERO) > 0) {
-            table.addCell(createLabelCell("GIAM GIA"));
-            table.addCell(createValueCell("-" + formatMoney(discountAmount) + " VND"));
-            table.addCell(createLabelCell("THANH TOAN"));
-            table.addCell(createValueCell(formatMoney(finalAmount) + " VND", true));
+            table.addCell(createLabelCell("GIẢM GIÁ"));
+            table.addCell(createValueCell("-" + formatMoney(discountAmount) + " đ"));
+            table.addCell(createLabelCell("THANH TOÁN"));
+            table.addCell(createValueCell(formatMoney(finalAmount) + " đ", true));
         } else {
-            table.addCell(createLabelCell("THANH TOAN"));
-            table.addCell(createValueCell(formatMoney(finalAmount) + " VND", true));
+            table.addCell(createLabelCell("THANH TOÁN"));
+            table.addCell(createValueCell(formatMoney(finalAmount) + " đ", true));
         }
 
         document.add(table);
@@ -271,7 +282,7 @@ public class TicketPdfGenerator {
         paragraph.setAlignment(Element.ALIGN_CENTER);
         paragraph.setSpacingBefore(8);
         paragraph.setSpacingAfter(8);
-        paragraph.add(new Phrase("Quet ma de xem chi tiet ve", createLabelFont()));
+        paragraph.add(new Phrase("Quét mã để xem chi tiết vé", createLabelFont()));
         paragraph.add(Chunk.NEWLINE);
         paragraph.add(image);
         document.add(paragraph);
@@ -286,8 +297,10 @@ public class TicketPdfGenerator {
         Showtime s = showtimeRepository.findById(booking.getShowtimeId()).orElse(null);
         if (s != null) {
             builder.append(s.getStartTime().format(DATE_TIME_FORMATTER)).append("|");
-            CinemaRoom room = cinemaRoomRepository.findById(s.getCinemaRoomId()).orElse(null);
-            builder.append(room != null ? room.getName() : "Rap").append("|");
+            CinemaRoom room = s.getCinemaRoomId() == null
+                    ? null
+                    : cinemaRoomRepository.findById(s.getCinemaRoomId()).orElse(null);
+            builder.append(s.isOnline() ? "ThauFilm Online" : room != null ? room.getName() : "Rạp").append("|");
         } else {
             builder.append("|");
         }
@@ -306,11 +319,11 @@ public class TicketPdfGenerator {
     }
 
     private String getSeatTypeLabel(Seat.Type type) {
-        if (type == null) return "Thuong";
+        if (type == null) return "Thường";
         return switch (type) {
             case VIP -> "VIP";
-            case COUPLE -> "Doi";
-            case STANDARD -> "Thuong";
+            case COUPLE -> "Ghế đôi";
+            case STANDARD -> "Thường";
         };
     }
 
@@ -359,28 +372,47 @@ public class TicketPdfGenerator {
         return cell;
     }
 
+    private static BaseFont loadUnicodeBaseFont() {
+        try (InputStream input = TicketPdfGenerator.class.getClassLoader().getResourceAsStream(UNICODE_FONT_RESOURCE)) {
+            if (input == null) {
+                throw new IllegalStateException("Không tìm thấy font Unicode cho PDF: " + UNICODE_FONT_RESOURCE);
+            }
+            byte[] fontBytes = input.readAllBytes();
+            return BaseFont.createFont(
+                    "LiberationSans-Regular.ttf",
+                    BaseFont.IDENTITY_H,
+                    BaseFont.EMBEDDED,
+                    true,
+                    fontBytes,
+                    null
+            );
+        } catch (Exception ex) {
+            throw new IllegalStateException("Không thể khởi tạo font Unicode cho PDF vé", ex);
+        }
+    }
+
     private static com.lowagie.text.Font createHeaderFont() {
-        return new com.lowagie.text.Font(com.lowagie.text.Font.HELVETICA, 18, com.lowagie.text.Font.BOLD,
+        return new com.lowagie.text.Font(UNICODE_BASE_FONT, 18, com.lowagie.text.Font.BOLD,
                 new Color(15, 30, 70));
     }
 
     private static com.lowagie.text.Font createSubHeaderFont() {
-        return new com.lowagie.text.Font(com.lowagie.text.Font.HELVETICA, 13, com.lowagie.text.Font.BOLD,
+        return new com.lowagie.text.Font(UNICODE_BASE_FONT, 13, com.lowagie.text.Font.BOLD,
                 new Color(45, 45, 45));
     }
 
     private static com.lowagie.text.Font createLabelFont() {
-        return new com.lowagie.text.Font(com.lowagie.text.Font.HELVETICA, 11, com.lowagie.text.Font.BOLD,
+        return new com.lowagie.text.Font(UNICODE_BASE_FONT, 11, com.lowagie.text.Font.BOLD,
                 new Color(90, 90, 100));
     }
 
     private static com.lowagie.text.Font createInfoFont() {
-        return new com.lowagie.text.Font(com.lowagie.text.Font.HELVETICA, 11, com.lowagie.text.Font.NORMAL,
+        return new com.lowagie.text.Font(UNICODE_BASE_FONT, 11, com.lowagie.text.Font.NORMAL,
                 new Color(50, 50, 55));
     }
 
     private static com.lowagie.text.Font createHighlightFont() {
-        return new com.lowagie.text.Font(com.lowagie.text.Font.HELVETICA, 12, com.lowagie.text.Font.BOLD,
+        return new com.lowagie.text.Font(UNICODE_BASE_FONT, 12, com.lowagie.text.Font.BOLD,
                 new Color(200, 45, 60));
     }
 }
