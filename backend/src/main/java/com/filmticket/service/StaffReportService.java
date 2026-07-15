@@ -30,6 +30,7 @@ import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -189,6 +190,130 @@ public class StaffReportService {
         return row("from", range.from, "to", range.to, "totalTickets", totalTickets,
                 "ticketsSold", totalTickets, "totalAmount", revenue(range.from, range.to).get("totalRevenue"),
                 "daily", daily);
+    }
+
+    public Map<String, Object> monthlyTicketAnalytics(int year, int month) {
+        YearMonth selected = reportMonth(year, month);
+        ReportContext context = context();
+        Set<UUID> confirmedBookingIds = context.bookings.values().stream()
+                .filter(booking -> booking.getStatus() == BookingStatus.CONFIRMED)
+                .map(Booking::getId).collect(Collectors.toSet());
+        List<Ticket> monthTickets = context.tickets.stream()
+                .filter(ticket -> ticket.getCreatedAt() != null && YearMonth.from(ticket.getCreatedAt()).equals(selected))
+                .filter(ticket -> confirmedBookingIds.contains(ticket.getBookingId())).toList();
+        Set<UUID> monthBookingIds = monthTickets.stream().map(Ticket::getBookingId).collect(Collectors.toSet());
+        Map<LocalDate, Long> soldByDate = selected.atDay(1).datesUntil(selected.atEndOfMonth().plusDays(1))
+                .collect(Collectors.toMap(Function.identity(), ignored -> 0L, (a, b) -> a, LinkedHashMap::new));
+        Map<LocalDate, Long> checkedInByDate = new LinkedHashMap<>(soldByDate);
+        Map<UUID, MutableAggregate> movieStats = new HashMap<>();
+        Map<UUID, Set<UUID>> movieOrders = new HashMap<>();
+        long checkedIn = 0;
+        for (Ticket ticket : monthTickets) {
+            LocalDate date = ticket.getCreatedAt().toLocalDate();
+            soldByDate.merge(date, 1L, Long::sum);
+            if (ticket.isCheckedIn()) {
+                checkedIn++;
+                checkedInByDate.merge(date, 1L, Long::sum);
+            }
+            Booking booking = context.bookings.get(ticket.getBookingId());
+            Showtime showtime = booking == null ? null : context.showtimes.get(booking.getShowtimeId());
+            if (showtime == null) continue;
+            movieStats.computeIfAbsent(showtime.getMovieId(), ignored -> new MutableAggregate()).count++;
+            movieOrders.computeIfAbsent(showtime.getMovieId(), ignored -> new HashSet<>()).add(booking.getId());
+        }
+        BigDecimal revenue = BigDecimal.ZERO;
+        for (Payment payment : context.payments) {
+            LocalDate date = paymentDate(payment);
+            if (payment.getStatus() != PaymentStatus.PAID || date == null || !YearMonth.from(date).equals(selected)
+                    || !monthBookingIds.contains(payment.getBookingId())) continue;
+            revenue = revenue.add(payment.getAmount());
+            Booking booking = context.bookings.get(payment.getBookingId());
+            Showtime showtime = booking == null ? null : context.showtimes.get(booking.getShowtimeId());
+            if (showtime != null) movieStats.computeIfAbsent(showtime.getMovieId(), ignored -> new MutableAggregate()).revenue =
+                    movieStats.get(showtime.getMovieId()).revenue.add(payment.getAmount());
+        }
+        List<Map<String, Object>> daily = soldByDate.keySet().stream()
+                .map(date -> row("date", date, "tickets", soldByDate.get(date), "checkedIn", checkedInByDate.get(date))).toList();
+        List<Map<String, Object>> movies = movieStats.entrySet().stream()
+                .sorted((a, b) -> Long.compare(b.getValue().count, a.getValue().count))
+                .map(entry -> row("movieId", entry.getKey(), "movieTitle",
+                        context.movies.getOrDefault(entry.getKey(), Movie.builder().title("Không rõ").build()).getTitle(),
+                        "tickets", entry.getValue().count, "orders", movieOrders.getOrDefault(entry.getKey(), Set.of()).size(),
+                        "revenue", entry.getValue().revenue)).toList();
+        Map.Entry<LocalDate, Long> peak = soldByDate.entrySet().stream().max(Map.Entry.comparingByValue()).orElse(null);
+        long totalTickets = monthTickets.size();
+        BigDecimal averageValue = totalTickets == 0 ? BigDecimal.ZERO
+                : revenue.divide(BigDecimal.valueOf(totalTickets), 0, java.math.RoundingMode.HALF_UP);
+        return row("year", year, "month", month, "allTimeTickets", context.tickets.stream()
+                        .filter(ticket -> confirmedBookingIds.contains(ticket.getBookingId())).count(),
+                "totalTickets", totalTickets, "paidOrders", monthBookingIds.size(), "checkedInTickets", checkedIn,
+                "checkInRate", totalTickets == 0 ? 0 : Math.round(checkedIn * 1000d / totalTickets) / 10d,
+                "totalRevenue", revenue, "averageTicketValue", averageValue,
+                "peakDate", peak == null ? null : peak.getKey(), "peakTickets", peak == null ? 0 : peak.getValue(),
+                "daily", daily, "movies", movies);
+    }
+
+    public Map<String, Object> monthlyCustomerAnalytics(int year, int month) {
+        YearMonth selected = reportMonth(year, month);
+        ReportContext context = context();
+        List<User> members = context.users.values().stream().filter(user -> user.getRole() == User.Role.MEMBER).toList();
+        Set<UUID> memberIds = members.stream().map(User::getId).collect(Collectors.toSet());
+        List<Booking> confirmed = context.bookings.values().stream()
+                .filter(booking -> booking.getStatus() == BookingStatus.CONFIRMED && memberIds.contains(booking.getUserId())).toList();
+        Map<UUID, List<Booking>> byCustomer = confirmed.stream().collect(Collectors.groupingBy(Booking::getUserId));
+        List<Booking> monthBookings = confirmed.stream().filter(booking -> YearMonth.from(bookingDate(booking)).equals(selected)).toList();
+        Set<UUID> activeIds = monthBookings.stream().map(Booking::getUserId).collect(Collectors.toSet());
+        Set<UUID> newBuyerIds = activeIds.stream().filter(userId -> byCustomer.getOrDefault(userId, List.of()).stream()
+                .map(this::bookingDate).min(LocalDate::compareTo).map(date -> YearMonth.from(date).equals(selected)).orElse(false))
+                .collect(Collectors.toSet());
+        Set<UUID> returningIds = new HashSet<>(activeIds);
+        returningIds.removeAll(newBuyerIds);
+        Map<UUID, BigDecimal> spend = new HashMap<>();
+        Set<UUID> monthBookingIds = monthBookings.stream().map(Booking::getId).collect(Collectors.toSet());
+        for (Payment payment : context.payments) {
+            LocalDate date = paymentDate(payment);
+            Booking booking = context.bookings.get(payment.getBookingId());
+            if (payment.getStatus() == PaymentStatus.PAID && date != null && YearMonth.from(date).equals(selected)
+                    && booking != null && memberIds.contains(booking.getUserId())) {
+                spend.merge(booking.getUserId(), payment.getAmount(), BigDecimal::add);
+            }
+        }
+        BigDecimal totalSpend = spend.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal averageSpend = activeIds.isEmpty() ? BigDecimal.ZERO
+                : totalSpend.divide(BigDecimal.valueOf(activeIds.size()), 0, java.math.RoundingMode.HALF_UP);
+        Map<LocalDate, Set<UUID>> activeByDate = selected.atDay(1).datesUntil(selected.atEndOfMonth().plusDays(1))
+                .collect(Collectors.toMap(Function.identity(), ignored -> new HashSet<>(), (a, b) -> a, LinkedHashMap::new));
+        Map<LocalDate, Long> ordersByDate = selected.atDay(1).datesUntil(selected.atEndOfMonth().plusDays(1))
+                .collect(Collectors.toMap(Function.identity(), ignored -> 0L, (a, b) -> a, LinkedHashMap::new));
+        monthBookings.forEach(booking -> {
+            LocalDate date = bookingDate(booking);
+            activeByDate.get(date).add(booking.getUserId());
+            ordersByDate.merge(date, 1L, Long::sum);
+        });
+        List<Map<String, Object>> daily = activeByDate.keySet().stream()
+                .map(date -> row("date", date, "activeCustomers", activeByDate.get(date).size(), "orders", ordersByDate.get(date))).toList();
+        List<Map<String, Object>> topCustomers = activeIds.stream().map(userId -> {
+                    User user = context.users.get(userId);
+                    List<Booking> orders = monthBookings.stream().filter(booking -> booking.getUserId().equals(userId)).toList();
+                    LocalDate lastPurchase = orders.stream().map(this::bookingDate).max(LocalDate::compareTo).orElse(null);
+                    return row("customerId", userId, "name", user == null ? "Không rõ" : user.getFullName(),
+                            "email", user == null ? "" : user.getEmail(), "orders", orders.size(),
+                            "spend", spend.getOrDefault(userId, BigDecimal.ZERO), "lastPurchase", lastPurchase,
+                            "segment", byCustomer.getOrDefault(userId, List.of()).size() >= 5 ? "LOYAL" : returningIds.contains(userId) ? "RETURNING" : "NEW");
+                }).sorted((a, b) -> ((BigDecimal) b.get("spend")).compareTo((BigDecimal) a.get("spend"))).limit(10).toList();
+        long loyal = byCustomer.values().stream().filter(items -> items.size() >= 5).count();
+        long repeat = byCustomer.values().stream().filter(items -> items.size() >= 2 && items.size() < 5).count();
+        long oneTime = byCustomer.values().stream().filter(items -> items.size() == 1).count();
+        long noPurchase = members.size() - byCustomer.size();
+        return row("year", year, "month", month, "totalMembers", members.size(), "activeCustomers", activeIds.size(),
+                "newBuyers", newBuyerIds.size(), "returningCustomers", returningIds.size(), "loyalCustomers", loyal,
+                "customersWithoutPurchase", noPurchase, "monthOrders", monthBookingIds.size(), "monthSpend", totalSpend,
+                "averageSpend", averageSpend, "repeatRate", activeIds.isEmpty() ? 0 : Math.round(returningIds.size() * 1000d / activeIds.size()) / 10d,
+                "segments", List.of(row("key", "LOYAL", "label", "Trung thành (≥5 đơn)", "count", loyal),
+                        row("key", "REPEAT", "label", "Mua lại (2–4 đơn)", "count", repeat),
+                        row("key", "ONE_TIME", "label", "Mua một lần", "count", oneTime),
+                        row("key", "NO_PURCHASE", "label", "Chưa mua", "count", noPurchase)),
+                "daily", daily, "topCustomers", topCustomers);
     }
 
     public Map<String, Object> onlineMovieSales(LocalDate from, LocalDate to) {
@@ -360,6 +485,16 @@ public class StaffReportService {
     private LocalDate paymentDate(Payment payment) {
         LocalDateTime timestamp = payment.getPaidAt() != null ? payment.getPaidAt() : payment.getCreatedAt();
         return timestamp == null ? null : timestamp.toLocalDate();
+    }
+
+    private LocalDate bookingDate(Booking booking) {
+        LocalDateTime timestamp = booking.getConfirmedAt() != null ? booking.getConfirmedAt() : booking.getCreatedAt();
+        return timestamp.toLocalDate();
+    }
+
+    private YearMonth reportMonth(int year, int month) {
+        try { return YearMonth.of(year, month); }
+        catch (RuntimeException exception) { throw new IllegalArgumentException("Invalid report month"); }
     }
 
     private ReportContext context() {

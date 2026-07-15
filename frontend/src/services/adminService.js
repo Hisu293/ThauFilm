@@ -53,6 +53,10 @@ export const adminService = {
 
   getMonthlyRevenue: (year, month) =>
     api.get('/api/admin/reports/revenue/monthly', { params: { year, month } }).then(unwrap),
+  getMonthlyTickets: (year, month) =>
+    api.get('/api/admin/reports/tickets/monthly', { params: { year, month } }).then(unwrap),
+  getMonthlyCustomers: (year, month) =>
+    api.get('/api/admin/reports/customers/monthly', { params: { year, month } }).then(unwrap),
 
   getWorkforceStaff: () => api.get('/api/admin/workforce/staff').then(unwrap),
   getShiftSchedule: (year, month) => api.get('/api/admin/workforce/shifts', { params: { year, month } }).then(unwrap),
