@@ -14,9 +14,12 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TablePagination,
   LinearProgress,
   Chip,
   Divider,
+  TextField,
+  Alert,
 } from '@mui/material';
 import AssessmentRoundedIcon from '@mui/icons-material/AssessmentRounded';
 import PaidRoundedIcon from '@mui/icons-material/PaidRounded';
@@ -50,15 +53,20 @@ const StaffReports = () => {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [fromDate, setFromDate] = useState('');
+  const [toDate, setToDate] = useState('');
+  const [filterError, setFilterError] = useState('');
+  const [page, setPage] = useState(0);
+  const rowsPerPage = 5;
 
-  const loadAll = useCallback(async () => {
+  const loadAll = useCallback(async (from, to) => {
     setLoading(true);
     setError('');
     try {
       const [revenue, tickets, online, topMovies, topShowtimes] = await Promise.all([
-        staffReportService.revenue(),
-        staffReportService.ticketSales(),
-        staffReportService.onlineMovieSales(),
+        staffReportService.revenue(from || undefined, to || undefined),
+        staffReportService.ticketSales(from || undefined, to || undefined),
+        staffReportService.onlineMovieSales(from || undefined, to || undefined),
         staffReportService.topMovies(),
         staffReportService.topShowtimes(),
       ]);
@@ -82,13 +90,36 @@ const StaffReports = () => {
     return (
       <Box sx={{ textAlign: 'center', py: 6 }}>
         <Typography color="error" sx={{ mb: 2 }}>{error}</Typography>
-        <Button variant="outlined" onClick={loadAll}>Thử lại</Button>
+        <Button variant="outlined" onClick={() => loadAll(fromDate, toDate)}>Thử lại</Button>
       </Box>
     );
   }
 
   const { revenue, tickets, online, topMovies, topShowtimes } = data;
-  const maxDaily = Math.max(...(revenue?.daily || []).map((d) => d.total), 1);
+  const dailyRows = [...(revenue?.daily || [])].sort(
+    (left, right) => Date.parse(right.date) - Date.parse(left.date),
+  );
+  const currentPage = Math.min(page, Math.max(0, Math.ceil(dailyRows.length / rowsPerPage) - 1));
+  const pagedDailyRows = dailyRows.slice(currentPage * rowsPerPage, currentPage * rowsPerPage + rowsPerPage);
+  const maxDaily = Math.max(...dailyRows.map((day) => day.total), 1);
+
+  const handleFilter = () => {
+    if (fromDate && toDate && fromDate > toDate) {
+      setFilterError('Ngày bắt đầu không được sau ngày kết thúc.');
+      return;
+    }
+    setFilterError('');
+    setPage(0);
+    loadAll(fromDate, toDate);
+  };
+
+  const handleClearFilter = () => {
+    setFromDate('');
+    setToDate('');
+    setFilterError('');
+    setPage(0);
+    loadAll();
+  };
 
   return (
     <Box>
@@ -100,6 +131,30 @@ const StaffReports = () => {
           Doanh thu, vé bán, lượt xem online, top phim và top suất chiếu (7 ngày gần nhất).
         </Typography>
       </Box>
+
+      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ mb: 3 }} alignItems={{ sm: 'center' }}>
+        <TextField
+          type="date"
+          label="Từ ngày"
+          size="small"
+          value={fromDate}
+          onChange={(event) => setFromDate(event.target.value)}
+          InputLabelProps={{ shrink: true }}
+          sx={{ width: { xs: '100%', sm: 180 } }}
+        />
+        <TextField
+          type="date"
+          label="Đến ngày"
+          size="small"
+          value={toDate}
+          onChange={(event) => setToDate(event.target.value)}
+          InputLabelProps={{ shrink: true }}
+          sx={{ width: { xs: '100%', sm: 180 } }}
+        />
+        <Button variant="contained" onClick={handleFilter}>Tra cứu</Button>
+        {(fromDate || toDate) && <Button onClick={handleClearFilter}>Xóa lọc</Button>}
+      </Stack>
+      {filterError && <Alert severity="error" sx={{ mb: 3 }}>{filterError}</Alert>}
 
       {/* KPI */}
       <Grid container spacing={2} sx={{ mb: 1 }}>
@@ -119,7 +174,7 @@ const StaffReports = () => {
             <Legend color="#a855f7" label="Phim online" />
           </Stack>
           <Box sx={{ display: 'flex', alignItems: 'flex-end', gap: { xs: 1, sm: 2 }, height: 220, px: 1 }}>
-            {(revenue?.daily || []).map((d) => {
+            {dailyRows.map((d) => {
               const totalH = (d.total / maxDaily) * 100;
               const cinemaH = d.total ? (d.cinema / d.total) * totalH : 0;
               const onlineH = d.total ? (d.online / d.total) * totalH : 0;
@@ -133,6 +188,11 @@ const StaffReports = () => {
                 </Box>
               );
             })}
+            {dailyRows.length === 0 && (
+              <Typography color="text.secondary" sx={{ alignSelf: 'center', width: '100%', textAlign: 'center' }}>
+                Không có dữ liệu trong khoảng thời gian này.
+              </Typography>
+            )}
           </Box>
         </CardContent>
       </Card>
@@ -160,6 +220,9 @@ const StaffReports = () => {
                     </Box>
                   );
                 })}
+                {(topMovies?.items || []).length === 0 && (
+                  <Typography color="text.secondary">Chưa có dữ liệu phim bán chạy.</Typography>
+                )}
               </Stack>
             </CardContent>
           </Card>
@@ -195,6 +258,13 @@ const StaffReports = () => {
                         </TableRow>
                       );
                     })}
+                    {(topShowtimes?.items || []).length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={3} align="center" sx={{ color: 'text.secondary', py: 4 }}>
+                          Chưa có dữ liệu suất chiếu.
+                        </TableCell>
+                      </TableRow>
+                    )}
                   </TableBody>
                 </Table>
               </TableContainer>
@@ -220,19 +290,36 @@ const StaffReports = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {(revenue?.daily || []).map((d, i) => (
+                {pagedDailyRows.map((d) => (
                   <TableRow key={d.date} hover>
                     <TableCell>{formatShortDate(d.date)}</TableCell>
                     <TableCell align="right">{formatCurrency(d.cinema)}</TableCell>
                     <TableCell align="right">{formatCurrency(d.online)}</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 700 }}>{formatCurrency(d.total)}</TableCell>
-                    <TableCell align="right">{tickets?.daily?.[i]?.tickets ?? '—'}</TableCell>
-                    <TableCell align="right">{online?.daily?.[i]?.views ?? '—'}</TableCell>
+                    <TableCell align="right">{tickets?.daily?.find((item) => item.date === d.date)?.tickets ?? '—'}</TableCell>
+                    <TableCell align="right">{online?.daily?.find((item) => item.date === d.date)?.views ?? '—'}</TableCell>
                   </TableRow>
                 ))}
+                {dailyRows.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} align="center" sx={{ color: 'text.secondary', py: 4 }}>
+                      Không có dữ liệu trong khoảng thời gian này.
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </TableContainer>
+          {dailyRows.length > 0 && (
+            <TablePagination
+              component="div"
+              count={dailyRows.length}
+              page={currentPage}
+              rowsPerPage={rowsPerPage}
+              rowsPerPageOptions={[rowsPerPage]}
+              onPageChange={(_event, nextPage) => setPage(nextPage)}
+            />
+          )}
           <Divider sx={{ my: 1.5 }} />
           <Typography variant="caption" color="text.secondary">
             Tổng: {formatCurrency(revenue?.totalRevenue)} · {tickets?.totalTickets ?? 0} vé · {online?.totalViews ?? 0} lượt xem online

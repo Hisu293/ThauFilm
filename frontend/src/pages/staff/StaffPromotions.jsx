@@ -19,6 +19,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TablePagination,
   TextField,
   Typography,
   Alert,
@@ -35,6 +36,13 @@ import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import LocalOfferRoundedIcon from '@mui/icons-material/LocalOfferRounded';
 import { staffPromotionService } from '../../services/staffPromotionService';
 import { fromUTCToLocal, toBackendLocalDateTime } from '../../services/adminShowtimeService';
+import useStaffList from '../../hooks/useStaffList';
+
+const PROMOTION_DATE_FIELDS = ['createdAt', 'updatedAt', 'validFrom'];
+const matchesPromotionSearch = (promotion, query) =>
+  [promotion.code, promotion.name]
+    .filter(Boolean)
+    .some((value) => String(value).toLowerCase().includes(query));
 
 const TYPE_META = {
   PERCENTAGE: { label: 'Giảm %', color: 'info' },
@@ -100,7 +108,6 @@ const StaffPromotions = () => {
   const [promos, setPromos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [search, setSearch] = useState('');
 
   const [dialog, setDialog] = useState(null); // { mode: 'add'|'edit', id? }
   const [form, setForm] = useState(emptyForm);
@@ -208,10 +215,19 @@ const StaffPromotions = () => {
     setForm({ ...form, applicableSeatTypes: serializeSeatTypes(next) });
   };
 
-  const q = search.trim().toLowerCase();
-  const filtered = q
-    ? promos.filter((p) => [p.code, p.name].filter(Boolean).some((v) => String(v).toLowerCase().includes(q)))
-    : promos;
+  const {
+    search,
+    page,
+    setPage,
+    handleSearchChange,
+    filteredItems,
+    paginatedItems,
+    rowsPerPage,
+  } = useStaffList({
+    items: promos,
+    matchesSearch: matchesPromotionSearch,
+    dateFields: PROMOTION_DATE_FIELDS,
+  });
 
   return (
     <Box>
@@ -234,8 +250,8 @@ const StaffPromotions = () => {
           size="small"
           placeholder="Tìm theo mã hoặc tên…"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          sx={{ minWidth: 280 }}
+          onChange={(e) => handleSearchChange(e.target.value)}
+          sx={{ width: { xs: '100%', sm: 'auto' }, minWidth: { sm: 280 } }}
         />
       </Stack>
 
@@ -248,7 +264,7 @@ const StaffPromotions = () => {
               <Typography color="error" sx={{ mb: 2 }}>{error}</Typography>
               <Button variant="outlined" onClick={loadPromos}>Thử lại</Button>
             </Box>
-          ) : filtered.length === 0 ? (
+          ) : filteredItems.length === 0 ? (
             <Box sx={{ textAlign: 'center', py: 6, color: 'text.secondary' }}>Chưa có mã giảm giá nào.</Box>
           ) : (
             <TableContainer>
@@ -265,7 +281,7 @@ const StaffPromotions = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {filtered.map((p) => {
+                  {paginatedItems.map((p) => {
                     const tm = TYPE_META[p.type] || { label: p.type, color: 'default' };
                     const limit = p.usageLimit;
                     const used = p.usageCount ?? p.usedCount ?? 0;
@@ -322,6 +338,16 @@ const StaffPromotions = () => {
                 </TableBody>
               </Table>
             </TableContainer>
+          )}
+          {!loading && !error && filteredItems.length > 0 && (
+            <TablePagination
+              component="div"
+              count={filteredItems.length}
+              page={page}
+              rowsPerPage={rowsPerPage}
+              rowsPerPageOptions={[rowsPerPage]}
+              onPageChange={(_event, nextPage) => setPage(nextPage)}
+            />
           )}
         </CardContent>
       </Card>

@@ -17,6 +17,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TablePagination,
   TextField,
   Typography,
   Alert,
@@ -36,6 +37,13 @@ import LockRoundedIcon from '@mui/icons-material/LockRounded';
 import LockOpenRoundedIcon from '@mui/icons-material/LockOpenRounded';
 import SupportAgentRoundedIcon from '@mui/icons-material/SupportAgentRounded';
 import { staffCustomerService } from '../../services/staffCustomerService';
+import useStaffList from '../../hooks/useStaffList';
+
+const CUSTOMER_DATE_FIELDS = ['createdAt', 'registeredAt', 'updatedAt', 'lastLoginAt'];
+const matchesCustomerSearch = (customer, query) =>
+  [customer.fullName, customer.email, customer.phone]
+    .filter(Boolean)
+    .some((value) => String(value).toLowerCase().includes(query));
 
 const formatDateTime = (iso) => {
   if (!iso) return '—';
@@ -54,7 +62,6 @@ const StaffCustomers = () => {
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [search, setSearch] = useState('');
 
   const [detail, setDetail] = useState(null);
   const [tab, setTab] = useState(0);
@@ -147,12 +154,19 @@ const StaffCustomers = () => {
     }
   };
 
-  const q = search.trim().toLowerCase();
-  const filtered = q
-    ? customers.filter((c) =>
-        [c.fullName, c.email, c.phone].filter(Boolean).some((v) => String(v).toLowerCase().includes(q)),
-      )
-    : customers;
+  const {
+    search,
+    page,
+    setPage,
+    handleSearchChange,
+    filteredItems,
+    paginatedItems,
+    rowsPerPage,
+  } = useStaffList({
+    items: customers,
+    matchesSearch: matchesCustomerSearch,
+    dateFields: CUSTOMER_DATE_FIELDS,
+  });
 
   return (
     <Box>
@@ -171,8 +185,8 @@ const StaffCustomers = () => {
           size="small"
           placeholder="Tìm theo tên, email, SĐT…"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          sx={{ minWidth: 280 }}
+          onChange={(e) => handleSearchChange(e.target.value)}
+          sx={{ width: { xs: '100%', sm: 'auto' }, minWidth: { sm: 280 } }}
         />
       </Stack>
 
@@ -185,7 +199,7 @@ const StaffCustomers = () => {
               <Typography color="error" sx={{ mb: 2 }}>{error}</Typography>
               <Button variant="outlined" onClick={loadCustomers}>Thử lại</Button>
             </Box>
-          ) : filtered.length === 0 ? (
+          ) : filteredItems.length === 0 ? (
             <Box sx={{ textAlign: 'center', py: 6, color: 'text.secondary' }}>Không có khách hàng nào khớp.</Box>
           ) : (
             <TableContainer>
@@ -200,7 +214,7 @@ const StaffCustomers = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {filtered.map((c) => (
+                  {paginatedItems.map((c) => (
                     <TableRow key={c.id} hover>
                       <TableCell>
                         <Stack direction="row" spacing={1.5} alignItems="center">
@@ -248,6 +262,16 @@ const StaffCustomers = () => {
                 </TableBody>
               </Table>
             </TableContainer>
+          )}
+          {!loading && !error && filteredItems.length > 0 && (
+            <TablePagination
+              component="div"
+              count={filteredItems.length}
+              page={page}
+              rowsPerPage={rowsPerPage}
+              rowsPerPageOptions={[rowsPerPage]}
+              onPageChange={(_event, nextPage) => setPage(nextPage)}
+            />
           )}
         </CardContent>
       </Card>

@@ -208,11 +208,8 @@ const StaffTickets = () => {
     )
     : tickets;
   const sortedFiltered = [...filtered].sort((a, b) => latestTime(b) - latestTime(a));
-  const pagedTickets = sortedFiltered.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
-
-  useEffect(() => {
-    setPage(0);
-  }, [search, tickets.length]);
+  const currentPage = Math.min(page, Math.max(0, Math.ceil(sortedFiltered.length / PAGE_SIZE) - 1));
+  const pagedTickets = sortedFiltered.slice(currentPage * PAGE_SIZE, currentPage * PAGE_SIZE + PAGE_SIZE);
 
   return (
     <Box>
@@ -274,8 +271,11 @@ const StaffTickets = () => {
           size="small"
           placeholder="Tìm theo mã vé, khách, phim…"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          sx={{ minWidth: 280 }}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setPage(0);
+          }}
+          sx={{ width: { xs: '100%', sm: 'auto' }, minWidth: { sm: 280 } }}
         />
       </Stack>
 
@@ -343,7 +343,7 @@ const StaffTickets = () => {
               <TablePagination
                 component="div"
                 count={sortedFiltered.length}
-                page={page}
+                page={currentPage}
                 onPageChange={(_, nextPage) => setPage(nextPage)}
                 rowsPerPage={PAGE_SIZE}
                 rowsPerPageOptions={[PAGE_SIZE]}

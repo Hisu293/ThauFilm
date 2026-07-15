@@ -8,7 +8,16 @@ import PageHeader from '../../components/ui/PageHeader';
 import StatisticCard from '../../components/ui/StatisticCard';
 import DataTable from '../../components/ui/DataTable';
 import StatusChip from '../../components/ui/StatusChip';
+import SearchBar from '../../components/ui/SearchBar';
+import EmptyState from '../../components/common/EmptyState';
 import { staffReportService } from '../../services/staffReportService';
+import useStaffList from '../../hooks/useStaffList';
+
+const DASHBOARD_DATE_FIELDS = ['time', 'checkedInAt', 'createdAt'];
+const matchesCheckInSearch = (checkIn, query) =>
+  [checkIn.id, checkIn.customer, checkIn.movie, checkIn.status]
+    .filter(Boolean)
+    .some((value) => String(value).toLowerCase().includes(query));
 
 const StaffDashboard = () => {
   const [dashboardStats, setDashboardStats] = useState(null);
@@ -49,11 +58,28 @@ const StaffDashboard = () => {
     }
   ];
 
+  const recentCheckIns = dashboardStats?.recentCheckIns || [];
+  const {
+    search,
+    page,
+    setPage,
+    handleSearchChange,
+    filteredItems,
+    paginatedItems,
+    rowsPerPage,
+  } = useStaffList({
+    items: recentCheckIns,
+    matchesSearch: matchesCheckInSearch,
+    dateFields: DASHBOARD_DATE_FIELDS,
+    rowsPerPage: 5,
+  });
+  const currency = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(dashboardStats?.todayRevenue || 0);
+
   if (loading) return <Box sx={{ display: 'grid', placeItems: 'center', py: 10 }}><CircularProgress /></Box>;
   if (error) return <Alert severity="error" action={<Button onClick={loadDashboard}>Thử lại</Button>}>{error}</Alert>;
-
-  const recentCheckIns = dashboardStats?.recentCheckIns || [];
-  const currency = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(dashboardStats?.todayRevenue || 0);
+  if (!dashboardStats) {
+    return <EmptyState title="Chưa có dữ liệu tổng quan" description="Dữ liệu thống kê Staff hiện đang trống." />;
+  }
 
   return (
     <Box>
@@ -101,12 +127,21 @@ const StaffDashboard = () => {
       <Typography variant="h6" fontWeight="bold" sx={{ mb: 2 }}>
         Recent Check-ins
       </Typography>
+      <Box sx={{ mb: 2, maxWidth: { sm: 360 } }}>
+        <SearchBar
+          placeholder="Tìm mã vé, khách hàng hoặc phim…"
+          value={search}
+          onChange={handleSearchChange}
+        />
+      </Box>
       <DataTable
         columns={tableColumns}
-        data={recentCheckIns}
-        page={0}
-        rowsPerPage={5}
-        totalCount={recentCheckIns.length}
+        data={paginatedItems}
+        page={page}
+        rowsPerPage={rowsPerPage}
+        totalCount={filteredItems.length}
+        onPageChange={(_event, nextPage) => setPage(nextPage)}
+        emptyMessage="Không có lượt check-in nào phù hợp."
       />
     </Box>
   );
