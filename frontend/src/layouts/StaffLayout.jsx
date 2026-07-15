@@ -35,6 +35,7 @@ import NotificationsNoneRoundedIcon from '@mui/icons-material/NotificationsNoneR
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
 import DashboardRoundedIcon from '@mui/icons-material/DashboardRounded';
 import PunchClockRoundedIcon from '@mui/icons-material/PunchClockRounded';
+import QrCode2RoundedIcon from '@mui/icons-material/QrCode2Rounded';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import { useAuth } from '../context/AuthContext';
 import cinemaTheme from '../theme/cinemaTheme';
@@ -43,6 +44,7 @@ const drawerWidth = 280;
 
 const menuItems = [
   { text: 'Tổng quan', icon: <DashboardRoundedIcon />, path: '/staff/dashboard' },
+  { text: 'Màn hình QR chấm công', icon: <QrCode2RoundedIcon />, path: '/staff/attendance-display' },
   { text: 'Chấm công', icon: <PunchClockRoundedIcon />, path: '/staff/attendance' },
   { text: 'Quản lý phim', icon: <LocalMoviesRoundedIcon />, path: '/staff/movies' },
   { text: 'Quản lý suất chiếu', icon: <ScheduleRoundedIcon />, path: '/staff/showtimes-manage' },

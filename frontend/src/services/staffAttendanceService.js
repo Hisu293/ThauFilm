@@ -10,6 +10,7 @@ export const staffAttendanceService = {
   todayShift: () => api.get('/api/staff/workforce/schedule/today').then(unwrap),
   schedule: (year, month) => api.get('/api/staff/workforce/schedule', { params: { year, month } }).then(unwrap),
   registerShift: (payload) => api.post('/api/staff/workforce/schedule/register', payload).then(unwrap),
+  dynamicAttendanceQr: () => api.post('/api/staff/workforce/attendance-display/dynamic-qr').then(unwrap),
 };
 
 export default staffAttendanceService;

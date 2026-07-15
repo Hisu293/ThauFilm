@@ -38,7 +38,8 @@ public class AdminWorkforceController {
     @PutMapping("/staff/{staffId}")
     public ResponseEntity<ApiResponse<Map<String, Object>>> updateProfile(@PathVariable UUID staffId, @RequestBody ProfileRequest request) {
         return ResponseEntity.ok(ApiResponse.success("Staff profile updated", workforceService.updateProfile(staffId,
-                request.employmentType(), request.hourlyRate(), request.monthlySalary(), request.overtimeHourlyRate(), request.defaultAllowance())));
+                request.employmentType(), request.hourlyRate(), request.monthlySalary(), request.overtimeHourlyRate(),
+                request.defaultAllowance(), request.shiftLeader())));
     }
 
     @GetMapping("/shifts")
@@ -91,7 +92,7 @@ public class AdminWorkforceController {
 
     public record ShiftRequest(UUID staffId, LocalDate workDate, WorkShiftType shiftType, String note) {}
     public record ProfileRequest(EmploymentType employmentType, BigDecimal hourlyRate, BigDecimal monthlySalary,
-                                 BigDecimal overtimeHourlyRate, BigDecimal defaultAllowance) {}
+                                 BigDecimal overtimeHourlyRate, BigDecimal defaultAllowance, Boolean shiftLeader) {}
     public record PayrollRequest(BigDecimal allowance, BigDecimal bonus, BigDecimal deduction, PayrollStatus status, String note) {}
     public record StatusRequest(com.filmticket.entity.ShiftApprovalStatus status) {}
     public record AttendanceCodeRequest(LocalDate workDate, WorkShiftType shiftType) {}
