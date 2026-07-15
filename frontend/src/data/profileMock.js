@@ -5,10 +5,6 @@ export const profileUser = {
   birthday: '1998-04-12',
   gender: 'Nữ',
   avatar: '',
-  tier: 'V-Star',
-  points: 3450,
-  nextTier: 'V-Diamond',
-  nextTierAt: 5000,
 };
 
 export const bookingHistory = [

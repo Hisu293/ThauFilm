@@ -116,6 +116,21 @@
 .pf-progress__bar { height: 100%; border-radius: 999px; background: linear-gradient(90deg, #e50914, #ff8a00); transition: width 0.6s ease; }
 .pf-membership__hint { margin: 12px 0 0; font-size: 0.85rem; color: rgba(255,255,255,0.7); }
 .pf-membership__hint b { color: #fff; }
+.pf-membership__error { color: #ff8a80; }
+.pf-membership__redeem {
+  margin-top: 16px;
+  border: 1px solid rgba(255, 206, 58, 0.4);
+  background: rgba(255, 206, 58, 0.1);
+  color: #ffda66;
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 800;
+  padding: 9px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.18s ease, transform 0.18s ease;
+}
+.pf-membership__redeem:hover { background: rgba(255, 206, 58, 0.18); transform: translateY(-1px); }
 
 /* ─── Ticket cards (premium design) ─── */
 .pf-tickets { display: flex; flex-direction: column; gap: 18px; }
