@@ -57,15 +57,16 @@ public class TicketQueueService {
         User user = requireUser(userId);
         ShowtimeQueue queue = queues.computeIfAbsent(showtimeId, ignored -> new ShowtimeQueue());
         synchronized (queue) {
-            cleanup(queue);
-            queue.activeViewers.put(userId, Instant.now());
+            Instant currentTime = now();
+            cleanup(queue, currentTime);
+            queue.activeViewers.put(userId, currentTime);
             QueueDecision decision = queueDecision(showtime, queue);
             if (!decision.required()) {
                 queue.entries.remove(userId);
                 return noQueueResponse(showtimeId, userId, decision.message());
             }
-            queue.entries.computeIfAbsent(userId, ignored -> new QueueEntry(userId, user.getFullName(), user.getEmail(), Instant.now()));
-            return toResponse(showtimeId, userId, queue, decision.message());
+            queue.entries.computeIfAbsent(userId, ignored -> createQueueEntry(queue, user, currentTime));
+            return toResponse(showtimeId, userId, queue, decision.message(), currentTime);
         }
     }
 
@@ -74,8 +75,9 @@ public class TicketQueueService {
         Showtime showtime = requireShowtime(showtimeId);
         ShowtimeQueue queue = queues.computeIfAbsent(showtimeId, ignored -> new ShowtimeQueue());
         synchronized (queue) {
-            cleanup(queue);
-            queue.activeViewers.put(userId, Instant.now());
+            Instant currentTime = now();
+            cleanup(queue, currentTime);
+            queue.activeViewers.put(userId, currentTime);
             QueueDecision decision = queueDecision(showtime, queue);
             if (!decision.required()) {
                 queue.entries.remove(userId);
@@ -83,9 +85,9 @@ public class TicketQueueService {
             }
             if (!queue.entries.containsKey(userId)) {
                 User user = requireUser(userId);
-                queue.entries.put(userId, new QueueEntry(userId, user.getFullName(), user.getEmail(), Instant.now()));
+                queue.entries.put(userId, createQueueEntry(queue, user, currentTime));
             }
-            return toResponse(showtimeId, userId, queue, decision.message());
+            return toResponse(showtimeId, userId, queue, decision.message(), currentTime);
         }
     }
 
@@ -94,8 +96,9 @@ public class TicketQueueService {
         Showtime showtime = requireShowtime(showtimeId);
         ShowtimeQueue queue = queues.computeIfAbsent(showtimeId, ignored -> new ShowtimeQueue());
         synchronized (queue) {
-            cleanup(queue);
-            queue.activeViewers.put(userId, Instant.now());
+            Instant currentTime = now();
+            cleanup(queue, currentTime);
+            queue.activeViewers.put(userId, currentTime);
             QueueDecision decision = queueDecision(showtime, queue);
             return noQueueResponse(showtimeId, userId, decision.required()
                     ? "Suất chiếu đang đông. Người mới vào sẽ được đưa vào hàng đợi."
@@ -112,11 +115,12 @@ public class TicketQueueService {
         }
         synchronized (queue) {
             queue.entries.remove(userId);
-            cleanup(queue);
+            Instant currentTime = now();
+            cleanup(queue, currentTime);
             if (queue.entries.isEmpty()) {
                 return noQueueResponse(showtimeId, userId, "Bạn có thể vào chọn ghế.");
             }
-            return toResponse(showtimeId, userId, queue, "Bạn đã rời hàng đợi.");
+            return toResponse(showtimeId, userId, queue, "Bạn đã rời hàng đợi.", currentTime);
         }
     }
 
@@ -130,11 +134,25 @@ public class TicketQueueService {
                 .orElseThrow(() -> new BadRequestException("User not found"));
     }
 
-    private void cleanup(ShowtimeQueue queue) {
-        Instant cutoff = Instant.now().minus(ENTRY_TTL);
-        queue.entries.values().removeIf(entry -> entry.joinedAt().isBefore(cutoff));
-        Instant activeCutoff = Instant.now().minus(ACTIVE_VIEWER_TTL);
+    private void cleanup(ShowtimeQueue queue, Instant currentTime) {
+        queue.entries.values().removeIf(entry -> entry.admissionAt().plus(ENTRY_TTL).isBefore(currentTime));
+        Instant activeCutoff = currentTime.minus(ACTIVE_VIEWER_TTL);
         queue.activeViewers.values().removeIf(lastSeen -> lastSeen.isBefore(activeCutoff));
+    }
+
+    private QueueEntry createQueueEntry(ShowtimeQueue queue, User user, Instant joinedAt) {
+        Instant previousAdmission = queue.entries.values().stream()
+                .map(QueueEntry::admissionAt)
+                .max(Comparator.naturalOrder())
+                .orElse(null);
+        Instant admissionAt = previousAdmission == null
+                ? joinedAt
+                : max(joinedAt, previousAdmission.plusSeconds(ESTIMATED_SECONDS_PER_PERSON));
+        return new QueueEntry(user.getId(), user.getFullName(), user.getEmail(), joinedAt, admissionAt);
+    }
+
+    private Instant max(Instant first, Instant second) {
+        return first.isAfter(second) ? first : second;
     }
 
     private TicketQueueStatusResponse noQueueResponse(UUID showtimeId, UUID userId, String message) {
@@ -150,7 +168,13 @@ public class TicketQueueService {
                 .build();
     }
 
-    private TicketQueueStatusResponse toResponse(UUID showtimeId, UUID currentUserId, ShowtimeQueue queue, String reason) {
+    private TicketQueueStatusResponse toResponse(
+            UUID showtimeId,
+            UUID currentUserId,
+            ShowtimeQueue queue,
+            String reason,
+            Instant currentTime
+    ) {
         List<QueueEntry> ordered = queue.entries.values().stream()
                 .sorted(Comparator.comparing(QueueEntry::joinedAt))
                 .toList();
@@ -161,6 +185,7 @@ public class TicketQueueService {
             QueueEntry entry = ordered.get(i);
             int position = i + 1;
             boolean currentUser = entry.userId().equals(currentUserId);
+            boolean admitted = !currentTime.isBefore(entry.admissionAt());
             if (currentUser) currentPosition = position;
             entries.add(TicketQueueEntryResponse.builder()
                     .userId(entry.userId())
@@ -168,13 +193,19 @@ public class TicketQueueService {
                     .email(entry.email())
                     .position(position)
                     .currentUser(currentUser)
-                    .admitted(position == 1)
+                    .admitted(admitted)
                     .joinedAt(entry.joinedAt())
                     .build());
         }
 
-        boolean admitted = currentPosition <= 1;
-        int waitSeconds = Math.max(0, currentPosition - 1) * ESTIMATED_SECONDS_PER_PERSON;
+        QueueEntry currentEntry = ordered.stream()
+                .filter(entry -> entry.userId().equals(currentUserId))
+                .findFirst()
+                .orElse(null);
+        boolean admitted = currentEntry != null && !currentTime.isBefore(currentEntry.admissionAt());
+        int waitSeconds = currentEntry == null || admitted
+                ? 0
+                : Math.toIntExact(Duration.between(currentTime, currentEntry.admissionAt()).getSeconds());
         return TicketQueueStatusResponse.builder()
                 .queueRequired(true)
                 .admitted(admitted)
@@ -249,12 +280,16 @@ public class TicketQueueService {
         return "Thành viên";
     }
 
+    protected Instant now() {
+        return Instant.now();
+    }
+
     private static class ShowtimeQueue {
         private final Map<UUID, QueueEntry> entries = new LinkedHashMap<>();
         private final Map<UUID, Instant> activeViewers = new LinkedHashMap<>();
     }
 
-    private record QueueEntry(UUID userId, String fullName, String email, Instant joinedAt) {}
+    private record QueueEntry(UUID userId, String fullName, String email, Instant joinedAt, Instant admissionAt) {}
     private record QueueDecision(boolean required, String message) {}
     private record SeatStats(int totalSeats, int availableSeats, int holdingSeats) {}
 }

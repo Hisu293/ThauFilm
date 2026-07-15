@@ -714,10 +714,10 @@ export const SeatSelectionPage = () => {
                 Hàng đợi chọn ghế
               </Typography>
               <Typography variant="h4" fontWeight={900} sx={{ mt: 1 }}>
-                Team đang vào theo thứ tự
+                Hàng chờ vào đặt ghế
               </Typography>
               <Typography color="text.secondary" sx={{ mt: 1.5 }}>
-                Mỗi tài khoản đăng nhập vào suất chiếu này sẽ có một dòng riêng trong hàng đợi.
+                Người đầu tiên vào ngay; mỗi người tiếp theo được vào chọn ghế sau người trước 1 phút.
               </Typography>
             </Box>
 
@@ -769,7 +769,7 @@ export const SeatSelectionPage = () => {
 
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} justifyContent="space-between" alignItems={{ sm: 'center' }}>
               <Typography variant="body2" color="text.secondary">
-                Danh sách tự cập nhật khi thành viên khác đăng nhập hoặc vào chọn ghế.
+                Đến giờ, bạn có thể chọn ghế và thanh toán mà không cần chờ người trước hoàn tất.
               </Typography>
               <Button variant="contained" disabled={!canEnter || queueBusy} onClick={handleEnterSeatSelection}>
                 {queueBusy ? 'Đang mở...' : 'Vào chọn ghế'}
