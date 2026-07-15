@@ -12,6 +12,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.UUID;
@@ -36,9 +37,34 @@ public class MovieMatchingController {
         return ok("Đã lưu hồ sơ", matchingService.saveProfile(userId(principal), request));
     }
 
+    @PostMapping(value = "/profile/photo", consumes = "multipart/form-data")
+    public ResponseEntity<ApiResponse<MovieMatchingDto.ProfileResponse>> uploadProfilePhoto(
+            @AuthenticationPrincipal UserDetails principal, @RequestPart("image") MultipartFile image) {
+        return ok("Đã cập nhật ảnh hồ sơ hẹn hò", matchingService.uploadProfilePhoto(userId(principal), image));
+    }
+
+    @DeleteMapping("/profile/photo")
+    public ResponseEntity<ApiResponse<MovieMatchingDto.ProfileResponse>> removeProfilePhoto(
+            @AuthenticationPrincipal UserDetails principal) {
+        return ok("Đã gỡ ảnh hồ sơ hẹn hò", matchingService.removeProfilePhoto(userId(principal)));
+    }
+
     @GetMapping("/candidates")
     public ResponseEntity<ApiResponse<List<MovieMatchingDto.ProfileResponse>>> candidates(@AuthenticationPrincipal UserDetails principal) {
         return ok("Đã tải danh sách gợi ý", matchingService.getCandidates(userId(principal)));
+    }
+
+    @GetMapping("/candidates/passed")
+    public ResponseEntity<ApiResponse<List<MovieMatchingDto.ProfileResponse>>> passedCandidates(
+            @AuthenticationPrincipal UserDetails principal) {
+        return ok("Đã tải danh sách hồ sơ đã bỏ qua", matchingService.getPassedCandidates(userId(principal)));
+    }
+
+    @DeleteMapping("/candidates/{targetId}/action")
+    public ResponseEntity<ApiResponse<Void>> restoreCandidate(
+            @AuthenticationPrincipal UserDetails principal, @PathVariable UUID targetId) {
+        matchingService.restoreCandidate(userId(principal), targetId);
+        return ok("Đã đưa hồ sơ trở lại danh sách khám phá", null);
     }
 
     @PostMapping("/candidates/{targetId}/action")

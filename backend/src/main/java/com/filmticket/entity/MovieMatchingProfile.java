@@ -29,6 +29,12 @@ public class MovieMatchingProfile {
     @Column(name = "available_times", length = 500)
     private String availableTimes;
 
+    @Column(name = "dating_avatar_url", length = 1000)
+    private String datingAvatarUrl;
+
+    @Column(name = "dating_avatar_public_id", length = 500)
+    private String datingAvatarPublicId;
+
     @Builder.Default
     private boolean active = false;
 

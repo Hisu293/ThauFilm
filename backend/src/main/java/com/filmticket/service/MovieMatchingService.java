@@ -8,6 +8,7 @@ import com.filmticket.websocket.RealtimeEventService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.*;
 import java.util.function.Function;
@@ -22,6 +23,7 @@ public class MovieMatchingService {
     private final MovieMatchingBlockRepository blockRepository;
     private final UserRepository userRepository;
     private final RealtimeEventService realtimeEventService;
+    private final CloudinaryStorageService cloudinaryStorageService;
 
     @Transactional(readOnly = true)
     public MovieMatchingDto.ProfileResponse getProfile(UUID userId) {
@@ -49,6 +51,38 @@ public class MovieMatchingService {
         return toProfile(profileRepository.save(profile), user, 0);
     }
 
+    @Transactional
+    public MovieMatchingDto.ProfileResponse uploadProfilePhoto(UUID userId, MultipartFile image) {
+        User user = requireUser(userId);
+        MovieMatchingProfile profile = profileRepository.findById(userId)
+                .orElseGet(() -> MovieMatchingProfile.builder().userId(userId).build());
+        String previousPublicId = profile.getDatingAvatarPublicId();
+        CloudinaryStorageService.UploadedImage uploaded = cloudinaryStorageService.upload(image);
+        profile.setDatingAvatarUrl(uploaded.secureUrl());
+        profile.setDatingAvatarPublicId(uploaded.publicId());
+        try {
+            MovieMatchingDto.ProfileResponse response = toProfile(profileRepository.save(profile), user, 0);
+            cloudinaryStorageService.deleteQuietly(previousPublicId);
+            return response;
+        } catch (RuntimeException exception) {
+            cloudinaryStorageService.deleteQuietly(uploaded.publicId());
+            throw exception;
+        }
+    }
+
+    @Transactional
+    public MovieMatchingDto.ProfileResponse removeProfilePhoto(UUID userId) {
+        User user = requireUser(userId);
+        MovieMatchingProfile profile = profileRepository.findById(userId)
+                .orElseThrow(() -> new BadRequestException("Hãy tạo hồ sơ Movie Dating trước"));
+        String previousPublicId = profile.getDatingAvatarPublicId();
+        profile.setDatingAvatarUrl(null);
+        profile.setDatingAvatarPublicId(null);
+        MovieMatchingDto.ProfileResponse response = toProfile(profileRepository.save(profile), user, 0);
+        cloudinaryStorageService.deleteQuietly(previousPublicId);
+        return response;
+    }
+
     @Transactional(readOnly = true)
     public List<MovieMatchingDto.ProfileResponse> getCandidates(UUID userId) {
         MovieMatchingProfile mine = profileRepository.findById(userId)
@@ -74,6 +108,44 @@ public class MovieMatchingService {
                 .map(profile -> toProfile(profile, users.get(profile.getUserId()), compatibility(mine, profile)))
                 .sorted(Comparator.comparingInt(MovieMatchingDto.ProfileResponse::getCompatibilityPercent).reversed())
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<MovieMatchingDto.ProfileResponse> getPassedCandidates(UUID userId) {
+        MovieMatchingProfile mine = profileRepository.findById(userId)
+                .orElseThrow(() -> new BadRequestException("Hãy tạo hồ sơ Movie Dating trước"));
+        List<MovieMatchingAction> passed = actionRepository
+                .findByActorIdAndDecisionOrderByUpdatedAtDesc(userId, MovieMatchingAction.Decision.PASS);
+        Set<UUID> blocked = blockRepository.findByBlockerIdOrBlockedId(userId, userId).stream()
+                .map(item -> item.getBlockerId().equals(userId) ? item.getBlockedId() : item.getBlockerId())
+                .collect(Collectors.toSet());
+        Map<UUID, MovieMatchingProfile> profiles = profileRepository.findAllById(
+                        passed.stream().map(MovieMatchingAction::getTargetId).toList()).stream()
+                .filter(MovieMatchingProfile::isActive)
+                .collect(Collectors.toMap(MovieMatchingProfile::getUserId, Function.identity()));
+        Map<UUID, User> users = userRepository.findAllById(profiles.keySet()).stream()
+                .collect(Collectors.toMap(User::getId, Function.identity()));
+
+        return passed.stream()
+                .filter(action -> !blocked.contains(action.getTargetId()))
+                .filter(action -> profiles.containsKey(action.getTargetId()) && users.containsKey(action.getTargetId()))
+                .map(action -> {
+                    MovieMatchingProfile profile = profiles.get(action.getTargetId());
+                    MovieMatchingDto.ProfileResponse response = toProfile(
+                            profile, users.get(action.getTargetId()), compatibility(mine, profile));
+                    response.setLastInteractedAt(action.getUpdatedAt());
+                    return response;
+                }).toList();
+    }
+
+    @Transactional
+    public void restoreCandidate(UUID actorId, UUID targetId) {
+        MovieMatchingAction action = actionRepository.findByActorIdAndTargetId(actorId, targetId)
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy lượt bỏ qua này"));
+        if (action.getDecision() != MovieMatchingAction.Decision.PASS) {
+            throw new BadRequestException("Chỉ có thể hoàn tác hồ sơ đã bỏ qua");
+        }
+        actionRepository.delete(action);
     }
 
     @Transactional
@@ -107,7 +179,13 @@ public class MovieMatchingService {
         UUID first = actorFirst ? actorId : targetId;
         UUID second = actorFirst ? targetId : actorId;
         MovieMatch match = matchRepository.findByUserOneIdAndUserTwoId(first, second)
-                .orElseGet(() -> matchRepository.save(MovieMatch.builder().userOneId(first).userTwoId(second).build()));
+                .orElseGet(() -> MovieMatch.builder().userOneId(first).userTwoId(second).build());
+        if (match.getStatus() != MovieMatch.Status.ACTIVE) {
+            match.setStatus(MovieMatch.Status.ACTIVE);
+            match.setEndedAt(null);
+            match.setEndedBy(null);
+        }
+        match = matchRepository.save(match);
         User actor = requireUser(actorId);
         realtimeEventService.notifyUser(targetId, "MOVIE_MATCH", "Bạn có match mới",
                 displayName(actor) + " cũng muốn xem phim cùng bạn", "/intelligence");
@@ -145,7 +223,9 @@ public class MovieMatchingService {
 
     private MovieMatchingDto.ProfileResponse toProfile(MovieMatchingProfile profile, User user, int compatibility) {
         return MovieMatchingDto.ProfileResponse.builder().userId(profile.getUserId())
-                .fullName(displayName(user)).avatarUrl(user == null ? null : user.getAvatarUrl())
+                .fullName(displayName(user)).avatarUrl(profile.getDatingAvatarUrl() != null
+                        ? profile.getDatingAvatarUrl() : user == null ? null : user.getAvatarUrl())
+                .customDatingPhoto(profile.getDatingAvatarUrl() != null)
                 .bio(profile.getBio()).favoriteGenres(split(profile.getFavoriteGenres()))
                 .preferredTheater(profile.getPreferredTheater()).availableTimes(profile.getAvailableTimes())
                 .active(profile.isActive()).compatibilityPercent(compatibility).build();
