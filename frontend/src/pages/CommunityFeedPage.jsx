@@ -27,7 +27,6 @@ import {
   Typography,
 } from '@mui/material';
 import AddPhotoAlternateOutlinedIcon from '@mui/icons-material/AddPhotoAlternateOutlined';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import CloseIcon from '@mui/icons-material/Close';
 import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
@@ -541,22 +540,7 @@ export default function CommunityFeedPage() {
   };
 
   return (
-    <Container maxWidth="xl" sx={{ py: { xs: 4, md: 7 }, minHeight: '75vh' }}>
-      <Button
-        startIcon={<ArrowBackIcon />}
-        onClick={() => window.history.length > 1 ? navigate(-1) : navigate('/')}
-        sx={{ alignSelf: 'flex-start', mb: 2 }}
-      >
-        Quay lại
-      </Button>
-      <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" gap={2} mb={4}>
-        <Box>
-          <Typography variant="h3" fontWeight={900}>Bảng tin cộng đồng</Typography>
-          <Typography color="text.secondary">Chia sẻ khoảnh khắc và khám phá cập nhật mới từ cộng đồng yêu phim.</Typography>
-        </Box>
-        <Button component={RouterLink} to="/community/connections" variant="outlined">Quản lý kết nối</Button>
-      </Stack>
-
+    <Container maxWidth="xl" sx={{ pt: { xs: 2, md: 3 }, pb: { xs: 4, md: 7 }, minHeight: '75vh' }}>
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'minmax(0,1fr)', lg: 'minmax(0,900px) minmax(290px,360px)' }, gap: 3, alignItems: 'start' }}>
         <Box minWidth={0}>
       <Card sx={{ p: { xs: 2, md: 3 }, mb: 3, borderRadius: 4 }}>
