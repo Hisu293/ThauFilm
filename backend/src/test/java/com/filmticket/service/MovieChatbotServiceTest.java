@@ -94,6 +94,65 @@ class MovieChatbotServiceTest {
     }
 
     @Test
+    void supportsEveryVietnameseGenreAliasAndMatchesStoredEnglishGenre() {
+        List<GenreCase> genres = List.of(
+                new GenreCase("Hành động", "Action"),
+                new GenreCase("Phiêu lưu", "Adventure"),
+                new GenreCase("Hoạt hình", "Animation"),
+                new GenreCase("Tiểu sử", "Biography"),
+                new GenreCase("Hài", "Comedy"),
+                new GenreCase("Hình sự", "Crime"),
+                new GenreCase("Tài liệu", "Documentary"),
+                new GenreCase("Chính kịch", "Drama"),
+                new GenreCase("Gia đình", "Family"),
+                new GenreCase("Giả tưởng", "Fantasy"),
+                new GenreCase("Lịch sử", "History"),
+                new GenreCase("Kinh dị", "Horror"),
+                new GenreCase("Âm nhạc", "Music"),
+                new GenreCase("Nhạc kịch", "Musical"),
+                new GenreCase("Bí ẩn", "Mystery"),
+                new GenreCase("Lãng mạn", "Romance"),
+                new GenreCase("Khoa học viễn tưởng", "Science Fiction"),
+                new GenreCase("Thể thao", "Sport"),
+                new GenreCase("Giật gân", "Thriller"),
+                new GenreCase("Chiến tranh", "War"),
+                new GenreCase("Viễn Tây", "Western"),
+                new GenreCase("Siêu anh hùng", "Superhero"),
+                new GenreCase("Tâm lý", "Psychological"),
+                new GenreCase("Võ thuật", "Martial Arts"),
+                new GenreCase("Thiếu nhi", "Kids"),
+                new GenreCase("Anime", "Anime"),
+                new GenreCase("Thảm họa", "Disaster"),
+                new GenreCase("Hậu tận thế", "Post-apocalyptic"),
+                new GenreCase("Siêu nhiên", "Supernatural"),
+                new GenreCase("Noir (Phim đen)", "Film Noir")
+        );
+        List<Movie> movies = genres.stream()
+                .map(genre -> Movie.builder()
+                        .id(UUID.randomUUID())
+                        .title("Phim " + genre.english())
+                        .genre(genre.english())
+                        .description("Phim kiểm thử thể loại " + genre.english())
+                        .durationMinutes(100)
+                        .rating(BigDecimal.valueOf(8.0))
+                        .status(Movie.Status.NOW_SHOWING)
+                        .posterUrl("poster.jpg")
+                        .build())
+                .toList();
+        when(movieRepository.findAllByActiveTrue()).thenReturn(movies);
+
+        for (GenreCase genre : genres) {
+            MovieChatResponse vietnameseResponse = service.chat("Gợi ý phim " + genre.vietnamese());
+            MovieChatResponse englishResponse = service.chat("Recommend a " + genre.english() + " movie");
+
+            assertEquals(1, vietnameseResponse.getRecommendations().size(), genre.vietnamese());
+            assertEquals("Phim " + genre.english(), vietnameseResponse.getRecommendations().get(0).getTitle(), genre.vietnamese());
+            assertEquals(1, englishResponse.getRecommendations().size(), genre.english());
+            assertEquals("Phim " + genre.english(), englishResponse.getRecommendations().get(0).getTitle(), genre.english());
+        }
+    }
+
+    @Test
     void shortFollowUpUsesPreviousMovieConversation() {
         when(movieRepository.findAllByActiveTrue()).thenReturn(sampleMovies());
         MovieChatRequest.ChatTurn previous = new MovieChatRequest.ChatTurn();
@@ -129,4 +188,6 @@ class MovieChatbotServiceTest {
                         .build()
         );
     }
+
+    private record GenreCase(String vietnamese, String english) {}
 }

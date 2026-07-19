@@ -53,6 +53,38 @@ public class MovieChatbotService {
     private static final Set<String> MOVIE_FOLLOW_UP_SIGNALS = Set.of(
             "con nao", "con phim nao", "khac di", "phim khac", "them nua", "ngan hon", "dai hon", "doi gu"
     );
+    private static final List<GenreDefinition> SUPPORTED_GENRES = List.of(
+            genre("action", "hành động", "action", "hanh dong"),
+            genre("adventure", "phiêu lưu", "adventure", "phieu luu"),
+            genre("animation", "hoạt hình", "animation", "animated", "hoat hinh"),
+            genre("biography", "tiểu sử", "biography", "biographical", "tieu su"),
+            genre("comedy", "hài", "comedy", "hai"),
+            genre("crime", "hình sự", "crime", "hinh su", "toi pham"),
+            genre("documentary", "tài liệu", "documentary", "tai lieu"),
+            genre("drama", "chính kịch", "drama", "chinh kich"),
+            genre("family", "gia đình", "family", "gia dinh"),
+            genre("fantasy", "giả tưởng", "fantasy", "gia tuong", "ky ao"),
+            genre("history", "lịch sử", "history", "historical", "lich su"),
+            genre("horror", "kinh dị", "horror", "kinh di"),
+            genre("music", "âm nhạc", "music", "am nhac"),
+            genre("musical", "nhạc kịch", "musical", "nhac kich"),
+            genre("mystery", "bí ẩn", "mystery", "bi an", "trinh tham"),
+            genre("romance", "lãng mạn", "romance", "romantic", "lang man", "tinh cam"),
+            genre("science_fiction", "khoa học viễn tưởng", "science fiction", "sci fi", "scifi", "khoa hoc vien tuong", "vien tuong"),
+            genre("sport", "thể thao", "sport", "sports", "the thao"),
+            genre("thriller", "giật gân", "thriller", "giat gan"),
+            genre("war", "chiến tranh", "war", "chien tranh"),
+            genre("western", "viễn Tây", "western", "vien tay"),
+            genre("superhero", "siêu anh hùng", "superhero", "super hero", "sieu anh hung"),
+            genre("psychological", "tâm lý", "psychological", "psychology", "tam ly"),
+            genre("martial_arts", "võ thuật", "martial arts", "martial art", "vo thuat"),
+            genre("kids", "thiếu nhi", "kids", "kid", "children", "thieu nhi"),
+            genre("anime", "anime", "anime"),
+            genre("disaster", "thảm họa", "disaster", "tham hoa"),
+            genre("post_apocalyptic", "hậu tận thế", "post apocalyptic", "postapocalyptic", "hau tan the"),
+            genre("supernatural", "siêu nhiên", "supernatural", "sieu nhien"),
+            genre("film_noir", "noir (phim đen)", "film noir", "noir", "phim den")
+    );
 
     private final MovieRepository movieRepository;
     private final S3PresignedUrlService s3PresignedUrlService;
@@ -265,7 +297,7 @@ public class MovieChatbotService {
             if (genreOverlap > 0) reasons.add("cùng chất " + safe(intent.reference().getTitle()));
         }
 
-        Set<String> movieGenres = tokens(movie.getGenre());
+        Set<String> movieGenres = detectGenreKeys(movie.getGenre());
         for (String excludedGenre : intent.excludedGenres()) {
             if (movieGenres.contains(excludedGenre)) {
                 return new ScoredMovie(movie, 0, "");
@@ -356,62 +388,41 @@ public class MovieChatbotService {
 
     private Set<String> detectGenres(String query) {
         Set<String> genres = new LinkedHashSet<>();
-        addIfContains(genres, query, "action", "hanh dong");
-        addIfContains(genres, query, "sci", "sci fi", "science fiction", "vien tuong", "khoa hoc");
-        addIfContains(genres, query, "romance", "tinh cam", "lang man");
-        addIfContains(genres, query, "comedy", "hai");
-        addIfContains(genres, query, "horror", "kinh di");
-        addIfContains(genres, query, "drama", "tam ly");
-        addIfContains(genres, query, "animation", "hoat hinh");
-        addIfContains(genres, query, "adventure", "phieu luu");
-        addIfContains(genres, query, "family", "gia dinh");
-        addIfContains(genres, query, "fantasy", "gia tuong", "ky ao");
-        addIfContains(genres, query, "mystery", "bi an", "trinh tham");
-        addIfContains(genres, query, "history", "lich su");
+        for (GenreDefinition definition : SUPPORTED_GENRES) {
+            if (containsGenreAlias(query, definition)) {
+                genres.add(definition.key());
+            }
+        }
         return genres;
     }
 
     private Set<String> detectExcludedGenres(String query) {
         Set<String> genres = new LinkedHashSet<>();
-        addIfNegated(genres, query, "action", "hanh dong");
-        addIfNegated(genres, query, "sci", "sci fi", "science fiction", "vien tuong", "khoa hoc");
-        addIfNegated(genres, query, "romance", "tinh cam", "lang man");
-        addIfNegated(genres, query, "comedy", "hai");
-        addIfNegated(genres, query, "horror", "kinh di");
-        addIfNegated(genres, query, "drama", "tam ly");
-        addIfNegated(genres, query, "animation", "hoat hinh");
-        addIfNegated(genres, query, "adventure", "phieu luu");
-        addIfNegated(genres, query, "family", "gia dinh");
-        addIfNegated(genres, query, "fantasy", "gia tuong", "ky ao");
-        addIfNegated(genres, query, "mystery", "bi an", "trinh tham");
-        addIfNegated(genres, query, "history", "lich su");
+        for (GenreDefinition definition : SUPPORTED_GENRES) {
+            if (definition.aliases().stream().anyMatch(alias -> isNegated(query, alias))) {
+                genres.add(definition.key());
+            }
+        }
         return genres;
     }
 
-    private void addIfContains(Set<String> genres, String query, String canonical, String... aliases) {
-        if (containsPhrase(query, canonical)) {
-            genres.add(canonical);
-            return;
-        }
-        for (String alias : aliases) {
-            if (containsPhrase(query, alias)) {
-                genres.add(canonical);
-                return;
+    private Set<String> detectGenreKeys(String value) {
+        String normalizedValue = normalize(value);
+        Set<String> genres = new LinkedHashSet<>();
+        for (GenreDefinition definition : SUPPORTED_GENRES) {
+            if (containsGenreAlias(normalizedValue, definition)) {
+                genres.add(definition.key());
             }
         }
+        return genres;
     }
 
-    private void addIfNegated(Set<String> genres, String query, String canonical, String... aliases) {
-        if (isNegated(query, canonical)) {
-            genres.add(canonical);
-            return;
-        }
-        for (String alias : aliases) {
-            if (isNegated(query, alias)) {
-                genres.add(canonical);
-                return;
-            }
-        }
+    private boolean containsGenreAlias(String value, GenreDefinition definition) {
+        return definition.aliases().stream().anyMatch(alias -> containsPhrase(value, alias));
+    }
+
+    private static GenreDefinition genre(String key, String label, String... aliases) {
+        return new GenreDefinition(key, label, List.of(aliases));
     }
 
     private boolean isNegated(String query, String value) {
@@ -622,21 +633,11 @@ public class MovieChatbotService {
     }
 
     private String genreLabel(String genre) {
-        return switch (genre) {
-            case "action" -> "hành động";
-            case "sci" -> "viễn tưởng";
-            case "romance" -> "tình cảm";
-            case "comedy" -> "hài";
-            case "horror" -> "kinh dị";
-            case "drama" -> "tâm lý";
-            case "animation" -> "hoạt hình";
-            case "adventure" -> "phiêu lưu";
-            case "family" -> "gia đình";
-            case "fantasy" -> "giả tưởng";
-            case "mystery" -> "bí ẩn";
-            case "history" -> "lịch sử";
-            default -> genre;
-        };
+        return SUPPORTED_GENRES.stream()
+                .filter(definition -> definition.key().equals(genre))
+                .map(GenreDefinition::label)
+                .findFirst()
+                .orElse(genre);
     }
 
     private enum MessageIntent {
@@ -676,4 +677,6 @@ public class MovieChatbotService {
     }
 
     private record ScoredMovie(Movie movie, int score, String reason) {}
+
+    private record GenreDefinition(String key, String label, List<String> aliases) {}
 }
