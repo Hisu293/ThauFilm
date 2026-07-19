@@ -64,6 +64,36 @@ class MovieChatbotServiceTest {
     }
 
     @Test
+    void requestedGenreCannotBeBypassedByDescriptionKeywords() {
+        Movie romance = Movie.builder()
+                .id(UUID.randomUUID())
+                .title("Mắt Biếc")
+                .genre("Romance, Drama")
+                .description("Chuyện tình tuổi học trò")
+                .durationMinutes(117)
+                .rating(BigDecimal.valueOf(8.3))
+                .status(Movie.Status.NOW_SHOWING)
+                .posterUrl("romance.jpg")
+                .build();
+        Movie horror = Movie.builder()
+                .id(UUID.randomUUID())
+                .title("Vùng Đất Câm Lặng")
+                .genre("Horror, Thriller")
+                .description("Một gia đình bảo vệ tình cảm giữa thảm họa")
+                .durationMinutes(100)
+                .rating(BigDecimal.valueOf(7.0))
+                .status(Movie.Status.NOW_SHOWING)
+                .posterUrl("horror.jpg")
+                .build();
+        when(movieRepository.findAllByActiveTrue()).thenReturn(List.of(romance, horror));
+
+        MovieChatResponse response = service.chat("phim tình cảm");
+
+        assertEquals(1, response.getRecommendations().size());
+        assertEquals("Mắt Biếc", response.getRecommendations().get(0).getTitle());
+    }
+
+    @Test
     void shortFollowUpUsesPreviousMovieConversation() {
         when(movieRepository.findAllByActiveTrue()).thenReturn(sampleMovies());
         MovieChatRequest.ChatTurn previous = new MovieChatRequest.ChatTurn();

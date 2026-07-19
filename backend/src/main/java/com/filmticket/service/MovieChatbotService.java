@@ -272,12 +272,18 @@ public class MovieChatbotService {
             }
         }
 
+        boolean matchedRequestedGenre = intent.genres().isEmpty();
         for (String genre : intent.genres()) {
             if (movieGenres.contains(genre)) {
+                matchedRequestedGenre = true;
                 score += 65;
                 matchedCriteria = true;
                 reasons.add("thuộc thể loại " + genreLabel(genre));
             }
+        }
+
+        if (!matchedRequestedGenre) {
+            return new ScoredMovie(movie, 0, "");
         }
 
         if (matchesFreeText(query, movie)) {
