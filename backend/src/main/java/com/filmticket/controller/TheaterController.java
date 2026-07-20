@@ -27,10 +27,22 @@ public class TheaterController {
     @Operation(summary = "Get all active theaters - Available for all authenticated users (MEMBER, STAFF, ADMIN)")
     @GetMapping
     @PreAuthorize("hasAnyRole('MEMBER', 'STAFF', 'ADMIN')")
-    public ResponseEntity<ApiResponse<List<TheaterResponse>>> getAllTheaters() {
+    public ResponseEntity<ApiResponse<List<TheaterResponse>>> getAllTheaters(
+            @RequestParam(required = false) String city) {
+
+        List<TheaterResponse> theaters;
+
+        // Kiểm tra xem Frontend có truyền tham số city lên không
+        if (city != null && !city.isBlank()) {
+            theaters = theaterService.getTheatersByCity(city);
+        } else {
+            // Nếu không truyền city, giữ nguyên logic cũ trả về tất cả rạp ACTIVE
+            theaters = theaterService.getAllActiveTheaters();
+        }
+
         return ResponseEntity.ok(ApiResponse.success(
                 "Theaters fetched successfully",
-                theaterService.getAllActiveTheaters()
+                theaters
         ));
     }
 

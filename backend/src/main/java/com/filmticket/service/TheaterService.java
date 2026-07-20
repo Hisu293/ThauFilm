@@ -32,6 +32,14 @@ public class TheaterService {
     private final CinemaRoomRepository cinemaRoomRepository;
 
     @Transactional(readOnly = true)
+    public List<TheaterResponse> getTheatersByCity(String city) {
+        // Gọi repository tìm các rạp thuộc City (không phân biệt hoa thường) và trạng thái ACTIVE
+        return theaterRepository.findByCityIgnoreCaseAndStatus(city, TheaterStatus.ACTIVE).stream()
+                .map(this::toResponse) // Map Entity sang DTO TheaterResponse giống các hàm trên của bạn
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
     public List<TheaterResponse> getAllActiveTheaters() {
         return theaterRepository.findByStatus(TheaterStatus.ACTIVE).stream()
                 .map(this::toResponse)

@@ -3,3 +3,6 @@
 __MACOSX/
 target2/
 node_modules/
+.env
+BE2/
+.DS_Store
