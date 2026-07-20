@@ -15,6 +15,9 @@ import java.util.UUID;
 public interface SeatAvailabilityRepository extends JpaRepository<SeatAvailability, UUID> {
     @Query("SELECT sa FROM SeatAvailability sa WHERE sa.showtimeId = :showtimeId ORDER BY sa.seatId")
     List<SeatAvailability> findByShowtimeIdOrderBySeatId(UUID showtimeId);
+
+    @Query("SELECT DISTINCT sa.showtimeId FROM SeatAvailability sa WHERE sa.showtimeId IN :showtimeIds")
+    List<UUID> findShowtimeIdsWithSeats(List<UUID> showtimeIds);
     
     Optional<SeatAvailability> findByShowtimeIdAndSeatId(UUID showtimeId, UUID seatId);
 

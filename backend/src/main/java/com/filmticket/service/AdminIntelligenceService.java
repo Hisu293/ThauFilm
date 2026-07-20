@@ -132,19 +132,29 @@ public class AdminIntelligenceService {
         Map<UUID, CinemaRoom> activeRooms = cinemaRoomRepository.findByStatus(RoomStatus.ACTIVE).stream()
                 .filter(room -> room.getTheaterId() != null && activeTheaters.containsKey(room.getTheaterId()))
                 .collect(Collectors.toMap(CinemaRoom::getId, Function.identity()));
+        Set<UUID> roomsWithActiveSeats = new HashSet<>(
+                seatRepository.findDistinctCinemaRoomIdsByStatus(Seat.Status.ACTIVE));
+        activeRooms.entrySet().removeIf(entry -> !roomsWithActiveSeats.contains(entry.getKey()));
         if (activeRooms.isEmpty()) {
-            throw new BadRequestException("No active cinema room is available in an active theater");
+            throw new BadRequestException("No active cinema room with configured seats is available in an active theater");
         }
 
         List<ShowtimeSuggestion> candidates = demandPredictionService.suggestForRooms(
                 movieId, activeRooms.keySet(), start, Math.max(70, activeRooms.size() * 20));
         List<ShowtimeSuggestion> selected = new ArrayList<>();
         for (ShowtimeSuggestion choice : candidates) {
+            CinemaRoom choiceRoom = activeRooms.get(choice.getCinemaRoomId());
             boolean conflict = selected.stream().anyMatch(other ->
                     choice.getCinemaRoomId().equals(other.getCinemaRoomId())
                             && other.getStartTime().isBefore(choice.getEndTime())
                             && other.getEndTime().isAfter(choice.getStartTime()));
-            if (!conflict) selected.add(choice);
+            boolean duplicateTheaterTime = selected.stream().anyMatch(other -> {
+                CinemaRoom otherRoom = activeRooms.get(other.getCinemaRoomId());
+                return choiceRoom != null && otherRoom != null
+                        && Objects.equals(choiceRoom.getTheaterId(), otherRoom.getTheaterId())
+                        && choice.getStartTime().equals(other.getStartTime());
+            });
+            if (!conflict && !duplicateTheaterTime) selected.add(choice);
             if (selected.size() == 8) break;
         }
         return selected.stream().sorted(Comparator.comparing(ShowtimeSuggestion::getStartTime))
@@ -164,6 +174,27 @@ public class AdminIntelligenceService {
     @Transactional
     public List<ShowtimeResponse> applyWeeklyPlan(List<WeeklyShowtimeRequest> plan) {
         List<ShowtimeResponse> created = new ArrayList<>();
+        Map<UUID, CinemaRoom> roomsById = cinemaRoomRepository.findAll().stream()
+                .collect(Collectors.toMap(CinemaRoom::getId, Function.identity()));
+        Map<UUID, Theater> theatersById = theaterRepository.findAll().stream()
+                .collect(Collectors.toMap(Theater::getId, Function.identity()));
+        Set<UUID> roomsWithActiveSeats = new HashSet<>(
+                seatRepository.findDistinctCinemaRoomIdsByStatus(Seat.Status.ACTIVE));
+        Set<WeeklyTheaterSlot> occupiedMovieSlots = new HashSet<>();
+        plan.stream()
+                .filter(Objects::nonNull)
+                .map(WeeklyShowtimeRequest::movieId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .flatMap(movieId -> showtimeRepository.findByMovieIdOrderByStartTimeAsc(movieId).stream())
+                .filter(showtime -> showtime.getStatus() != ShowtimeStatus.CANCELLED)
+                .forEach(showtime -> {
+                    CinemaRoom room = roomsById.get(showtime.getCinemaRoomId());
+                    if (room != null && room.getTheaterId() != null && showtime.getStartTime() != null) {
+                        occupiedMovieSlots.add(new WeeklyTheaterSlot(
+                                showtime.getMovieId(), room.getTheaterId(), showtime.getStartTime()));
+                    }
+                });
         for (WeeklyShowtimeRequest item : plan) {
             if (item == null) {
                 continue;
@@ -183,12 +214,18 @@ public class AdminIntelligenceService {
             }
 
             if (!online) {
-                CinemaRoom room = cinemaRoomRepository.findById(item.cinemaRoomId()).orElse(null);
+                CinemaRoom room = roomsById.get(item.cinemaRoomId());
                 Theater theater = room == null || room.getTheaterId() == null
                         ? null
-                        : theaterRepository.findById(room.getTheaterId()).orElse(null);
+                        : theatersById.get(room.getTheaterId());
                 if (room == null || room.getStatus() != RoomStatus.ACTIVE
-                        || theater == null || theater.getStatus() != TheaterStatus.ACTIVE) {
+                        || theater == null || theater.getStatus() != TheaterStatus.ACTIVE
+                        || !roomsWithActiveSeats.contains(room.getId())) {
+                    continue;
+                }
+                WeeklyTheaterSlot slot = new WeeklyTheaterSlot(
+                        item.movieId(), theater.getId(), item.startTime());
+                if (!occupiedMovieSlots.add(slot)) {
                     continue;
                 }
                 boolean overlapsExisting = !showtimeRepository
@@ -226,5 +263,6 @@ public class AdminIntelligenceService {
     }
     private boolean isCentral(Seat seat, int max) { double center = (max + 1) / 2.0; return Math.abs(seat.getSeatNumber() - center) <= Math.max(1, max * .25); }
     private Map<String, Object> map(Object... values) { Map<String, Object> result = new LinkedHashMap<>(); for (int i=0;i<values.length;i+=2) result.put((String) values[i], values[i+1]); return result; }
+    private record WeeklyTheaterSlot(UUID movieId, UUID theaterId, LocalDateTime startTime) {}
     public record WeeklyShowtimeRequest(UUID movieId, UUID cinemaRoomId, LocalDateTime startTime, LocalDateTime endTime, Boolean online) {}
 }

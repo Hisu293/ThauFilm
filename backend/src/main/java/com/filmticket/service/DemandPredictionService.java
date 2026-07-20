@@ -29,6 +29,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import java.util.function.Predicate;
 
@@ -115,6 +116,7 @@ public class DemandPredictionService {
         }
 
         Model model = buildModel();
+        Map<UUID, CinemaRoom> allRooms = loadRooms();
         List<Showtime> existingShowtimes = showtimeRepository.findAll();
         List<ShowtimeSuggestion> candidates = new ArrayList<>();
         LocalDateTime now = LocalDateTime.now();
@@ -126,6 +128,15 @@ public class DemandPredictionService {
                 LocalDateTime endsAt = startsAt.plusMinutes(durationMinutes + CLEANUP_MINUTES);
                 if (!startsAt.isAfter(now.plusMinutes(30))) continue;
                 for (CinemaRoom room : rooms) {
+                    boolean duplicateMovieAtTheaterTime = existingShowtimes.stream()
+                            .filter(existing -> existing.getStatus() != ShowtimeStatus.CANCELLED)
+                            .filter(existing -> movieId.equals(existing.getMovieId()))
+                            .filter(existing -> startsAt.equals(existing.getStartTime()))
+                            .map(existing -> allRooms.get(existing.getCinemaRoomId()))
+                            .filter(java.util.Objects::nonNull)
+                            .anyMatch(existingRoom -> Objects.equals(
+                                    room.getTheaterId(), existingRoom.getTheaterId()));
+                    if (duplicateMovieAtTheaterTime) continue;
                     boolean occupied = existingShowtimes.stream()
                             .filter(existing -> room.getId().equals(existing.getCinemaRoomId()))
                             .filter(existing -> existing.getStatus() != ShowtimeStatus.CANCELLED)

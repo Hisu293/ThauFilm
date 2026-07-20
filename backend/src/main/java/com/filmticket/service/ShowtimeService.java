@@ -28,7 +28,9 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -70,7 +72,21 @@ public class ShowtimeService {
         Map<UUID, com.filmticket.entity.Theater> theaterById = theaterRepository.findAllById(theaterIds).stream()
                 .collect(Collectors.toMap(com.filmticket.entity.Theater::getId, t -> t));
 
+        Set<UUID> showtimeIdsWithSeats = revealMystery || showtimes.isEmpty()
+                ? Set.of()
+                : new HashSet<>(seatAvailabilityRepository.findShowtimeIdsWithSeats(
+                        showtimes.stream().map(Showtime::getId).toList()));
+        Set<PublicScheduleKey> visibleSlots = new HashSet<>();
+
         return showtimes.stream()
+                .filter(showtime -> revealMystery || showtime.isOnline()
+                        || showtimeIdsWithSeats.contains(showtime.getId()))
+                .filter(showtime -> {
+                    if (revealMystery || showtime.isOnline()) return true;
+                    CinemaRoom room = roomByRoomId.get(showtime.getCinemaRoomId());
+                    return room != null && visibleSlots.add(new PublicScheduleKey(
+                            showtime.getMovieId(), room.getTheaterId(), showtime.getStartTime()));
+                })
                 .map(s -> {
                     com.filmticket.entity.CinemaRoom room = roomByRoomId.get(s.getCinemaRoomId());
                     String cinemaRoomName = s.isOnline() ? "Xem online" : (room != null ? room.getName() : null);
@@ -130,6 +146,9 @@ public class ShowtimeService {
             }
             if (room.getStatus() == RoomStatus.MAINTENANCE) {
                 throw new BadRequestException("Cannot create showtime in a room that is under maintenance");
+            }
+            if (!seatRepository.existsByCinemaRoomIdAndStatus(room.getId(), Seat.Status.ACTIVE)) {
+                throw new BadRequestException("Cinema room has no active seats");
             }
         }
 
@@ -191,6 +210,9 @@ public class ShowtimeService {
             if (room.getStatus() == RoomStatus.MAINTENANCE) {
                 throw new BadRequestException("Cannot create showtime in a room that is under maintenance");
             }
+            if (!seatRepository.existsByCinemaRoomIdAndStatus(room.getId(), Seat.Status.ACTIVE)) {
+                throw new BadRequestException("Cinema room has no active seats");
+            }
         }
 
         LocalDateTime endTime = request.getStartTime()
@@ -222,6 +244,11 @@ public class ShowtimeService {
         Showtime showtime = getShowtimeEntityOrThrow(showtimeId);
         showtime.setStatus(ShowtimeStatus.CANCELLED);
         showtimeRepository.save(showtime);
+    }
+
+    @Transactional
+    public void ensureSeatAvailabilities(UUID showtimeId) {
+        ensureSeatAvailabilities(getShowtimeEntityOrThrow(showtimeId));
     }
 
     @Transactional(readOnly = true)
@@ -338,7 +365,8 @@ public class ShowtimeService {
         List<SeatAvailability> existing = seatAvailabilityRepository.findByShowtimeIdOrderBySeatId(showtime.getId());
         if (existing.isEmpty()) {
             List<Seat> seats = seatRepository
-                    .findAllByCinemaRoomIdOrderByRowNameAscSeatNumberAsc(showtime.getCinemaRoomId());
+                    .findAllByCinemaRoomIdAndStatusOrderByRowNameAscSeatNumberAsc(
+                            showtime.getCinemaRoomId(), Seat.Status.ACTIVE);
             List<SeatAvailability> newAvailabilities = seats.stream()
                     .map(seat -> SeatAvailability.builder()
                             .showtimeId(showtime.getId())
@@ -384,4 +412,6 @@ public class ShowtimeService {
             throw new BadRequestException("Showtime overlaps with an existing showtime in this room");
         }
     }
+
+    private record PublicScheduleKey(UUID movieId, UUID theaterId, LocalDateTime startTime) {}
 }

@@ -52,6 +52,7 @@ public class BookingService {
     private final PaymentGatewayService paymentGatewayService;
     private final LoyaltyService loyaltyService;
     private final BookingComboItemRepository bookingComboItemRepository;
+    private final ShowtimeService showtimeService;
 
     @Value("${app.mail.from:onboarding@resend.dev}")
     private String mailFrom;
@@ -64,13 +65,16 @@ public class BookingService {
     }
 
     // ĐÃ SỬA: Thêm UUID currentUserId
-    @Transactional(readOnly = true)
+    @Transactional
     public List<ShowtimeSeatResponse> getAvailableSeats(UUID showtimeId, UUID currentUserId) {
-        if (!showtimeRepository.existsById(showtimeId)) {
-            throw new BadRequestException("Showtime not found");
-        }
+        Showtime showtime = showtimeRepository.findById(showtimeId)
+                .orElseThrow(() -> new BadRequestException("Showtime not found"));
 
         List<SeatAvailability> availabilities = seatAvailabilityRepository.findByShowtimeIdOrderBySeatId(showtimeId);
+        if (availabilities.isEmpty() && !showtime.isOnline()) {
+            showtimeService.ensureSeatAvailabilities(showtimeId);
+            availabilities = seatAvailabilityRepository.findByShowtimeIdOrderBySeatId(showtimeId);
+        }
         List<UUID> seatIds = availabilities.stream().map(SeatAvailability::getSeatId).toList();
 
         Map<UUID, Seat> seatById = seatRepository.findAllById(seatIds)
