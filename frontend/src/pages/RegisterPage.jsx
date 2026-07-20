@@ -51,6 +51,8 @@ const RegisterPage = () => {
     phone:           '',
     password:        '',
     confirmPassword: '',
+    securityQuestion: '',
+    securityAnswer:   '',
   });
   const [showPw,        setShowPw]        = useState(false);
   const [showCpw,       setShowCpw]       = useState(false);
@@ -87,6 +89,10 @@ const RegisterPage = () => {
       e.confirmPassword = 'Vui lòng xác nhận mật khẩu.';
     else if (form.password !== form.confirmPassword)
       e.confirmPassword = 'Mật khẩu xác nhận không khớp.';
+    if (!form.securityQuestion.trim())
+      e.securityQuestion = 'Vui lòng nhập câu hỏi bảo mật.';
+    if (!form.securityAnswer.trim())
+      e.securityAnswer = 'Vui lòng nhập câu trả lời bảo mật.';
     return e;
   }, [submitted, form]);
 
@@ -112,7 +118,9 @@ const RegisterPage = () => {
       !PHONE_RE.test(form.phone.trim()) ||
       !form.password ||
       form.password.length < 6 ||
-      form.password !== form.confirmPassword;
+      form.password !== form.confirmPassword ||
+      !form.securityQuestion.trim() ||
+      !form.securityAnswer.trim();
 
     if (hasErrors) return;
 
@@ -123,6 +131,8 @@ const RegisterPage = () => {
         email: form.email,
         phone: form.phone,
         password: form.password,
+        securityQuestion: form.securityQuestion.trim(),
+        securityAnswer: form.securityAnswer.trim(),
       });
       // backend wraps payload in { success, message, data: AuthResponse }
       const payload = resp?.data?.data || resp?.data;
@@ -259,6 +269,32 @@ const RegisterPage = () => {
             error={Boolean(errors.phone)}
             helperText={errors.phone || ' '}
             autoComplete="tel"
+            fullWidth
+            required
+          />
+
+          <TextField
+            label="Câu hỏi bảo mật"
+            name="securityQuestion"
+            id="reg-security-question"
+            value={form.securityQuestion}
+            onChange={handleChange}
+            error={Boolean(errors.securityQuestion)}
+            helperText={errors.securityQuestion || 'Ví dụ: Tên trường tiểu học của bạn là gì?'}
+            autoComplete="off"
+            fullWidth
+            required
+          />
+
+          <TextField
+            label="Câu trả lời bảo mật"
+            name="securityAnswer"
+            id="reg-security-answer"
+            value={form.securityAnswer}
+            onChange={handleChange}
+            error={Boolean(errors.securityAnswer)}
+            helperText={errors.securityAnswer || 'Hãy chọn câu trả lời dễ nhớ nhưng khó đoán.'}
+            autoComplete="off"
             fullWidth
             required
           />
