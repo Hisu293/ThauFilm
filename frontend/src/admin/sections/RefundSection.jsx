@@ -48,7 +48,13 @@ const money = (value) => new Intl.NumberFormat('vi-VN', {
 const dateTime = (value) => {
   if (!value) return '—';
   const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? '—' : parsed.toLocaleString('vi-VN');
+  return Number.isNaN(parsed.getTime()) ? '—' : parsed.toLocaleString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 };
 
 const statusMeta = {
@@ -62,7 +68,7 @@ const statusMeta = {
 
 const metricSx = {
   height: '100%',
-  borderRadius: 3,
+  borderRadius: 2.5,
   boxShadow: 'none',
   background: 'linear-gradient(145deg, rgba(255,255,255,.04), rgba(255,255,255,.01))',
 };
@@ -167,16 +173,16 @@ const RefundSection = () => {
     { label: 'Đã từ chối', value: stats.rejected, icon: CancelRoundedIcon, color: '#94a3b8' },
   ];
 
-  return <Stack spacing={2.5}>
-    <Card sx={{ borderRadius: 4, overflow: 'hidden', position: 'relative', boxShadow: 'none' }}>
+  return <Stack spacing={1.5}>
+    <Card sx={{ borderRadius: 3, overflow: 'hidden', position: 'relative', boxShadow: 'none' }}>
       <Box sx={{ position: 'absolute', inset: 0, background: 'radial-gradient(circle at 12% 0%, rgba(229,9,20,.24), transparent 38%), radial-gradient(circle at 90% 100%, rgba(245,158,11,.14), transparent 34%)' }} />
-      <CardContent sx={{ position: 'relative', p: { xs: 3, md: 3.5 } }}>
-        <Stack direction={{ xs: 'column', md: 'row' }} alignItems={{ md: 'center' }} justifyContent="space-between" spacing={2}>
-          <Stack direction="row" spacing={1.5} alignItems="center">
-            <Avatar sx={{ bgcolor: 'rgba(229,9,20,.16)', color: 'primary.main', width: 50, height: 50 }}><ShieldRoundedIcon /></Avatar>
+      <CardContent sx={{ position: 'relative', p: { xs: 2, md: 2.25 }, '&:last-child': { pb: { xs: 2, md: 2.25 } } }}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ sm: 'center' }} justifyContent="space-between" spacing={1.25}>
+          <Stack direction="row" spacing={1.25} alignItems="center">
+            <Avatar sx={{ bgcolor: 'rgba(229,9,20,.16)', color: 'primary.main', width: 42, height: 42 }}><ShieldRoundedIcon fontSize="small" /></Avatar>
             <Box>
-              <Typography variant="h4" fontWeight={950}>Duyệt hoàn tiền</Typography>
-              <Typography color="text.secondary">Kiểm soát các yêu cầu giá trị cao đã được staff trưởng xác minh.</Typography>
+              <Typography variant="h5" fontWeight={950}>Duyệt hoàn tiền</Typography>
+              <Typography variant="body2" color="text.secondary">Kiểm soát các yêu cầu giá trị cao đã được staff trưởng xác minh.</Typography>
             </Box>
           </Stack>
           <Button
@@ -191,34 +197,34 @@ const RefundSection = () => {
       </CardContent>
     </Card>
 
-    <Box display="grid" gridTemplateColumns={{ xs: '1fr 1fr', xl: 'repeat(4, 1fr)' }} gap={2}>
+    <Box display="grid" gridTemplateColumns={{ xs: '1fr', sm: 'repeat(2, 1fr)', md: 'repeat(4, 1fr)' }} gap={1.25}>
       {metrics.map(({ label, value, icon: Icon, color }) => <Card key={label} sx={metricSx}>
-        <CardContent sx={{ p: 2.25, '&:last-child': { pb: 2.25 } }}>
+        <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
           <Stack direction="row" justifyContent="space-between" alignItems="center">
-            <Box><Typography variant="body2" color="text.secondary">{label}</Typography><Typography variant="h4" fontWeight={950} sx={{ mt: 0.5 }}>{value}</Typography></Box>
-            <Avatar sx={{ bgcolor: `${color}1c`, color }}><Icon /></Avatar>
+            <Box sx={{ minWidth: 0 }}><Typography variant="caption" color="text.secondary">{label}</Typography><Typography variant="h5" noWrap fontWeight={950} sx={{ mt: 0.25 }}>{value}</Typography></Box>
+            <Avatar sx={{ ml: 1, width: 36, height: 36, bgcolor: `${color}1c`, color }}><Icon fontSize="small" /></Avatar>
           </Stack>
         </CardContent>
       </Card>)}
     </Box>
 
-    <Alert severity="warning" icon={<ShieldRoundedIcon />} sx={{ borderRadius: 2.5 }}>
+    <Alert severity="warning" icon={<ShieldRoundedIcon fontSize="small" />} sx={{ borderRadius: 2, py: 0.25, '& .MuiAlert-message': { py: 0.5, fontSize: '0.85rem' } }}>
       Admin chỉ ra quyết định với yêu cầu ở trạng thái <b>Chờ Admin duyệt</b>. Hãy đối chiếu khách hàng, mã vé, suất chiếu và số tiền trước khi xác nhận.
     </Alert>
     {error && <Alert severity="error" onClose={() => setError('')}>{error}</Alert>}
 
-    <Card sx={{ borderRadius: 3, boxShadow: 'none' }}>
-      <CardContent sx={{ p: 2.25 }}>
-        <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} justifyContent="space-between">
+    <Card sx={{ borderRadius: 2.5, boxShadow: 'none' }}>
+      <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.25} justifyContent="space-between">
           <TextField
             size="small"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Tìm mã booking, mã vé, khách hàng, phim..."
-            sx={{ width: { xs: '100%', md: 430 } }}
+            sx={{ width: { xs: '100%', sm: 380 } }}
             slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchRoundedIcon fontSize="small" /></InputAdornment> } }}
           />
-          <TextField select size="small" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} sx={{ minWidth: 210 }}>
+          <TextField select size="small" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} sx={{ minWidth: 190 }}>
             <MenuItem value="ALL">Tất cả trạng thái</MenuItem>
             {Object.entries(statusMeta).map(([value, meta]) => <MenuItem key={value} value={value}>{meta.label}</MenuItem>)}
           </TextField>
@@ -226,35 +232,50 @@ const RefundSection = () => {
       </CardContent>
       <Divider />
 
-      {loading ? <Box minHeight={340} display="grid" sx={{ placeItems: 'center' }}><CircularProgress /></Box> : <TableContainer>
-        <Table sx={{ minWidth: 1120 }}>
-          <TableHead><TableRow><TableCell>Yêu cầu</TableCell><TableCell>Khách hàng</TableCell><TableCell>Vé / phim</TableCell><TableCell>Staff xác minh</TableCell><TableCell>Số tiền</TableCell><TableCell>Lý do</TableCell><TableCell>QR nhận tiền</TableCell><TableCell>Trạng thái</TableCell><TableCell align="right">Quyết định</TableCell></TableRow></TableHead>
+      {loading ? <Box minHeight={340} display="grid" sx={{ placeItems: 'center' }}><CircularProgress /></Box> : <TableContainer sx={{ overflowX: 'hidden' }}>
+        <Table size="small" sx={{ width: '100%', tableLayout: 'fixed', '& th': { py: 1.25, px: 1.25, fontSize: '0.76rem' }, '& td': { px: 1.25, fontSize: '0.82rem', verticalAlign: 'middle' } }}>
+          <TableHead><TableRow>
+            <TableCell sx={{ width: '11%' }}>Yêu cầu</TableCell>
+            <TableCell sx={{ width: '20%' }}>Khách hàng</TableCell>
+            <TableCell sx={{ width: '18%' }}>Vé / phim</TableCell>
+            <TableCell sx={{ width: '15%' }}>Xác minh / lý do</TableCell>
+            <TableCell sx={{ width: '11%' }}>Số tiền</TableCell>
+            <TableCell sx={{ width: '15%' }}>Hoàn tiền</TableCell>
+            <TableCell sx={{ width: '10%' }} align="right">Quyết định</TableCell>
+          </TableRow></TableHead>
           <TableBody>
             {filteredItems.map((item) => {
               const meta = statusMeta[item.status] || { label: item.status, color: 'default' };
-              return <TableRow key={item.id} hover sx={{ '& td': { py: 2 } }}>
+              return <TableRow key={item.id} hover sx={{ '& td': { py: 1.25 } }}>
                 <TableCell><Typography fontWeight={850}>{item.bookingCode || '—'}</Typography><Typography variant="caption" color="text.secondary">Gửi: {dateTime(item.createdAt)}</Typography></TableCell>
                 <TableCell>
                   <Stack direction="row" spacing={1.1} alignItems="center">
-                    <Avatar sx={{ width: 36, height: 36, bgcolor: 'primary.main', fontSize: 13, fontWeight: 850 }}>{(item.customerName || item.customerEmail || '?').slice(0, 2).toUpperCase()}</Avatar>
-                    <Box><Typography fontWeight={750}>{item.customerName || '—'}</Typography><Typography variant="caption" color="text.secondary">{item.customerEmail || '—'}</Typography></Box>
+                    <Avatar sx={{ width: 32, height: 32, bgcolor: 'primary.main', fontSize: 12, fontWeight: 850 }}>{(item.customerName || item.customerEmail || '?').slice(0, 2).toUpperCase()}</Avatar>
+                    <Box sx={{ minWidth: 0 }}><Typography noWrap fontWeight={750}>{item.customerName || '—'}</Typography><Typography noWrap display="block" variant="caption" color="text.secondary" title={item.customerEmail || ''}>{item.customerEmail || '—'}</Typography></Box>
                   </Stack>
                 </TableCell>
-                <TableCell><Typography fontFamily="monospace" fontWeight={800}>{item.ticketCode || '—'}</Typography><Typography variant="caption" color="text.secondary">{item.movieTitle || '—'} · {dateTime(item.showtimeStart)}</Typography></TableCell>
-                <TableCell><Stack direction="row" spacing={0.75} alignItems="center"><PersonRoundedIcon fontSize="small" color="action" /><Typography variant="body2">{item.staffName || 'Chưa chỉ định'}</Typography></Stack></TableCell>
-                <TableCell><Typography fontWeight={950} color={item.status === 'PENDING_APPROVAL' ? 'warning.main' : 'text.primary'}>{money(item.amount)}</Typography></TableCell>
-                <TableCell sx={{ maxWidth: 260 }}><Typography variant="body2" sx={{ whiteSpace: 'normal' }}>{item.reason}</Typography>{item.rejectionReason && <Typography variant="caption" display="block" color="error">Từ chối: {item.rejectionReason}</Typography>}</TableCell>
-                <TableCell>{item.refundQrImageUrl
-                  ? <Button size="small" variant="outlined" startIcon={<QrCode2RoundedIcon />} href={item.refundQrImageUrl} target="_blank" rel="noreferrer">Mở QR</Button>
-                  : <Chip size="small" color="error" variant="outlined" label="Thiếu QR" />}</TableCell>
-                <TableCell><Chip size="small" label={meta.label} color={meta.color} sx={{ fontWeight: 750 }} /></TableCell>
-                <TableCell align="right">{item.status === 'PENDING_APPROVAL' ? <Stack direction="row" justifyContent="flex-end" spacing={0.75}>
-                  <Button size="small" variant="contained" color="success" startIcon={<PaidRoundedIcon />} disabled={busy} onClick={() => setApproving(item)}>Duyệt</Button>
-                  <Button size="small" color="error" startIcon={<CancelRoundedIcon />} disabled={busy} onClick={() => setRejecting(item)}>Từ chối</Button>
+                <TableCell><Typography fontFamily="monospace" fontWeight={800}>{item.ticketCode || '—'}</Typography><Typography variant="caption" color="text.secondary" sx={{ display: 'block', overflowWrap: 'anywhere' }}>{item.movieTitle || '—'} · {dateTime(item.showtimeStart)}</Typography></TableCell>
+                <TableCell>
+                  <Stack spacing={0.4}>
+                    <Stack direction="row" spacing={0.5} alignItems="center"><PersonRoundedIcon sx={{ fontSize: 17 }} color="action" /><Typography variant="body2">{item.staffName || 'Chưa chỉ định'}</Typography></Stack>
+                    <Typography variant="caption" color="text.secondary" sx={{ overflowWrap: 'anywhere' }}>{item.reason || 'Không có lý do'}</Typography>
+                    {item.rejectionReason && <Typography variant="caption" color="error">Từ chối: {item.rejectionReason}</Typography>}
+                  </Stack>
+                </TableCell>
+                <TableCell><Typography noWrap fontWeight={950} color={item.status === 'PENDING_APPROVAL' ? 'warning.main' : 'text.primary'}>{money(item.amount)}</Typography></TableCell>
+                <TableCell><Stack spacing={0.75} alignItems="flex-start">
+                  {item.refundQrImageUrl
+                    ? <Button size="small" variant="outlined" startIcon={<QrCode2RoundedIcon />} href={item.refundQrImageUrl} target="_blank" rel="noreferrer" sx={{ minWidth: 0, whiteSpace: 'nowrap' }}>Mở QR</Button>
+                    : <Chip size="small" color="error" variant="outlined" label="Thiếu QR" />}
+                  <Chip size="small" label={meta.label} color={meta.color} sx={{ maxWidth: '100%', fontWeight: 750, '& .MuiChip-label': { overflow: 'hidden', textOverflow: 'ellipsis' } }} />
+                </Stack></TableCell>
+                <TableCell align="right">{item.status === 'PENDING_APPROVAL' ? <Stack alignItems="flex-end" spacing={0.5}>
+                  <Button size="small" variant="contained" color="success" disabled={busy} onClick={() => setApproving(item)} sx={{ minWidth: 72 }}>Duyệt</Button>
+                  <Button size="small" color="error" disabled={busy} onClick={() => setRejecting(item)} sx={{ minWidth: 72 }}>Từ chối</Button>
                 </Stack> : <Typography variant="caption" color="text.disabled">Đã xử lý</Typography>}</TableCell>
               </TableRow>;
             })}
-            {!filteredItems.length && <TableRow><TableCell colSpan={9}>
+            {!filteredItems.length && <TableRow><TableCell colSpan={7}>
               <Stack alignItems="center" spacing={1.25} py={8}>
                 <Avatar sx={{ width: 56, height: 56, bgcolor: 'action.hover', color: 'text.secondary' }}><ReceiptLongRoundedIcon /></Avatar>
                 <Typography fontWeight={850}>{items.length ? 'Không tìm thấy yêu cầu phù hợp' : 'Chưa có yêu cầu cần Admin duyệt'}</Typography>
