@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { bookingApi } from '../api/bookingApi';
 import { bookingService } from '../services/bookingService';
 
@@ -6,8 +6,8 @@ import { bookingService } from '../services/bookingService';
  * useQuickBooking
  * Manages the cascading state for the Quick Booking widget:
  *   1. Fetch now-showing movies on mount
- *   2. When a movie is selected → fetch theaters for that movie
- *   3. When a movie is selected → fetch showtimes for that movie
+ *   2. When a movie is selected → fetch its showtimes
+ *   3. Keep theater showtimes only and derive theaters from those showtimes
  *   4. Derive available dates from fetched showtimes
  *   5. When a theater + date are selected → filter showtimes accordingly
  */
@@ -24,18 +24,13 @@ export const useQuickBooking = () => {
   // ── showtimes (raw, grouped) ───────────────────────────────────────────────
   const [allShowtimes, setAllShowtimes] = useState([]); // normalized flat list
   const [showtimesLoading, setShowtimesLoading] = useState(false);
+  const [showtimesError, setShowtimesError] = useState('');
 
   // ── selected values ────────────────────────────────────────────────────────
   const [selectedMovieId, setSelectedMovieId] = useState('');
   const [selectedTheaterId, setSelectedTheaterId] = useState('');
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedShowtimeId, setSelectedShowtimeId] = useState('');
-
-  // ── derived: available dates for the selected theater ─────────────────────
-  const [availableDates, setAvailableDates] = useState([]);
-
-  // ── derived: showtime slots for selected theater + date ───────────────────
-  const [availableSlots, setAvailableSlots] = useState([]);
 
   // ── 1. Fetch now-showing movies on mount ───────────────────────────────────
   useEffect(() => {
@@ -48,7 +43,7 @@ export const useQuickBooking = () => {
         if (cancelled) return;
         const raw = Array.isArray(res) ? res : (res?.data ?? []);
         setMovies(bookingService.normalizeMovies(raw));
-      } catch (err) {
+      } catch {
         if (!cancelled) {
           setMoviesError('Không thể tải danh sách phim đang chiếu.');
         }
@@ -60,16 +55,9 @@ export const useQuickBooking = () => {
     return () => { cancelled = true; };
   }, []);
 
-  // ── 2 & 3. When movie changes → fetch theaters and showtimes in parallel ──
+  // ── 2 & 3. Load theater showtimes only; online booking has a separate flow ──
   useEffect(() => {
     if (!selectedMovieId) {
-      setTheaters([]);
-      setAllShowtimes([]);
-      setSelectedTheaterId('');
-      setSelectedDate('');
-      setSelectedShowtimeId('');
-      setAvailableDates([]);
-      setAvailableSlots([]);
       return;
     }
 
@@ -78,34 +66,47 @@ export const useQuickBooking = () => {
     const loadDependent = async () => {
       setTheatersLoading(true);
       setShowtimesLoading(true);
-      setSelectedTheaterId('');
-      setSelectedDate('');
-      setSelectedShowtimeId('');
-      setAvailableDates([]);
-      setAvailableSlots([]);
+      setShowtimesError('');
+      setTheaters([]);
+      setAllShowtimes([]);
 
       try {
-        const [theatersRes, showtimesRes] = await Promise.all([
-          bookingApi.fetchTheatersByMovie(selectedMovieId),
-          bookingApi.fetchShowtimesByMovie(selectedMovieId),
-        ]);
+        const showtimesRes = await bookingApi.fetchShowtimesByMovie(selectedMovieId);
 
         if (cancelled) return;
 
-        const rawTheaters = Array.isArray(theatersRes) ? theatersRes : (theatersRes?.data ?? []);
         const rawShowtimes = Array.isArray(showtimesRes) ? showtimesRes : (showtimesRes?.data ?? []);
-
-        setTheaters(bookingService.normalizeTheaters(rawTheaters));
-
-        // flat already has _date embedded on every entry
-        const { flat } = bookingService.normalizeShowtimesForWidget(rawShowtimes);
+        const theaterShowtimes = rawShowtimes.filter((showtime) => {
+          const online = showtime.online === true || String(showtime.online).toLowerCase() === 'true';
+          const status = String(showtime.status || '').toUpperCase();
+          const roomId = showtime.cinemaRoomId ?? showtime.roomId;
+          return !online && Boolean(showtime.theaterId) && Boolean(roomId)
+            && !['CANCELLED', 'COMPLETED'].includes(status);
+        });
+        const { flat } = bookingService.normalizeShowtimesForWidget(theaterShowtimes);
         const now = Date.now();
-        setAllShowtimes(flat.filter((showtime) => {
+        const upcoming = flat.filter((showtime) => {
           const startMs = new Date(showtime.startTime).getTime();
-          return !Number.isNaN(startMs) && startMs > now;
-        }));
+          return showtime.theaterId && !Number.isNaN(startMs) && startMs > now;
+        });
+        const theatersById = new Map();
+        upcoming.forEach((showtime) => {
+          if (!theatersById.has(showtime.theaterId)) {
+            theatersById.set(showtime.theaterId, {
+              id: showtime.theaterId,
+              name: showtime.theaterName || 'Rạp ThauFilm',
+              address: '',
+            });
+          }
+        });
+        setTheaters([...theatersById.values()]);
+        setAllShowtimes(upcoming);
       } catch {
-        // Silently degrade — the widget will show no options
+        if (!cancelled) {
+          setTheaters([]);
+          setAllShowtimes([]);
+          setShowtimesError('Không thể tải lịch chiếu tại rạp. Vui lòng thử lại.');
+        }
       } finally {
         if (!cancelled) {
           setTheatersLoading(false);
@@ -119,54 +120,42 @@ export const useQuickBooking = () => {
   }, [selectedMovieId]);
 
   // ── 4. Derive available dates whenever theater or allShowtimes changes ─────
-  useEffect(() => {
-    if (!selectedTheaterId || allShowtimes.length === 0) {
-      setAvailableDates([]);
-      setSelectedDate('');
-      setSelectedShowtimeId('');
-      setAvailableSlots([]);
-      return;
-    }
-
+  const availableDates = useMemo(() => {
+    if (!selectedTheaterId) return [];
     const forTheater = allShowtimes.filter((s) => s.theaterId === selectedTheaterId);
-    const uniqueDates = [...new Set(forTheater.map((s) => s._date))]
+    return [...new Set(forTheater.map((s) => s._date))]
       .filter(Boolean)
       .sort();
-
-    setAvailableDates(uniqueDates);
-    setSelectedDate('');
-    setSelectedShowtimeId('');
-    setAvailableSlots([]);
   }, [selectedTheaterId, allShowtimes]);
 
   // ── 5. Derive time slots for selected date ─────────────────────────────────
-  useEffect(() => {
-    if (!selectedTheaterId || !selectedDate || allShowtimes.length === 0) {
-      setAvailableSlots([]);
-      setSelectedShowtimeId('');
-      return;
-    }
-
-    const slots = allShowtimes.filter(
+  const availableSlots = useMemo(() => {
+    if (!selectedTheaterId || !selectedDate) return [];
+    return allShowtimes.filter(
       (s) => s.theaterId === selectedTheaterId && s._date === selectedDate
     );
-    setAvailableSlots(slots);
-    setSelectedShowtimeId('');
   }, [selectedTheaterId, selectedDate, allShowtimes]);
 
   // ── public handlers ────────────────────────────────────────────────────────
   const handleMovieChange = useCallback((movieId) => {
     setSelectedMovieId(movieId);
+    setTheaters([]);
+    setAllShowtimes([]);
+    setSelectedTheaterId('');
+    setSelectedDate('');
+    setSelectedShowtimeId('');
+    setShowtimesError('');
   }, []);
 
   const handleTheaterChange = useCallback((theaterId) => {
     setSelectedTheaterId(theaterId);
+    setSelectedDate('');
+    setSelectedShowtimeId('');
   }, []);
 
   const handleDateChange = useCallback((date) => {
     setSelectedDate(date);
     setSelectedShowtimeId('');
-    setAvailableSlots([]);
   }, []);
 
   const handleShowtimeChange = useCallback((showtimeId) => {
@@ -189,6 +178,7 @@ export const useQuickBooking = () => {
     moviesLoading,
     theatersLoading,
     showtimesLoading,
+    showtimesError,
     moviesError,
     // selected values
     selectedMovieId,

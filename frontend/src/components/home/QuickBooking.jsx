@@ -32,6 +32,7 @@ const QuickBooking = () => {
     moviesLoading,
     theatersLoading,
     showtimesLoading,
+    showtimesError,
     moviesError,
     selectedMovieId,
     selectedTheaterId,
@@ -151,7 +152,15 @@ const QuickBooking = () => {
                   disabled={!selectedMovieId || theatersLoading}
                 >
                   <option value="">
-                    {theatersLoading ? 'Đang tải rạp…' : !selectedMovieId ? '-- Chọn phim trước --' : '-- Chọn rạp --'}
+                    {theatersLoading
+                      ? 'Đang tải rạp…'
+                      : !selectedMovieId
+                      ? '-- Chọn phim trước --'
+                      : showtimesError
+                      ? '-- Không thể tải lịch chiếu --'
+                      : theaters.length === 0
+                      ? '-- Phim chưa có suất tại rạp --'
+                      : '-- Chọn rạp --'}
                   </option>
                   {theaters.map((t) => (
                     <option key={t.id} value={t.id}>{t.name}</option>
@@ -164,7 +173,7 @@ const QuickBooking = () => {
                   />
                 )}
               </div>
-              <span className="qb-error">{missing('cinema') ? 'Vui lòng chọn rạp' : ''}</span>
+              <span className="qb-error">{showtimesError || (missing('cinema') ? 'Vui lòng chọn rạp' : '')}</span>
             </div>
 
             {/* ── 3. Chọn Ngày ───────────────────────────────────────────── */}
