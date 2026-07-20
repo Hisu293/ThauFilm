@@ -26,8 +26,8 @@ import { movieChatbotService } from '../services/movieChatbotService';
 const quickPrompts = [
   'Gợi ý phim hành động',
   'Có phim nào dưới 2 tiếng không?',
-  'Phim nào khoảng 120 phút?',
   'Gợi ý phim viễn tưởng đang chiếu',
+  'Bạn làm được gì?',
 ];
 
 const initialMessages = [
@@ -96,7 +96,7 @@ const MovieChatbotPage = () => {
             </Typography>
           </Stack>
           <Typography color="text.secondary">
-            Hỏi theo gu phim, thời lượng, thể loại, trạng thái hoặc một phim bạn từng thích. Chatbot chỉ gợi ý phim đang có trong hệ thống ThauFilm.
+            Trò chuyện tự nhiên hoặc hỏi theo gu phim, thời lượng, thể loại và trạng thái chiếu. AI chỉ gợi ý phim thật đang có trong hệ thống ThauFilm.
           </Typography>
         </Box>
 

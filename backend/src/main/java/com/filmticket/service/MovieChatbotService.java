@@ -46,6 +46,45 @@ public class MovieChatbotService {
             "(?:khoang|tam|gan|around|about)?\\s*(\\d{1,3})\\s*(tieng|h|hour|hours|phut|p|min|minutes)\\b",
             Pattern.CASE_INSENSITIVE
     );
+    private static final Set<String> MOVIE_SIGNALS = Set.of(
+            "phim", "movie", "cinema", "dien anh", "rap", "suat chieu", "dang chieu", "sap chieu",
+            "goi y", "de xuat", "recommend", "xem gi", "co gi hay", "thoi luong", "dao dien", "dien vien"
+    );
+    private static final Set<String> MOVIE_FOLLOW_UP_SIGNALS = Set.of(
+            "con nao", "con phim nao", "khac di", "phim khac", "them nua", "ngan hon", "dai hon", "doi gu"
+    );
+    private static final List<GenreDefinition> SUPPORTED_GENRES = List.of(
+            genre("action", "hành động", "action", "hanh dong"),
+            genre("adventure", "phiêu lưu", "adventure", "phieu luu"),
+            genre("animation", "hoạt hình", "animation", "animated", "hoat hinh"),
+            genre("biography", "tiểu sử", "biography", "biographical", "tieu su"),
+            genre("comedy", "hài", "comedy", "hai"),
+            genre("crime", "hình sự", "crime", "hinh su", "toi pham"),
+            genre("documentary", "tài liệu", "documentary", "tai lieu"),
+            genre("drama", "chính kịch", "drama", "chinh kich"),
+            genre("family", "gia đình", "family", "gia dinh"),
+            genre("fantasy", "giả tưởng", "fantasy", "gia tuong", "ky ao"),
+            genre("history", "lịch sử", "history", "historical", "lich su"),
+            genre("horror", "kinh dị", "horror", "kinh di"),
+            genre("music", "âm nhạc", "music", "am nhac"),
+            genre("musical", "nhạc kịch", "musical", "nhac kich"),
+            genre("mystery", "bí ẩn", "mystery", "bi an", "trinh tham"),
+            genre("romance", "lãng mạn", "romance", "romantic", "lang man", "tinh cam"),
+            genre("science_fiction", "khoa học viễn tưởng", "science fiction", "sci fi", "scifi", "khoa hoc vien tuong", "vien tuong"),
+            genre("sport", "thể thao", "sport", "sports", "the thao"),
+            genre("thriller", "giật gân", "thriller", "giat gan"),
+            genre("war", "chiến tranh", "war", "chien tranh"),
+            genre("western", "viễn Tây", "western", "vien tay"),
+            genre("superhero", "siêu anh hùng", "superhero", "super hero", "sieu anh hung"),
+            genre("psychological", "tâm lý", "psychological", "psychology", "tam ly"),
+            genre("martial_arts", "võ thuật", "martial arts", "martial art", "vo thuat"),
+            genre("kids", "thiếu nhi", "kids", "kid", "children", "thieu nhi"),
+            genre("anime", "anime", "anime"),
+            genre("disaster", "thảm họa", "disaster", "tham hoa"),
+            genre("post_apocalyptic", "hậu tận thế", "post apocalyptic", "postapocalyptic", "hau tan the"),
+            genre("supernatural", "siêu nhiên", "supernatural", "sieu nhien"),
+            genre("film_noir", "noir (phim đen)", "film noir", "noir", "phim den")
+    );
 
     private final MovieRepository movieRepository;
     private final S3PresignedUrlService s3PresignedUrlService;
@@ -67,6 +106,13 @@ public class MovieChatbotService {
 
     public MovieChatResponse chat(String message, List<MovieChatRequest.ChatTurn> history) {
         List<Movie> movies = movieRepository.findAllByActiveTrue();
+        ConversationContext context = buildConversationContext(message, history);
+        MessageIntent messageIntent = classifyMessage(context, movies);
+
+        if (messageIntent != MessageIntent.MOVIE_DISCOVERY) {
+            return buildConversationResponse(context, messageIntent);
+        }
+
         if (movies.isEmpty()) {
             return MovieChatResponse.builder()
                     .answer("Hiện chưa có phim nào trong hệ thống để tư vấn.")
@@ -74,7 +120,6 @@ public class MovieChatbotService {
                     .build();
         }
 
-        ConversationContext context = buildConversationContext(message, history);
         List<ScoredMovie> ranked = rankMovies(context, movies);
         List<MovieChatResponse.MovieRecommendation> recommendations = ranked.stream()
                 .limit(5)
@@ -86,12 +131,7 @@ public class MovieChatbotService {
             try {
                 answer = callGemini(context, recommendations);
             } catch (Exception exception) {
-                if (exception.getMessage() != null && exception.getMessage().contains("HTTP 429")) {
-                    geminiRetryAfterMillis = System.currentTimeMillis() + Duration.ofMinutes(5).toMillis();
-                    log.info("Gemini quota/rate limit reached. Falling back to local recommendations for 5 minutes.");
-                } else {
-                    log.warn("Movie chatbot AI failed: {}", exception.getMessage());
-                }
+                handleGeminiFailure(exception);
             }
         }
 
@@ -99,6 +139,60 @@ public class MovieChatbotService {
                 .answer(answer)
                 .recommendations(recommendations)
                 .build();
+    }
+
+    private MessageIntent classifyMessage(ConversationContext context, List<Movie> movies) {
+        String query = context.currentQuery();
+        if (!hasText(query)) return MessageIntent.GIBBERISH;
+
+        QueryIntent parsedIntent = parseIntent(query, movies);
+        if (parsedIntent.hasCriteria() || containsAny(query, MOVIE_SIGNALS)) {
+            return MessageIntent.MOVIE_DISCOVERY;
+        }
+        if (containsAny(query, MOVIE_FOLLOW_UP_SIGNALS)
+                && (containsAny(context.previousUserQuery(), MOVIE_SIGNALS)
+                || parseIntent(context.previousUserQuery(), movies).hasCriteria())) {
+            return MessageIntent.MOVIE_DISCOVERY;
+        }
+        if (isGreeting(query)) return MessageIntent.GREETING;
+        if (containsAny(query, Set.of("cam on", "thanks", "thank you", "tot qua", "hay qua"))) {
+            return MessageIntent.THANKS;
+        }
+        if (containsAny(query, Set.of("ban la ai", "ban lam duoc gi", "chuc nang", "giup gi", "help"))) {
+            return MessageIntent.CAPABILITY;
+        }
+        if (looksLikeGibberish(query)) return MessageIntent.GIBBERISH;
+        return MessageIntent.GENERAL_CONVERSATION;
+    }
+
+    private MovieChatResponse buildConversationResponse(ConversationContext context, MessageIntent intent) {
+        String answer = switch (intent) {
+            case GREETING -> "Chào bạn! Mình là trợ lý phim của ThauFilm. Bạn có thể hỏi mình phim gì đang chiếu, phim theo thể loại hoặc theo thời lượng nhé.";
+            case THANKS -> "Không có gì! Khi cần đổi gu hoặc tìm thêm phim, bạn cứ nói thể loại và thời lượng mong muốn nhé.";
+            case CAPABILITY -> "Mình có thể trò chuyện và tư vấn phim đang có trên ThauFilm theo thể loại, thời lượng, trạng thái chiếu hoặc một phim bạn từng thích.";
+            case GIBBERISH -> "Mình chưa hiểu câu này. Bạn thử viết rõ hơn, ví dụ: “Gợi ý phim hành động dưới 2 tiếng” nhé.";
+            case GENERAL_CONVERSATION -> buildGeneralFallback();
+            case MOVIE_DISCOVERY -> throw new IllegalStateException("Movie discovery must use the recommendation flow");
+        };
+
+        if (intent == MessageIntent.GENERAL_CONVERSATION
+                && hasText(geminiApiKey)
+                && System.currentTimeMillis() >= geminiRetryAfterMillis) {
+            try {
+                answer = callGeminiConversation(context);
+            } catch (Exception exception) {
+                handleGeminiFailure(exception);
+            }
+        }
+
+        return MovieChatResponse.builder()
+                .answer(answer)
+                .recommendations(List.of())
+                .build();
+    }
+
+    private String buildGeneralFallback() {
+        return "Mình chuyên hỗ trợ về phim và trải nghiệm tại ThauFilm. Với câu hỏi này mình chưa thể trả lời chắc chắn; bạn có thể hỏi mình gợi ý phim, thể loại, thời lượng hoặc phim đang chiếu nhé.";
     }
 
     private List<ScoredMovie> rankMovies(ConversationContext context, List<Movie> movies) {
@@ -125,11 +219,13 @@ public class MovieChatbotService {
                     .skip(Math.max(0, history.size() - 8))
                     .forEach(recentUserMessages::add);
         }
+        String previousUserQuery = normalize(String.join(" ", recentUserMessages));
         recentUserMessages.add(currentMessage);
         return new ConversationContext(
                 currentMessage,
                 normalize(currentMessage),
-                normalize(String.join(" ", recentUserMessages))
+                normalize(String.join(" ", recentUserMessages)),
+                previousUserQuery
         );
     }
 
@@ -201,19 +297,25 @@ public class MovieChatbotService {
             if (genreOverlap > 0) reasons.add("cùng chất " + safe(intent.reference().getTitle()));
         }
 
-        Set<String> movieGenres = tokens(movie.getGenre());
+        Set<String> movieGenres = detectGenreKeys(movie.getGenre());
         for (String excludedGenre : intent.excludedGenres()) {
             if (movieGenres.contains(excludedGenre)) {
                 return new ScoredMovie(movie, 0, "");
             }
         }
 
+        boolean matchedRequestedGenre = intent.genres().isEmpty();
         for (String genre : intent.genres()) {
             if (movieGenres.contains(genre)) {
+                matchedRequestedGenre = true;
                 score += 65;
                 matchedCriteria = true;
                 reasons.add("thuộc thể loại " + genreLabel(genre));
             }
+        }
+
+        if (!matchedRequestedGenre) {
+            return new ScoredMovie(movie, 0, "");
         }
 
         if (matchesFreeText(query, movie)) {
@@ -286,62 +388,41 @@ public class MovieChatbotService {
 
     private Set<String> detectGenres(String query) {
         Set<String> genres = new LinkedHashSet<>();
-        addIfContains(genres, query, "action", "hanh dong", "hanh");
-        addIfContains(genres, query, "sci", "sci fi", "science fiction", "vien tuong", "khoa hoc");
-        addIfContains(genres, query, "romance", "tinh cam", "lang man");
-        addIfContains(genres, query, "comedy", "hai");
-        addIfContains(genres, query, "horror", "kinh di");
-        addIfContains(genres, query, "drama", "tam ly");
-        addIfContains(genres, query, "animation", "hoat hinh");
-        addIfContains(genres, query, "adventure", "phieu luu");
-        addIfContains(genres, query, "family", "gia dinh");
-        addIfContains(genres, query, "fantasy", "gia tuong", "ky ao");
-        addIfContains(genres, query, "mystery", "bi an", "trinh tham");
-        addIfContains(genres, query, "history", "lich su");
+        for (GenreDefinition definition : SUPPORTED_GENRES) {
+            if (containsGenreAlias(query, definition)) {
+                genres.add(definition.key());
+            }
+        }
         return genres;
     }
 
     private Set<String> detectExcludedGenres(String query) {
         Set<String> genres = new LinkedHashSet<>();
-        addIfNegated(genres, query, "action", "hanh dong", "hanh");
-        addIfNegated(genres, query, "sci", "sci fi", "science fiction", "vien tuong", "khoa hoc");
-        addIfNegated(genres, query, "romance", "tinh cam", "lang man");
-        addIfNegated(genres, query, "comedy", "hai");
-        addIfNegated(genres, query, "horror", "kinh di");
-        addIfNegated(genres, query, "drama", "tam ly");
-        addIfNegated(genres, query, "animation", "hoat hinh");
-        addIfNegated(genres, query, "adventure", "phieu luu");
-        addIfNegated(genres, query, "family", "gia dinh");
-        addIfNegated(genres, query, "fantasy", "gia tuong", "ky ao");
-        addIfNegated(genres, query, "mystery", "bi an", "trinh tham");
-        addIfNegated(genres, query, "history", "lich su");
+        for (GenreDefinition definition : SUPPORTED_GENRES) {
+            if (definition.aliases().stream().anyMatch(alias -> isNegated(query, alias))) {
+                genres.add(definition.key());
+            }
+        }
         return genres;
     }
 
-    private void addIfContains(Set<String> genres, String query, String canonical, String... aliases) {
-        if (query.contains(canonical)) {
-            genres.add(canonical);
-            return;
-        }
-        for (String alias : aliases) {
-            if (query.contains(alias)) {
-                genres.add(canonical);
-                return;
+    private Set<String> detectGenreKeys(String value) {
+        String normalizedValue = normalize(value);
+        Set<String> genres = new LinkedHashSet<>();
+        for (GenreDefinition definition : SUPPORTED_GENRES) {
+            if (containsGenreAlias(normalizedValue, definition)) {
+                genres.add(definition.key());
             }
         }
+        return genres;
     }
 
-    private void addIfNegated(Set<String> genres, String query, String canonical, String... aliases) {
-        if (isNegated(query, canonical)) {
-            genres.add(canonical);
-            return;
-        }
-        for (String alias : aliases) {
-            if (isNegated(query, alias)) {
-                genres.add(canonical);
-                return;
-            }
-        }
+    private boolean containsGenreAlias(String value, GenreDefinition definition) {
+        return definition.aliases().stream().anyMatch(alias -> containsPhrase(value, alias));
+    }
+
+    private static GenreDefinition genre(String key, String label, String... aliases) {
+        return new GenreDefinition(key, label, List.of(aliases));
     }
 
     private boolean isNegated(String query, String value) {
@@ -419,6 +500,48 @@ public class MovieChatbotService {
         return hasText(text) ? text.trim() : buildFallbackAnswer(recommendations);
     }
 
+    private String callGeminiConversation(ConversationContext context) throws Exception {
+        String prompt = """
+                Bạn là trợ lý trò chuyện của rạp phim ThauFilm.
+                Trả lời câu hỏi của khách bằng tiếng Việt, thân thiện, chính xác và tối đa 4 câu.
+                Nếu câu hỏi cần dữ liệu thời gian thực hoặc bạn không chắc, hãy nói rõ giới hạn thay vì bịa.
+                Không tự tạo tên phim, suất chiếu, giá vé hoặc chính sách của ThauFilm.
+                Nếu phù hợp, nhẹ nhàng hướng cuộc trò chuyện về nhu cầu xem phim.
+
+                Câu hỏi của khách: "%s"
+                """.formatted(context.currentMessage().replace("\"", "'"));
+
+        ObjectNode root = objectMapper.createObjectNode();
+        ObjectNode content = root.putArray("contents").addObject();
+        content.putArray("parts").addObject().put("text", prompt);
+        root.putObject("generationConfig")
+                .put("temperature", 0.25)
+                .put("maxOutputTokens", 220);
+
+        HttpRequest request = HttpRequest.newBuilder(URI.create(GEMINI_ENDPOINT.formatted(geminiModel)))
+                .timeout(Duration.ofSeconds(20))
+                .header("x-goog-api-key", geminiApiKey)
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(root.toString()))
+                .build();
+        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+        if (response.statusCode() < 200 || response.statusCode() >= 300) {
+            throw new IllegalStateException("Gemini returned HTTP " + response.statusCode());
+        }
+        String text = objectMapper.readTree(response.body()).path("candidates").path(0)
+                .path("content").path("parts").path(0).path("text").asText();
+        return hasText(text) ? text.trim() : buildGeneralFallback();
+    }
+
+    private void handleGeminiFailure(Exception exception) {
+        if (exception.getMessage() != null && exception.getMessage().contains("HTTP 429")) {
+            geminiRetryAfterMillis = System.currentTimeMillis() + Duration.ofMinutes(5).toMillis();
+            log.info("Gemini quota/rate limit reached. Falling back to local responses for 5 minutes.");
+        } else {
+            log.warn("Movie chatbot AI failed: {}", exception.getMessage());
+        }
+    }
+
     private String buildPrompt(ConversationContext context, List<MovieChatResponse.MovieRecommendation> recommendations) {
         StringBuilder prompt = new StringBuilder("""
                 Bạn là chatbot tư vấn phim cho rạp ThauFilm. Trả lời bằng tiếng Việt, thân thiện, ngắn gọn.
@@ -468,6 +591,33 @@ public class MovieChatbotService {
         return count;
     }
 
+    private boolean containsAny(String value, Set<String> signals) {
+        for (String signal : signals) {
+            if (containsPhrase(value, signal)) return true;
+        }
+        return false;
+    }
+
+    private boolean containsPhrase(String value, String phrase) {
+        return (" " + value + " ").contains(" " + phrase + " ");
+    }
+
+    private boolean isGreeting(String query) {
+        return query.matches("^(xin chao|chao|hello|hi|hey)( ban| bot| chatbot| thaufilm)?$")
+                || query.startsWith("chao buoi ");
+    }
+
+    private boolean looksLikeGibberish(String query) {
+        if (query.length() <= 1) return true;
+        String compact = query.replace(" ", "");
+        if (compact.matches(".*(.)\\1{4,}.*")) return true;
+        if (query.split("\\s+").length <= 2 && compact.length() >= 5) {
+            long vowels = compact.chars().filter(character -> "aeiouy".indexOf(character) >= 0).count();
+            return vowels == 0 || vowels * 5 < compact.length();
+        }
+        return false;
+    }
+
     private String normalize(String value) {
         String normalized = Normalizer.normalize(safe(value), Normalizer.Form.NFD)
                 .replaceAll("\\p{M}", "");
@@ -483,24 +633,28 @@ public class MovieChatbotService {
     }
 
     private String genreLabel(String genre) {
-        return switch (genre) {
-            case "action" -> "hành động";
-            case "sci" -> "viễn tưởng";
-            case "romance" -> "tình cảm";
-            case "comedy" -> "hài";
-            case "horror" -> "kinh dị";
-            case "drama" -> "tâm lý";
-            case "animation" -> "hoạt hình";
-            case "adventure" -> "phiêu lưu";
-            case "family" -> "gia đình";
-            case "fantasy" -> "giả tưởng";
-            case "mystery" -> "bí ẩn";
-            case "history" -> "lịch sử";
-            default -> genre;
-        };
+        return SUPPORTED_GENRES.stream()
+                .filter(definition -> definition.key().equals(genre))
+                .map(GenreDefinition::label)
+                .findFirst()
+                .orElse(genre);
     }
 
-    private record ConversationContext(String currentMessage, String currentQuery, String intentQuery) {}
+    private enum MessageIntent {
+        MOVIE_DISCOVERY,
+        GREETING,
+        THANKS,
+        CAPABILITY,
+        GENERAL_CONVERSATION,
+        GIBBERISH
+    }
+
+    private record ConversationContext(
+            String currentMessage,
+            String currentQuery,
+            String intentQuery,
+            String previousUserQuery
+    ) {}
 
     private record QueryIntent(
             Integer maxDurationMinutes,
@@ -523,4 +677,6 @@ public class MovieChatbotService {
     }
 
     private record ScoredMovie(Movie movie, int score, String reason) {}
+
+    private record GenreDefinition(String key, String label, List<String> aliases) {}
 }

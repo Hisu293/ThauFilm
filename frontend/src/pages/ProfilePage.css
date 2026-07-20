@@ -187,6 +187,7 @@
 
 .pf-ticket__footer { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-top: auto; padding-top: 10px; border-top: 1px dashed rgba(255,255,255,0.1); }
 .pf-ticket__footer-main { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.pf-ticket__actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
 .pf-ticket__code { font-family: 'Courier New', monospace; font-size: 0.78rem; color: rgba(255,255,255,0.45); letter-spacing: 0.04em; }
 .pf-ticket__hold {
   display: inline-flex;
@@ -342,5 +343,7 @@
   .pf-fav-grid { grid-template-columns: repeat(2, 1fr); }
   .pf-ticket__details { grid-template-columns: 1fr; }
   .pf-ticket__footer { flex-direction: column; align-items: stretch; }
+  .pf-ticket__actions { flex-direction: column; align-items: stretch; }
+  .pf-ticket__actions .pf-btn { justify-content: center; }
   .pf-ticket__barcode { justify-content: flex-end; }
 }

@@ -98,7 +98,7 @@ const isDoneTicket = (ticket) => ticket.rawStatus === 'CONFIRMED';
 const isCancelTicket = (ticket) => ['CANCELLED', 'EXPIRED'].includes(ticket.rawStatus);
 
 /* ─── Premium ticket card ─── */
-const TicketCard = ({ ticket, onResume, onWatch }) => (
+const TicketCard = ({ ticket, onResume, onWatch, onDetails }) => (
   <article className="pf-ticket">
     <div className="pf-ticket__left">
       <img
@@ -154,15 +154,27 @@ const TicketCard = ({ ticket, onResume, onWatch }) => (
             <ConfirmationNumberRoundedIcon sx={{ fontSize: 16 }} />
             Tiếp tục thanh toán
           </button>
-        ) : ticket.rawStatus === 'CONFIRMED' && ticket.movieId ? (
-          <button
-            type="button"
-            className="pf-btn pf-btn--sm pf-btn--pay"
-            onClick={() => onWatch(ticket)}
-          >
-            <ConfirmationNumberRoundedIcon sx={{ fontSize: 16 }} />
-            Xem phim online
-          </button>
+        ) : ticket.rawStatus === 'CONFIRMED' ? (
+          <div className="pf-ticket__actions">
+            <button
+              type="button"
+              className="pf-btn pf-btn--sm"
+              onClick={() => onDetails(ticket)}
+            >
+              <ConfirmationNumberRoundedIcon sx={{ fontSize: 16 }} />
+              {ticket.canRequestRefund ? 'Chi tiết / Hoàn tiền' : 'Chi tiết vé'}
+            </button>
+            {ticket.movieId && (
+              <button
+                type="button"
+                className="pf-btn pf-btn--sm pf-btn--pay"
+                onClick={() => onWatch(ticket)}
+              >
+                <ConfirmationNumberRoundedIcon sx={{ fontSize: 16 }} />
+                Xem phim online
+              </button>
+            )}
+          </div>
         ) : ticket.isExpired ? (
           <span className="pf-ticket__hold is-expired">Đã hết hạn giữ ghế</span>
         ) : (
@@ -350,6 +362,7 @@ const ProfilePage = () => {
               remainingText: isPending && holdExpiresMs > 0 ? remainingText : '',
               isExpired,
               canResume: isPending && !isExpired,
+              canRequestRefund: normStatus === 'CONFIRMED' && !isPast,
               moviePayload: {
                 ...mergedMovie,
                 id: b.movieId || showtimeInfo?.movieId || mergedShowtime?.movieId,
@@ -441,6 +454,9 @@ const ProfilePage = () => {
   };
   const watchOnline = (ticket) => {
     if (ticket?.movieId) navigate(`/movies/${ticket.movieId}?watch=1`);
+  };
+  const viewBookingDetails = (ticket) => {
+    if (ticket?.bookingId) navigate(`/my-bookings/${ticket.bookingId}`);
   };
 
   const MembershipCard = (
@@ -578,7 +594,15 @@ const ProfilePage = () => {
                 </Box>
               ) : filteredHistory.length ? (
                 <div className="pf-tickets">
-                  {filteredHistory.map((t) => <TicketCard key={t.id} ticket={t} onResume={resumePayment} onWatch={watchOnline} />)}
+                  {filteredHistory.map((t) => (
+                    <TicketCard
+                      key={t.id}
+                      ticket={t}
+                      onResume={resumePayment}
+                      onWatch={watchOnline}
+                      onDetails={viewBookingDetails}
+                    />
+                  ))}
                 </div>
               ) : (
                 <div className="pf-empty-state" style={{ minHeight: 200 }}>

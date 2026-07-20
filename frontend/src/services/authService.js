@@ -17,6 +17,10 @@ export const authService = {
 
   register: (data) => api.post('/api/auth/register', data),
 
+  forgotPassword: (email) => api.post('/api/auth/forgot-password', { email }),
+
+  resetPassword: (data) => api.post('/api/auth/reset-password', data),
+
   /** POST /api/auth/logout — body: { refreshToken } */
   logout: (refreshToken) =>
     api.post('/api/auth/logout', { refreshToken }),
