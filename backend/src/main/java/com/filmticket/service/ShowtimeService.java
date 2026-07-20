@@ -347,8 +347,7 @@ public class ShowtimeService {
                             .price(BigDecimal.ZERO)
                             .build())
                     .toList();
-            seatAvailabilityRepository.saveAll(newAvailabilities);
-            applyPricing(showtime, newAvailabilities);
+            applyPricing(showtime, newAvailabilities, seats);
             seatAvailabilityRepository.saveAll(newAvailabilities);
         } else {
             applyPricing(showtime, existing);
@@ -362,6 +361,14 @@ public class ShowtimeService {
             return;
         }
         pricingService.applyDefaultPricing(availabilities);
+    }
+
+    private void applyPricing(Showtime showtime, List<SeatAvailability> availabilities, List<Seat> seats) {
+        if (showtime.isMystery()) {
+            availabilities.forEach(availability -> availability.setPrice(MYSTERY_PRICE));
+            return;
+        }
+        pricingService.applyDefaultPricing(availabilities, seats);
     }
 
     private void validateNoOverlap(UUID cinemaRoomId, LocalDateTime startTime,

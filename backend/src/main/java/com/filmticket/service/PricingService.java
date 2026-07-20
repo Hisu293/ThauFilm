@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -25,15 +26,28 @@ public class PricingService {
 
     @Transactional
     public void applyDefaultPricing(List<SeatAvailability> availabilities) {
+        Map<UUID, Seat> seatsById = seatRepository.findAllById(availabilities.stream()
+                        .map(SeatAvailability::getSeatId)
+                        .distinct()
+                        .toList())
+                .stream()
+                .collect(Collectors.toMap(Seat::getId, seat -> seat));
+        applyDefaultPricing(availabilities, seatsById.values());
+    }
+
+    @Transactional
+    public void applyDefaultPricing(List<SeatAvailability> availabilities, Collection<Seat> seats) {
         List<SeatTypePriceConfig> configs = seatTypePriceConfigRepository.findByActiveTrue();
         if (configs.isEmpty()) {
             throw new BadRequestException("Missing seat type price configs");
         }
         Map<String, BigDecimal> configMap = configs.stream()
                 .collect(Collectors.toMap(SeatTypePriceConfig::getSeatType, SeatTypePriceConfig::getPrice));
+        Map<UUID, Seat> seatsById = seats.stream()
+                .collect(Collectors.toMap(Seat::getId, seat -> seat));
 
         for (SeatAvailability availability : availabilities) {
-            Seat seat = seatRepository.findById(availability.getSeatId()).orElse(null);
+            Seat seat = seatsById.get(availability.getSeatId());
             if (seat == null) {
                 throw new BadRequestException("Seat not found: " + availability.getSeatId());
             }
