@@ -393,12 +393,12 @@ const MyBookingDetailPage = () => {
               </Box>;
             })}
           </Stack>
-        </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          {refundRequest?.status === 'REQUESTED' && <Button component="label" variant="outlined" startIcon={<AddPhotoAlternateRoundedIcon />} disabled={qrUploading} sx={{ whiteSpace: 'nowrap' }}>
-            {qrUploading ? 'Đang tải...' : 'Gửi QR'}
+          {['REQUESTED', 'PENDING_APPROVAL'].includes(refundRequest?.status) && <Button component="label" fullWidth variant="outlined" startIcon={<AddPhotoAlternateRoundedIcon />} disabled={qrUploading} sx={{ mt: 1.5 }}>
+            {qrUploading ? 'Đang tải ảnh QR...' : refundRequest?.refundQrImageUrl ? 'Đổi ảnh QR nhận tiền' : 'Chọn ảnh QR để gửi'}
             <input hidden type="file" accept="image/jpeg,image/png,image/webp" onChange={uploadRefundQr} />
           </Button>}
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
           <TextField fullWidth size="small" placeholder="Nhắn cho staff trưởng..." value={messageText} onChange={(event) => setMessageText(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendRefundMessage(); } }} />
           <Button variant="contained" onClick={sendRefundMessage} disabled={!messageText.trim()}><SendRoundedIcon /></Button>
         </DialogActions>

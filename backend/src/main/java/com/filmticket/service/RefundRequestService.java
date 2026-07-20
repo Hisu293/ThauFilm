@@ -141,8 +141,9 @@ public class RefundRequestService {
     @Transactional
     public RefundMessageDto customerQrMessage(UUID customerId, UUID requestId, MultipartFile image, String caption) {
         RefundRequest request = requireOwnedRequest(customerId, requestId);
-        if (request.getStatus() != RefundRequestStatus.REQUESTED) {
-            throw new BadRequestException("Chỉ được cập nhật QR khi yêu cầu đang chờ staff kiểm tra");
+        if (request.getStatus() != RefundRequestStatus.REQUESTED
+                && request.getStatus() != RefundRequestStatus.PENDING_APPROVAL) {
+            throw new BadRequestException("Chỉ được cập nhật QR khi yêu cầu đang chờ duyệt");
         }
         CloudinaryStorageService.UploadedImage uploaded = cloudinaryStorageService.upload(image);
         try {
@@ -160,6 +161,10 @@ public class RefundRequestService {
             refundRepository.saveAndFlush(request);
             notifyShiftLeaders("Khách hàng đã gửi QR hoàn tiền",
                     "QR nhận tiền cho vé " + request.getTicketCode() + " đã sẵn sàng để kiểm tra");
+            if (request.getStatus() == RefundRequestStatus.PENDING_APPROVAL) {
+                notifyAdmins("Khách hàng đã bổ sung QR hoàn tiền",
+                        "QR nhận tiền cho vé " + request.getTicketCode() + " đã sẵn sàng để duyệt");
+            }
             return messageDto(message);
         } catch (RuntimeException exception) {
             cloudinaryStorageService.deleteQuietly(uploaded.publicId());
