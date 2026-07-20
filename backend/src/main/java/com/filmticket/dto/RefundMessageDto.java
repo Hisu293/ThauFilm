@@ -13,5 +13,6 @@ public class RefundMessageDto {
     private String senderName;
     private String senderRole;
     private String content;
+    private String imageUrl;
     private LocalDateTime createdAt;
 }

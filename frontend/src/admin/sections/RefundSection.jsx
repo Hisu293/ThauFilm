@@ -35,6 +35,7 @@ import TaskAltRoundedIcon from '@mui/icons-material/TaskAltRounded';
 import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded';
 import PersonRoundedIcon from '@mui/icons-material/PersonRounded';
 import ShieldRoundedIcon from '@mui/icons-material/ShieldRounded';
+import QrCode2RoundedIcon from '@mui/icons-material/QrCode2Rounded';
 import adminService from '../../services/adminService';
 import { connectRealtime } from '../../services/realtimeService';
 
@@ -227,7 +228,7 @@ const RefundSection = () => {
 
       {loading ? <Box minHeight={340} display="grid" sx={{ placeItems: 'center' }}><CircularProgress /></Box> : <TableContainer>
         <Table sx={{ minWidth: 1120 }}>
-          <TableHead><TableRow><TableCell>Yêu cầu</TableCell><TableCell>Khách hàng</TableCell><TableCell>Vé / phim</TableCell><TableCell>Staff xác minh</TableCell><TableCell>Số tiền</TableCell><TableCell>Lý do</TableCell><TableCell>Trạng thái</TableCell><TableCell align="right">Quyết định</TableCell></TableRow></TableHead>
+          <TableHead><TableRow><TableCell>Yêu cầu</TableCell><TableCell>Khách hàng</TableCell><TableCell>Vé / phim</TableCell><TableCell>Staff xác minh</TableCell><TableCell>Số tiền</TableCell><TableCell>Lý do</TableCell><TableCell>QR nhận tiền</TableCell><TableCell>Trạng thái</TableCell><TableCell align="right">Quyết định</TableCell></TableRow></TableHead>
           <TableBody>
             {filteredItems.map((item) => {
               const meta = statusMeta[item.status] || { label: item.status, color: 'default' };
@@ -243,6 +244,9 @@ const RefundSection = () => {
                 <TableCell><Stack direction="row" spacing={0.75} alignItems="center"><PersonRoundedIcon fontSize="small" color="action" /><Typography variant="body2">{item.staffName || 'Chưa chỉ định'}</Typography></Stack></TableCell>
                 <TableCell><Typography fontWeight={950} color={item.status === 'PENDING_APPROVAL' ? 'warning.main' : 'text.primary'}>{money(item.amount)}</Typography></TableCell>
                 <TableCell sx={{ maxWidth: 260 }}><Typography variant="body2" sx={{ whiteSpace: 'normal' }}>{item.reason}</Typography>{item.rejectionReason && <Typography variant="caption" display="block" color="error">Từ chối: {item.rejectionReason}</Typography>}</TableCell>
+                <TableCell>{item.refundQrImageUrl
+                  ? <Button size="small" variant="outlined" startIcon={<QrCode2RoundedIcon />} href={item.refundQrImageUrl} target="_blank" rel="noreferrer">Mở QR</Button>
+                  : <Chip size="small" color="error" variant="outlined" label="Thiếu QR" />}</TableCell>
                 <TableCell><Chip size="small" label={meta.label} color={meta.color} sx={{ fontWeight: 750 }} /></TableCell>
                 <TableCell align="right">{item.status === 'PENDING_APPROVAL' ? <Stack direction="row" justifyContent="flex-end" spacing={0.75}>
                   <Button size="small" variant="contained" color="success" startIcon={<PaidRoundedIcon />} disabled={busy} onClick={() => setApproving(item)}>Duyệt</Button>
@@ -250,7 +254,7 @@ const RefundSection = () => {
                 </Stack> : <Typography variant="caption" color="text.disabled">Đã xử lý</Typography>}</TableCell>
               </TableRow>;
             })}
-            {!filteredItems.length && <TableRow><TableCell colSpan={8}>
+            {!filteredItems.length && <TableRow><TableCell colSpan={9}>
               <Stack alignItems="center" spacing={1.25} py={8}>
                 <Avatar sx={{ width: 56, height: 56, bgcolor: 'action.hover', color: 'text.secondary' }}><ReceiptLongRoundedIcon /></Avatar>
                 <Typography fontWeight={850}>{items.length ? 'Không tìm thấy yêu cầu phù hợp' : 'Chưa có yêu cầu cần Admin duyệt'}</Typography>
@@ -274,9 +278,15 @@ const RefundSection = () => {
               <Stack direction="row" justifyContent="space-between"><Typography color="text.secondary">Số tiền hoàn</Typography><Typography fontWeight={950} color="warning.main">{money(approving?.amount)}</Typography></Stack>
             </Stack>
           </Box>
+          {approving?.refundQrImageUrl ? <Box>
+            <Typography fontWeight={800} mb={1}>QR nhận tiền của khách</Typography>
+            <Box component="a" href={approving.refundQrImageUrl} target="_blank" rel="noreferrer" display="block">
+              <Box component="img" src={approving.refundQrImageUrl} alt="QR nhận tiền của khách" sx={{ display: 'block', width: '100%', maxHeight: 360, objectFit: 'contain', borderRadius: 2, bgcolor: 'common.white' }} />
+            </Box>
+          </Box> : <Alert severity="error">Không có QR nhận tiền. Yêu cầu staff liên hệ khách trước khi duyệt.</Alert>}
         </Stack>
       </DialogContent>
-      <DialogActions sx={{ p: 2 }}><Button onClick={() => setApproving(null)}>Quay lại</Button><Button variant="contained" color="success" startIcon={<PaidRoundedIcon />} disabled={busy} onClick={approve}>Xác nhận hoàn tiền</Button></DialogActions>
+      <DialogActions sx={{ p: 2 }}><Button onClick={() => setApproving(null)}>Quay lại</Button><Button variant="contained" color="success" startIcon={<PaidRoundedIcon />} disabled={busy || !approving?.refundQrImageUrl} onClick={approve}>Xác nhận hoàn tiền</Button></DialogActions>
     </Dialog>
 
     <Dialog open={Boolean(rejecting)} onClose={() => !busy && setRejecting(null)} fullWidth maxWidth="sm">

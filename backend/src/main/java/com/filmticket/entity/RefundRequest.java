@@ -12,7 +12,8 @@ import java.util.UUID;
         @Index(name = "idx_refund_booking", columnList = "booking_id"),
         @Index(name = "idx_refund_customer", columnList = "customer_id, created_at"),
         @Index(name = "idx_refund_status", columnList = "status, created_at"),
-        @Index(name = "idx_refund_staff", columnList = "staff_id")
+        @Index(name = "idx_refund_staff", columnList = "staff_id"),
+        @Index(name = "idx_refund_qr_message", columnList = "refund_qr_message_id")
 })
 @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
 public class RefundRequest {
@@ -34,6 +35,9 @@ public class RefundRequest {
 
     @Column(name = "reviewed_by")
     private UUID reviewedBy;
+
+    @Column(name = "refund_qr_message_id")
+    private UUID refundQrMessageId;
 
     @Column(name = "ticket_code", nullable = false, length = 20)
     private String ticketCode;

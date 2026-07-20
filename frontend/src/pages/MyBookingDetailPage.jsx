@@ -22,6 +22,7 @@ import {
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
 import ChatRoundedIcon from '@mui/icons-material/ChatRounded';
 import SendRoundedIcon from '@mui/icons-material/SendRounded';
+import AddPhotoAlternateRoundedIcon from '@mui/icons-material/AddPhotoAlternateRounded';
 import { useAuth } from '../context/AuthContext';
 import { useBooking } from '../hooks/useBooking';
 import ConfirmationDialog from '../components/common/ConfirmationDialog';
@@ -87,6 +88,7 @@ const MyBookingDetailPage = () => {
   const [chatOpen, setChatOpen] = useState(false);
   const [messages, setMessages] = useState([]);
   const [messageText, setMessageText] = useState('');
+  const [qrUploading, setQrUploading] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -198,6 +200,29 @@ const MyBookingDetailPage = () => {
     const message = response?.data?.data ?? response?.data;
     setMessages((list) => [...list, message]);
     setMessageText('');
+  };
+
+  const uploadRefundQr = async (event) => {
+    const image = event.target.files?.[0];
+    event.target.value = '';
+    if (!image || !refundRequest?.id) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(image.type) || image.size > 8 * 1024 * 1024) {
+      setSnackbar('Chỉ hỗ trợ ảnh JPEG, PNG hoặc WebP tối đa 8 MB.');
+      return;
+    }
+    setQrUploading(true);
+    try {
+      const response = await bookingApi.sendRefundQr(refundRequest.id, image, messageText.trim());
+      const message = response?.data?.data ?? response?.data;
+      setMessages((list) => [...list, message]);
+      setRefundRequest((current) => ({ ...current, refundQrImageUrl: message?.imageUrl || current?.refundQrImageUrl }));
+      setMessageText('');
+      setSnackbar('Đã gửi ảnh QR nhận tiền cho staff trưởng.');
+    } catch (err) {
+      setSnackbar(err?.message || 'Không thể tải ảnh QR lên.');
+    } finally {
+      setQrUploading(false);
+    }
   };
 
   if (dataLoading && !booking) {
@@ -353,17 +378,27 @@ const MyBookingDetailPage = () => {
       <Dialog open={chatOpen} onClose={() => setChatOpen(false)} fullWidth maxWidth="sm">
         <DialogTitle><ChatRoundedIcon sx={{ mr: 1, verticalAlign: 'middle' }} />Hỗ trợ hoàn tiền</DialogTitle>
         <DialogContent dividers>
+          {refundRequest?.requiresAdmin && !refundRequest?.refundQrImageUrl && <Alert severity="warning" sx={{ mb: 1.5 }}>
+            Đơn từ 200.000đ cần ảnh QR nhận tiền. Hãy bấm “Gửi QR” để staff kiểm tra và chuyển Admin duyệt.
+          </Alert>}
           <Stack spacing={1.2} sx={{ minHeight: 300, maxHeight: 430, overflowY: 'auto' }}>
             {messages.map((message) => {
               const mine = String(message.senderId) === String(user?.id);
               return <Box key={message.id} alignSelf={mine ? 'flex-end' : 'flex-start'} sx={{ maxWidth: '78%', bgcolor: mine ? 'primary.main' : 'action.hover', color: mine ? 'primary.contrastText' : 'text.primary', px: 2, py: 1.2, borderRadius: mine ? '18px 18px 4px 18px' : '18px 18px 18px 4px' }}>
                 <Typography variant="caption" sx={{ opacity: 0.75 }}>{mine ? 'Bạn' : message.senderName || 'Staff trưởng'}</Typography>
                 <Typography variant="body2">{message.content}</Typography>
+                {message.imageUrl && <Box component="a" href={message.imageUrl} target="_blank" rel="noreferrer" display="block" mt={1}>
+                  <Box component="img" src={message.imageUrl} alt="QR nhận tiền" sx={{ display: 'block', width: '100%', maxWidth: 260, maxHeight: 260, objectFit: 'contain', borderRadius: 1.5, bgcolor: 'common.white' }} />
+                </Box>}
               </Box>;
             })}
           </Stack>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
+          {refundRequest?.status === 'REQUESTED' && <Button component="label" variant="outlined" startIcon={<AddPhotoAlternateRoundedIcon />} disabled={qrUploading} sx={{ whiteSpace: 'nowrap' }}>
+            {qrUploading ? 'Đang tải...' : 'Gửi QR'}
+            <input hidden type="file" accept="image/jpeg,image/png,image/webp" onChange={uploadRefundQr} />
+          </Button>}
           <TextField fullWidth size="small" placeholder="Nhắn cho staff trưởng..." value={messageText} onChange={(event) => setMessageText(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendRefundMessage(); } }} />
           <Button variant="contained" onClick={sendRefundMessage} disabled={!messageText.trim()}><SendRoundedIcon /></Button>
         </DialogActions>

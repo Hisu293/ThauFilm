@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -34,6 +35,7 @@ public class RefundRequestService {
     private final PaymentGatewayService paymentGatewayService;
     private final BookingService bookingService;
     private final RealtimeEventService realtimeEventService;
+    private final CloudinaryStorageService cloudinaryStorageService;
 
     @Value("${refund.staff-approval-threshold:200000}")
     private BigDecimal staffApprovalThreshold;
@@ -79,6 +81,9 @@ public class RefundRequestService {
         requireShiftLeader(staffId);
         RefundRequest request = requireStatus(requestId, RefundRequestStatus.REQUESTED);
         validateEligibility(request);
+        if (request.getAmount().compareTo(staffApprovalThreshold) >= 0) {
+            requireRefundQr(request);
+        }
         request.setStaffId(staffId);
         request.setReviewedBy(staffId);
         request.setReviewedAt(LocalDateTime.now());
@@ -98,6 +103,7 @@ public class RefundRequestService {
     public RefundRequestDto adminApprove(UUID adminId, UUID requestId) {
         RefundRequest request = requireStatus(requestId, RefundRequestStatus.PENDING_APPROVAL);
         validateEligibility(request);
+        requireRefundQr(request);
         return completeRefund(request, adminId);
     }
 
@@ -130,6 +136,35 @@ public class RefundRequestService {
         RefundMessage message = saveMessage(request, customerId, "MEMBER", content);
         notifyShiftLeaders("Tin nhắn hoàn tiền mới", "Khách hàng vừa nhắn về vé " + request.getTicketCode());
         return messageDto(message);
+    }
+
+    @Transactional
+    public RefundMessageDto customerQrMessage(UUID customerId, UUID requestId, MultipartFile image, String caption) {
+        RefundRequest request = requireOwnedRequest(customerId, requestId);
+        if (request.getStatus() != RefundRequestStatus.REQUESTED) {
+            throw new BadRequestException("Chỉ được cập nhật QR khi yêu cầu đang chờ staff kiểm tra");
+        }
+        CloudinaryStorageService.UploadedImage uploaded = cloudinaryStorageService.upload(image);
+        try {
+            String content = clean(caption);
+            if (content.length() > 500) throw new BadRequestException("Chú thích ảnh không được vượt quá 500 ký tự");
+            RefundMessage message = messageRepository.saveAndFlush(RefundMessage.builder()
+                    .refundRequestId(request.getId())
+                    .senderId(customerId)
+                    .senderRole("MEMBER")
+                    .content(content.isEmpty() ? "Ảnh QR nhận hoàn tiền" : content)
+                    .imageUrl(uploaded.secureUrl())
+                    .imagePublicId(uploaded.publicId())
+                    .build());
+            request.setRefundQrMessageId(message.getId());
+            refundRepository.saveAndFlush(request);
+            notifyShiftLeaders("Khách hàng đã gửi QR hoàn tiền",
+                    "QR nhận tiền cho vé " + request.getTicketCode() + " đã sẵn sàng để kiểm tra");
+            return messageDto(message);
+        } catch (RuntimeException exception) {
+            cloudinaryStorageService.deleteQuietly(uploaded.publicId());
+            throw exception;
+        }
     }
 
     @Transactional(readOnly = true)
@@ -200,7 +235,7 @@ public class RefundRequestService {
         User sender = userRepository.findById(message.getSenderId()).orElse(null);
         return RefundMessageDto.builder().id(message.getId()).senderId(message.getSenderId())
                 .senderName(sender == null ? message.getSenderRole() : sender.getFullName()).senderRole(message.getSenderRole())
-                .content(message.getContent()).createdAt(message.getCreatedAt()).build();
+                .content(message.getContent()).imageUrl(message.getImageUrl()).createdAt(message.getCreatedAt()).build();
     }
 
     private RefundRequestDto completeRefund(RefundRequest request, UUID reviewerId) {
@@ -297,16 +332,30 @@ public class RefundRequestService {
         User staff = request.getStaffId() == null ? null : userRepository.findById(request.getStaffId()).orElse(null);
         Showtime showtime = booking == null ? null : showtimeRepository.findById(booking.getShowtimeId()).orElse(null);
         Movie movie = showtime == null ? null : movieRepository.findById(showtime.getMovieId()).orElse(null);
+        String refundQrImageUrl = request.getRefundQrMessageId() == null ? null
+                : messageRepository.findById(request.getRefundQrMessageId()).map(RefundMessage::getImageUrl).orElse(null);
         return RefundRequestDto.builder().id(request.getId()).bookingId(request.getBookingId())
                 .bookingCode(booking == null ? null : booking.getConfirmationCode()).ticketCode(request.getTicketCode())
                 .customerId(request.getCustomerId()).customerName(customer == null ? null : customer.getFullName())
                 .customerEmail(customer == null ? null : customer.getEmail()).staffId(request.getStaffId())
                 .staffName(staff == null ? null : staff.getFullName()).movieTitle(movie == null ? null : movie.getTitle())
                 .amount(request.getAmount()).reason(request.getReason()).rejectionReason(request.getRejectionReason())
+                .refundQrImageUrl(refundQrImageUrl)
                 .status(request.getStatus()).requiresAdmin(request.isRequiresAdmin())
                 .ticketCheckedIn(ticketRepository.findByBookingId(request.getBookingId()).stream().anyMatch(Ticket::isCheckedIn))
                 .showtimeStart(showtime == null ? null : showtime.getStartTime()).createdAt(request.getCreatedAt())
                 .updatedAt(request.getUpdatedAt()).reviewedAt(request.getReviewedAt()).build();
+    }
+
+    private void requireRefundQr(RefundRequest request) {
+        boolean hasQr = request.getRefundQrMessageId() != null
+                && messageRepository.findById(request.getRefundQrMessageId())
+                .map(RefundMessage::getImageUrl)
+                .filter(url -> !url.isBlank())
+                .isPresent();
+        if (!hasQr) {
+            throw new BadRequestException("Yêu cầu từ 200.000đ cần ảnh QR nhận tiền của khách trước khi duyệt");
+        }
     }
 
     private String clean(String value) { return value == null ? "" : value.trim(); }

@@ -35,6 +35,7 @@ import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
 import PendingActionsRoundedIcon from '@mui/icons-material/PendingActionsRounded';
 import AdminPanelSettingsRoundedIcon from '@mui/icons-material/AdminPanelSettingsRounded';
 import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded';
+import QrCode2RoundedIcon from '@mui/icons-material/QrCode2Rounded';
 import { useAuth } from '../../context/AuthContext';
 import refundService from '../../services/refundService';
 import { connectRealtime } from '../../services/realtimeService';
@@ -276,6 +277,7 @@ export default function StaffRefunds() {
           <TableBody>
             {filteredItems.map((item) => {
               const status = statusMeta[item.status] || { label: item.status, color: 'default' };
+              const needsQr = Number(item.amount || 0) >= Number(access?.refundApprovalThreshold || 200000);
               return <TableRow key={item.id} hover sx={{ '& td': { py: 2 } }}>
                 <TableCell>
                   <Stack direction="row" spacing={1.25} alignItems="center">
@@ -302,8 +304,9 @@ export default function StaffRefunds() {
                 <TableCell align="right">
                   <Stack direction="row" justifyContent="flex-end" spacing={0.75}>
                     <Button size="small" variant="outlined" startIcon={<ChatRoundedIcon />} onClick={() => openChat(item)}>Chat</Button>
+                    {item.refundQrImageUrl && <Button size="small" color="info" startIcon={<QrCode2RoundedIcon />} href={item.refundQrImageUrl} target="_blank" rel="noreferrer">QR khách</Button>}
                     {item.status === 'REQUESTED' && <>
-                      <Button size="small" variant="contained" color="success" disabled={busy} onClick={() => approve(item)}>Duyệt</Button>
+                      <Button size="small" variant="contained" color="success" disabled={busy || (needsQr && !item.refundQrImageUrl)} onClick={() => approve(item)}>Duyệt</Button>
                       <Button size="small" color="error" startIcon={<CancelRoundedIcon />} disabled={busy} onClick={() => setRejecting(item)}>Từ chối</Button>
                     </>}
                   </Stack>
@@ -342,6 +345,9 @@ export default function StaffRefunds() {
         </Stack>
       </DialogTitle>
       <DialogContent dividers sx={{ bgcolor: 'background.default' }}>
+        {chatItem?.requiresAdmin && !chatItem?.refundQrImageUrl && <Alert severity="warning" sx={{ mb: 1.5 }}>
+          Đơn từ 200.000đ cần khách gửi ảnh QR nhận tiền trong chat trước khi staff chuyển lên Admin.
+        </Alert>}
         <Stack spacing={1.2} sx={{ minHeight: 320, maxHeight: 460, overflowY: 'auto' }}>
           {messages.length === 0 && <Typography color="text.secondary" textAlign="center" py={8}>Chưa có tin nhắn trong cuộc trao đổi này.</Typography>}
           {messages.map((message) => {
@@ -349,6 +355,9 @@ export default function StaffRefunds() {
             return <Box key={message.id} alignSelf={mine ? 'flex-end' : 'flex-start'} sx={{ maxWidth: '78%', bgcolor: mine ? 'primary.main' : 'action.hover', color: mine ? 'primary.contrastText' : 'text.primary', px: 2, py: 1.2, borderRadius: mine ? '18px 18px 4px 18px' : '18px 18px 18px 4px' }}>
               <Typography variant="caption" sx={{ opacity: 0.75 }}>{mine ? 'Bạn' : message.senderName || 'Khách hàng'}</Typography>
               <Typography variant="body2">{message.content}</Typography>
+              {message.imageUrl && <Box component="a" href={message.imageUrl} target="_blank" rel="noreferrer" display="block" mt={1}>
+                <Box component="img" src={message.imageUrl} alt="QR nhận tiền của khách" sx={{ display: 'block', width: '100%', maxWidth: 280, maxHeight: 280, objectFit: 'contain', borderRadius: 1.5, bgcolor: 'common.white' }} />
+              </Box>}
             </Box>;
           })}
         </Stack>

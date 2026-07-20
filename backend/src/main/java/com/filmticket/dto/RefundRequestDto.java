@@ -23,6 +23,7 @@ public class RefundRequestDto {
     private BigDecimal amount;
     private String reason;
     private String rejectionReason;
+    private String refundQrImageUrl;
     private RefundRequestStatus status;
     private boolean requiresAdmin;
     private boolean ticketCheckedIn;

@@ -131,6 +131,15 @@ export const bookingApi = {
   fetchMyRefundRequests: () => axiosClient.get('/api/member/booking/refund-requests/me'),
   fetchRefundMessages: (requestId) => axiosClient.get(`/api/member/booking/refund-requests/${requestId}/messages`),
   sendRefundMessage: (requestId, content) => axiosClient.post(`/api/member/booking/refund-requests/${requestId}/messages`, { content }),
+  sendRefundQr: (requestId, image, content = '') => {
+    const formData = new FormData();
+    formData.append('image', image);
+    if (content) formData.append('content', content);
+    return axiosClient.post(`/api/member/booking/refund-requests/${requestId}/messages/qr`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: 30000,
+    });
+  },
 
   fetchGroupBooking: (groupId) => {
     return axiosClient.get(`/api/member/group-bookings/${groupId}`);
