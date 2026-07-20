@@ -46,4 +46,24 @@ public class AuthController {
         authService.logout(request != null ? request.getRefreshToken() : null);
         return ResponseEntity.ok(ApiResponse.success("Logout successful", null));
     }
+    @PostMapping("/forgot-password")
+    public ResponseEntity<ApiResponse<String>> getSecurityQuestion(@Valid @RequestBody ForgotPasswordRequest request) {
+        try {
+            String question = authService.getSecurityQuestion(request);
+            return ResponseEntity.ok(ApiResponse.success("Get security question successfully", question));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+            // Hoặc dùng ApiResponse.fail() tùy thuộc vào hàm báo lỗi trong dự án của bạn
+        }
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<ApiResponse<Void>> resetPassword(@Valid @RequestBody ResetPasswordWithQuestionRequest request) {
+        try {
+            authService.resetPasswordWithQuestion(request);
+            return ResponseEntity.ok(ApiResponse.success("Reset password successfully", null));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+        }
+    }
 }
