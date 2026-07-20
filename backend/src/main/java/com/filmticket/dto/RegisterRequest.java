@@ -28,4 +28,10 @@ public class RegisterRequest {
 
     @Pattern(regexp = "^[0-9]{10}$", message = "Phone number must be exactly 10 digits")
     private String phone;
+    // Thêm 2 trường này vào file RegisterRequest của bạn
+    @NotBlank(message = "Security question cannot be blank")
+    private String securityQuestion;
+
+    @NotBlank(message = "Security answer cannot be blank")
+    private String securityAnswer;
 }

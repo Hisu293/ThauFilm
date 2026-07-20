@@ -48,20 +48,22 @@ public class SecurityConfig {
                 session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers(
-                    "/actuator/health",
-                    "/actuator/info",
-                    "/api/auth/register",
-                    "/api/auth/login",
-                    "/api/auth/google",
-                    "/api/auth/refresh",
-                    "/api/auth/logout",
-                    "/api/payments/webhooks/**",
-                    "/api/movie-chatbot/**",
-                    "/api/showtimes/**",
-                    "/api/events/movies",
-                    "/swagger-ui/**",
-                    "/swagger-ui.html",
-                    "/v3/api-docs/**"
+                        "/actuator/health",
+                        "/actuator/info",
+                        "/api/auth/register",
+                        "/api/auth/login",
+                        "/api/auth/google",
+                        "/api/auth/refresh",
+                        "/api/auth/logout",
+                        "/api/auth/forgot-password",
+                        "/api/auth/reset-password",
+                        "/api/payments/webhooks/**",
+                        "/api/movie-chatbot/**",
+                        "/api/showtimes/**",
+                        "/api/events/movies",
+                        "/swagger-ui/**",
+                        "/swagger-ui.html",
+                        "/v3/api-docs/**"
                 ).permitAll()
                 // Public community reads must stay available to guests. Put the
                 // authenticated community routes before the broader movie rule,

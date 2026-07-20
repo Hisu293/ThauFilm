@@ -4,9 +4,11 @@ import com.filmticket.dto.AuthResponse;
 import com.filmticket.dto.GoogleLoginRequest;
 import com.filmticket.dto.LoginRequest;
 import com.filmticket.dto.RegisterRequest;
+import com.filmticket.dto.ForgotPasswordRequest; // Nhớ import DTO mới
+import com.filmticket.dto.ResetPasswordWithQuestionRequest; // Nhớ import DTO mới
 import com.filmticket.entity.RefreshToken;
 import com.filmticket.entity.User;
-import com.filmticket.exception.BadRequestException;
+import com.filmticket.exception.BadRequestException; // Dùng exception chuẩn của dự án
 import com.filmticket.repository.RefreshTokenRepository;
 import com.filmticket.repository.UserRepository;
 import com.filmticket.security.GoogleIdTokenVerifier;
@@ -30,12 +32,16 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final GoogleIdTokenVerifier googleIdTokenVerifier;
+    private final UserService userService; // BỔ SUNG: Tiêm UserService để gọi các hàm xử lý câu hỏi bảo mật
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
         if (userRepository.existsByEmail(request.getEmail())) {
             throw new BadRequestException("Email already registered");
         }
+
+        // Chuẩn hóa câu trả lời (xóa dấu, xóa cách, viết thường) trước khi băm
+        String processedAnswer = com.filmticket.util.StringUtil.normalizeAnswer(request.getSecurityAnswer());
 
         User user = User.builder()
                 .email(request.getEmail())
@@ -45,6 +51,8 @@ public class AuthService {
                 .provider(User.AuthProvider.EMAIL)
                 .role(User.Role.MEMBER)
                 .enabled(true)
+                .securityQuestion(request.getSecurityQuestion())
+                .securityAnswer(passwordEncoder.encode(processedAnswer)) // Mã hóa câu trả lời đã chuẩn hóa
                 .build();
 
         User saved = userRepository.save(user);
@@ -137,6 +145,32 @@ public class AuthService {
                 .avatarUrl(user.getAvatarUrl())
                 .build();
     }
+
+    // --- BỔ SUNG: 2 HÀM MỚI VÀO ĐÂY ĐỂ PHỤC VỤ CONTROLLER ---
+
+    @Transactional(readOnly = true)
+    public String getSecurityQuestion(ForgotPasswordRequest request) {
+        try {
+            return userService.getQuestionByEmail(request.getEmail());
+        } catch (RuntimeException e) {
+            throw new BadRequestException(e.getMessage());
+        }
+    }
+
+    @Transactional
+    public void resetPasswordWithQuestion(ResetPasswordWithQuestionRequest request) {
+        try {
+            userService.resetPasswordWithQuestion(
+                    request.getEmail(),
+                    request.getAnswer(),
+                    request.getNewPassword()
+            );
+        } catch (RuntimeException e) {
+            throw new BadRequestException(e.getMessage());
+        }
+    }
+
+    // ----------------------------------------------------
 
     @Transactional
     public void logout(String refreshTokenValue) {

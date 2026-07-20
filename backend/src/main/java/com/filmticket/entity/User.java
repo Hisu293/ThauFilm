@@ -12,6 +12,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import com.fasterxml.jackson.annotation.JsonIgnore; // Import thêm để ẩn câu trả lời khi trả về API
 
 import java.util.UUID;
 
@@ -30,6 +31,7 @@ public class User {
     @Column(unique = true, nullable = false)
     private String email;
 
+    @JsonIgnore // Tránh lộ password ra API công khai
     private String password;
 
     private String fullName;
@@ -52,6 +54,17 @@ public class User {
     @Builder.Default
     private boolean enabled = true;
 
+    // --- BỔ SUNG THÊM 2 TRƯỜNG CHO TÍNH NĂNG ĐẶC BIỆT ---
+
+    @Column(name = "security_question")
+    private String securityQuestion; // Ví dụ: "Tên trường tiểu học của bạn là gì?"
+
+    @JsonIgnore // BẮT BUỘC: Ẩn câu trả lời để mentor thấy bạn xử lý security rất kỹ
+    @Column(name = "security_answer")
+    private String securityAnswer;   // Lưu câu trả lời đã CHUẨN HÓA + BĂM (Hash) bằng BCrypt
+
+    // ---------------------------------------------------
+
     @PrePersist
     public void prePersist() {
         if (id == null) {
@@ -66,5 +79,4 @@ public class User {
     public enum AuthProvider {
         EMAIL, GOOGLE
     }
-
 }
