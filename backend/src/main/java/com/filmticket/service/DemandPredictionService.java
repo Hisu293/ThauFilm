@@ -24,6 +24,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -34,10 +35,11 @@ import java.util.function.Predicate;
 @Service
 @RequiredArgsConstructor
 public class DemandPredictionService {
-    private static final int CLEANUP_MINUTES = 20;
-    private static final List<LocalTime> CANDIDATE_TIMES = List.of(
-            LocalTime.of(10, 0), LocalTime.of(13, 0), LocalTime.of(16, 0),
-            LocalTime.of(19, 0), LocalTime.of(21, 30));
+    private static final int CLEANUP_MINUTES = 15;
+    private static final LocalTime OPENING_TIME = LocalTime.of(9, 0);
+    private static final LocalTime LAST_START_TIME = LocalTime.of(22, 30);
+    private static final int SLOT_STEP_MINUTES = 30;
+    private static final List<LocalTime> CANDIDATE_TIMES = candidateTimes();
 
     private final ShowtimeRepository showtimeRepository;
     private final BookingRepository bookingRepository;
@@ -62,7 +64,7 @@ public class DemandPredictionService {
             if (room == null) continue;
             int capacity = capacity(room);
             totalSeats += capacity;
-            predictedSeats += capacity * predict(model, showtime.getMovieId(), showtime.getStartTime(), room.getType());
+            predictedSeats += capacity * predict(model, showtime.getMovieId(), showtime.getStartTime(), room.getType(), room.getTheaterId());
         }
         int percent = totalSeats == 0 ? 0 : (int) Math.round(predictedSeats * 100 / totalSeats);
         return DemandPredictionResponse.builder()
@@ -85,6 +87,22 @@ public class DemandPredictionService {
 
     @Transactional(readOnly = true)
     public List<ShowtimeSuggestion> suggest(UUID movieId, LocalDate fromDate, int limit) {
+        return suggest(movieId, fromDate, limit, cinemaRoomRepository.findByStatus(RoomStatus.ACTIVE));
+    }
+
+    @Transactional(readOnly = true)
+    public List<ShowtimeSuggestion> suggestForRooms(
+            UUID movieId, Collection<UUID> cinemaRoomIds, LocalDate fromDate, int limit) {
+        List<CinemaRoom> rooms = cinemaRoomRepository.findAllById(cinemaRoomIds).stream()
+                .filter(room -> room.getStatus() == RoomStatus.ACTIVE)
+                .toList();
+        if (rooms.isEmpty()) {
+            throw new BadRequestException("No active cinema room is available");
+        }
+        return suggest(movieId, fromDate, limit, rooms);
+    }
+
+    private List<ShowtimeSuggestion> suggest(UUID movieId, LocalDate fromDate, int limit, List<CinemaRoom> rooms) {
         Movie movie = movieRepository.findById(movieId)
                 .orElseThrow(() -> new BadRequestException("Movie not found"));
         if (!movie.isActive() || movie.getStatus() != Movie.Status.NOW_SHOWING) {
@@ -97,7 +115,6 @@ public class DemandPredictionService {
         }
 
         Model model = buildModel();
-        List<CinemaRoom> rooms = cinemaRoomRepository.findByStatus(RoomStatus.ACTIVE);
         List<Showtime> existingShowtimes = showtimeRepository.findAll();
         List<ShowtimeSuggestion> candidates = new ArrayList<>();
         LocalDateTime now = LocalDateTime.now();
@@ -116,7 +133,7 @@ public class DemandPredictionService {
                             .anyMatch(existing -> existing.getStartTime().isBefore(endsAt)
                                     && existing.getEndTime().isAfter(startsAt));
                     if (occupied) continue;
-                    int percent = (int) Math.round(predict(model, movieId, startsAt, room.getType()) * 100);
+                    int percent = (int) Math.round(predict(model, movieId, startsAt, room.getType(), room.getTheaterId()) * 100);
                     candidates.add(ShowtimeSuggestion.builder()
                             .movieId(movieId)
                             .cinemaRoomId(room.getId())
@@ -140,7 +157,7 @@ public class DemandPredictionService {
 
     @Transactional(readOnly = true)
     public int predictOccupancy(UUID movieId, LocalDateTime startTime, RoomType roomType) {
-        return (int) Math.round(predict(buildModel(), movieId, startTime, roomType) * 100);
+        return (int) Math.round(predict(buildModel(), movieId, startTime, roomType, null) * 100);
     }
 
     private Model buildModel() {
@@ -158,21 +175,24 @@ public class DemandPredictionService {
                     CinemaRoom room = rooms.get(s.getCinemaRoomId());
                     int capacity = capacity(room);
                     double occupancy = Math.min(1, soldByShowtime.getOrDefault(s.getId(), 0L) / (double) capacity);
-                    return new Sample(s.getMovieId(), s.getStartTime(), room.getType(), occupancy);
+                    return new Sample(s.getMovieId(), s.getStartTime(), room.getType(), room.getTheaterId(), occupancy);
                 })
                 .toList();
         double global = samples.isEmpty() ? 0.55 : samples.stream().mapToDouble(Sample::occupancy).average().orElse(0.55);
         return new Model(samples, global);
     }
 
-    private double predict(Model model, UUID movieId, LocalDateTime time, RoomType roomType) {
+    private double predict(Model model, UUID movieId, LocalDateTime time, RoomType roomType, UUID theaterId) {
         if (model.samples.isEmpty()) return fallback(time, roomType);
         double movie = featureMean(model, s -> s.movieId.equals(movieId), 5);
         double slot = featureMean(model, s -> slot(s.time.getHour()) == slot(time.getHour()), 5);
         double weekday = featureMean(model, s -> s.time.getDayOfWeek() == time.getDayOfWeek(), 4);
         double holiday = featureMean(model, s -> isHoliday(s.time.toLocalDate()) == isHoliday(time.toLocalDate()), 4);
         double room = featureMean(model, s -> s.roomType == roomType, 4);
-        return clamp(movie * .35 + slot * .20 + weekday * .15 + holiday * .10 + room * .20, .08, .98);
+        double theater = theaterId == null ? model.global
+                : featureMean(model, s -> theaterId.equals(s.theaterId), 5);
+        return clamp(movie * .30 + slot * .20 + weekday * .15 + holiday * .10
+                + room * .10 + theater * .15, .08, .98);
     }
 
     private double featureMean(Model model, Predicate<Sample> predicate, double smoothing) {
@@ -208,6 +228,14 @@ public class DemandPredictionService {
         return 3;
     }
 
+    private static List<LocalTime> candidateTimes() {
+        List<LocalTime> times = new ArrayList<>();
+        for (LocalTime time = OPENING_TIME; !time.isAfter(LAST_START_TIME); time = time.plusMinutes(SLOT_STEP_MINUTES)) {
+            times.add(time);
+        }
+        return List.copyOf(times);
+    }
+
     private boolean isHoliday(LocalDate date) {
         int month = date.getMonthValue();
         int day = date.getDayOfMonth();
@@ -239,6 +267,6 @@ public class DemandPredictionService {
         return Math.max(min, Math.min(max, value));
     }
 
-    private record Sample(UUID movieId, LocalDateTime time, RoomType roomType, double occupancy) {}
+    private record Sample(UUID movieId, LocalDateTime time, RoomType roomType, UUID theaterId, double occupancy) {}
     private record Model(List<Sample> samples, double global) {}
 }

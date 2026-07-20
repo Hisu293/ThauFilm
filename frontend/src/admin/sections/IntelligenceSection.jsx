@@ -126,7 +126,7 @@ export default function IntelligenceSection({ rooms = [], movies = [], onShowtim
         </Stack>
         {tab === 0 && <Heatmap rooms={rooms} />}
         {tab === 1 && <Pricing movies={movies} />}
-        {tab === 2 && <WeeklyManager onApplied={onShowtimesChanged} />}
+        {tab === 2 && <WeeklyManager movies={movies} onApplied={onShowtimesChanged} />}
       </Box>
     </Card>
   </Stack>;
@@ -333,28 +333,30 @@ const Pricing = ({ movies }) => {
   </Stack>;
 };
 
-const WeeklyManager = ({ onApplied }) => {
+const WeeklyManager = ({ movies, onApplied }) => {
   const nextMonday = useMemo(() => {
     const date = new Date();
     date.setDate(date.getDate() + ((8 - date.getDay()) % 7 || 7));
     return localDateInput(date);
   }, []);
   const [date, setDate] = useState(nextMonday);
+  const [movieId, setMovieId] = useState('');
   const [plan, setPlan] = useState([]);
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState('');
   const [error, setError] = useState('');
   const [confirmOpen, setConfirmOpen] = useState(false);
   const requestInFlight = useRef(false);
+  const availableMovies = useMemo(() => movies.filter((movie) => movie.active !== false && movie.status === 'NOW_SHOWING'), [movies]);
 
   const generate = async () => {
-    if (requestInFlight.current) return;
+    if (requestInFlight.current || !movieId || !date) return;
     requestInFlight.current = true;
     setLoading(true);
     setNotice('');
     setError('');
     try {
-      setPlan((await adminIntelligenceService.weeklyPlan(date)) || []);
+      setPlan((await adminIntelligenceService.weeklyPlan({ startDate: date, movieId })) || []);
     } catch (err) {
       setError(err.message || 'Không thể tạo kế hoạch tuần.');
     } finally {
@@ -385,8 +387,8 @@ const WeeklyManager = ({ onApplied }) => {
   };
 
   const summary = useMemo(() => ({
-    theater: plan.filter((item) => !item.online).length,
-    online: plan.filter((item) => item.online).length,
+    showtimes: plan.length,
+    theaters: new Set(plan.map((item) => item.theaterId).filter(Boolean)).size,
     rooms: new Set(plan.filter((item) => !item.online).map((item) => item.cinemaRoomId)).size,
     average: plan.length ? Math.round(plan.reduce((sum, item) => sum + Number(item.predictedOccupancyPercent || 0), 0) / plan.length) : 0,
   }), [plan]);
@@ -398,9 +400,15 @@ const WeeklyManager = ({ onApplied }) => {
   const removeItem = (target) => setPlan((current) => current.filter((item) => !(item.movieId === target.movieId && item.cinemaRoomId === target.cinemaRoomId && item.startTime === target.startTime)));
 
   return <Stack spacing={2.5}>
-    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+    <Alert severity="info">Chỉ cần chọn phim. AI tự tìm rạp đang hoạt động, phòng đang hoạt động thuộc đúng rạp và khung giờ còn trống; mỗi suất gồm thời lượng phim và 15 phút dọn phòng.</Alert>
+    <Box display="grid" gridTemplateColumns={{ xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' }} gap={1.5}>
+      <TextField select size="small" label="Phim" value={movieId} onChange={(event) => { setMovieId(event.target.value); setPlan([]); }} disabled={loading}>
+        {availableMovies.map((movie) => <MenuItem key={movie.id} value={movie.id}>{movie.title}</MenuItem>)}
+      </TextField>
       <TextField type="date" size="small" label="Tuần bắt đầu" value={date} onChange={(event) => { setDate(event.target.value); setPlan([]); }} disabled={loading} slotProps={{ inputLabel: { shrink: true } }} />
-      <Button variant="contained" onClick={generate} disabled={loading || !date} startIcon={loading ? <CircularProgress size={17} /> : <AutoAwesomeRoundedIcon />}>Tạo kế hoạch bằng AI</Button>
+    </Box>
+    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+      <Button variant="contained" onClick={generate} disabled={loading || !date || !movieId} startIcon={loading ? <CircularProgress size={17} /> : <AutoAwesomeRoundedIcon />}>Đề xuất rạp, phòng và giờ chiếu</Button>
       {plan.length > 0 && <Button variant="outlined" color="inherit" onClick={() => setPlan([])}>Xóa bản nháp</Button>}
     </Stack>
     {notice && <Alert severity="success" onClose={() => setNotice('')}>{notice}</Alert>}
@@ -414,8 +422,8 @@ const WeeklyManager = ({ onApplied }) => {
 
     {plan.length > 0 && <>
       <Box display="grid" gridTemplateColumns={{ xs: '1fr 1fr', lg: 'repeat(4, 1fr)' }} gap={1.5}>
-        <Metric label="Suất tại rạp" value={summary.theater} icon={MeetingRoomRoundedIcon} color="primary.main" />
-        <Metric label="Suất online" value={summary.online} icon={OnlinePredictionRoundedIcon} color="info.main" />
+        <Metric label="Suất được đề xuất" value={summary.showtimes} icon={CalendarMonthRoundedIcon} color="primary.main" />
+        <Metric label="Rạp được chọn" value={summary.theaters} icon={MeetingRoomRoundedIcon} color="info.main" />
         <Metric label="Phòng được dùng" value={summary.rooms} icon={MovieRoundedIcon} color="warning.main" />
         <Metric label="Lấp đầy dự báo" value={`${summary.average}%`} icon={InsightsRoundedIcon} color="success.main" />
       </Box>
@@ -426,7 +434,7 @@ const WeeklyManager = ({ onApplied }) => {
           <Divider />
           <Stack divider={<Divider flexItem />}>{entries.map((item) => <Stack key={`${item.online ? 'online' : item.cinemaRoomId}-${item.movieId}-${item.startTime}`} direction="row" spacing={1.5} alignItems="center" sx={{ p: 2 }}>
             <Avatar sx={{ bgcolor: item.online ? 'rgba(56,189,248,.14)' : 'rgba(229,9,20,.14)', color: item.online ? 'info.main' : 'primary.main' }}>{item.online ? <OnlinePredictionRoundedIcon /> : <MovieRoundedIcon />}</Avatar>
-            <Box flex={1} minWidth={0}><Typography fontWeight={850}>{item.movieTitle}</Typography><Typography variant="body2" color="text.secondary">{localDate(item.startTime)} · {item.online ? 'Kênh online' : item.roomName}</Typography><Typography variant="caption" color="text.secondary">{item.reason}</Typography></Box>
+            <Box flex={1} minWidth={0}><Typography fontWeight={850}>{item.movieTitle}</Typography><Typography variant="body2" color="text.secondary">{localDate(item.startTime)} · {item.theaterName} · {item.roomName}</Typography><Typography variant="caption" color="text.secondary">{item.reason}</Typography></Box>
             <Chip size="small" color={item.predictedOccupancyPercent >= 70 ? 'success' : 'warning'} label={`${item.predictedOccupancyPercent}% dự báo`} />
             <Tooltip title="Loại khỏi kế hoạch"><IconButton color="error" onClick={() => removeItem(item)}><DeleteOutlineRoundedIcon /></IconButton></Tooltip>
           </Stack>)}</Stack>
@@ -440,7 +448,7 @@ const WeeklyManager = ({ onApplied }) => {
 
     <Dialog open={confirmOpen} onClose={() => !loading && setConfirmOpen(false)} fullWidth maxWidth="sm">
       <DialogTitle fontWeight={900}>Áp dụng kế hoạch tuần</DialogTitle>
-      <DialogContent><Stack spacing={2} sx={{ pt: 0.5 }}><Alert severity="warning">Hệ thống sẽ tạo thật các suất chiếu trong danh sách. Các suất trùng phòng phát sinh sẽ được bỏ qua an toàn.</Alert><Box sx={{ p: 2, borderRadius: 2.5, bgcolor: 'action.hover' }}><Typography fontWeight={850}>{plan.length} suất chiếu</Typography><Typography color="text.secondary">{summary.theater} suất tại rạp · {summary.online} suất online · trung bình {summary.average}% lấp đầy dự báo</Typography></Box></Stack></DialogContent>
+      <DialogContent><Stack spacing={2} sx={{ pt: 0.5 }}><Alert severity="warning">Hệ thống sẽ tạo thật các suất chiếu trong danh sách. Phòng hoặc rạp ngừng hoạt động và các suất trùng phòng phát sinh sẽ được bỏ qua an toàn.</Alert><Box sx={{ p: 2, borderRadius: 2.5, bgcolor: 'action.hover' }}><Typography fontWeight={850}>{plan.length} suất chiếu</Typography><Typography color="text.secondary">{summary.theaters} rạp · {summary.rooms} phòng · trung bình {summary.average}% lấp đầy dự báo</Typography></Box></Stack></DialogContent>
       <DialogActions sx={{ p: 2 }}><Button onClick={() => setConfirmOpen(false)}>Kiểm tra lại</Button><Button variant="contained" color="success" disabled={loading} onClick={apply}>Tạo toàn bộ lịch</Button></DialogActions>
     </Dialog>
   </Stack>;

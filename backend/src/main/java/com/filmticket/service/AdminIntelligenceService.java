@@ -6,6 +6,8 @@ import com.filmticket.dto.UpsertShowtimeRequest;
 import com.filmticket.entity.*;
 import com.filmticket.exception.BadRequestException;
 import com.filmticket.model.ShowtimeStatus;
+import com.filmticket.model.RoomStatus;
+import com.filmticket.model.TheaterStatus;
 import com.filmticket.repository.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -28,6 +30,7 @@ public class AdminIntelligenceService {
     private final BookingSeatRepository bookingSeatRepository;
     private final CinemaRoomRepository cinemaRoomRepository;
     private final MovieRepository movieRepository;
+    private final TheaterRepository theaterRepository;
     private final SeatTypePriceConfigRepository priceConfigRepository;
     private final ShowtimePriceOverrideRepository overrideRepository;
     private final SeatAvailabilityRepository availabilityRepository;
@@ -115,34 +118,47 @@ public class AdminIntelligenceService {
     }
 
     @Transactional(readOnly = true)
-    public List<Map<String, Object>> weeklyPlan(LocalDate startDate) {
+    public List<Map<String, Object>> weeklyPlan(LocalDate startDate, UUID movieId) {
         LocalDate requestedStart = startDate == null ? LocalDate.now().plusWeeks(1) : startDate;
         LocalDate start = requestedStart.with(
                 java.time.temporal.TemporalAdjusters.nextOrSame(java.time.DayOfWeek.MONDAY));
-        List<Movie> movies = movieRepository.findAll().stream().filter(Movie::isActive)
-                .filter(movie -> movie.getStatus() == Movie.Status.NOW_SHOWING).toList();
-        Map<UUID, List<ShowtimeSuggestion>> byMovie = new LinkedHashMap<>();
-        movies.forEach(movie -> byMovie.put(movie.getId(), demandPredictionService.suggest(movie.getId(), start, 8)));
-        List<ShowtimeSuggestion> selected = new ArrayList<>();
-        for (int round = 0; round < 6; round++) {
-            for (Movie movie : movies) {
-                List<ShowtimeSuggestion> choices = byMovie.get(movie.getId());
-                if (round >= choices.size()) continue;
-                ShowtimeSuggestion choice = choices.get(round);
-                boolean conflict = selected.stream().anyMatch(other -> choice.getCinemaRoomId().equals(other.getCinemaRoomId())
-                        && other.getStartTime().isBefore(choice.getEndTime()) && other.getEndTime().isAfter(choice.getStartTime()));
-                if (!conflict) selected.add(choice);
-            }
+        Movie movie = movieRepository.findById(movieId)
+                .orElseThrow(() -> new BadRequestException("Movie not found"));
+        if (!movie.isActive() || movie.getStatus() != Movie.Status.NOW_SHOWING) {
+            throw new BadRequestException("Movie is not currently active");
         }
-        Map<UUID, String> titles = movies.stream().collect(Collectors.toMap(Movie::getId, Movie::getTitle));
-        List<Map<String, Object>> plan = selected.stream().sorted(Comparator.comparing(ShowtimeSuggestion::getStartTime))
-                .map(item -> map("movieId", item.getMovieId(), "movieTitle", titles.get(item.getMovieId()), "cinemaRoomId", item.getCinemaRoomId(),
+        Map<UUID, Theater> activeTheaters = theaterRepository.findByStatus(TheaterStatus.ACTIVE).stream()
+                .collect(Collectors.toMap(Theater::getId, Function.identity()));
+        Map<UUID, CinemaRoom> activeRooms = cinemaRoomRepository.findByStatus(RoomStatus.ACTIVE).stream()
+                .filter(room -> room.getTheaterId() != null && activeTheaters.containsKey(room.getTheaterId()))
+                .collect(Collectors.toMap(CinemaRoom::getId, Function.identity()));
+        if (activeRooms.isEmpty()) {
+            throw new BadRequestException("No active cinema room is available in an active theater");
+        }
+
+        List<ShowtimeSuggestion> candidates = demandPredictionService.suggestForRooms(
+                movieId, activeRooms.keySet(), start, Math.max(70, activeRooms.size() * 20));
+        List<ShowtimeSuggestion> selected = new ArrayList<>();
+        for (ShowtimeSuggestion choice : candidates) {
+            boolean conflict = selected.stream().anyMatch(other ->
+                    choice.getCinemaRoomId().equals(other.getCinemaRoomId())
+                            && other.getStartTime().isBefore(choice.getEndTime())
+                            && other.getEndTime().isAfter(choice.getStartTime()));
+            if (!conflict) selected.add(choice);
+            if (selected.size() == 8) break;
+        }
+        return selected.stream().sorted(Comparator.comparing(ShowtimeSuggestion::getStartTime))
+                .map(item -> {
+                    CinemaRoom room = activeRooms.get(item.getCinemaRoomId());
+                    Theater theater = room == null ? null : activeTheaters.get(room.getTheaterId());
+                    return map("movieId", item.getMovieId(), "movieTitle", movie.getTitle(),
+                        "theaterId", theater == null ? null : theater.getId(),
+                        "theaterName", theater == null ? null : theater.getName(), "cinemaRoomId", item.getCinemaRoomId(),
                         "online", false, "channel", "THEATER",
                         "roomName", item.getRoomName(), "startTime", item.getStartTime(), "endTime", item.getEndTime(),
-                        "predictedOccupancyPercent", item.getPredictedOccupancyPercent(), "reason", item.getReason())).collect(Collectors.toCollection(ArrayList::new));
-        plan.addAll(onlineWeeklyPlan(movies, start, titles));
-        plan.sort(Comparator.comparing(item -> (LocalDateTime) item.get("startTime")));
-        return plan;
+                        "predictedOccupancyPercent", item.getPredictedOccupancyPercent(), "reason", item.getReason());
+                })
+                .toList();
     }
 
     @Transactional
@@ -167,6 +183,14 @@ public class AdminIntelligenceService {
             }
 
             if (!online) {
+                CinemaRoom room = cinemaRoomRepository.findById(item.cinemaRoomId()).orElse(null);
+                Theater theater = room == null || room.getTheaterId() == null
+                        ? null
+                        : theaterRepository.findById(room.getTheaterId()).orElse(null);
+                if (room == null || room.getStatus() != RoomStatus.ACTIVE
+                        || theater == null || theater.getStatus() != TheaterStatus.ACTIVE) {
+                    continue;
+                }
                 boolean overlapsExisting = !showtimeRepository
                         .findOverlappingShowtimes(item.cinemaRoomId(), item.startTime(), endTime)
                         .isEmpty();
@@ -199,28 +223,6 @@ public class AdminIntelligenceService {
         Map<UUID, Long> result = new HashMap<>();
         bookingSeatRepository.findAll().forEach(item -> { UUID showtime = bookingShowtime.get(item.getBookingId()); if (showtime != null) result.put(showtime, result.getOrDefault(showtime, 0L) + 1); });
         return result;
-    }
-    private List<Map<String, Object>> onlineWeeklyPlan(List<Movie> movies, LocalDate start, Map<UUID, String> titles) {
-        List<Movie> streamable = movies.stream()
-                .filter(movie -> movie.getStreamKey() != null && !movie.getStreamKey().trim().isBlank())
-                .toList();
-        if (streamable.isEmpty()) {
-            return List.of();
-        }
-
-        List<Map<String, Object>> items = new ArrayList<>();
-        List<java.time.LocalTime> onlineTimes = List.of(java.time.LocalTime.of(20, 0), java.time.LocalTime.of(22, 30));
-        int maxDays = Math.min(7, streamable.size() * 2);
-        for (int day = 0; day < maxDays; day++) {
-            Movie movie = streamable.get(day % streamable.size());
-            java.time.LocalTime time = onlineTimes.get(day % onlineTimes.size());
-            LocalDateTime startTime = LocalDateTime.of(start.plusDays(day), time);
-            LocalDateTime endTime = startTime.plusMinutes(movie.getDurationMinutes() == null ? 120 : movie.getDurationMinutes()).plusMinutes(15);
-            items.add(map("movieId", movie.getId(), "movieTitle", titles.get(movie.getId()), "cinemaRoomId", null,
-                    "online", true, "channel", "ONLINE", "roomName", "Xem online", "startTime", startTime, "endTime", endTime,
-                    "predictedOccupancyPercent", 70, "reason", "Suất online tự động cho phim có stream, không chiếm phòng chiếu"));
-        }
-        return items;
     }
     private boolean isCentral(Seat seat, int max) { double center = (max + 1) / 2.0; return Math.abs(seat.getSeatNumber() - center) <= Math.max(1, max * .25); }
     private Map<String, Object> map(Object... values) { Map<String, Object> result = new LinkedHashMap<>(); for (int i=0;i<values.length;i+=2) result.put((String) values[i], values[i+1]); return result; }

@@ -5,7 +5,9 @@ export const adminIntelligenceService = {
   heatmap: (roomId) => api.get('/api/admin/intelligence/seat-heatmap', { params: { roomId } }).then(unwrap),
   pricing: () => api.get('/api/admin/intelligence/pricing').then(unwrap),
   applyPricing: (showtimeId, prices) => api.post(`/api/admin/intelligence/pricing/${showtimeId}/apply`, { prices }).then(unwrap),
-  weeklyPlan: (startDate) => api.get('/api/admin/intelligence/weekly-plan', { params: { startDate } }).then(unwrap),
+  weeklyPlan: ({ startDate, movieId }) => api.get('/api/admin/intelligence/weekly-plan', {
+    params: { startDate, movieId },
+  }).then(unwrap),
   applyWeeklyPlan: (plan) => api.post('/api/admin/intelligence/weekly-plan/apply', plan).then(unwrap),
 };
 
