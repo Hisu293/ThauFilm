@@ -1,6 +1,6 @@
 import { useCallback, useState, useEffect, useMemo, useRef } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
-import { Container, Box, Alert, Snackbar, Button, Chip, CircularProgress, LinearProgress, Paper, Stack, Typography } from '@mui/material';
+import { Container, Box, Alert, Snackbar, Button, Chip, CircularProgress, FormControl, LinearProgress, MenuItem, Paper, Select, Stack, Typography } from '@mui/material';
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 
@@ -815,108 +815,165 @@ export const SeatSelectionPage = () => {
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                py: 5,
+                py: { xs: 2.5, md: 3 },
                 position: 'relative',
               }}
             >
               <Box
                 sx={{
                   width: '100%',
-                  mb: 3,
-                  p: 2,
-                  borderRadius: 2,
+                  mb: 2,
+                  p: { xs: 1.5, md: 2 },
+                  borderRadius: 3,
                   border: '1px solid rgba(148, 163, 184, 0.14)',
-                  bgcolor: 'rgba(15, 23, 42, 0.32)',
+                  background: 'linear-gradient(145deg, rgba(15, 23, 42, 0.52), rgba(15, 23, 42, 0.25))',
                 }}
               >
-                <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems={{ md: 'center' }} justifyContent="space-between">
-                  <Box>
-                    <Stack direction="row" spacing={1} alignItems="center">
+                <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems={{ md: 'center' }} justifyContent="space-between">
+                  <Box sx={{ minWidth: 0 }}>
+                    <Stack direction="row" spacing={1} alignItems="center" useFlexGap flexWrap="wrap">
                       <AutoAwesomeRoundedIcon color="primary" fontSize="small" />
                       <Typography variant="subtitle1" fontWeight={900}>Tìm ghế nhóm tự động</Typography>
                       {seatSuggestion && (
                         <Chip
                           size="small"
                           color="info"
-                          label={`${seatSuggestion.options.length} hàng phù hợp`}
+                          variant="outlined"
+                          label={`${seatSuggestion.options.length} lựa chọn`}
                         />
                       )}
                     </Stack>
-                    <Typography variant="body2" color="text.secondary">
-                      Hệ thống sẽ đề xuất ghế theo từng hàng. Ghế chỉ được giữ sau khi bạn chọn hàng và xác nhận.
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.35 }}>
+                      Chọn quy mô nhóm, xem phương án theo hàng rồi xác nhận để giữ ghế.
                     </Typography>
                   </Box>
-                  <Stack spacing={1} alignItems={{ md: 'flex-end' }}>
-                    <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap">
-                      {GROUP_SEAT_COUNTS.map((count) => (
-                        <Chip
-                          key={count}
-                          label={`${count} người`}
-                          color={groupSeatCount === count ? 'primary' : 'default'}
-                          variant={groupSeatCount === count ? 'filled' : 'outlined'}
-                          onClick={() => {
+                  <Stack direction="row" spacing={1} alignItems="center" sx={{ width: { xs: '100%', md: 'auto' } }}>
+                    <FormControl size="small" sx={{ minWidth: 118 }}>
+                      <Select
+                        value={groupSeatCount}
+                        onChange={(event) => {
+                            const count = Number(event.target.value);
                             setGroupSeatCount(count);
                             setSeatSuggestion(null);
                             setSelectedGroupOption(null);
                           }}
-                          disabled={suggestingSeats || apiLoading}
-                        />
-                      ))}
-                    </Stack>
+                        disabled={suggestingSeats || apiLoading}
+                        displayEmpty
+                        aria-label="Số người trong nhóm"
+                        sx={{
+                          bgcolor: 'rgba(15, 23, 42, 0.58)',
+                          fontWeight: 800,
+                          '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(148, 163, 184, 0.25)' },
+                        }}
+                      >
+                        {GROUP_SEAT_COUNTS.map((count) => (
+                          <MenuItem key={count} value={count}>{count} người</MenuItem>
+                        ))}
+                      </Select>
+                    </FormControl>
                     <Button
                       variant="contained"
                       startIcon={suggestingSeats ? <CircularProgress size={16} color="inherit" /> : <AutoAwesomeRoundedIcon />}
                       onClick={handleSuggestGroupSeats}
                       disabled={suggestingSeats || apiLoading || seats.length === 0}
+                      sx={{
+                        minHeight: 40,
+                        px: { xs: 1.5, sm: 2.25 },
+                        flex: { xs: 1, md: 'initial' },
+                        whiteSpace: 'nowrap',
+                      }}
                     >
-                      {suggestingSeats ? 'Đang tìm các hàng phù hợp...' : `Đề xuất hàng cho ${groupSeatCount} người`}
+                      {suggestingSeats ? 'Đang tìm...' : 'Tìm phương án'}
                     </Button>
                   </Stack>
                 </Stack>
-                {seatSuggestion?.message && (
-                  <Alert severity="info" sx={{ mt: 2 }}>
-                    {seatSuggestion.message}
-                  </Alert>
-                )}
                 {seatSuggestion?.options?.length > 0 && (
-                  <Stack spacing={1.5} sx={{ mt: 2 }}>
-                    <Typography variant="subtitle2" fontWeight={800}>
-                      Chọn hàng ghế bạn muốn:
-                    </Typography>
-                    <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
-                      {seatSuggestion.options.map((option) => {
+                  <Stack spacing={1.25} sx={{ mt: 1.75, pt: 1.5, borderTop: '1px solid rgba(148, 163, 184, 0.12)' }}>
+                    <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
+                      <Typography variant="subtitle2" fontWeight={850}>
+                        Chọn hàng để xem trước
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        Chưa giữ ghế
+                      </Typography>
+                    </Stack>
+                    <Box
+                      sx={{
+                        display: 'grid',
+                        gridTemplateColumns: {
+                          xs: '1fr',
+                          sm: 'repeat(2, minmax(0, 1fr))',
+                          xl: 'repeat(4, minmax(0, 1fr))',
+                        },
+                        gap: 1,
+                      }}
+                    >
+                      {seatSuggestion.options.map((option, index) => {
                         const selected = selectedGroupOption?.rowName === option.rowName;
                         const labels = option.seats.map((seat) => seat.label).join(', ');
+                        const firstSeat = option.seats[0]?.label;
+                        const lastSeat = option.seats[option.seats.length - 1]?.label;
                         return (
-                          <Button
+                          <Paper
                             key={`${option.rowName}-${option.seats.map((seat) => seat.id).join('-')}`}
-                            variant={selected ? 'contained' : 'outlined'}
-                            color={option.exactMatch ? 'success' : 'warning'}
+                            component="button"
+                            type="button"
                             onClick={() => {
                               setSelectedGroupOption(option);
                               setSeatSuggestion((current) => ({ ...current, confirmedMessage: null }));
                             }}
                             disabled={holdingSeats || apiLoading}
-                            sx={{ textTransform: 'none' }}
+                            title={labels}
+                            sx={{
+                              p: 1.25,
+                              minWidth: 0,
+                              textAlign: 'left',
+                              color: 'text.primary',
+                              bgcolor: selected ? 'rgba(34, 211, 238, 0.13)' : 'rgba(15, 23, 42, 0.38)',
+                              border: '1px solid',
+                              borderColor: selected ? '#22D3EE' : 'rgba(148, 163, 184, 0.18)',
+                              borderRadius: 2,
+                              cursor: 'pointer',
+                              transition: 'border-color 0.18s ease, background-color 0.18s ease, transform 0.18s ease',
+                              '&:hover': {
+                                borderColor: selected ? '#22D3EE' : 'rgba(251, 191, 36, 0.55)',
+                                bgcolor: selected ? 'rgba(34, 211, 238, 0.16)' : 'rgba(30, 41, 59, 0.70)',
+                                transform: 'translateY(-1px)',
+                              },
+                              '&:disabled': { cursor: 'not-allowed', opacity: 0.55 },
+                            }}
                           >
-                            Hàng {option.rowName}: {labels} · {option.exactMatch ? 'liền nhau' : 'gần nhau nhất'}
-                          </Button>
+                            <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={0.75}>
+                              <Typography variant="subtitle2" fontWeight={900} color={selected ? 'info.main' : 'text.primary'}>
+                                Hàng {option.rowName}
+                              </Typography>
+                              {index === 0 && <Chip size="small" color="primary" label="Tốt nhất" sx={{ height: 20 }} />}
+                            </Stack>
+                            <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block', mt: 0.25 }}>
+                              {firstSeat}–{lastSeat} · {option.seats.length} ghế · {option.exactMatch ? 'liền nhau' : 'gần nhất'}
+                            </Typography>
+                          </Paper>
                         );
                       })}
+                    </Box>
+                    <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ sm: 'center' }} justifyContent="space-between" spacing={1}>
+                      <Typography variant="body2" color={selectedGroupOption ? 'info.main' : 'text.secondary'} fontWeight={selectedGroupOption ? 700 : 500}>
+                        {selectedGroupOption
+                          ? `Đang xem trước hàng ${selectedGroupOption.rowName}: ${selectedGroupOption.seats.map((seat) => seat.label).join(', ')}`
+                          : 'Chọn một phương án phía trên để xem ghế trên sơ đồ.'}
+                      </Typography>
+                      <Button
+                        variant="contained"
+                        color="success"
+                        onClick={handleConfirmGroupSeats}
+                        disabled={!selectedGroupOption || holdingSeats || apiLoading}
+                        sx={{ minWidth: 190, whiteSpace: 'nowrap' }}
+                      >
+                        {selectedGroupOption ? `Giữ ghế hàng ${selectedGroupOption.rowName}` : 'Xác nhận giữ ghế'}
+                      </Button>
                     </Stack>
-                    <Button
-                      variant="contained"
-                      color="success"
-                      onClick={handleConfirmGroupSeats}
-                      disabled={!selectedGroupOption || holdingSeats || apiLoading}
-                      sx={{ alignSelf: { md: 'flex-start' } }}
-                    >
-                      {selectedGroupOption
-                        ? `Xác nhận giữ ghế hàng ${selectedGroupOption.rowName}`
-                        : 'Chọn một hàng để xác nhận'}
-                    </Button>
                     {seatSuggestion.confirmedMessage && (
-                      <Alert severity="success">{seatSuggestion.confirmedMessage}</Alert>
+                      <Alert severity="success" sx={{ py: 0 }}>{seatSuggestion.confirmedMessage}</Alert>
                     )}
                   </Stack>
                 )}
