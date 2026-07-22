@@ -75,6 +75,5 @@ public interface BookingRepository extends JpaRepository<Booking, UUID> {
                                                 @Param("status") BookingStatus status,
                                                 @Param("now") LocalDateTime now);
 
-    Optional<Booking> findByUserIdAndShowtimeIdAndStatus(UUID userId, UUID showtimeId, BookingStatus status);
     List<Booking> findByStatusAndConfirmedAtBetween(BookingStatus status, LocalDateTime from, LocalDateTime to);
 }

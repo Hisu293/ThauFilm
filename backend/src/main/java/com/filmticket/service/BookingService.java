@@ -84,11 +84,12 @@ public class BookingService {
         // Lấy danh sách ID ghế mà user hiện tại đang giữ chỗ (nếu đã đăng nhập)
         Set<UUID> myHeldSeatIds = new HashSet<>();
         if (currentUserId != null) {
-            bookingRepository.findByUserIdAndShowtimeIdAndStatus(currentUserId, showtimeId, BookingStatus.HOLD)
-                    .ifPresent(booking -> {
-                        List<BookingSeat> mySeats = bookingSeatRepository.findByBookingId(booking.getId());
-                        mySeats.forEach(bs -> myHeldSeatIds.add(bs.getSeatId()));
-                    });
+            myHeldSeatIds.addAll(bookingSeatRepository.findActiveHeldSeatIds(
+                    currentUserId,
+                    showtimeId,
+                    BookingStatus.HOLD,
+                    now()
+            ));
         }
 
         return availabilities.stream()

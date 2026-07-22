@@ -45,6 +45,7 @@ export const SeatSelectionPage = () => {
   const [movie, setMovie] = useState(null);
   const [showtime, setShowtime] = useState(null);
   const [seats, setSeats] = useState([]);
+  const [seatLoadFailed, setSeatLoadFailed] = useState(false);
   const [selectedSeats, setSelectedSeats] = useState(location.state?.selectedSeats || []);
   const [holdingSeats, setHoldingSeats] = useState(false);
   const [loadingDetails, setLoadingDetails] = useState(true);
@@ -87,12 +88,16 @@ export const SeatSelectionPage = () => {
         : await getSeats(showtimeId);
       if (cancelledRef.current) return;
       const editableSeatIds = editingSeatIdsRef.current;
+      setSeatLoadFailed(false);
       setSeats((Array.isArray(seatLayout) ? seatLayout : []).map((seat) => (
         editableSeatIds.has(String(seat.id)) ? { ...seat, isSold: false } : seat
       )));
     } catch {
       if (cancelledRef.current) return;
-      setSeats([]);
+      if (!silent) {
+        setSeatLoadFailed(true);
+        setSeats([]);
+      }
     }
   }, [getSeats, showtimeId]);
 
@@ -800,7 +805,14 @@ export const SeatSelectionPage = () => {
         }}
       >
         <Box sx={{ flex: '1 1 65%', minWidth: 0 }}>
-          {seats.length === 0 && !apiLoading ? (
+          {seatLoadFailed && !apiLoading ? (
+            <EmptyState
+              title="Không tải được sơ đồ ghế"
+              description="Máy chủ đang gặp lỗi khi tải trạng thái ghế. Vui lòng thử lại sau ít giây."
+              actionText="Thử lại"
+              onAction={() => refreshSeats({ current: false })}
+            />
+          ) : seats.length === 0 && !apiLoading ? (
             <EmptyState
               title="Không tìm thấy sơ đồ ghế"
               description="Hiện tại phòng chiếu này chưa được cấu hình sơ đồ ghế ngồi. Vui lòng chọn suất chiếu khác."
