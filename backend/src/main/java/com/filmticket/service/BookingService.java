@@ -116,12 +116,12 @@ public class BookingService {
     }
 
     @Transactional(readOnly = true)
-    public SeatSuggestionResponse suggestSeats(UUID showtimeId, int count) {
+    public SeatSuggestionResponse suggestSeats(UUID showtimeId, UUID currentUserId, int count) {
         if (count < 1 || count > 8) {
             throw new BadRequestException("Số ghế cần tìm phải từ 1 đến 8");
         }
-        List<ShowtimeSeatResponse> availableSeats = getAvailableSeats(showtimeId, null).stream()
-                .filter(seat -> seat.getStatus() == SeatBookingStatus.AVAILABLE)
+        List<ShowtimeSeatResponse> availableSeats = getAvailableSeats(showtimeId, currentUserId).stream()
+                .filter(seat -> seat.getStatus() == SeatBookingStatus.AVAILABLE || seat.isHeldByMe())
                 .filter(seat -> seat.getRowName() != null && seat.getSeatNumber() != null)
                 .sorted(Comparator.comparing(ShowtimeSeatResponse::getRowName)
                         .thenComparing(ShowtimeSeatResponse::getSeatNumber))
@@ -130,54 +130,55 @@ public class BookingService {
             throw new BadRequestException("Không còn đủ " + count + " ghế trống cho suất chiếu này");
         }
 
-        Candidate exact = findExactAdjacentCandidate(availableSeats, count);
-        if (exact != null) {
-            return toSeatSuggestion(count, true, "Đã tìm thấy " + count + " ghế liền nhau cùng hàng.", exact.seats());
+        List<RankedRowCandidate> rowCandidates = seatsByRow(availableSeats).entrySet().stream()
+                .map(entry -> {
+                    Candidate candidate = bestWindow(entry.getValue(), count, false);
+                    if (candidate == null) return null;
+                    int span = candidate.seats().get(candidate.seats().size() - 1).getSeatNumber()
+                            - candidate.seats().get(0).getSeatNumber();
+                    return new RankedRowCandidate(entry.getKey(), candidate, span == count - 1);
+                })
+                .filter(Objects::nonNull)
+                .sorted(Comparator.comparing(RankedRowCandidate::exactMatch).reversed()
+                        .thenComparingInt(candidate -> candidate.candidate().score()))
+                .toList();
+
+        if (rowCandidates.isEmpty()) {
+            throw new BadRequestException("Không có hàng ghế nào còn đủ " + count + " chỗ phù hợp");
         }
 
-        Candidate nearest = findNearestCandidate(availableSeats, count);
-        return toSeatSuggestion(count, false, "Không có đủ " + count + " ghế liền nhau. Đây là cụm ghế gần nhau nhất.", nearest.seats());
-    }
+        List<SeatSuggestionOptionResponse> options = rowCandidates.stream()
+                .map(candidate -> toSeatSuggestionOption(
+                        candidate.rowName(),
+                        candidate.exactMatch(),
+                        candidate.candidate().seats()
+                ))
+                .toList();
+        SeatSuggestionOptionResponse recommended = options.get(0);
 
-    private Candidate findExactAdjacentCandidate(List<ShowtimeSeatResponse> seats, int count) {
-        return seatsByRow(seats).values().stream()
-                .map(rowSeats -> bestWindow(rowSeats, count, true))
-                .filter(Objects::nonNull)
-                .min(Comparator.comparingInt(Candidate::score))
-                .orElse(null);
-    }
-
-    private Candidate findNearestCandidate(List<ShowtimeSeatResponse> seats, int count) {
-        Candidate sameRow = seatsByRow(seats).values().stream()
-                .map(rowSeats -> bestWindow(rowSeats, count, false))
-                .filter(Objects::nonNull)
-                .min(Comparator.comparingInt(Candidate::score))
-                .orElse(null);
-        if (sameRow != null) return sameRow;
-
-        List<ShowtimeSeatResponse> selected = new ArrayList<>();
-        List<List<ShowtimeSeatResponse>> rows = new ArrayList<>(seatsByRow(seats).values());
-        rows.sort(Comparator.<List<ShowtimeSeatResponse>, String>comparing(row -> row.get(0).getRowName())
-                .thenComparing(row -> row.get(0).getSeatNumber()));
-        rows.sort(Comparator.comparingInt(List<ShowtimeSeatResponse>::size).reversed());
-        for (List<ShowtimeSeatResponse> row : rows) {
-            for (ShowtimeSeatResponse seat : row) {
-                selected.add(seat);
-                if (selected.size() == count) return new Candidate(selected, 10_000);
-            }
-        }
-        return new Candidate(selected, 20_000);
+        return SeatSuggestionResponse.builder()
+                .requestedCount(count)
+                .exactMatch(recommended.isExactMatch())
+                .message("Có " + options.size() + " hàng ghế phù hợp. Hãy chọn một hàng để xác nhận giữ ghế.")
+                .seatIds(recommended.getSeatIds())
+                .seats(recommended.getSeats())
+                .options(options)
+                .build();
     }
 
     private Candidate bestWindow(List<ShowtimeSeatResponse> rowSeats, int count, boolean requireAdjacent) {
         if (rowSeats.size() < count) return null;
         Candidate best = null;
+        int rowCenter = rowSeats.get(0).getSeatNumber()
+                + rowSeats.get(rowSeats.size() - 1).getSeatNumber();
         for (int start = 0; start <= rowSeats.size() - count; start++) {
             List<ShowtimeSeatResponse> window = rowSeats.subList(start, start + count);
             int span = window.get(window.size() - 1).getSeatNumber() - window.get(0).getSeatNumber();
             if (requireAdjacent && span != count - 1) continue;
             int gaps = span - (count - 1);
-            int centerPenalty = Math.abs(window.get(0).getSeatNumber() + window.get(window.size() - 1).getSeatNumber());
+            int candidateCenter = window.get(0).getSeatNumber()
+                    + window.get(window.size() - 1).getSeatNumber();
+            int centerPenalty = Math.abs(candidateCenter - rowCenter);
             Candidate candidate = new Candidate(List.copyOf(window), span * 100 + gaps * 1_000 + centerPenalty);
             if (best == null || candidate.score() < best.score()) best = candidate;
         }
@@ -193,17 +194,21 @@ public class BookingService {
         return byRow;
     }
 
-    private SeatSuggestionResponse toSeatSuggestion(int count, boolean exactMatch, String message, List<ShowtimeSeatResponse> seats) {
-        return SeatSuggestionResponse.builder()
-                .requestedCount(count)
+    private SeatSuggestionOptionResponse toSeatSuggestionOption(
+            String rowName,
+            boolean exactMatch,
+            List<ShowtimeSeatResponse> seats
+    ) {
+        return SeatSuggestionOptionResponse.builder()
+                .rowName(rowName)
                 .exactMatch(exactMatch)
-                .message(message)
                 .seatIds(seats.stream().map(ShowtimeSeatResponse::getSeatId).toList())
                 .seats(seats)
                 .build();
     }
 
     private record Candidate(List<ShowtimeSeatResponse> seats, int score) {}
+    private record RankedRowCandidate(String rowName, Candidate candidate, boolean exactMatch) {}
 
     @Transactional
     public BookingResponse createBooking(UUID userId, CreateBookingRequest request) {

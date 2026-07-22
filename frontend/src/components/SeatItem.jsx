@@ -13,7 +13,7 @@ const TYPE_GLOW = {
   STANDARD: 'rgba(148, 163, 184, 0.35)',
 };
 
-export const SeatItem = ({ seat, isSelected, onToggleSelect }) => {
+export const SeatItem = ({ seat, isSelected, isSuggested = false, onToggleSelect }) => {
   const { id, label, type, price, isSold } = seat;
   const displayName = label || id;
   const isDouble = type === 'COUPLE';
@@ -38,6 +38,15 @@ export const SeatItem = ({ seat, isSelected, onToggleSelect }) => {
         boxShadow: '0 6px 16px rgba(251, 191, 36, 0.5)',
       };
     }
+    if (isSuggested) {
+      return {
+        bgcolor: 'rgba(34, 211, 238, 0.20)',
+        border: '1.5px solid #22D3EE',
+        color: '#CFFAFE',
+        cursor: 'pointer',
+        boxShadow: '0 5px 14px rgba(34, 211, 238, 0.35)',
+      };
+    }
     return {
       bgcolor: 'rgba(15, 23, 42, 0.35)',
       border: `1.5px solid ${accent}`,
@@ -54,7 +63,7 @@ export const SeatItem = ({ seat, isSelected, onToggleSelect }) => {
 
   const tooltipTitle = isSold
     ? `Ghế ${displayName} - Đã bán`
-    : `Ghế ${displayName} (${enumLabel(SEAT_TYPE, type)}) - ${formattedPrice}`;
+    : `Ghế ${displayName} (${enumLabel(SEAT_TYPE, type)}) - ${formattedPrice}${isSuggested ? ' - Đang xem trước' : ''}`;
 
   return (
     <Tooltip title={tooltipTitle} TransitionComponent={Zoom} arrow disableInteractive>
@@ -86,12 +95,12 @@ export const SeatItem = ({ seat, isSelected, onToggleSelect }) => {
                 right: 2,
                 height: '3px',
                 borderRadius: '3px',
-                bgcolor: isSelected ? 'rgba(15,23,42,0.35)' : `${accent}55`,
+                bgcolor: isSelected ? 'rgba(15,23,42,0.35)' : isSuggested ? 'rgba(34,211,238,0.55)' : `${accent}55`,
               },
           '&:hover': !isSold
             ? {
                 transform: 'translateY(-2px) scale(1.08)',
-                boxShadow: `0 8px 18px ${isSelected ? 'rgba(251,191,36,0.5)' : TYPE_GLOW[type] || TYPE_GLOW.STANDARD}`,
+                boxShadow: `0 8px 18px ${isSelected ? 'rgba(251,191,36,0.5)' : isSuggested ? 'rgba(34,211,238,0.45)' : TYPE_GLOW[type] || TYPE_GLOW.STANDARD}`,
                 zIndex: 2,
               }
             : {},

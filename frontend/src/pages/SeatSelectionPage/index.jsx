@@ -1,6 +1,6 @@
 import { useCallback, useState, useEffect, useMemo, useRef } from 'react';
 import { useLocation, useParams } from 'react-router-dom';
-import { Container, Box, Alert, Snackbar, Button, Chip, CircularProgress, LinearProgress, Paper, Stack, TextField, Typography } from '@mui/material';
+import { Container, Box, Alert, Snackbar, Button, Chip, CircularProgress, LinearProgress, Paper, Stack, Typography } from '@mui/material';
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 
@@ -21,69 +21,12 @@ import { useBookingNavigate } from '../../context/BookingNavigationContext';
 import { pruneExpiredPendingBookings, removePendingBooking, savePendingBooking } from '../../utils/pendingBookingStorage';
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const GROUP_SEAT_COUNTS = [2, 3, 4, 5, 6, 7, 8];
 const unwrapApiResponse = (response) => response?.data?.data ?? response?.data ?? response;
 const formatQueueWait = (seconds = 0) => {
   if (seconds <= 0) return 'Đang đến lượt';
   const minutes = Math.max(1, Math.ceil(seconds / 60));
   return `Khoảng ${minutes} phút`;
-};
-
-const buildGroupSeatSuggestion = (seats = [], count = 1) => {
-  const availableSeats = seats
-    .filter((seat) => !seat.isSold)
-    .slice()
-    .sort((a, b) => String(a.rowName).localeCompare(String(b.rowName)) || Number(a.col) - Number(b.col));
-
-  if (availableSeats.length < count) {
-    throw new Error(`Không còn đủ ${count} ghế trống cho suất chiếu này.`);
-  }
-
-  const byRow = bookingService.groupSeatsByRow(availableSeats);
-  const findBestWindow = (requireAdjacent) => {
-    let best = null;
-    byRow.forEach(({ seats: rowSeats }) => {
-      if (rowSeats.length < count) return;
-      for (let start = 0; start <= rowSeats.length - count; start += 1) {
-        const group = rowSeats.slice(start, start + count);
-        const span = group[group.length - 1].col - group[0].col;
-        if (requireAdjacent && span !== count - 1) continue;
-        const gaps = span - (count - 1);
-        const score = span * 100 + gaps * 1000 + Math.abs(group[0].col + group[group.length - 1].col);
-        if (!best || score < best.score) best = { seats: group, score };
-      }
-    });
-    return best;
-  };
-
-  const exact = findBestWindow(true);
-  if (exact) {
-    return {
-      exactMatch: true,
-      requestedCount: count,
-      message: `Đã tìm thấy ${count} ghế liền nhau cùng hàng.`,
-      seats: exact.seats,
-      seatIds: exact.seats.map((seat) => seat.id),
-    };
-  }
-
-  const nearestSameRow = findBestWindow(false);
-  if (nearestSameRow) {
-    return {
-      exactMatch: false,
-      requestedCount: count,
-      message: `Không có đủ ${count} ghế liền nhau. Đây là cụm ghế gần nhau nhất trong cùng hàng.`,
-      seats: nearestSameRow.seats,
-      seatIds: nearestSameRow.seats.map((seat) => seat.id),
-    };
-  }
-
-  return {
-    exactMatch: false,
-    requestedCount: count,
-    message: `Không có đủ ${count} ghế trong một hàng. Đây là các ghế gần nhất còn trống.`,
-    seats: availableSeats.slice(0, count),
-    seatIds: availableSeats.slice(0, count).map((seat) => seat.id),
-  };
 };
 
 export const SeatSelectionPage = () => {
@@ -103,15 +46,17 @@ export const SeatSelectionPage = () => {
   const [showtime, setShowtime] = useState(null);
   const [seats, setSeats] = useState([]);
   const [selectedSeats, setSelectedSeats] = useState(location.state?.selectedSeats || []);
+  const [holdingSeats, setHoldingSeats] = useState(false);
   const [loadingDetails, setLoadingDetails] = useState(true);
   const [, setActiveBooking] = useState(location.state?.activeBooking || null);
 
   const editingSeatIdsRef = useRef(new Set((location.state?.selectedSeats || []).map((seat) => String(seat.id))));
 
 
-  const [groupSeatCount, setGroupSeatCount] = useState(6);
+  const [groupSeatCount, setGroupSeatCount] = useState(2);
   const [suggestingSeats, setSuggestingSeats] = useState(false);
   const [seatSuggestion, setSeatSuggestion] = useState(null);
+  const [selectedGroupOption, setSelectedGroupOption] = useState(null);
   const [ticketQueue, setTicketQueue] = useState(null);
   const [queueReady, setQueueReady] = useState(false);
   const [queueBusy, setQueueBusy] = useState(false);
@@ -460,6 +405,7 @@ export const SeatSelectionPage = () => {
   const applySeatSelection = useCallback(async (nextSeats, options = {}) => {
     if (apiLoading && !options.force) return false;
 
+    setHoldingSeats(true);
     try {
       await syncSeatHold(nextSeats);
       setSelectedSeats(nextSeats);
@@ -482,12 +428,15 @@ export const SeatSelectionPage = () => {
       setSnackbarOpen(true);
       await refreshSeats({ current: false }, true);
       return false;
+    } finally {
+      setHoldingSeats(false);
     }
   }, [apiLoading, movie, refreshSeats, showtime, syncSeatHold, updateBookingState]);
 
   const handleToggleSelectSeat = async (seat) => {
     if (apiLoading) return;
     setSeatSuggestion(null);
+    setSelectedGroupOption(null);
 
     const isAlreadySelected = selectedSeats.some((s) => s.id === seat.id);
     if (isAlreadySelected) {
@@ -511,24 +460,50 @@ export const SeatSelectionPage = () => {
   };
 
   const handleSuggestGroupSeats = async () => {
-    const count = Math.max(1, Math.min(8, Number(groupSeatCount) || 1));
+    const count = Math.max(2, Math.min(8, Number(groupSeatCount) || 2));
     setGroupSeatCount(count);
     setSuggestingSeats(true);
     setSeatSuggestion(null);
+    setSelectedGroupOption(null);
 
     try {
-      const suggestion = buildGroupSeatSuggestion(seats, count);
-      const held = await applySeatSelection(suggestion.seats, { force: true });
-      if (!held) return;
-      setSeatSuggestion(suggestion);
-      setSnackbarMessage(suggestion.message);
-      setSnackbarOpen(true);
+      const suggestion = unwrapApiResponse(await bookingApi.suggestGroupSeats(showtimeId, count));
+      const options = (suggestion?.options ?? []).map((option) => ({
+        ...option,
+        seats: bookingService.normalizeSeats(option?.seats ?? []),
+      })).filter((option) => option.seats.length === count);
+      if (options.length === 0) {
+        throw new Error('Hệ thống chưa tìm được đủ ghế phù hợp. Vui lòng thử lại.');
+      }
+      setSeatSuggestion({
+        ...suggestion,
+        options,
+      });
     } catch (err) {
       setSnackbarMessage(err.message || 'Không thể tìm ghế nhóm phù hợp.');
       setSnackbarOpen(true);
     } finally {
       setSuggestingSeats(false);
     }
+  };
+
+  const handleConfirmGroupSeats = async () => {
+    if (!selectedGroupOption) return;
+
+    const held = await applySeatSelection(selectedGroupOption.seats, { force: true });
+    if (!held) {
+      setSeatSuggestion(null);
+      setSelectedGroupOption(null);
+      return;
+    }
+
+    const labels = selectedGroupOption.seats.map((seat) => seat.label).join(', ');
+    setSeatSuggestion((current) => ({
+      ...current,
+      confirmedMessage: `Đã giữ hàng ${selectedGroupOption.rowName}: ${labels}.`,
+    }));
+    setSnackbarMessage(`Đã giữ ${labels}.`);
+    setSnackbarOpen(true);
   };
 
   useEffect(() => {
@@ -798,8 +773,8 @@ export const SeatSelectionPage = () => {
     );
   }
 
-  const isProcessing = apiLoading && selectedSeats.length === 0;
-  const isHolding = apiLoading && selectedSeats.length > 0;
+  const isProcessing = apiLoading && !holdingSeats && seats.length === 0;
+  const isHolding = holdingSeats;
 
   return (
     <Container maxWidth="xl" sx={{ pb: 8, pt: 2, position: 'relative' }}>
@@ -862,44 +837,94 @@ export const SeatSelectionPage = () => {
                       {seatSuggestion && (
                         <Chip
                           size="small"
-                          color={seatSuggestion.exactMatch ? 'success' : 'warning'}
-                          label={seatSuggestion.exactMatch ? 'Liền nhau' : 'Gần nhất'}
+                          color="info"
+                          label={`${seatSuggestion.options.length} hàng phù hợp`}
                         />
                       )}
                     </Stack>
                     <Typography variant="body2" color="text.secondary">
-                      Nhập số người, hệ thống ưu tiên tìm ghế liền nhau cùng hàng; nếu hết chỗ sẽ chọn cụm gần nhất.
+                      Hệ thống sẽ đề xuất ghế theo từng hàng. Ghế chỉ được giữ sau khi bạn chọn hàng và xác nhận.
                     </Typography>
                   </Box>
-                  <Stack direction="row" spacing={1} alignItems="center">
-                    <TextField
-                      label="Số người"
-                      type="number"
-                      size="small"
-                      value={groupSeatCount}
-                      onChange={(event) => setGroupSeatCount(event.target.value)}
-                      inputProps={{ min: 1, max: 8 }}
-                      sx={{ width: 110 }}
-                    />
+                  <Stack spacing={1} alignItems={{ md: 'flex-end' }}>
+                    <Stack direction="row" spacing={0.75} useFlexGap flexWrap="wrap">
+                      {GROUP_SEAT_COUNTS.map((count) => (
+                        <Chip
+                          key={count}
+                          label={`${count} người`}
+                          color={groupSeatCount === count ? 'primary' : 'default'}
+                          variant={groupSeatCount === count ? 'filled' : 'outlined'}
+                          onClick={() => {
+                            setGroupSeatCount(count);
+                            setSeatSuggestion(null);
+                            setSelectedGroupOption(null);
+                          }}
+                          disabled={suggestingSeats || apiLoading}
+                        />
+                      ))}
+                    </Stack>
                     <Button
                       variant="contained"
                       startIcon={suggestingSeats ? <CircularProgress size={16} color="inherit" /> : <AutoAwesomeRoundedIcon />}
                       onClick={handleSuggestGroupSeats}
                       disabled={suggestingSeats || apiLoading || seats.length === 0}
                     >
-                      Tìm ghế
+                      {suggestingSeats ? 'Đang tìm các hàng phù hợp...' : `Đề xuất hàng cho ${groupSeatCount} người`}
                     </Button>
                   </Stack>
                 </Stack>
                 {seatSuggestion?.message && (
-                  <Alert severity={seatSuggestion.exactMatch ? 'success' : 'warning'} sx={{ mt: 2 }}>
+                  <Alert severity="info" sx={{ mt: 2 }}>
                     {seatSuggestion.message}
                   </Alert>
+                )}
+                {seatSuggestion?.options?.length > 0 && (
+                  <Stack spacing={1.5} sx={{ mt: 2 }}>
+                    <Typography variant="subtitle2" fontWeight={800}>
+                      Chọn hàng ghế bạn muốn:
+                    </Typography>
+                    <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap">
+                      {seatSuggestion.options.map((option) => {
+                        const selected = selectedGroupOption?.rowName === option.rowName;
+                        const labels = option.seats.map((seat) => seat.label).join(', ');
+                        return (
+                          <Button
+                            key={`${option.rowName}-${option.seats.map((seat) => seat.id).join('-')}`}
+                            variant={selected ? 'contained' : 'outlined'}
+                            color={option.exactMatch ? 'success' : 'warning'}
+                            onClick={() => {
+                              setSelectedGroupOption(option);
+                              setSeatSuggestion((current) => ({ ...current, confirmedMessage: null }));
+                            }}
+                            disabled={holdingSeats || apiLoading}
+                            sx={{ textTransform: 'none' }}
+                          >
+                            Hàng {option.rowName}: {labels} · {option.exactMatch ? 'liền nhau' : 'gần nhau nhất'}
+                          </Button>
+                        );
+                      })}
+                    </Stack>
+                    <Button
+                      variant="contained"
+                      color="success"
+                      onClick={handleConfirmGroupSeats}
+                      disabled={!selectedGroupOption || holdingSeats || apiLoading}
+                      sx={{ alignSelf: { md: 'flex-start' } }}
+                    >
+                      {selectedGroupOption
+                        ? `Xác nhận giữ ghế hàng ${selectedGroupOption.rowName}`
+                        : 'Chọn một hàng để xác nhận'}
+                    </Button>
+                    {seatSuggestion.confirmedMessage && (
+                      <Alert severity="success">{seatSuggestion.confirmedMessage}</Alert>
+                    )}
+                  </Stack>
                 )}
               </Box>
               <SeatMap
                 seats={seats}
                 selectedSeats={selectedSeats}
+                suggestedSeats={selectedGroupOption?.seats ?? []}
                 onToggleSelectSeat={handleToggleSelectSeat}
               />
             </SectionCard>

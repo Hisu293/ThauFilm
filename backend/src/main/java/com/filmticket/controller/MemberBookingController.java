@@ -60,7 +60,7 @@ public class MemberBookingController {
     ) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Seat suggestion generated",
-                bookingService.suggestSeats(showtimeId, count)
+                bookingService.suggestSeats(showtimeId, getCurrentUserId(), count)
         ));
     }
 

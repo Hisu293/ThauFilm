@@ -8,11 +8,9 @@ import java.util.UUID;
 
 @Data
 @Builder
-public class SeatSuggestionResponse {
+public class SeatSuggestionOptionResponse {
+    private String rowName;
     private boolean exactMatch;
-    private int requestedCount;
-    private String message;
     private List<UUID> seatIds;
     private List<ShowtimeSeatResponse> seats;
-    private List<SeatSuggestionOptionResponse> options;
 }

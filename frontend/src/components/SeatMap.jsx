@@ -2,7 +2,7 @@ import { Box, Stack, Typography } from '@mui/material';
 import SeatItem from './SeatItem';
 import { bookingService } from '../services/bookingService';
 
-export const SeatMap = ({ seats = [], selectedSeats = [], onToggleSelectSeat }) => {
+export const SeatMap = ({ seats = [], selectedSeats = [], suggestedSeats = [], onToggleSelectSeat }) => {
   // Cấu trúc 2 chiều đã sort sẵn: [{ rowName, seats: [...] }]
   const seatRows = bookingService.groupSeatsByRow(seats);
 
@@ -68,6 +68,7 @@ export const SeatMap = ({ seats = [], selectedSeats = [], onToggleSelectSeat }) 
                     key={seat.id}
                     seat={seat}
                     isSelected={selectedSeats.some((selectedSeat) => selectedSeat.id === seat.id)}
+                    isSuggested={suggestedSeats.some((suggestedSeat) => suggestedSeat.id === seat.id)}
                     onToggleSelect={onToggleSelectSeat}
                   />
                 ))}
@@ -128,6 +129,13 @@ export const SeatMap = ({ seats = [], selectedSeats = [], onToggleSelectSeat }) 
           <Box sx={{ width: 16, height: 16, background: 'linear-gradient(135deg, #FCD34D 0%, #FBBF24 100%)', borderRadius: '6px 6px 3px 3px' }} />
           <Typography variant="caption" color="text.secondary" fontWeight={600}>
             Đang chọn
+          </Typography>
+        </Stack>
+
+        <Stack direction="row" alignItems="center" spacing={1}>
+          <Box sx={{ width: 16, height: 16, bgcolor: 'rgba(34, 211, 238, 0.20)', border: '1.5px solid #22D3EE', borderRadius: '6px 6px 3px 3px' }} />
+          <Typography variant="caption" color="text.secondary" fontWeight={600}>
+            Đang xem trước
           </Typography>
         </Stack>
 
