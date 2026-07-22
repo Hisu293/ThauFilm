@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Avatar, Box, Button, Chip, CircularProgress, Container, IconButton, Paper, Stack, TextField, Typography } from '@mui/material';
+import { Alert, Avatar, Box, Button, Chip, CircularProgress, Collapse, Container, IconButton, Paper, Stack, TextField, Typography } from '@mui/material';
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
 import ContentCopyRoundedIcon from '@mui/icons-material/ContentCopyRounded';
 import FavoriteRoundedIcon from '@mui/icons-material/FavoriteRounded';
 import GroupsRoundedIcon from '@mui/icons-material/GroupsRounded';
 import InsertEmoticonRoundedIcon from '@mui/icons-material/InsertEmoticonRounded';
+import KeyboardArrowDownRoundedIcon from '@mui/icons-material/KeyboardArrowDownRounded';
+import KeyboardArrowUpRoundedIcon from '@mui/icons-material/KeyboardArrowUpRounded';
 import PlayArrowRoundedIcon from '@mui/icons-material/PlayArrowRounded';
 import SendRoundedIcon from '@mui/icons-material/SendRounded';
 import SentimentVerySatisfiedRoundedIcon from '@mui/icons-material/SentimentVerySatisfiedRounded';
@@ -52,9 +54,12 @@ export default function WatchPartyPage() {
   const [error, setError] = useState('');
   const [inviteCopied, setInviteCopied] = useState(false);
   const [streamUrl, setStreamUrl] = useState('');
+  const [membersExpanded, setMembersExpanded] = useState(false);
 
   const inviteUrl = room ? `${getPublicAppUrl()}${room.invitePath || `/watch-party/${room.id}`}` : '';
   const me = room?.members?.find((member) => member.currentUser);
+  const members = room?.members || [];
+  const paidMemberCount = members.filter((member) => member.paid).length;
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -446,30 +451,6 @@ export default function WatchPartyPage() {
               elevation={0}
               sx={{
                 p: 2,
-                borderRadius: 3,
-                bgcolor: 'rgba(30,41,59,0.84)',
-                border: '1px solid rgba(255,255,255,0.09)',
-                boxShadow: '0 24px 70px rgba(0,0,0,0.24)',
-              }}
-            >
-              <Typography fontWeight={900} mb={1}>Thành viên</Typography>
-              <Stack spacing={1}>
-                {(room.members || []).map((member) => (
-                  <Stack key={member.userId} direction="row" justifyContent="space-between" alignItems="center" spacing={1}>
-                    <Box minWidth={0}>
-                      <Typography fontWeight={800} noWrap>{member.fullName}{member.currentUser ? ' (Bạn)' : ''}</Typography>
-                      <Typography variant="caption" color="text.secondary" noWrap>{member.email}</Typography>
-                    </Box>
-                    <Chip size="small" color={member.paid ? 'success' : 'warning'} label={member.paid ? 'Đã trả' : 'Chưa trả'} />
-                  </Stack>
-                ))}
-              </Stack>
-            </Paper>
-
-            <Paper
-              elevation={0}
-              sx={{
-                p: 2,
                 height: 440,
                 display: 'flex',
                 flexDirection: 'column',
@@ -479,16 +460,33 @@ export default function WatchPartyPage() {
                 boxShadow: '0 24px 70px rgba(0,0,0,0.24)',
               }}
             >
-              <Typography fontWeight={900} mb={1}>Chat phòng</Typography>
-              <Box flex={1} overflow="auto" pr={0.5}>
-                <Stack spacing={1}>
-                  {messages.map((message) => (
-                    <Box key={message.id} sx={{ bgcolor: 'rgba(15,23,42,0.72)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 2, p: 1 }}>
-                      <Typography variant="caption" color="text.secondary">{message.senderName}</Typography>
-                      <Typography variant="body2">{message.content}</Typography>
+              <Stack direction="row" alignItems="center" justifyContent="space-between" mb={1.25}>
+                <Typography fontWeight={900}>Chat phòng</Typography>
+                <Chip
+                  size="small"
+                  color={status === 'connected' ? 'success' : 'default'}
+                  variant="outlined"
+                  label={status === 'connected' ? 'Trực tuyến' : 'Đang kết nối'}
+                />
+              </Stack>
+              <Box flex={1} overflow="auto" pr={0.5} sx={{ scrollbarWidth: 'thin' }}>
+                {messages.length === 0 ? (
+                  <Box sx={{ height: '100%', display: 'grid', placeItems: 'center', textAlign: 'center', px: 2 }}>
+                    <Box>
+                      <Typography color="text.secondary" fontWeight={700}>Chưa có tin nhắn</Typography>
+                      <Typography variant="caption" color="text.secondary">Hãy bắt đầu trò chuyện cùng mọi người trong phòng.</Typography>
                     </Box>
-                  ))}
-                </Stack>
+                  </Box>
+                ) : (
+                  <Stack spacing={1}>
+                    {messages.map((message) => (
+                      <Box key={message.id} sx={{ bgcolor: 'rgba(15,23,42,0.72)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 2, p: 1 }}>
+                        <Typography variant="caption" color="text.secondary">{message.senderName}</Typography>
+                        <Typography variant="body2" sx={{ overflowWrap: 'anywhere' }}>{message.content}</Typography>
+                      </Box>
+                    ))}
+                  </Stack>
+                )}
               </Box>
               <Stack direction="row" spacing={1} mt={1.5}>
                 <TextField
@@ -504,8 +502,104 @@ export default function WatchPartyPage() {
                     }
                   }}
                 />
-                <IconButton color="primary" onClick={sendMessage}><SendRoundedIcon /></IconButton>
+                <IconButton color="primary" onClick={sendMessage} aria-label="Gửi tin nhắn"><SendRoundedIcon /></IconButton>
               </Stack>
+            </Paper>
+
+            <Paper
+              elevation={0}
+              sx={{
+                p: 2,
+                borderRadius: 3,
+                bgcolor: 'rgba(30,41,59,0.84)',
+                border: '1px solid rgba(255,255,255,0.09)',
+                boxShadow: '0 24px 70px rgba(0,0,0,0.24)',
+              }}
+            >
+              <Stack
+                direction="row"
+                alignItems="center"
+                justifyContent="space-between"
+                spacing={1}
+                role="button"
+                tabIndex={0}
+                aria-expanded={membersExpanded}
+                onClick={() => setMembersExpanded((current) => !current)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    setMembersExpanded((current) => !current);
+                  }
+                }}
+                sx={{ cursor: 'pointer' }}
+              >
+                <Stack direction="row" alignItems="center" spacing={1} minWidth={0}>
+                  <Typography fontWeight={900}>Thành viên</Typography>
+                  <Chip size="small" color="info" variant="outlined" label={members.length} />
+                </Stack>
+                <IconButton size="small" tabIndex={-1} aria-label={membersExpanded ? 'Thu gọn thành viên' : 'Mở danh sách thành viên'}>
+                  {membersExpanded ? <KeyboardArrowUpRoundedIcon /> : <KeyboardArrowDownRoundedIcon />}
+                </IconButton>
+              </Stack>
+
+              <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1.5} mt={1.25}>
+                <Stack direction="row" sx={{ pl: 0.5 }}>
+                  {members.slice(0, 4).map((member, index) => (
+                    <Avatar
+                      key={member.userId}
+                      src={member.avatarUrl}
+                      alt={member.fullName}
+                      sx={{
+                        width: 30,
+                        height: 30,
+                        ml: index === 0 ? 0 : -0.75,
+                        fontSize: 12,
+                        fontWeight: 900,
+                        border: '2px solid #1e293b',
+                        bgcolor: member.paid ? 'success.dark' : 'warning.dark',
+                      }}
+                    >
+                      {(member.fullName || member.email || 'T').charAt(0).toUpperCase()}
+                    </Avatar>
+                  ))}
+                  {members.length > 4 && (
+                    <Avatar sx={{ width: 30, height: 30, ml: -0.75, fontSize: 11, fontWeight: 900, border: '2px solid #1e293b', bgcolor: 'rgba(71,85,105,0.95)' }}>
+                      +{members.length - 4}
+                    </Avatar>
+                  )}
+                </Stack>
+                <Typography variant="caption" color="text.secondary" textAlign="right">
+                  <Box component="span" color="success.main" fontWeight={900}>{paidMemberCount}</Box>/{members.length} đã thanh toán
+                </Typography>
+              </Stack>
+
+              <Collapse in={membersExpanded} timeout="auto" unmountOnExit>
+                <Box sx={{ mt: 1.5, pt: 1.25, borderTop: '1px solid rgba(255,255,255,0.08)', maxHeight: 260, overflowY: 'auto', pr: 0.5, scrollbarWidth: 'thin' }}>
+                  <Stack spacing={0.75}>
+                    {members.map((member) => (
+                      <Stack
+                        key={member.userId}
+                        direction="row"
+                        justifyContent="space-between"
+                        alignItems="center"
+                        spacing={1}
+                        sx={{ p: 0.75, borderRadius: 1.5, bgcolor: member.currentUser ? 'rgba(251,191,36,0.08)' : 'transparent' }}
+                      >
+                        <Stack direction="row" alignItems="center" spacing={1} minWidth={0}>
+                          <Avatar src={member.avatarUrl} sx={{ width: 30, height: 30, fontSize: 12 }}>
+                            {(member.fullName || member.email || 'T').charAt(0).toUpperCase()}
+                          </Avatar>
+                          <Box minWidth={0}>
+                            <Typography variant="body2" fontWeight={800} noWrap>{member.fullName}{member.currentUser ? ' (Bạn)' : ''}</Typography>
+                            <Typography variant="caption" color="text.secondary" noWrap display="block">{member.email}</Typography>
+                          </Box>
+                        </Stack>
+                        <Chip size="small" color={member.paid ? 'success' : 'warning'} label={member.paid ? 'Đã trả' : 'Chưa trả'} />
+                      </Stack>
+                    ))}
+                  </Stack>
+                </Box>
+              </Collapse>
             </Paper>
           </Stack>
         </Stack>
