@@ -12,6 +12,7 @@ import {
   Typography,
 } from '@mui/material';
 import ConfirmationNumberRoundedIcon from '@mui/icons-material/ConfirmationNumberRounded';
+import CurrencyExchangeRoundedIcon from '@mui/icons-material/CurrencyExchangeRounded';
 import { useBooking } from '../hooks/useBooking';
 import EmptyState from '../components/common/EmptyState';
 import ConfirmationDialog from '../components/common/ConfirmationDialog';
@@ -241,9 +242,14 @@ const MyBookingsPage = () => {
           </Typography>
           <Typography color="text.secondary">Theo dõi lịch sử đặt vé và mở chi tiết vé đã mua.</Typography>
         </Box>
-        <Button variant="contained" onClick={() => navigate('/movies')}>
-          Đặt vé mới
-        </Button>
+        <Stack direction="row" spacing={1}>
+          <Button variant="outlined" startIcon={<CurrencyExchangeRoundedIcon />} onClick={() => navigate('/my-refunds')}>
+            Lịch sử hoàn tiền
+          </Button>
+          <Button variant="contained" onClick={() => navigate('/movies')}>
+            Đặt vé mới
+          </Button>
+        </Stack>
       </Stack>
 
       {error && (

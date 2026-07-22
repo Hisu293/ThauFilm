@@ -17,6 +17,7 @@ import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
 import AccountCircleRoundedIcon from '@mui/icons-material/AccountCircleRounded';
 import BookmarkRoundedIcon from '@mui/icons-material/BookmarkRounded';
 import ConfirmationNumberRoundedIcon from '@mui/icons-material/ConfirmationNumberRounded';
+import CurrencyExchangeRoundedIcon from '@mui/icons-material/CurrencyExchangeRounded';
 import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded';
 import GroupsRoundedIcon from '@mui/icons-material/GroupsRounded';
 import DashboardRoundedIcon from '@mui/icons-material/DashboardRounded';
@@ -235,6 +236,19 @@ const UserMenu = () => {
           </ListItemIcon>
           <Typography sx={{ fontSize: '0.9rem', color: 'rgba(255,255,255,0.88)' }}>
             Vé của tôi
+          </Typography>
+        </MenuItem>
+
+        <MenuItem
+          id="menu-refunds"
+          onClick={() => goTo('/my-refunds')}
+          sx={{ px: 2.5, py: 1.2, gap: 1.5, '&:hover': { backgroundColor: 'rgba(255,255,255,0.06)' } }}
+        >
+          <ListItemIcon sx={{ color: 'rgba(255,255,255,0.7)', minWidth: 0 }}>
+            <CurrencyExchangeRoundedIcon fontSize="small" />
+          </ListItemIcon>
+          <Typography sx={{ fontSize: '0.9rem', color: 'rgba(255,255,255,0.88)' }}>
+            Lịch sử hoàn tiền
           </Typography>
         </MenuItem>
 

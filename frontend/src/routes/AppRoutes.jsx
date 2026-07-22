@@ -31,6 +31,7 @@ import PaymentPage from '../pages/PaymentPage';
 import BookingSuccessPage from '../pages/BookingSuccessPage';
 import MyBookingsPage from '../pages/MyBookingsPage';
 import MyBookingDetailPage from '../pages/MyBookingDetailPage';
+import MyRefundsPage from '../pages/MyRefundsPage';
 import GroupBookingPage from '../pages/GroupBookingPage';
 import WatchPartyPage from '../pages/WatchPartyPage';
 
@@ -79,6 +80,7 @@ const AppRoutes = () => {
         <Route path="/watch-party/:roomId" element={<WatchPartyPage />} />
         <Route path="/my-bookings" element={<MyBookingsPage />} />
         <Route path="/my-bookings/:bookingId" element={<MyBookingDetailPage />} />
+        <Route path="/my-refunds" element={<MyRefundsPage />} />
 
         {/* Trang nội dung tĩnh liên kết từ footer */}
         <Route path="/faq" element={<InfoPage contentKey="faq" />} />
