@@ -9,7 +9,7 @@ import {
 import { authService } from '../services/authService';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const steps = ['Xác nhận email', 'Câu hỏi bảo mật', 'Mật khẩu mới'];
+const steps = ['Xác nhận email', 'Đặt lại mật khẩu'];
 
 export default function ForgotPasswordDialog({ open, onClose }) {
   const [step, setStep] = useState(0);
@@ -60,6 +60,11 @@ export default function ForgotPasswordDialog({ open, onClose }) {
       }
       setEmail(normalizedEmail);
       setQuestion(securityQuestion);
+      setAnswer('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setShowNewPassword(false);
+      setShowConfirmPassword(false);
       setStep(1);
     } catch (requestError) {
       setError(requestError.message || 'Không thể lấy câu hỏi bảo mật.');
@@ -68,16 +73,11 @@ export default function ForgotPasswordDialog({ open, onClose }) {
     }
   };
 
-  const continueWithAnswer = () => {
+  const submitNewPassword = async () => {
     if (!answer.trim()) {
       setError('Vui lòng nhập câu trả lời bảo mật.');
       return;
     }
-    setError('');
-    setStep(2);
-  };
-
-  const submitNewPassword = async () => {
     if (newPassword.length < 6) {
       setError('Mật khẩu mới phải có ít nhất 6 ký tự.');
       return;
@@ -95,15 +95,14 @@ export default function ForgotPasswordDialog({ open, onClose }) {
     } catch (requestError) {
       setNewPassword('');
       setConfirmPassword('');
-      setStep(1);
       setError(requestError.message || 'Câu trả lời bảo mật không chính xác.');
     } finally {
       setLoading(false);
     }
   };
 
-  const primaryAction = step === 0 ? findAccount : step === 1 ? continueWithAnswer : submitNewPassword;
-  const primaryLabel = step === 0 ? 'Tiếp tục' : step === 1 ? 'Xác nhận câu trả lời' : 'Đổi mật khẩu';
+  const primaryAction = step === 0 ? findAccount : submitNewPassword;
+  const primaryLabel = step === 0 ? 'Tiếp tục' : 'Đổi mật khẩu';
 
   return (
     <Dialog open={open} onClose={handleClose} fullWidth maxWidth="sm">
@@ -129,22 +128,22 @@ export default function ForgotPasswordDialog({ open, onClose }) {
                   <Typography variant="caption" color="text.secondary">Câu hỏi bảo mật</Typography>
                   <Typography fontWeight={750}>{question}</Typography>
                 </Box>
-                <TextField autoFocus fullWidth required label="Câu trả lời" value={answer} onChange={(event) => setAnswer(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') continueWithAnswer(); }} disabled={loading} autoComplete="off" />
-              </Stack>
-            )}
-
-            {step === 2 && (
-              <Stack spacing={2}>
                 <TextField
-                  autoFocus fullWidth required label="Mật khẩu mới" type={showNewPassword ? 'text' : 'password'}
+                  autoFocus fullWidth required label="Câu trả lời" value={answer}
+                  onChange={(event) => setAnswer(event.target.value)}
+                  disabled={loading} autoComplete="off"
+                />
+                <TextField
+                  fullWidth required label="Mật khẩu mới" type={showNewPassword ? 'text' : 'password'}
                   value={newPassword} onChange={(event) => setNewPassword(event.target.value)}
-                  autoComplete="new-password"
+                  disabled={loading} autoComplete="new-password"
                   InputProps={{ endAdornment: <InputAdornment position="end"><IconButton onClick={() => setShowNewPassword((value) => !value)} edge="end" aria-label={showNewPassword ? 'Ẩn mật khẩu mới' : 'Hiện mật khẩu mới'}>{showNewPassword ? <VisibilityOffRoundedIcon /> : <VisibilityRoundedIcon />}</IconButton></InputAdornment> }}
                 />
                 <TextField
                   fullWidth required label="Xác nhận mật khẩu mới" type={showConfirmPassword ? 'text' : 'password'}
                   value={confirmPassword} onChange={(event) => setConfirmPassword(event.target.value)}
-                  onKeyDown={(event) => { if (event.key === 'Enter') submitNewPassword(); }} autoComplete="new-password"
+                  onKeyDown={(event) => { if (event.key === 'Enter') submitNewPassword(); }}
+                  disabled={loading} autoComplete="new-password"
                   InputProps={{ endAdornment: <InputAdornment position="end"><IconButton onClick={() => setShowConfirmPassword((value) => !value)} edge="end" aria-label={showConfirmPassword ? 'Ẩn mật khẩu xác nhận' : 'Hiện mật khẩu xác nhận'}>{showConfirmPassword ? <VisibilityOffRoundedIcon /> : <VisibilityRoundedIcon />}</IconButton></InputAdornment> }}
                 />
               </Stack>
