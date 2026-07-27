@@ -11,7 +11,6 @@ export const SHOWTIME_FIELDS = [
   'movieId',
   'cinemaRoomId',
   'startTime',
-  'endTime',
   'status',
   'online',
   'mystery',
@@ -29,7 +28,6 @@ export const toShowtimePayload = (form) => {
   if (form.cinemaRoomId !== undefined && form.cinemaRoomId !== '') payload.cinemaRoomId = String(form.cinemaRoomId);
   // Backend uses LocalDateTime, so send local wall-clock time without timezone.
   if (form.startTime) payload.startTime = toBackendLocalDateTime(form.startTime);
-  if (form.endTime) payload.endTime = toBackendLocalDateTime(form.endTime);
   payload.online = Boolean(form.online);
   payload.mystery = Boolean(form.mystery);
   if (form.mysteryUnlockAt) payload.mysteryUnlockAt = toBackendLocalDateTime(form.mysteryUnlockAt);

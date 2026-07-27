@@ -194,11 +194,24 @@ export function useAdminStore() {
       // Lấy chi tiết 1 phim từ API (dùng khi mở form sửa để có dữ liệu mới nhất)
       getById: (id) => adminMovieService.getById(id),
       add: async (row) => {
-        await adminMovieService.create(row);
+        const created = await adminMovieService.create(row);
+        const uploaded = {};
+        if (row.streamFile) uploaded.streamKey = await adminMovieService.uploadStream(created.id, row.streamFile);
+        if (row.trailerFile) uploaded.trailerUrl = await adminMovieService.uploadTrailer(created.id, row.trailerFile);
+        if (Object.keys(uploaded).length > 0) {
+          await adminMovieService.update(created.id, { ...row, ...uploaded, streamProvider: uploaded.streamKey ? 'S3' : row.streamProvider });
+        }
         await loadMovies();
+        return created;
       },
       update: async (id, row) => {
         await adminMovieService.update(id, row);
+        const uploaded = {};
+        if (row.streamFile) uploaded.streamKey = await adminMovieService.uploadStream(id, row.streamFile);
+        if (row.trailerFile) uploaded.trailerUrl = await adminMovieService.uploadTrailer(id, row.trailerFile);
+        if (Object.keys(uploaded).length > 0) {
+          await adminMovieService.update(id, { ...row, ...uploaded, streamProvider: uploaded.streamKey ? 'S3' : row.streamProvider });
+        }
         await loadMovies();
       },
       // Xóa mềm: chỉ chuyển active = false (không xóa cứng khỏi DB)

@@ -10,6 +10,7 @@ import com.filmticket.repository.UserRepository;
 import com.filmticket.service.MovieService;
 import com.filmticket.service.DemandPredictionService;
 import com.filmticket.service.StaffReportService;
+import com.filmticket.service.S3PresignedUrlService;
 import com.filmticket.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -32,10 +33,12 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -50,6 +53,7 @@ public class AdminController {
     private final MovieService movieService;
     private final DemandPredictionService demandPredictionService;
     private final StaffReportService staffReportService;
+    private final S3PresignedUrlService s3PresignedUrlService;
 
     @Operation(summary = "Admin test endpoint")
     @GetMapping("/ping")
@@ -110,6 +114,58 @@ public class AdminController {
         MovieResponse movie = movieService.createMovie(request);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.success("Movie created successfully", movie));
+    }
+
+    @Operation(summary = "Create a presigned S3 upload URL for a movie stream")
+    @GetMapping("/movies/{movieId}/stream-upload-url")
+    public ResponseEntity<ApiResponse<Map<String, String>>> createStreamUploadUrl(
+            @PathVariable UUID movieId,
+            @RequestParam String fileName,
+            @RequestParam(defaultValue = "video/mp4") String contentType
+    ) {
+        movieService.getMovieEntityOrThrow(movieId);
+        if (!s3PresignedUrlService.hasS3Credentials()) {
+            throw new BadRequestException("S3 is not configured");
+        }
+        if (contentType == null || !contentType.toLowerCase().startsWith("video/")) {
+            throw new BadRequestException("Only video files are supported");
+        }
+
+        String safeName = fileName == null ? "movie.mp4" : fileName.replaceAll("[^a-zA-Z0-9._-]", "-");
+        String objectKey = "movies/" + movieId + "/" + UUID.randomUUID() + "-" + safeName;
+        String uploadUrl = s3PresignedUrlService.presignPutUrl(objectKey, 900);
+
+        return ResponseEntity.ok(ApiResponse.success("S3 upload URL created", Map.of(
+                "uploadUrl", uploadUrl,
+                "streamKey", objectKey,
+                "contentType", contentType
+        )));
+    }
+
+    @Operation(summary = "Create a presigned S3 upload URL for a movie trailer")
+    @GetMapping("/movies/{movieId}/trailer-upload-url")
+    public ResponseEntity<ApiResponse<Map<String, String>>> createTrailerUploadUrl(
+            @PathVariable UUID movieId,
+            @RequestParam String fileName,
+            @RequestParam(defaultValue = "video/mp4") String contentType
+    ) {
+        movieService.getMovieEntityOrThrow(movieId);
+        if (!s3PresignedUrlService.hasS3Credentials()) {
+            throw new BadRequestException("S3 is not configured");
+        }
+        if (contentType == null || !contentType.toLowerCase().startsWith("video/")) {
+            throw new BadRequestException("Only video files are supported");
+        }
+
+        String safeName = fileName == null ? "trailer.mp4" : fileName.replaceAll("[^a-zA-Z0-9._-]", "-");
+        String objectKey = "trailers/" + movieId + "/" + UUID.randomUUID() + "-" + safeName;
+        String uploadUrl = s3PresignedUrlService.presignPutUrl(objectKey, 900);
+
+        return ResponseEntity.ok(ApiResponse.success("S3 trailer upload URL created", Map.of(
+                "uploadUrl", uploadUrl,
+                "trailerKey", objectKey,
+                "contentType", contentType
+        )));
     }
 
     @Operation(summary = "Update a movie")

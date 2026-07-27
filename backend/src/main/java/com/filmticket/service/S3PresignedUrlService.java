@@ -90,6 +90,14 @@ public class S3PresignedUrlService {
     }
 
     public String presignGetUrl(String objectKey, long ttlSeconds) {
+        return presignUrl("GET", objectKey, ttlSeconds);
+    }
+
+    public String presignPutUrl(String objectKey, long ttlSeconds) {
+        return presignUrl("PUT", objectKey, ttlSeconds);
+    }
+
+    private String presignUrl(String method, String objectKey, long ttlSeconds) {
         String bucket = blankToNull(s3Bucket);
         String region = blankToNull(s3Region);
         String accessKey = blankToNull(s3AccessKey);
@@ -114,7 +122,7 @@ public class S3PresignedUrlService {
 
         String canonicalUri = "/" + encodePath(objectKey);
         String canonicalQuery = canonicalQuery(params);
-        String canonicalRequest = "GET\n" + canonicalUri + "\n" + canonicalQuery + "\n" +
+        String canonicalRequest = method + "\n" + canonicalUri + "\n" + canonicalQuery + "\n" +
                 "host:" + host + "\n\nhost\nUNSIGNED-PAYLOAD";
         String stringToSign = "AWS4-HMAC-SHA256\n" + amzDate + "\n" + credentialScope + "\n" +
                 hex(sha256(canonicalRequest));

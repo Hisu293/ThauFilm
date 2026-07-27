@@ -115,7 +115,7 @@ public class ShowtimeService {
         return enrich(showtimeRepository.findAll(Sort.by(Sort.Direction.DESC, "createdAt")), false);
     }
 
-    private static final int CLEANUP_MINUTES = 15;
+    private static final int CLEANUP_MINUTES = 5;
 
     @Transactional
     public ShowtimeResponse createShowtime(@Valid UpsertShowtimeRequest request) {

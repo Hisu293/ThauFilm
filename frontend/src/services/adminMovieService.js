@@ -48,6 +48,45 @@ export const adminMovieService = {
   /** POST /api/admin/movies — tạo phim mới */
   create: (form) => api.post('/api/admin/movies', toMoviePayload(form)).then(unwrap),
 
+  /** Upload file phim trực tiếp lên S3 bằng presigned URL rồi trả về object key. */
+  uploadStream: async (movieId, file) => {
+    const contentType = file.type || 'video/mp4';
+    const uploadData = await api
+      .get(`/api/admin/movies/${movieId}/stream-upload-url`, {
+        params: { fileName: file.name, contentType },
+      })
+      .then(unwrap);
+
+    const response = await fetch(uploadData.uploadUrl, {
+      method: 'PUT',
+      headers: { 'Content-Type': contentType },
+      body: file,
+    });
+    if (!response.ok) {
+      throw new Error(`Upload S3 thất bại (${response.status})`);
+    }
+    return uploadData.streamKey;
+  },
+
+  uploadTrailer: async (movieId, file) => {
+    const contentType = file.type || 'video/mp4';
+    const uploadData = await api
+      .get(`/api/admin/movies/${movieId}/trailer-upload-url`, {
+        params: { fileName: file.name, contentType },
+      })
+      .then(unwrap);
+
+    const response = await fetch(uploadData.uploadUrl, {
+      method: 'PUT',
+      headers: { 'Content-Type': contentType },
+      body: file,
+    });
+    if (!response.ok) {
+      throw new Error(`Upload trailer S3 thất bại (${response.status})`);
+    }
+    return uploadData.trailerKey;
+  },
+
   /** PUT /api/admin/movies/{movieId} — cập nhật phim */
   update: (movieId, form) => api.put(`/api/admin/movies/${movieId}`, toMoviePayload(form)).then(unwrap),
 

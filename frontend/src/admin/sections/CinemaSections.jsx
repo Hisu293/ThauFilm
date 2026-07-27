@@ -658,7 +658,6 @@ export const ShowtimesSection = ({ crud, movies, theaters, rooms }) => {
     movieId: '',
     cinemaRoomId: '',
     startTime: '',
-    endTime: '',
     status: 'SCHEDULED',
     online: false,
     mystery: false,
@@ -674,19 +673,14 @@ export const ShowtimesSection = ({ crud, movies, theaters, rooms }) => {
     try {
       setFormError('');
       if (dialog === 'add') {
-        if (!form.movieId || (!form.online && !form.cinemaRoomId) || !form.startTime || !form.endTime) {
+        if (!form.movieId || (!form.online && !form.cinemaRoomId) || !form.startTime) {
           setFormError(t('admin.showtime', 'errorRequired'));
-          return;
-        }
-        if (new Date(form.endTime).getTime() <= new Date(form.startTime).getTime()) {
-          setFormError(t('admin.showtime', 'errorEnd'));
           return;
         }
         await crud.add({
           movieId: String(form.movieId),
           cinemaRoomId: form.online ? '' : String(form.cinemaRoomId),
           startTime: form.startTime,
-          endTime: form.endTime,
           status: 'SCHEDULED',
           online: Boolean(form.online),
           mystery: Boolean(form.mystery),
@@ -697,7 +691,7 @@ export const ShowtimesSection = ({ crud, movies, theaters, rooms }) => {
       }
       setDialog(null);
       setFormError('');
-      setForm({ movieId: '', cinemaRoomId: '', startTime: '', endTime: '', status: 'SCHEDULED', online: false, mystery: false, mysteryUnlockAt: '' });
+      setForm({ movieId: '', cinemaRoomId: '', startTime: '', status: 'SCHEDULED', online: false, mystery: false, mysteryUnlockAt: '' });
     } catch (err) {
       setFormError(err.message || 'Không thể lưu suất chiếu.');
       console.error('Lỗi khi lưu suất chiếu:', err);
@@ -729,7 +723,6 @@ export const ShowtimesSection = ({ crud, movies, theaters, rooms }) => {
       movieId: String(suggestion.movieId),
       cinemaRoomId: String(suggestion.cinemaRoomId),
       startTime: String(suggestion.startTime).slice(0, 16),
-      endTime: String(suggestion.endTime).slice(0, 16),
     }));
   };
 
@@ -917,7 +910,9 @@ export const ShowtimesSection = ({ crud, movies, theaters, rooms }) => {
               ))}
             </TextField>
             <TextField key="start" label="Giờ bắt đầu" type="datetime-local" fullWidth InputLabelProps={{ shrink: true }} value={form.startTime || ''} onChange={(e) => setForm({ ...form, startTime: e.target.value })} />
-            <TextField key="end" label="Giờ kết thúc" type="datetime-local" fullWidth InputLabelProps={{ shrink: true }} value={form.endTime || ''} onChange={(e) => setForm({ ...form, endTime: e.target.value })} />
+            <Typography variant="caption" color="text.secondary">
+              Giờ kết thúc sẽ tự tính theo thời lượng phim và cộng thêm 5 phút dọn phòng.
+            </Typography>
             <FormControlLabel
               control={
                 <Switch

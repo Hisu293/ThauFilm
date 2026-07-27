@@ -4,6 +4,8 @@ This project now supports online movie playback from S3 through backend-signed U
 
 ## 1. S3 Object
 
+Admin can now choose a movie file in the movie creation form. The browser uploads it directly to S3 using a short-lived presigned URL, and the created movie is automatically saved with the generated object key.
+
 Upload each movie as one playable browser file when possible:
 
 ```text
@@ -36,7 +38,7 @@ For local development, put them in `BE2/.env`. For Railway, put them in the back
 
 ## 3. IAM Permission
 
-The IAM user only needs read access to movie objects:
+The IAM user needs read access for playback and write access for admin uploads:
 
 ```json
 {
@@ -44,7 +46,7 @@ The IAM user only needs read access to movie objects:
   "Statement": [
     {
       "Effect": "Allow",
-      "Action": ["s3:GetObject"],
+      "Action": ["s3:GetObject", "s3:PutObject"],
       "Resource": "arn:aws:s3:::your-bucket-name/movies/*"
     }
   ]
@@ -59,7 +61,7 @@ Configure CORS on the S3 bucket so the browser can load video from signed URLs:
 [
   {
     "AllowedHeaders": ["*"],
-    "AllowedMethods": ["GET", "HEAD"],
+    "AllowedMethods": ["GET", "HEAD", "PUT"],
     "AllowedOrigins": [
       "http://localhost:5173",
       "https://your-frontend-domain.vercel.app"
