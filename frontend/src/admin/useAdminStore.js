@@ -219,7 +219,7 @@ export function useAdminStore() {
       reload: loadMovies,
       // Lấy chi tiết 1 phim từ API (dùng khi mở form sửa để có dữ liệu mới nhất)
       getById: (id) => adminMovieService.getById(id),
-      uploadStreamFile: (file) => adminMovieService.uploadStreamFile(file),
+      uploadStreamFile: (file, onProgress) => adminMovieService.uploadStreamFile(file, onProgress),
       add: async (row) => {
         const created = await adminMovieService.create(row);
         await loadMovies();

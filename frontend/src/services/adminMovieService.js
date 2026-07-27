@@ -69,7 +69,7 @@ export const adminMovieService = {
   },
 
   /** Upload ngay khi admin chọn file, không cần tạo movie trước. */
-  uploadStreamFile: async (file) => {
+  uploadStreamFile: async (file, onProgress) => {
     const contentType = file.type || 'video/mp4';
     const uploadData = await api
       .get('/api/admin/movies/stream-upload-url', {
@@ -77,14 +77,27 @@ export const adminMovieService = {
       })
       .then(unwrap);
 
-    const response = await fetch(uploadData.uploadUrl, {
-      method: 'PUT',
-      headers: { 'Content-Type': contentType },
-      body: file,
+    await new Promise((resolve, reject) => {
+      const request = new XMLHttpRequest();
+      request.open('PUT', uploadData.uploadUrl);
+      request.setRequestHeader('Content-Type', contentType);
+      request.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          onProgress?.(Math.round((event.loaded * 100) / event.total));
+        }
+      };
+      request.onload = () => {
+        if (request.status >= 200 && request.status < 300) {
+          onProgress?.(100);
+          resolve();
+        } else {
+          reject(new Error(`Upload S3 thất bại (${request.status})`));
+        }
+      };
+      request.onerror = () => reject(new Error('Không thể kết nối tới S3 để upload phim'));
+      request.onabort = () => reject(new Error('Upload phim đã bị hủy'));
+      request.send(file);
     });
-    if (!response.ok) {
-      throw new Error(`Upload S3 thất bại (${response.status})`);
-    }
     return uploadData.streamKey;
   },
 

@@ -70,6 +70,7 @@ export const MoviesSection = ({ crud, genres = [] }) => {
   const [formError, setFormError] = useState(null);
   const [editLoadingId, setEditLoadingId] = useState(null);
   const [streamUploading, setStreamUploading] = useState(false);
+  const [streamUploadProgress, setStreamUploadProgress] = useState(0);
 
   // ── Bộ lọc ──
   const [search, setSearch] = useState('');
@@ -122,7 +123,8 @@ export const MoviesSection = ({ crud, genres = [] }) => {
     setFormError(null);
     if (!file) return;
     setStreamUploading(true);
-    crud.uploadStreamFile(file)
+    setStreamUploadProgress(0);
+    crud.uploadStreamFile(file, setStreamUploadProgress)
       .then((streamKey) => {
         setForm((current) => ({
           ...current,
@@ -389,7 +391,7 @@ export const MoviesSection = ({ crud, genres = [] }) => {
           />
         </Stack>
         <Button variant="outlined" component="label" disabled={streamUploading} startIcon={streamUploading ? <CircularProgress size={18} /> : <CloudUploadRoundedIcon />} sx={{ justifyContent: 'flex-start' }}>
-          {streamUploading ? 'Đang upload phim lên S3...' : form.streamFileName ? `Đã upload: ${form.streamFileName}` : 'Chọn file phim để upload lên S3'}
+          {streamUploading ? `Đang upload phim lên S3... ${streamUploadProgress}%` : form.streamFileName ? `Đã upload: ${form.streamFileName}` : 'Chọn file phim để upload lên S3'}
           <input
             hidden
             type="file"
