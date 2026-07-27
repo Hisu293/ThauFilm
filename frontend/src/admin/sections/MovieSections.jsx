@@ -51,6 +51,7 @@ const emptyMovie = {
   rated: '',
   streamProvider: 'S3',
   streamKey: '',
+  streamFileName: '',
   status: 'NOW_SHOWING',
 };
 const emptyGenre = { name: '', slug: '' };
@@ -68,6 +69,7 @@ export const MoviesSection = ({ crud, genres = [] }) => {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState(null);
   const [editLoadingId, setEditLoadingId] = useState(null);
+  const [streamUploading, setStreamUploading] = useState(false);
 
   // ── Bộ lọc ──
   const [search, setSearch] = useState('');
@@ -118,7 +120,22 @@ export const MoviesSection = ({ crud, genres = [] }) => {
       return;
     }
     setFormError(null);
-    setForm((current) => ({ ...current, streamFile: file }));
+    if (!file) return;
+    setStreamUploading(true);
+    crud.uploadStreamFile(file)
+      .then((streamKey) => {
+        setForm((current) => ({
+          ...current,
+          streamKey,
+          streamProvider: 'S3',
+          streamFileName: file.name,
+        }));
+      })
+      .catch((err) => setFormError(err.message || 'Upload phim lên S3 thất bại'))
+      .finally(() => {
+        setStreamUploading(false);
+        event.target.value = '';
+      });
   };
 
   const openAdd = () => {
@@ -142,6 +159,10 @@ export const MoviesSection = ({ crud, genres = [] }) => {
     }
   };
   const save = async () => {
+    if (streamUploading) {
+      setFormError('Vui lòng chờ upload phim lên S3 hoàn tất trước khi lưu.');
+      return;
+    }
     setSaving(true);
     setFormError(null);
     try {
@@ -305,7 +326,7 @@ export const MoviesSection = ({ crud, genres = [] }) => {
         title={dialog === 'add' ? 'Thêm phim' : 'Sửa phim'}
         onClose={() => setDialog(null)}
         onSave={save}
-        saving={saving}
+        saving={saving || streamUploading}
       >
         {formError && <Alert severity="error" sx={{ mb: 1 }}>{formError}</Alert>}
         <Box sx={{ p: 2, borderRadius: 2.5, bgcolor: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.08)' }}>
@@ -367,8 +388,8 @@ export const MoviesSection = ({ crud, genres = [] }) => {
             placeholder="movies/example/master.m3u8"
           />
         </Stack>
-        <Button variant="outlined" component="label" startIcon={<CloudUploadRoundedIcon />} sx={{ justifyContent: 'flex-start' }}>
-          {form.streamFile ? `Đã chọn: ${form.streamFile.name}` : 'Chọn file phim để upload lên S3'}
+        <Button variant="outlined" component="label" disabled={streamUploading} startIcon={streamUploading ? <CircularProgress size={18} /> : <CloudUploadRoundedIcon />} sx={{ justifyContent: 'flex-start' }}>
+          {streamUploading ? 'Đang upload phim lên S3...' : form.streamFileName ? `Đã upload: ${form.streamFileName}` : 'Chọn file phim để upload lên S3'}
           <input
             hidden
             type="file"
@@ -377,7 +398,7 @@ export const MoviesSection = ({ crud, genres = [] }) => {
           />
         </Button>
         <Typography variant="caption" color="text.secondary">
-          File sẽ được upload trực tiếp lên S3 sau khi lưu phim. Khuyến nghị MP4/WebM, tối đa 500MB.
+          File sẽ được upload trực tiếp lên S3 ngay khi chọn. Khuyến nghị MP4/WebM, tối đa 500MB.
         </Typography>
           </Stack>
         </Box>

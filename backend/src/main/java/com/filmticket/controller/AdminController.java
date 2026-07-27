@@ -117,6 +117,15 @@ public class AdminController {
     }
 
     @Operation(summary = "Create a presigned S3 upload URL for a movie stream")
+    @GetMapping("/movies/stream-upload-url")
+    public ResponseEntity<ApiResponse<Map<String, String>>> createStreamUploadUrl(
+            @RequestParam String fileName,
+            @RequestParam(defaultValue = "video/mp4") String contentType
+    ) {
+        return createStreamUploadUrlForObject(fileName, contentType);
+    }
+
+    @Operation(summary = "Create a presigned S3 upload URL for a movie stream")
     @GetMapping("/movies/{movieId}/stream-upload-url")
     public ResponseEntity<ApiResponse<Map<String, String>>> createStreamUploadUrl(
             @PathVariable UUID movieId,
@@ -124,6 +133,13 @@ public class AdminController {
             @RequestParam(defaultValue = "video/mp4") String contentType
     ) {
         movieService.getMovieEntityOrThrow(movieId);
+        return createStreamUploadUrlForObject(fileName, contentType);
+    }
+
+    private ResponseEntity<ApiResponse<Map<String, String>>> createStreamUploadUrlForObject(
+            String fileName,
+            String contentType
+    ) {
         if (!s3PresignedUrlService.hasS3Credentials()) {
             throw new BadRequestException("S3 is not configured");
         }
@@ -132,7 +148,7 @@ public class AdminController {
         }
 
         String safeName = fileName == null ? "movie.mp4" : fileName.replaceAll("[^a-zA-Z0-9._-]", "-");
-        String objectKey = "movies/" + movieId + "/" + UUID.randomUUID() + "-" + safeName;
+        String objectKey = "movies/" + UUID.randomUUID() + "-" + safeName;
         String uploadUrl = s3PresignedUrlService.presignPutUrl(objectKey, 900);
 
         return ResponseEntity.ok(ApiResponse.success("S3 upload URL created", Map.of(
