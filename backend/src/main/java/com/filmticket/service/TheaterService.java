@@ -30,6 +30,7 @@ public class TheaterService {
     private final TheaterRepository theaterRepository;
     private final ShowtimeRepository showtimeRepository;
     private final CinemaRoomRepository cinemaRoomRepository;
+    private final S3PresignedUrlService s3PresignedUrlService;
 
     @Transactional(readOnly = true)
     public List<TheaterResponse> getTheatersByCity(String city) {
@@ -152,7 +153,7 @@ public class TheaterService {
                 .address(theater.getAddress())
                 .city(theater.getCity())
                 .phoneNumber(theater.getPhoneNumber())
-                .imageUrl(theater.getImageUrl())
+                .imageUrl(resolveImageUrl(theater.getImageUrl()))
                 .status(theater.getStatus())
                 .build();
     }
@@ -169,7 +170,7 @@ public class TheaterService {
                 .address(theater.getAddress())
                 .city(theater.getCity())
                 .phoneNumber(theater.getPhoneNumber())
-                .imageUrl(theater.getImageUrl())
+                .imageUrl(resolveImageUrl(theater.getImageUrl()))
                 .status(theater.getStatus())
                 .cinemaRooms(rooms)
                 .build();
@@ -191,7 +192,11 @@ public class TheaterService {
                 .theaterId(theater.getId())
                 .theaterName(theater.getName())
                 .address(theater.getAddress())
-                .imageUrl(theater.getImageUrl())
+                .imageUrl(resolveImageUrl(theater.getImageUrl()))
                 .build();
+    }
+
+    private String resolveImageUrl(String imageUrl) {
+        return s3PresignedUrlService.resolvePosterUrl(imageUrl);
     }
 }
