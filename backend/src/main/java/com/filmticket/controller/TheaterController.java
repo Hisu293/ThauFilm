@@ -7,10 +7,8 @@ import com.filmticket.dto.TheaterResponse;
 import com.filmticket.dto.TheaterWithRoomsResponse;
 import com.filmticket.service.TheaterService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -19,14 +17,12 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/theaters")
 @RequiredArgsConstructor
-@SecurityRequirement(name = "bearerAuth")
 public class TheaterController {
 
     private final TheaterService theaterService;
 
-    @Operation(summary = "Get all active theaters - Available for all authenticated users (MEMBER, STAFF, ADMIN)")
+    @Operation(summary = "Get all active theaters")
     @GetMapping
-    @PreAuthorize("hasAnyRole('MEMBER', 'STAFF', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<TheaterResponse>>> getAllTheaters(
             @RequestParam(required = false) String city) {
 
@@ -46,9 +42,8 @@ public class TheaterController {
         ));
     }
 
-    @Operation(summary = "Get theater by ID with all rooms - Available for all authenticated users (MEMBER, STAFF, ADMIN)")
+    @Operation(summary = "Get theater by ID with all rooms")
     @GetMapping("/{theaterId}")
-    @PreAuthorize("hasAnyRole('MEMBER', 'STAFF', 'ADMIN')")
     public ResponseEntity<ApiResponse<TheaterWithRoomsResponse>> getTheaterById(
             @PathVariable UUID theaterId
     ) {
@@ -58,9 +53,8 @@ public class TheaterController {
         ));
     }
 
-    @Operation(summary = "Get all rooms in a theater - Available for all authenticated users (MEMBER, STAFF, ADMIN)")
+    @Operation(summary = "Get all rooms in a theater")
     @GetMapping("/{theaterId}/rooms")
-    @PreAuthorize("hasAnyRole('MEMBER', 'STAFF', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<CinemaRoomResponse>>> getRoomsByTheater(
             @PathVariable UUID theaterId
     ) {
@@ -70,9 +64,8 @@ public class TheaterController {
         ));
     }
 
-    @Operation(summary = "Get theaters showing a specific movie - Available for all authenticated users (MEMBER, STAFF, ADMIN)")
+    @Operation(summary = "Get theaters showing a specific movie")
     @GetMapping("/movie/{movieId}")
-    @PreAuthorize("hasAnyRole('MEMBER', 'STAFF', 'ADMIN')")
     public ResponseEntity<ApiResponse<List<TheaterMovieResponse>>> getTheatersByMovie(
             @PathVariable UUID movieId
     ) {
