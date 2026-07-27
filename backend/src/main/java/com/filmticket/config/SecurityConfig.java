@@ -65,6 +65,7 @@ public class SecurityConfig {
                         "/swagger-ui.html",
                         "/v3/api-docs/**"
                 ).permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/theaters/**").permitAll()
                 // Public community reads must stay available to guests. Put the
                 // authenticated community routes before the broader movie rule,
                 // otherwise /reviews/me is accidentally treated as public.
@@ -79,7 +80,6 @@ public class SecurityConfig {
                     .hasAnyRole("MEMBER", "STAFF", "ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/movies/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/favorite-lists/public/**").permitAll()
-                .requestMatchers("/api/theaters/**").hasAnyRole("MEMBER", "STAFF", "ADMIN")
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .requestMatchers("/api/staff/**").hasAnyRole("STAFF", "ADMIN")
                 .requestMatchers("/api/member/**").hasAnyRole("MEMBER", "STAFF", "ADMIN")

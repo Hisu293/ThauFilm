@@ -175,6 +175,7 @@ public class TheaterService {
         return CinemaRoomResponse.builder()
                 .id(room.getId())
                 .name(room.getName())
+                .type(room.getType())
                 .capacity(room.getCapacity())
                 .status(room.getStatus())
                 .theaterId(room.getTheaterId())
