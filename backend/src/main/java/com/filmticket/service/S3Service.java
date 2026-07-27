@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 import software.amazon.awssdk.core.sync.RequestBody;
+import software.amazon.awssdk.core.exception.SdkClientException;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
@@ -23,6 +24,7 @@ public class S3Service {
     private static final long MAX_VIDEO_SIZE = 200L * 1024 * 1024;
     private static final Set<String> ALLOWED_FOLDERS = Set.of("images", "posters", "trailers");
     private static final Set<String> IMAGE_EXTENSIONS = Set.of("jpg", "jpeg", "png", "webp");
+    private static final Set<String> VIDEO_EXTENSIONS = Set.of("mp4", "mov");
 
     private final S3Client s3Client;
     private final String bucket;
@@ -65,6 +67,8 @@ public class S3Service {
             throw new BadRequestException("Không thể đọc file upload");
         } catch (S3Exception exception) {
             throw new BadRequestException("Không thể upload file lên Amazon S3");
+        } catch (SdkClientException exception) {
+            throw new BadRequestException("Không thể kết nối Amazon S3. Kiểm tra bucket, region và AWS credentials trên Railway");
         }
     }
 
@@ -75,11 +79,11 @@ public class S3Service {
 
         String originalName = file.getOriginalFilename() == null ? "file" : file.getOriginalFilename();
         String extension = extensionOf(originalName);
-        if (!IMAGE_EXTENSIONS.contains(extension) && !"mp4".equals(extension)) {
-            throw new BadRequestException("Chỉ hỗ trợ file JPG, JPEG, PNG, WebP hoặc MP4");
+        if (!IMAGE_EXTENSIONS.contains(extension) && !VIDEO_EXTENSIONS.contains(extension)) {
+            throw new BadRequestException("Chỉ hỗ trợ file JPG, JPEG, PNG, WebP, MP4 hoặc MOV");
         }
 
-        boolean video = "mp4".equals(extension);
+        boolean video = VIDEO_EXTENSIONS.contains(extension);
         long maxSize = video ? MAX_VIDEO_SIZE : MAX_IMAGE_SIZE;
         if (file.getSize() > maxSize) {
             throw new BadRequestException(video
@@ -94,7 +98,7 @@ public class S3Service {
     private String resolveFolder(String requestedFolder, String extension) {
         String folder = normalize(requestedFolder);
         if (folder == null) {
-            return "mp4".equals(extension) ? "trailers" : "images";
+            return videoExtension(extension) ? "trailers" : "images";
         }
         if (!ALLOWED_FOLDERS.contains(folder)) {
             throw new BadRequestException("Folder upload không hợp lệ");
@@ -121,8 +125,13 @@ public class S3Service {
             case "png" -> "image/png";
             case "webp" -> "image/webp";
             case "mp4" -> "video/mp4";
+            case "mov" -> "video/quicktime";
             default -> "application/octet-stream";
         };
+    }
+
+    private boolean videoExtension(String extension) {
+        return VIDEO_EXTENSIONS.contains(extension);
     }
 
     private String extensionOf(String fileName) {

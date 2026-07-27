@@ -4,7 +4,7 @@ import CloudUploadRoundedIcon from '@mui/icons-material/CloudUploadRounded';
 import uploadFile from '../services/fileUploadService';
 
 const IMAGE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'webp'];
-const VIDEO_EXTENSIONS = ['mp4'];
+const VIDEO_EXTENSIONS = ['mp4', 'mov'];
 const IMAGE_MAX_SIZE = 5 * 1024 * 1024;
 const VIDEO_MAX_SIZE = 200 * 1024 * 1024;
 
@@ -46,7 +46,7 @@ export default function UploadFile({
     const isVideo = VIDEO_EXTENSIONS.includes(extension);
     const maxSize = isVideo ? VIDEO_MAX_SIZE : IMAGE_MAX_SIZE;
     if ((!isImage && !isVideo) || file.size > maxSize) {
-      setError(isVideo ? 'Video phải là MP4 và không vượt quá 200MB.' : 'Ảnh phải là JPG, PNG hoặc WebP và không vượt quá 5MB.');
+      setError(isVideo ? 'Video phải là MP4 hoặc MOV và không vượt quá 200MB.' : 'Ảnh phải là JPG, PNG hoặc WebP và không vượt quá 5MB.');
       return;
     }
     if (folder === 'posters' && !isImage) {
@@ -54,7 +54,7 @@ export default function UploadFile({
       return;
     }
     if (folder === 'trailers' && !isVideo) {
-      setError('Trailer chỉ được phép là file MP4.');
+      setError('Trailer chỉ được phép là file MP4 hoặc MOV.');
       return;
     }
 

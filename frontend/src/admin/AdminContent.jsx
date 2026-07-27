@@ -17,7 +17,7 @@ const AdminContent = ({ view, store }) => {
     case ADMIN_VIEWS.DASHBOARD:
       return <DashboardSection dashboard={dashboard} users={crud.users} />;
     case ADMIN_VIEWS.MOVIES:
-      return <MoviesSection crud={crud.movies} />;
+      return <MoviesSection crud={crud.movies} genres={crud.genres.list} />;
     case ADMIN_VIEWS.GENRES:
       return <GenresSection crud={crud.genres} />;
     case ADMIN_VIEWS.ACTORS:

@@ -8,6 +8,7 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  Divider,
   FormControlLabel,
   IconButton,
   InputAdornment,
@@ -61,7 +62,7 @@ const MOVIE_STATUSES = [
   { value: 'STOPPED', label: 'Ngừng chiếu' },
 ];
 
-export const MoviesSection = ({ crud }) => {
+export const MoviesSection = ({ crud, genres = [] }) => {
   const [dialog, setDialog] = useState(null);
   const [form, setForm] = useState(emptyMovie);
   const [saving, setSaving] = useState(false);
@@ -74,10 +75,11 @@ export const MoviesSection = ({ crud }) => {
   const [statusFilter, setStatusFilter] = useState('');
   const [activeFilter, setActiveFilter] = useState(''); // '' | 'active' | 'hidden'
 
-  const genreOptions = useMemo(
-    () => [...new Set(crud.list.map((m) => m.genre).filter(Boolean))].sort(),
-    [crud.list]
-  );
+  const genreOptions = useMemo(() => {
+    const configured = genres.map((genre) => genre.name).filter(Boolean);
+    const existing = crud.list.map((movie) => movie.genre).filter(Boolean);
+    return [...new Set([...configured, ...existing])].sort();
+  }, [crud.list, genres]);
 
   const filtered = useMemo(
     () =>
@@ -300,39 +302,35 @@ export const MoviesSection = ({ crud }) => {
         saving={saving}
       >
         {formError && <Alert severity="error" sx={{ mb: 1 }}>{formError}</Alert>}
-        <TextField label="Tên phim" fullWidth value={form.title} onChange={set('title')} />
-        <TextField label="Mô tả" fullWidth multiline minRows={2} value={form.description} onChange={set('description')} />
-        <Stack direction="row" spacing={2}>
-          <TextField label="Thể loại" value={form.genre} onChange={set('genre')} sx={{ flex: 1 }} />
-          <TextField label="Đạo diễn" value={form.director} onChange={set('director')} sx={{ flex: 1 }} />
-        </Stack>
-        <TextField label="Diễn viên" fullWidth value={form.actors} onChange={set('actors')} />
-        <Stack direction="row" spacing={2}>
-          <TextField label="Thời lượng (phút)" type="number" value={form.durationMinutes} onChange={set('durationMinutes')} sx={{ flex: 1 }} />
-          <TextField label="Đánh giá (0-10)" type="number" inputProps={{ min: 0, max: 10 }} value={form.rating} onChange={set('rating')} sx={{ flex: 1 }} />
-        </Stack>
-        <Stack direction="row" spacing={2}>
-          <TextField label="Ngôn ngữ" value={form.language} onChange={set('language')} sx={{ flex: 1 }} />
-          <TextField label="Phân loại (rated)" value={form.rated} onChange={set('rated')} sx={{ flex: 1 }} placeholder="VD: PG-13" />
-        </Stack>
-        <Stack direction="row" spacing={2}>
-          <TextField
-            label="Ngày phát hành"
-            type="date"
-            value={form.releaseDate || ''}
-            onChange={set('releaseDate')}
-           
-            sx={{ flex: 1 }}
-            InputLabelProps={{ shrink: true }}
-          />
-          <TextField select label="Trạng thái" value={form.status} onChange={set('status')} sx={{ flex: 1 }}>
-            {MOVIE_STATUSES.map((s) => (
-              <MenuItem key={s.value} value={s.value}>
-                {s.label}
-              </MenuItem>
-            ))}
-          </TextField>
-        </Stack>
+        <Box sx={{ p: 2, borderRadius: 2.5, bgcolor: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <Typography variant="subtitle1" fontWeight={800} sx={{ mb: 1.5 }}>Thông tin cơ bản</Typography>
+          <Stack spacing={2}>
+            <TextField label="Tên phim" fullWidth value={form.title} onChange={set('title')} />
+            <TextField label="Mô tả" fullWidth multiline minRows={3} value={form.description} onChange={set('description')} />
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
+              <TextField select label="Thể loại" value={form.genre} onChange={set('genre')}>
+                <MenuItem value="">Chọn thể loại</MenuItem>
+                {genreOptions.map((genre) => <MenuItem key={genre} value={genre}>{genre}</MenuItem>)}
+              </TextField>
+              <TextField label="Đạo diễn" value={form.director} onChange={set('director')} />
+            </Box>
+            <TextField label="Diễn viên" fullWidth value={form.actors} onChange={set('actors')} />
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
+              <TextField label="Thời lượng (phút)" type="number" value={form.durationMinutes} onChange={set('durationMinutes')} />
+              <TextField label="Đánh giá (0-10)" type="number" inputProps={{ min: 0, max: 10 }} value={form.rating} onChange={set('rating')} />
+              <TextField label="Ngôn ngữ" value={form.language} onChange={set('language')} />
+              <TextField label="Phân loại (rated)" value={form.rated} onChange={set('rated')} placeholder="VD: PG-13" />
+              <TextField label="Ngày phát hành" type="date" value={form.releaseDate || ''} onChange={set('releaseDate')} InputLabelProps={{ shrink: true }} />
+              <TextField select label="Trạng thái" value={form.status} onChange={set('status')}>
+                {MOVIE_STATUSES.map((s) => <MenuItem key={s.value} value={s.value}>{s.label}</MenuItem>)}
+              </TextField>
+            </Box>
+          </Stack>
+        </Box>
+        <Divider />
+        <Box sx={{ p: 2, borderRadius: 2.5, bgcolor: 'rgba(229,9,20,0.05)', border: '1px solid rgba(229,9,20,0.18)' }}>
+          <Typography variant="subtitle1" fontWeight={800} sx={{ mb: 1.5 }}>Ảnh và trailer</Typography>
+          <Stack spacing={2}>
         <UploadFile
           label="Chọn poster để upload lên S3"
           folder="posters"
@@ -341,12 +339,18 @@ export const MoviesSection = ({ crud }) => {
           onChange={(fileUrl) => setForm((current) => ({ ...current, posterUrl: fileUrl }))}
         />
         <UploadFile
-          label="Chọn trailer MP4 để upload lên S3"
+          label="Chọn trailer MP4/MOV để upload lên S3"
           folder="trailers"
           value={form.trailerUrl || ''}
-          accept="video/mp4"
+          accept="video/mp4,video/quicktime,.mp4,.mov"
           onChange={(fileUrl) => setForm((current) => ({ ...current, trailerUrl: fileUrl }))}
         />
+          </Stack>
+        </Box>
+        <Divider />
+        <Box sx={{ p: 2, borderRadius: 2.5, bgcolor: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.08)' }}>
+          <Typography variant="subtitle1" fontWeight={800} sx={{ mb: 1.5 }}>Phim online</Typography>
+          <Stack spacing={2}>
         <Stack direction="row" spacing={2}>
           <TextField label="Stream provider" value={form.streamProvider || 'S3'} onChange={set('streamProvider')} sx={{ flex: 1 }} />
           <TextField
@@ -369,6 +373,8 @@ export const MoviesSection = ({ crud }) => {
         <Typography variant="caption" color="text.secondary">
           File sẽ được upload trực tiếp lên S3 sau khi lưu phim. Khuyến nghị MP4/WebM, tối đa 500MB.
         </Typography>
+          </Stack>
+        </Box>
         <FormControlLabel
           control={<Switch checked={!!form.active} onChange={(e) => setForm((f) => ({ ...f, active: e.target.checked }))} />}
           label="Kích hoạt (active)"
@@ -529,7 +535,7 @@ export const TrailersSection = ({ crud, movies }) => {
 };
 
 const EntityDialog = ({ open, title, onClose, onSave, saving, children }) => (
-  <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+  <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
     <DialogTitle sx={{ fontWeight: 700 }}>{title}</DialogTitle>
     <DialogContent>
       <Stack spacing={2.5} sx={{ mt: 1 }}>{children}</Stack>

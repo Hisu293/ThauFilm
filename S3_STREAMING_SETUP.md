@@ -32,7 +32,7 @@ Content-Type: multipart/form-data
 field: file
 ```
 
-Allowed folders are `images`, `posters`, and `trailers`. The backend generates a UUID object name and returns `fileName`, `fileUrl`, `contentType`, and `fileSize`. Images are limited to 5MB and MP4 files to 200MB.
+Allowed folders are `images`, `posters`, and `trailers`. The backend generates a UUID object name and returns `fileName`, `fileUrl`, `contentType`, and `fileSize`. Supported videos are MP4 and MOV; images are limited to 5MB and videos to 200MB.
 
 Set these variables for the shared uploader:
 
