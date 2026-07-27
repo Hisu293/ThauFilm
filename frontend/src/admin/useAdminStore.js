@@ -197,7 +197,6 @@ export function useAdminStore() {
         const created = await adminMovieService.create(row);
         const uploaded = {};
         if (row.streamFile) uploaded.streamKey = await adminMovieService.uploadStream(created.id, row.streamFile);
-        if (row.trailerFile) uploaded.trailerUrl = await adminMovieService.uploadTrailer(created.id, row.trailerFile);
         if (Object.keys(uploaded).length > 0) {
           await adminMovieService.update(created.id, { ...row, ...uploaded, streamProvider: uploaded.streamKey ? 'S3' : row.streamProvider });
         }
@@ -208,7 +207,6 @@ export function useAdminStore() {
         await adminMovieService.update(id, row);
         const uploaded = {};
         if (row.streamFile) uploaded.streamKey = await adminMovieService.uploadStream(id, row.streamFile);
-        if (row.trailerFile) uploaded.trailerUrl = await adminMovieService.uploadTrailer(id, row.trailerFile);
         if (Object.keys(uploaded).length > 0) {
           await adminMovieService.update(id, { ...row, ...uploaded, streamProvider: uploaded.streamKey ? 'S3' : row.streamProvider });
         }

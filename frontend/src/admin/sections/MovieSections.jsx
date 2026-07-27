@@ -32,6 +32,7 @@ import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
 import FilterAltOffRoundedIcon from '@mui/icons-material/FilterAltOffRounded';
 import SectionHeader from '../components/SectionHeader';
 import StatusChip from '../components/StatusChip';
+import UploadFile from '../../components/UploadFile';
 
 const emptyMovie = {
   title: '',
@@ -110,17 +111,6 @@ export const MoviesSection = ({ crud }) => {
     }
     setFormError(null);
     setForm((current) => ({ ...current, streamFile: file }));
-  };
-
-  const selectTrailerFile = (event) => {
-    const file = event.target.files?.[0] || null;
-    if (file && (!file.type.startsWith('video/') || file.size > 500 * 1024 * 1024)) {
-      setFormError('Chỉ nhận file trailer video tối đa 500MB.');
-      event.target.value = '';
-      return;
-    }
-    setFormError(null);
-    setForm((current) => ({ ...current, trailerFile: file }));
   };
 
   const openAdd = () => {
@@ -343,22 +333,20 @@ export const MoviesSection = ({ crud }) => {
             ))}
           </TextField>
         </Stack>
-        <TextField label="Poster URL" fullWidth value={form.posterUrl} onChange={set('posterUrl')} />
-        <TextField
-          label="Trailer URL hoặc S3 object key"
-          fullWidth
-          value={form.trailerUrl || ''}
-          onChange={set('trailerUrl')}
-          placeholder="https://youtube.com/... hoặc trailer/example.mp4"
-          helperText="Nếu bucket S3 private, nhập object key như trailer/example.mp4; backend sẽ tự tạo presigned URL."
+        <UploadFile
+          label="Chọn poster để upload lên S3"
+          folder="posters"
+          value={form.posterUrl || ''}
+          accept="image/jpeg,image/png,image/webp"
+          onChange={(fileUrl) => setForm((current) => ({ ...current, posterUrl: fileUrl }))}
         />
-        <Button variant="outlined" component="label" startIcon={<CloudUploadRoundedIcon />} sx={{ justifyContent: 'flex-start' }}>
-          {form.trailerFile ? `Đã chọn trailer: ${form.trailerFile.name}` : 'Chọn file trailer để upload lên S3'}
-          <input hidden type="file" accept="video/mp4,video/webm,video/*" onChange={selectTrailerFile} />
-        </Button>
-        <Typography variant="caption" color="text.secondary">
-          Trailer sẽ được upload trực tiếp lên S3 sau khi lưu phim, tối đa 500MB.
-        </Typography>
+        <UploadFile
+          label="Chọn trailer MP4 để upload lên S3"
+          folder="trailers"
+          value={form.trailerUrl || ''}
+          accept="video/mp4"
+          onChange={(fileUrl) => setForm((current) => ({ ...current, trailerUrl: fileUrl }))}
+        />
         <Stack direction="row" spacing={2}>
           <TextField label="Stream provider" value={form.streamProvider || 'S3'} onChange={set('streamProvider')} sx={{ flex: 1 }} />
           <TextField

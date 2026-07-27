@@ -22,6 +22,30 @@ S3 object key: movies/the-flash/the-flash.mp4
 
 If `streamKey` is a full `https://...` URL, backend returns it directly. If it is an S3 object key, backend signs a temporary private URL.
 
+## 1.1 Shared file upload API
+
+Authenticated staff/admin clients can upload an image or MP4 with:
+
+```text
+POST /api/files/upload?folder=posters
+Content-Type: multipart/form-data
+field: file
+```
+
+Allowed folders are `images`, `posters`, and `trailers`. The backend generates a UUID object name and returns `fileName`, `fileUrl`, `contentType`, and `fileSize`. Images are limited to 5MB and MP4 files to 200MB.
+
+Set these variables for the shared uploader:
+
+```env
+FILE_UPLOAD_S3_BUCKET=your-bucket-name
+FILE_UPLOAD_S3_REGION=ap-southeast-1
+FILE_UPLOAD_S3_ACCESS_KEY=your-iam-access-key
+FILE_UPLOAD_S3_SECRET_KEY=your-iam-secret-key
+FILE_UPLOAD_S3_PUBLIC_BASE_URL=https://your-public-cdn-or-s3-base-url
+```
+
+The returned URL is public only when the bucket policy/CDN allows `s3:GetObject` for the generated folders. Never expose the access or secret key to the frontend.
+
 ## 2. Backend Environment
 
 Set these variables for the backend:

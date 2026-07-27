@@ -142,32 +142,6 @@ public class AdminController {
         )));
     }
 
-    @Operation(summary = "Create a presigned S3 upload URL for a movie trailer")
-    @GetMapping("/movies/{movieId}/trailer-upload-url")
-    public ResponseEntity<ApiResponse<Map<String, String>>> createTrailerUploadUrl(
-            @PathVariable UUID movieId,
-            @RequestParam String fileName,
-            @RequestParam(defaultValue = "video/mp4") String contentType
-    ) {
-        movieService.getMovieEntityOrThrow(movieId);
-        if (!s3PresignedUrlService.hasS3Credentials()) {
-            throw new BadRequestException("S3 is not configured");
-        }
-        if (contentType == null || !contentType.toLowerCase().startsWith("video/")) {
-            throw new BadRequestException("Only video files are supported");
-        }
-
-        String safeName = fileName == null ? "trailer.mp4" : fileName.replaceAll("[^a-zA-Z0-9._-]", "-");
-        String objectKey = "trailers/" + movieId + "/" + UUID.randomUUID() + "-" + safeName;
-        String uploadUrl = s3PresignedUrlService.presignPutUrl(objectKey, 900);
-
-        return ResponseEntity.ok(ApiResponse.success("S3 trailer upload URL created", Map.of(
-                "uploadUrl", uploadUrl,
-                "trailerKey", objectKey,
-                "contentType", contentType
-        )));
-    }
-
     @Operation(summary = "Update a movie")
     @PutMapping("/movies/{movieId}")
     public ResponseEntity<ApiResponse<MovieResponse>> updateMovie(

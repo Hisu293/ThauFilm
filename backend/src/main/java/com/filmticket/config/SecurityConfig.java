@@ -81,6 +81,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/movies/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/favorite-lists/public/**").permitAll()
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                .requestMatchers("/api/files/**").hasAnyRole("STAFF", "ADMIN")
                 .requestMatchers("/api/staff/**").hasAnyRole("STAFF", "ADMIN")
                 .requestMatchers("/api/member/**").hasAnyRole("MEMBER", "STAFF", "ADMIN")
                 .requestMatchers("/api/users/**").hasAnyRole("MEMBER", "STAFF", "ADMIN")
