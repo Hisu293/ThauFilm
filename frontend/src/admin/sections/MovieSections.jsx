@@ -76,9 +76,15 @@ export const MoviesSection = ({ crud, genres = [] }) => {
   const [activeFilter, setActiveFilter] = useState(''); // '' | 'active' | 'hidden'
 
   const genreOptions = useMemo(() => {
-    const configured = genres.map((genre) => genre.name).filter(Boolean);
-    const existing = crud.list.map((movie) => movie.genre).filter(Boolean);
-    return [...new Set([...configured, ...existing])].sort();
+    const configured = genres
+      .filter((genre) => genre.name || genre.slug)
+      .map((genre) => ({ value: genre.slug || genre.name, label: genre.slug ? `${genre.name} (${genre.slug})` : genre.name }));
+    const knownValues = new Set(configured.map((genre) => genre.value));
+    const existing = crud.list
+      .map((movie) => movie.genre)
+      .filter((genre) => genre && !knownValues.has(genre))
+      .map((genre) => ({ value: genre, label: genre }));
+    return [...configured, ...existing];
   }, [crud.list, genres]);
 
   const filtered = useMemo(
@@ -196,9 +202,9 @@ export const MoviesSection = ({ crud, genres = [] }) => {
         />
         <TextField select size="small" label="Thể loại" value={genreFilter} onChange={(e) => setGenreFilter(e.target.value)} sx={{ minWidth: 150 }}>
           <MenuItem value="">Tất cả thể loại</MenuItem>
-          {genreOptions.map((g) => (
-            <MenuItem key={g} value={g}>
-              {g}
+          {genreOptions.map((genre) => (
+            <MenuItem key={genre.value} value={genre.value}>
+              {genre.label}
             </MenuItem>
           ))}
         </TextField>
@@ -310,7 +316,7 @@ export const MoviesSection = ({ crud, genres = [] }) => {
             <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2 }}>
               <TextField select label="Thể loại" value={form.genre} onChange={set('genre')}>
                 <MenuItem value="">Chọn thể loại</MenuItem>
-                {genreOptions.map((genre) => <MenuItem key={genre} value={genre}>{genre}</MenuItem>)}
+                {genreOptions.map((genre) => <MenuItem key={genre.value} value={genre.value}>{genre.label}</MenuItem>)}
               </TextField>
               <TextField label="Đạo diễn" value={form.director} onChange={set('director')} />
             </Box>

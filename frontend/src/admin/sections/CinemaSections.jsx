@@ -30,6 +30,7 @@ import MeetingRoomRoundedIcon from '@mui/icons-material/MeetingRoomRounded';
 import AutoAwesomeRoundedIcon from '@mui/icons-material/AutoAwesomeRounded';
 import SectionHeader from '../components/SectionHeader';
 import StatusChip from '../components/StatusChip';
+import UploadFile from '../../components/UploadFile';
 import { fromUTCToLocal } from '../../services/adminShowtimeService';
 import { t } from '../../i18n/labels';
 import {
@@ -51,6 +52,7 @@ const sortByLatest = (items = []) =>
     return (Number.isFinite(bTime) ? bTime : 0) - (Number.isFinite(aTime) ? aTime : 0);
   });
 const getPagedRows = (rows, page) => rows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+const emptyTheater = { name: '', address: '', city: '', phoneNumber: '', imageUrl: '', status: 'ACTIVE' };
 const PaginationBar = ({ total, page, onPageChange }) => {
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   return (
@@ -66,7 +68,7 @@ const PaginationBar = ({ total, page, onPageChange }) => {
 
 export const TheatersSection = ({ crud }) => {
   const [dialog, setDialog] = useState(null);
-  const [form, setForm] = useState({ name: '', address: '', city: '', phoneNumber: '', status: 'ACTIVE' });
+  const [form, setForm] = useState(emptyTheater);
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
 
@@ -79,7 +81,7 @@ export const TheatersSection = ({ crud }) => {
       if (dialog === 'add') await crud.add(form);
       else await crud.update(dialog, form);
       setDialog(null);
-      setForm({ name: '', address: '', city: '', phoneNumber: '', status: 'ACTIVE' });
+      setForm(emptyTheater);
     } catch (err) {
       console.error('Lỗi khi lưu rạp:', err);
     }
@@ -97,7 +99,7 @@ export const TheatersSection = ({ crud }) => {
   if (crud.error) {
     return (
       <>
-        <SectionHeader title="Quản lý rạp" subtitle="Thêm · Sửa · Xóa rạp chiếu" onAction={() => { setForm({ name: '', address: '', city: '', phoneNumber: '', status: 'ACTIVE' }); setDialog('add'); }} actionLabel="Thêm rạp" />
+        <SectionHeader title="Quản lý rạp" subtitle="Thêm · Sửa · Xóa rạp chiếu" onAction={() => { setForm(emptyTheater); setDialog('add'); }} actionLabel="Thêm rạp" />
         <Box sx={{ textAlign: 'center', py: 4, color: 'error.main' }}>
           {crud.error}
           <Button size="small" onClick={crud.reload} sx={{ ml: 2 }}>
@@ -121,7 +123,7 @@ export const TheatersSection = ({ crud }) => {
 
   return (
     <>
-      <SectionHeader title="Quản lý rạp" subtitle="Thêm · Sửa · Xóa rạp chiếu" onAction={() => { setForm({ name: '', address: '', city: '', phoneNumber: '', status: 'ACTIVE' }); setDialog('add'); }} actionLabel="Thêm rạp" />
+      <SectionHeader title="Quản lý rạp" subtitle="Thêm · Sửa · Xóa rạp chiếu" onAction={() => { setForm(emptyTheater); setDialog('add'); }} actionLabel="Thêm rạp" />
 
       <Box className="admin-panel admin-animate-in" sx={{ p: 2, mb: 2, display: 'flex', flexWrap: 'wrap', gap: 1.5, alignItems: 'center' }}>
         <TextField
@@ -171,7 +173,10 @@ export const TheatersSection = ({ crud }) => {
                 {pagedTheaters.map((theater) => (
                   <TableRow key={theater.id} className="admin-table-row">
                     <TableCell>
-                      <Typography fontWeight={600}>{theater.name}</Typography>
+                      <Stack direction="row" spacing={1.2} alignItems="center">
+                        {theater.imageUrl ? <Box component="img" src={theater.imageUrl} alt={theater.name} sx={{ width: 42, height: 42, borderRadius: 1.5, objectFit: 'cover' }} /> : null}
+                        <Typography fontWeight={600}>{theater.name}</Typography>
+                      </Stack>
                     </TableCell>
                     <TableCell sx={{ color: 'rgba(255,255,255,0.7)' }}>{theater.address || '—'}</TableCell>
                     <TableCell sx={{ color: 'rgba(255,255,255,0.7)' }}>{theater.city || '—'}</TableCell>
@@ -200,6 +205,13 @@ export const TheatersSection = ({ crud }) => {
         <TextField label="Địa chỉ" fullWidth value={form.address} onChange={(e) => setForm({ ...form, address: e.target.value })} />
         <TextField label="Thành phố" fullWidth value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} />
         <TextField label="Số điện thoại" fullWidth value={form.phoneNumber} onChange={(e) => setForm({ ...form, phoneNumber: e.target.value })} />
+        <UploadFile
+          label="Chọn ảnh rạp để upload lên S3"
+          folder="images"
+          value={form.imageUrl || ''}
+          accept="image/jpeg,image/png,image/webp"
+          onChange={(fileUrl) => setForm((current) => ({ ...current, imageUrl: fileUrl }))}
+        />
         <TextField select label="Trạng thái" fullWidth value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
           {FACILITY_STATUS_OPTIONS.map((opt) => (
             <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>

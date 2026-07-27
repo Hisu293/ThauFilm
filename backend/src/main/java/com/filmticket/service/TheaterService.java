@@ -95,6 +95,7 @@ public class TheaterService {
                 .address(request.getAddress())
                 .city(request.getCity())
                 .phoneNumber(request.getPhoneNumber())
+                .imageUrl(request.getImageUrl())
                 .status(request.getStatus() != null ? request.getStatus() : TheaterStatus.ACTIVE)
                 .build();
 
@@ -109,6 +110,7 @@ public class TheaterService {
         theater.setAddress(request.getAddress());
         theater.setCity(request.getCity());
         theater.setPhoneNumber(request.getPhoneNumber());
+        theater.setImageUrl(request.getImageUrl());
         if (request.getStatus() != null) {
             theater.setStatus(request.getStatus());
         }
@@ -150,6 +152,7 @@ public class TheaterService {
                 .address(theater.getAddress())
                 .city(theater.getCity())
                 .phoneNumber(theater.getPhoneNumber())
+                .imageUrl(theater.getImageUrl())
                 .status(theater.getStatus())
                 .build();
     }
@@ -166,6 +169,7 @@ public class TheaterService {
                 .address(theater.getAddress())
                 .city(theater.getCity())
                 .phoneNumber(theater.getPhoneNumber())
+                .imageUrl(theater.getImageUrl())
                 .status(theater.getStatus())
                 .cinemaRooms(rooms)
                 .build();
@@ -187,6 +191,7 @@ public class TheaterService {
                 .theaterId(theater.getId())
                 .theaterName(theater.getName())
                 .address(theater.getAddress())
+                .imageUrl(theater.getImageUrl())
                 .build();
     }
 }

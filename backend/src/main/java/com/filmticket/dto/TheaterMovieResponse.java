@@ -13,6 +13,7 @@ public class TheaterMovieResponse {
     private UUID theaterId;
     private String theaterName;
     private String address;
+    private String imageUrl;
     private java.util.List<MovieInfo> movies;
 
     @Getter

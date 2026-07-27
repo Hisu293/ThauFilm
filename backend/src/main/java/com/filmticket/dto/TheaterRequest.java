@@ -19,5 +19,7 @@ public class TheaterRequest {
 
     private String phoneNumber;
 
+    private String imageUrl;
+
     private TheaterStatus status;
 }

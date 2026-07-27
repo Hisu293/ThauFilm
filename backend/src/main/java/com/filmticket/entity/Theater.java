@@ -33,6 +33,9 @@ public class Theater {
     @Column(name = "phone_number", length = 20)
     private String phoneNumber;
 
+    @Column(name = "image_url", length = 1000)
+    private String imageUrl;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     @Builder.Default

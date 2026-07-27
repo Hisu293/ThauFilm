@@ -12,6 +12,7 @@ export const THEATER_FIELDS = [
   'address',
   'city',
   'phoneNumber',
+  'imageUrl',
   'status',
 ];
 

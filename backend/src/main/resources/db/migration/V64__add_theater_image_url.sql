@@ -1,0 +1,2 @@
+ALTER TABLE theaters
+    ADD COLUMN IF NOT EXISTS image_url VARCHAR(1000);

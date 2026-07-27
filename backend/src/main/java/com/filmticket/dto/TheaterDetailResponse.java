@@ -17,6 +17,7 @@ public class TheaterDetailResponse {
     private String address;
     private String city;
     private String phoneNumber;
+    private String imageUrl;
     private TheaterStatus status;
 
     public static TheaterDetailResponse fromTheater(Theater theater) {
@@ -26,6 +27,7 @@ public class TheaterDetailResponse {
                 .address(theater.getAddress())
                 .city(theater.getCity())
                 .phoneNumber(theater.getPhoneNumber())
+                .imageUrl(theater.getImageUrl())
                 .status(theater.getStatus())
                 .build();
     }
