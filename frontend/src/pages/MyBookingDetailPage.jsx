@@ -82,6 +82,10 @@ const MyBookingDetailPage = () => {
   const [dataLoading, setDataLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [refundOpen, setRefundOpen] = useState(false);
+  const [autoRefundOpen, setAutoRefundOpen] = useState(false);
+  const [refundBankBin, setRefundBankBin] = useState('');
+  const [refundAccountNumber, setRefundAccountNumber] = useState('');
+  const [autoRefundReason, setAutoRefundReason] = useState('Khách hàng hủy vé');
   const [refundReason, setRefundReason] = useState('');
   const [refundTicketCode, setRefundTicketCode] = useState('');
   const [refundRequest, setRefundRequest] = useState(null);
@@ -181,6 +185,23 @@ const MyBookingDetailPage = () => {
     } catch (err) {
       clearError();
       setSnackbar(err?.message || 'Không thể gửi yêu cầu hoàn tiền.');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleAutomaticRefund = async () => {
+    setActionLoading(true);
+    try {
+      const response = await bookingApi.refundBookingAutomatically(
+        bookingId, refundBankBin.trim(), refundAccountNumber.trim(), autoRefundReason.trim(),
+      );
+      const result = response?.data?.data ?? response?.data;
+      setAutoRefundOpen(false);
+      setBooking((current) => current ? { ...current, status: result?.status === 'REFUNDED' ? 'CANCELLED' : current.status } : current);
+      setSnackbar(result?.message || 'Đã tiếp nhận yêu cầu hoàn tiền tự động.');
+    } catch (err) {
+      setSnackbar(err?.message || 'Không thể hoàn tiền tự động.');
     } finally {
       setActionLoading(false);
     }
@@ -332,9 +353,14 @@ const MyBookingDetailPage = () => {
               </Button>
             )}
             {booking.status === 'CONFIRMED' && !refundRequest && (
-              <Button color="warning" variant="outlined" onClick={() => setRefundOpen(true)}>
-                Yêu cầu hoàn tiền
-              </Button>
+              <>
+                <Button color="success" variant="contained" onClick={() => setAutoRefundOpen(true)}>
+                  Hoàn tiền tự động
+                </Button>
+                <Button color="warning" variant="outlined" onClick={() => setRefundOpen(true)}>
+                  Yêu cầu hoàn tiền thủ công
+                </Button>
+              </>
             )}
             {canCancelBooking(booking.status) && (
               <>
@@ -372,6 +398,24 @@ const MyBookingDetailPage = () => {
         <DialogActions>
           <Button onClick={() => setRefundOpen(false)}>Hủy</Button>
           <Button variant="contained" onClick={handleRefundRequest} disabled={actionLoading || refundReason.trim().length < 10 || !refundTicketCode}>Gửi yêu cầu</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={autoRefundOpen} onClose={() => !actionLoading && setAutoRefundOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle>Hoàn tiền tự động qua PayOS</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ pt: 1 }}>
+            <Alert severity="info">PayOS sẽ chuyển tiền vào tài khoản ngân hàng bạn nhập. Chỉ khi PayOS báo thành công hệ thống mới giải phóng ghế và hủy vé.</Alert>
+            <TextField label="Mã BIN ngân hàng" value={refundBankBin} onChange={(event) => setRefundBankBin(event.target.value.replace(/\D/g, '').slice(0, 10))} helperText="Ví dụ: 970422" inputProps={{ inputMode: 'numeric' }} />
+            <TextField label="Số tài khoản nhận tiền" value={refundAccountNumber} onChange={(event) => setRefundAccountNumber(event.target.value.replace(/\D/g, '').slice(0, 20))} inputProps={{ inputMode: 'numeric' }} />
+            <TextField multiline minRows={2} label="Lý do hoàn tiền" value={autoRefundReason} onChange={(event) => setAutoRefundReason(event.target.value)} />
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setAutoRefundOpen(false)}>Hủy</Button>
+          <Button variant="contained" color="success" onClick={handleAutomaticRefund} disabled={actionLoading || !/^\d{6,10}$/.test(refundBankBin) || !/^\d{5,20}$/.test(refundAccountNumber)}>
+            Xác nhận hoàn tiền
+          </Button>
         </DialogActions>
       </Dialog>
 

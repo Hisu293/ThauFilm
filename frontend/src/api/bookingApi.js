@@ -128,6 +128,9 @@ export const bookingApi = {
   requestRefund: (bookingId, ticketCode, reason) =>
     axiosClient.post(`/api/member/booking/${bookingId}/refund-requests`, { ticketCode, reason }),
 
+  refundBookingAutomatically: (bookingId, bankBin, accountNumber, reason) =>
+    axiosClient.post(`/api/bookings/${bookingId}/refund`, { bankBin, accountNumber, reason }),
+
   fetchMyRefundRequests: () => axiosClient.get('/api/member/booking/refund-requests/me'),
   fetchRefundMessages: (requestId) => axiosClient.get(`/api/member/booking/refund-requests/${requestId}/messages`),
   sendRefundMessage: (requestId, content) => axiosClient.post(`/api/member/booking/refund-requests/${requestId}/messages`, { content }),
