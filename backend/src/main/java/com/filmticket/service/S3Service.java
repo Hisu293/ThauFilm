@@ -2,6 +2,7 @@ package com.filmticket.service;
 
 import com.filmticket.dto.UploadFileResponse;
 import com.filmticket.exception.BadRequestException;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -13,12 +14,14 @@ import software.amazon.awssdk.services.s3.model.S3Exception;
 
 import java.io.IOException;
 import java.net.URLEncoder;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 
 @Service
+@Slf4j
 public class S3Service {
     private static final long MAX_IMAGE_SIZE = 5L * 1024 * 1024;
     private static final long MAX_VIDEO_SIZE = 200L * 1024 * 1024;
@@ -38,9 +41,9 @@ public class S3Service {
             @Value("${app.file-upload.s3.public-base-url:}") String publicBaseUrl
     ) {
         this.s3Client = s3Client;
-        this.bucket = normalize(bucket);
         this.region = normalize(region);
         this.publicBaseUrl = publicBaseUrl == null || publicBaseUrl.isBlank() ? null : publicBaseUrl.trim();
+        this.bucket = normalize(firstNonBlank(bucket, inferBucketFromPublicBaseUrl(this.publicBaseUrl)));
     }
 
     public UploadFileResponse upload(MultipartFile file, String requestedFolder) {
@@ -66,8 +69,11 @@ public class S3Service {
         } catch (IOException exception) {
             throw new BadRequestException("Không thể đọc file upload");
         } catch (S3Exception exception) {
+            String errorCode = exception.awsErrorDetails() == null ? "unknown" : exception.awsErrorDetails().errorCode();
+            log.error("S3 upload failed: status={}, code={}", exception.statusCode(), errorCode);
             throw new BadRequestException("Không thể upload file lên Amazon S3");
         } catch (SdkClientException exception) {
+            log.error("S3 client configuration/connection failed", exception);
             throw new BadRequestException("Không thể kết nối Amazon S3. Kiểm tra bucket, region và AWS credentials trên Railway");
         }
     }
@@ -156,6 +162,25 @@ public class S3Service {
     private String normalize(String value) {
         if (value == null || value.isBlank()) return null;
         return value.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private String firstNonBlank(String... values) {
+        for (String value : values) {
+            if (value != null && !value.trim().isBlank()) return value.trim();
+        }
+        return null;
+    }
+
+    private String inferBucketFromPublicBaseUrl(String baseUrl) {
+        if (baseUrl == null || baseUrl.isBlank()) return null;
+        try {
+            String host = URI.create(baseUrl).getHost();
+            if (host == null) return null;
+            int s3Marker = host.indexOf(".s3.");
+            return s3Marker > 0 ? host.substring(0, s3Marker) : null;
+        } catch (IllegalArgumentException exception) {
+            return null;
+        }
     }
 
     private record FileInfo(String originalName, String extension, String contentType) {}
