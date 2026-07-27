@@ -26,6 +26,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class WatchPartyService {
     private static final BigDecimal DEFAULT_MOVIE_PRICE = BigDecimal.valueOf(89000);
     private static final int MAX_CHAT_HISTORY = 80;
+    private static final int WATCH_PARTY_GRACE_MINUTES = 5;
 
     private final MovieRepository movieRepository;
     private final UserRepository userRepository;
@@ -210,6 +211,9 @@ public class WatchPartyService {
     private WatchPartyRoom requireRoom(UUID roomId) {
         WatchPartyRoom room = rooms.get(roomId);
         if (room == null) throw new BadRequestException("Watch party not found");
+        if (Instant.now().isAfter(room.expiresAt)) {
+            throw new BadRequestException("Watch party đã hết thời gian xem phim");
+        }
         return room;
     }
 
@@ -251,6 +255,7 @@ public class WatchPartyService {
                 .movieId(room.movie.getId())
                 .movieTitle(room.movie.getTitle())
                 .posterUrl(room.movie.getPosterUrl())
+                .expiresAt(room.expiresAt)
                 .pricePerMember(DEFAULT_MOVIE_PRICE)
                 .readyToWatch(readyToWatch)
                 .currentUserPaid(currentUserPaid)
@@ -308,6 +313,7 @@ public class WatchPartyService {
     private static class WatchPartyRoom {
         private final UUID id;
         private final Movie movie;
+        private final Instant expiresAt;
         private final Map<UUID, WatchPartyMember> members = new LinkedHashMap<>();
         private final List<WatchPartyDto.ChatMessageResponse> messages = new ArrayList<>();
         private PlaybackState playback = new PlaybackState(0, true, Instant.now(), null);
@@ -316,6 +322,8 @@ public class WatchPartyService {
         private WatchPartyRoom(UUID id, Movie movie) {
             this.id = id;
             this.movie = movie;
+            int durationMinutes = movie.getDurationMinutes() == null ? 0 : movie.getDurationMinutes();
+            this.expiresAt = Instant.now().plusSeconds((long) (durationMinutes + WATCH_PARTY_GRACE_MINUTES) * 60);
         }
     }
 

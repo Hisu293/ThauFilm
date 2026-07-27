@@ -69,6 +69,7 @@ public final class WatchPartyDto {
         private UUID movieId;
         private String movieTitle;
         private String posterUrl;
+        private Instant expiresAt;
         private BigDecimal pricePerMember;
         private boolean readyToWatch;
         private boolean currentUserPaid;
