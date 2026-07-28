@@ -1,0 +1,156 @@
+# THAUFILM - COPY SOURCE LÊN EC2 VÀ CHẠY DOCKER
+
+Quy trình deploy chỉ gồm 2 bước:
+
+1. Từ máy local, copy source lên EC2.
+2. SSH vào EC2 và chạy Docker Compose.
+
+Điều kiện:
+
+- EC2 đã cài Docker Engine, Docker Compose và Buildx theo mục 0.
+- Thư mục `/opt/thaufilm` đã tồn tại và thuộc quyền của `ec2-user`.
+- File `/opt/thaufilm/.env` đã được cấu hình sẵn trên EC2.
+- Security Group đã mở port `22` cho SSH và port chạy frontend.
+
+## 0. Cài Docker lần đầu trên EC2
+
+Mục này chỉ chạy một lần trên EC2 Amazon Linux 2023. SSH vào EC2:
+
+```bash
+ssh -o IdentitiesOnly=yes -i ./lanhkv.pem \
+  ec2-user@ec2-54-255-134-80.ap-southeast-1.compute.amazonaws.com
+```
+
+Cài và khởi động Docker Engine:
+
+```bash
+sudo dnf update -y
+sudo dnf install -y docker
+
+sudo systemctl enable --now docker
+sudo usermod -aG docker ec2-user
+```
+
+Amazon Linux thường đã có `curl-minimal`. Nếu chưa có lệnh `curl`, cài bằng:
+
+```bash
+command -v curl || sudo dnf install -y curl-minimal
+```
+
+Cài Docker Compose và Buildx tương thích:
+
+```bash
+case "$(uname -m)" in
+  x86_64)
+    COMPOSE_ARCH="x86_64"
+    BUILDX_ARCH="amd64"
+    ;;
+  aarch64|arm64)
+    COMPOSE_ARCH="aarch64"
+    BUILDX_ARCH="arm64"
+    ;;
+  *)
+    echo "Kiến trúc không được hỗ trợ: $(uname -m)"
+    exit 1
+    ;;
+esac
+
+COMPOSE_VERSION="v5.3.1"
+BUILDX_VERSION="v0.34.1"
+
+sudo install -d -m 0755 /usr/local/lib/docker/cli-plugins
+
+sudo curl -fL \
+  "https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-linux-${COMPOSE_ARCH}" \
+  -o /usr/local/lib/docker/cli-plugins/docker-compose
+
+sudo curl -fL \
+  "https://github.com/docker/buildx/releases/download/${BUILDX_VERSION}/buildx-${BUILDX_VERSION}.linux-${BUILDX_ARCH}" \
+  -o /usr/local/lib/docker/cli-plugins/docker-buildx
+
+sudo chmod 0755 \
+  /usr/local/lib/docker/cli-plugins/docker-compose \
+  /usr/local/lib/docker/cli-plugins/docker-buildx
+```
+
+Thoát khỏi EC2 rồi SSH lại để quyền thuộc nhóm `docker` có hiệu lực:
+
+```bash
+exit
+```
+
+```bash
+ssh -o IdentitiesOnly=yes -i ./lanhkv.pem \
+  ec2-user@ec2-54-255-134-80.ap-southeast-1.compute.amazonaws.com
+```
+
+Kiểm tra cài đặt:
+
+```bash
+docker --version
+docker compose version
+docker buildx version
+docker info
+```
+
+Tạo thư mục ứng dụng lần đầu:
+
+```bash
+sudo mkdir -p /opt/thaufilm
+sudo chown ec2-user:ec2-user /opt/thaufilm
+```
+
+## 1. Copy source từ máy local lên EC2
+
+Đứng tại thư mục root của project, nơi có `docker-compose.yml`, rồi chạy:
+
+```bash
+chmod 400 ./lanhkv.pem
+
+rsync -az --progress \
+  --exclude='.git/' \
+  --exclude='.env' \
+  --exclude='*.pem' \
+  --exclude='*.key' \
+  --exclude='.DS_Store' \
+  --exclude='backups/' \
+  --exclude='frontend/node_modules/' \
+  --exclude='frontend/dist/' \
+  --exclude='backend/target/' \
+  -e "ssh -o IdentitiesOnly=yes -i ./lanhkv.pem" \
+  ./ ec2-user@ec2-54-255-134-80.ap-southeast-1.compute.amazonaws.com:/opt/thaufilm/
+```
+
+Lệnh trên chỉ đồng bộ source. File `.env`, khóa PEM, dependencies và build
+output không được copy lên EC2.
+
+## 2. SSH vào EC2 và chạy Docker
+
+Từ máy local, truy cập EC2:
+
+```bash
+ssh -o IdentitiesOnly=yes -i ./lanhkv.pem \
+  ec2-user@ec2-54-255-134-80.ap-southeast-1.compute.amazonaws.com
+```
+
+Sau khi đã vào EC2, chạy:
+
+```bash
+cd /opt/thaufilm
+docker compose config --quiet
+docker compose up --build -d
+docker compose ps
+```
+
+Nếu cần xem log:
+
+```bash
+docker compose logs -f backend
+```
+
+Nhấn `Ctrl+C` để thoát phần xem log; các container vẫn tiếp tục chạy.
+
+Mỗi lần cập nhật source, chỉ cần lặp lại bước 1 rồi bước 2.
+
+Không chạy `docker compose down -v` trên EC2 nếu muốn giữ dữ liệu PostgreSQL,
+vì tùy chọn `-v` sẽ xóa Docker volume của database.

@@ -1,5 +1,5 @@
 # Build stage
-FROM maven:3.9-eclipse-temurin-17-alpine AS build
+FROM maven:3.9-eclipse-temurin-17 AS build
 
 WORKDIR /app
 
@@ -12,12 +12,16 @@ COPY src ./src
 RUN mvn clean package -DskipTests -B
 
 # Runtime stage
-FROM eclipse-temurin:17-jre-alpine
+FROM eclipse-temurin:17-jre
 
 WORKDIR /app
 
-# Create non-root user for security
-RUN addgroup -g 1001 app && adduser -u 1001 -G app -s /bin/sh -D app
+# Install the health-check client and create a non-root runtime user.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && groupadd --gid 1001 app \
+    && useradd --uid 1001 --gid app --shell /usr/sbin/nologin --create-home app
 
 # Copy jar from build stage
 COPY --from=build /app/target/*.jar app.jar
@@ -31,6 +35,6 @@ EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:8080/actuator/health || exit 1
+  CMD curl --fail --silent http://localhost:8080/actuator/health >/dev/null || exit 1
 
 ENTRYPOINT ["java", "-XX:+UseContainerSupport", "-XX:MaxRAMPercentage=75.0", "-jar", "app.jar"]

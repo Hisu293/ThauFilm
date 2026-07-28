@@ -1,5 +1,45 @@
 # JAVA_06_TEAM_05
 
+## Chạy toàn bộ project bằng Docker
+
+Yêu cầu: Docker Desktop (hoặc Docker Engine kèm Docker Compose v2).
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+Các địa chỉ mặc định:
+
+- Frontend: http://localhost:5173
+- Backend API: http://localhost:8080
+- Swagger UI: http://localhost:8080/swagger-ui/index.html
+- PostgreSQL: `localhost:5433` (`thaufilm` / `thaufilm`)
+
+Backend tự chạy toàn bộ Flyway migrations và seed dữ liệu khi PostgreSQL sẵn sàng.
+Các tích hợp Google, AI, email, Cloudinary, PayOS và AWS S3 là tùy chọn; điền
+credentials tương ứng trong `.env` nếu cần dùng các chức năng đó.
+
+Tài khoản admin được source hiện tại tự seed cho môi trường demo:
+`admin@gmail.com` / `123456`.
+
+Một số lệnh hữu ích:
+
+```bash
+# Chạy nền
+docker compose up --build -d
+
+# Xem trạng thái và log
+docker compose ps
+docker compose logs -f backend
+
+# Dừng nhưng giữ dữ liệu
+docker compose down
+
+# Dừng và xóa luôn database local
+docker compose down -v
+```
+
 
 
 ## Getting started
