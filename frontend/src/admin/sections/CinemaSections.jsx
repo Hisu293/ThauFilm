@@ -735,7 +735,19 @@ export const ShowtimesSection = ({ crud, movies, theaters, rooms }) => {
       movieId: String(suggestion.movieId),
       cinemaRoomId: String(suggestion.cinemaRoomId),
       startTime: String(suggestion.startTime).slice(0, 16),
+      online: false,
     }));
+  };
+
+  const selectShowtimeMode = (online) => {
+    setForm((current) => ({
+      ...current,
+      online,
+      cinemaRoomId: online ? '' : current.cinemaRoomId,
+    }));
+    setSuggestions([]);
+    setSuggestionsError('');
+    setFormError('');
   };
 
   // Chỉ hiện rạp đang hoạt động (status === 'ACTIVE')
@@ -866,64 +878,92 @@ export const ShowtimesSection = ({ crud, movies, theaters, rooms }) => {
                 </MenuItem>
               ))}
             </TextField>
-            <Button
-              variant="outlined"
-              startIcon={<AutoAwesomeRoundedIcon />}
-              onClick={loadSuggestions}
-              disabled={!form.movieId || suggestionsLoading}
-              sx={{ alignSelf: 'flex-start' }}
-            >
-              {suggestionsLoading ? 'Đang phân tích...' : 'AI gợi ý suất chiếu'}
-            </Button>
-            {suggestionsError && <Alert severity="info">{suggestionsError}</Alert>}
-            {suggestions.length > 0 && (
-              <Stack spacing={1}>
-                {suggestions.map((suggestion, index) => (
-                  <Box key={`${suggestion.cinemaRoomId}-${suggestion.startTime}`} sx={{ p: 1.5, border: '1px solid rgba(99,102,241,.35)', borderRadius: 2, bgcolor: 'rgba(99,102,241,.08)' }}>
-                    <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1}>
-                      <Box>
-                        <Typography fontWeight={700}>
-                          #{index + 1} · {new Date(suggestion.startTime).toLocaleString('vi-VN', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} · {suggestion.roomName}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">{suggestion.reason}</Typography>
-                      </Box>
-                      <Button size="small" variant="contained" onClick={() => applySuggestion(suggestion)}>Áp dụng</Button>
-                    </Stack>
+            <Box>
+              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 700 }}>
+                Hình thức chiếu
+              </Typography>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+                <Button
+                  fullWidth
+                  variant={!form.online ? 'contained' : 'outlined'}
+                  onClick={() => selectShowtimeMode(false)}
+                  sx={{ minHeight: 68, justifyContent: 'flex-start', px: 2, textAlign: 'left' }}
+                >
+                  <Box>
+                    <Typography fontWeight={800}>Tại rạp</Typography>
+                    <Typography variant="caption" sx={{ opacity: 0.75 }}>
+                      Chọn rạp và phòng chiếu
+                    </Typography>
                   </Box>
-                ))}
+                </Button>
+                <Button
+                  fullWidth
+                  variant={form.online ? 'contained' : 'outlined'}
+                  onClick={() => selectShowtimeMode(true)}
+                  sx={{ minHeight: 68, justifyContent: 'flex-start', px: 2, textAlign: 'left' }}
+                >
+                  <Box>
+                    <Typography fontWeight={800}>Online</Typography>
+                    <Typography variant="caption" sx={{ opacity: 0.75 }}>
+                      Phát trực tuyến, không cần phòng
+                    </Typography>
+                  </Box>
+                </Button>
               </Stack>
+            </Box>
+            {!form.online ? (
+              <>
+                <TextField
+                  select
+                  label={t('admin.showtime', 'room')}
+                  fullWidth
+                  value={form.cinemaRoomId || ''}
+                  onChange={(event) => setForm({ ...form, cinemaRoomId: String(event.target.value) })}
+                >
+                  {activeRooms.map((room) => (
+                    <MenuItem key={room.id} value={room.cinemaRoomId || room.id}>
+                      {room.name} — {getTheaterName(room.theaterId)}
+                    </MenuItem>
+                  ))}
+                </TextField>
+                <Button
+                  variant="outlined"
+                  startIcon={<AutoAwesomeRoundedIcon />}
+                  onClick={loadSuggestions}
+                  disabled={!form.movieId || suggestionsLoading}
+                  sx={{ alignSelf: 'flex-start' }}
+                >
+                  {suggestionsLoading ? 'Đang phân tích...' : 'AI gợi ý suất chiếu'}
+                </Button>
+                {suggestionsError && <Alert severity="info">{suggestionsError}</Alert>}
+                {suggestions.length > 0 && (
+                  <Stack spacing={1}>
+                    {suggestions.map((suggestion, index) => (
+                      <Box key={`${suggestion.cinemaRoomId}-${suggestion.startTime}`} sx={{ p: 1.5, border: '1px solid rgba(99,102,241,.35)', borderRadius: 2, bgcolor: 'rgba(99,102,241,.08)' }}>
+                        <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1}>
+                          <Box>
+                            <Typography fontWeight={700}>
+                              #{index + 1} · {new Date(suggestion.startTime).toLocaleString('vi-VN', { weekday: 'short', day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })} · {suggestion.roomName}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">{suggestion.reason}</Typography>
+                          </Box>
+                          <Button size="small" variant="contained" onClick={() => applySuggestion(suggestion)}>Áp dụng</Button>
+                        </Stack>
+                      </Box>
+                    ))}
+                  </Stack>
+                )}
+              </>
+            ) : (
+              <Alert severity="info">
+                Suất chiếu online sử dụng nguồn phim đã tải lên và không cần chọn rạp hoặc phòng chiếu.
+              </Alert>
             )}
-            <FormControlLabel
-              control={
-                <Switch
-                  checked={Boolean(form.online)}
-                  onChange={(e) => setForm({
-                    ...form,
-                    online: e.target.checked,
-                    cinemaRoomId: e.target.checked ? '' : form.cinemaRoomId,
-                  })}
-                />
-              }
-              label="Suất chiếu online"
-            />
-            <TextField
-              select
-              label={t('admin.showtime', 'room')}
-              fullWidth
-              disabled={Boolean(form.online)}
-              helperText={form.online ? 'Suất online không cần chọn rạp/phòng.' : ''}
-              value={form.cinemaRoomId || ''}
-              onChange={(event) => setForm({ ...form, cinemaRoomId: String(event.target.value) })}
-            >
-              {activeRooms.map((room) => (
-                <MenuItem key={room.id} value={room.cinemaRoomId || room.id}>
-                  {room.name} — {getTheaterName(room.theaterId)}
-                </MenuItem>
-              ))}
-            </TextField>
             <TextField key="start" label="Giờ bắt đầu" type="datetime-local" fullWidth InputLabelProps={{ shrink: true }} value={form.startTime || ''} onChange={(e) => setForm({ ...form, startTime: e.target.value })} />
             <Typography variant="caption" color="text.secondary">
-              Giờ kết thúc sẽ tự tính theo thời lượng phim và cộng thêm 5 phút dọn phòng.
+              {form.online
+                ? 'Giờ kết thúc sẽ tự tính theo thời lượng phim.'
+                : 'Giờ kết thúc sẽ tự tính theo thời lượng phim và cộng thêm 5 phút dọn phòng.'}
             </Typography>
             <FormControlLabel
               control={
