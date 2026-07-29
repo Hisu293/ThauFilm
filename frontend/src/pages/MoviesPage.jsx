@@ -1,19 +1,19 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Box, CircularProgress, Container, Typography } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
 import MoviePosterCard from '../components/movies/MoviePosterCard';
 import { fetchMovies } from '../services/movieService';
 import { bookingApi } from '../api/bookingApi';
 import './MoviesPage.css';
 
-const TABS = [
-  { label: 'Tất cả', key: 'all' },
-  { label: 'Đang Chiếu', key: 'now' },
-  { label: 'Sắp Chiếu', key: 'soon' },
-];
-
-const PAGE_SIZE = 12;
+// Desktop rộng hiển thị 7 card mỗi hàng; 14 phim giúp mỗi trang đủ 2 hàng.
+const PAGE_SIZE = 14;
+const tabIndexFromQuery = (value) => {
+  if (value === 'now') return 1;
+  if (value === 'soon') return 2;
+  return 0;
+};
 const unwrapApiResponse = (response) => response?.data?.data ?? response?.data ?? response;
 const formatMysteryDate = (value) => {
   if (!value) return '';
@@ -32,7 +32,8 @@ const formatMysteryDate = (value) => {
 
 const MoviesPage = () => {
   const navigate = useNavigate();
-  const [tab, setTab] = useState(0);
+  const [searchParams] = useSearchParams();
+  const [tab, setTab] = useState(() => tabIndexFromQuery(searchParams.get('tab')));
   const [query, setQuery] = useState('');
   const [genre, setGenre] = useState('Tất cả');
   const [page, setPage] = useState(1);
@@ -68,7 +69,11 @@ const MoviesPage = () => {
     }
   }, []);
 
-  useEffect(() => { loadMovies(); }, [loadMovies]);
+  useEffect(() => {
+    // Việc tải dữ liệu là side effect khởi tạo của trang.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadMovies();
+  }, [loadMovies]);
 
   // Counts for tab badges
   const nowCount = useMemo(() => allMovies.filter((m) => m.isNowShowing).length, [allMovies]);

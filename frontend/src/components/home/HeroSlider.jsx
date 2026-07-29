@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import ChevronLeftRoundedIcon from '@mui/icons-material/ChevronLeftRounded';
-import ChevronRightRoundedIcon from '@mui/icons-material/ChevronRightRounded';
 import PlayArrowRoundedIcon from '@mui/icons-material/PlayArrowRounded';
 import ConfirmationNumberRoundedIcon from '@mui/icons-material/ConfirmationNumberRounded';
 import InfoOutlinedIcon from '@mui/icons-material/InfoOutlined';
@@ -9,11 +7,14 @@ import StarRoundedIcon from '@mui/icons-material/StarRounded';
 import './HeroSlider.css';
 
 const AUTOPLAY_MS = 5000;
+const SWIPE_THRESHOLD_PX = 55;
 
 const HeroSlider = ({ movies = [], loading = false }) => {
   const navigate = useNavigate();
   const [active, setActive] = useState(0);
+  const [dragging, setDragging] = useState(false);
   const timerRef = useRef(null);
+  const dragRef = useRef(null);
   const count = movies.length;
 
   const goTo = useCallback((i) => setActive((i + count) % count), [count]);
@@ -25,6 +26,46 @@ const HeroSlider = ({ movies = [], loading = false }) => {
     timerRef.current = setInterval(next, AUTOPLAY_MS);
     return () => clearInterval(timerRef.current);
   }, [count, next, active]);
+
+  const handlePointerDown = (event) => {
+    if (count <= 1 || event.button !== 0 || event.target.closest('button, a, input, select, textarea')) return;
+    dragRef.current = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      currentX: event.clientX,
+      horizontal: false,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handlePointerMove = (event) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    drag.currentX = event.clientX;
+    const distanceX = event.clientX - drag.startX;
+    const distanceY = event.clientY - drag.startY;
+    if (!drag.horizontal && Math.abs(distanceX) > 10 && Math.abs(distanceX) > Math.abs(distanceY)) {
+      drag.horizontal = true;
+      setDragging(true);
+    }
+    if (drag.horizontal) event.preventDefault();
+  };
+
+  const finishDrag = (event) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    const distanceX = drag.currentX - drag.startX;
+    if (drag.horizontal && Math.abs(distanceX) >= SWIPE_THRESHOLD_PX) {
+      if (distanceX < 0) next();
+      else prev();
+    }
+    dragRef.current = null;
+    setDragging(false);
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  };
 
   if (loading) {
     return (
@@ -38,7 +79,15 @@ const HeroSlider = ({ movies = [], loading = false }) => {
   const bgOf = (m) => m.backdropUrl || m.posterUrl || '/placeholder.svg';
 
   return (
-    <div className="hero-slider" aria-roledescription="carousel">
+    <div
+      className={`hero-slider ${dragging ? 'is-dragging' : ''}`}
+      aria-roledescription="carousel"
+      aria-label="Phim nổi bật. Kéo ngang để đổi phim."
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={finishDrag}
+      onPointerCancel={finishDrag}
+    >
       {movies.map((movie, i) => (
         <div key={movie.id ?? i} className={`hero-slide ${i === active ? 'is-active' : ''}`} aria-hidden={i !== active}>
           <div className="hero-slide__bg" style={{ backgroundImage: `url(${bgOf(movie)})` }} />
@@ -72,12 +121,6 @@ const HeroSlider = ({ movies = [], loading = false }) => {
 
       {count > 1 && (
         <>
-          <button type="button" className="hero-arrow hero-arrow--prev" onClick={prev} aria-label="Phim trước">
-            <ChevronLeftRoundedIcon />
-          </button>
-          <button type="button" className="hero-arrow hero-arrow--next" onClick={next} aria-label="Phim sau">
-            <ChevronRightRoundedIcon />
-          </button>
           <div className="hero-dots">
             {movies.map((m, i) => (
               <button
