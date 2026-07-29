@@ -37,7 +37,10 @@ const MovieConveyor = ({ movies }) => {
   }, [movies]);
 
   const handlePointerDown = (event) => {
-    if (event.button !== 0) return;
+    if (
+      event.button !== 0
+      || event.target.closest('button, a, input, select, textarea, [role="button"]')
+    ) return;
     draggedRef.current = false;
     dragRef.current = {
       pointerId: event.pointerId,
@@ -100,7 +103,7 @@ const MovieConveyor = ({ movies }) => {
         <div className="home-movie-group">
           {movies.map((movie) => <MoviePosterCard key={movie.id} movie={movie} />)}
         </div>
-        <div className="home-movie-group" aria-hidden="true" inert="">
+        <div className="home-movie-group">
           {movies.map((movie) => <MoviePosterCard key={`${movie.id}-copy`} movie={movie} />)}
         </div>
       </div>

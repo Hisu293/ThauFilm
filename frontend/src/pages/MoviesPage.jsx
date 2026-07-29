@@ -1,279 +1,240 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Box, CircularProgress, Container, Typography } from '@mui/material';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Box, CircularProgress, Typography } from '@mui/material';
 import MoviePosterCard from '../components/movies/MoviePosterCard';
 import { fetchMovies } from '../services/movieService';
-import { bookingApi } from '../api/bookingApi';
 import './MoviesPage.css';
 
-// Desktop rộng hiển thị 7 card mỗi hàng; 14 phim giúp mỗi trang đủ 2 hàng.
-const PAGE_SIZE = 14;
-const tabIndexFromQuery = (value) => {
-  if (value === 'now') return 1;
-  if (value === 'soon') return 2;
-  return 0;
-};
-const unwrapApiResponse = (response) => response?.data?.data ?? response?.data ?? response;
-const formatMysteryDate = (value) => {
-  if (!value) return '';
-  try {
-    return new Intl.DateTimeFormat('vi-VN', {
-      weekday: 'short',
-      day: '2-digit',
-      month: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(new Date(value));
-  } catch {
-    return value;
-  }
+const MovieGlobe = ({
+  movies,
+  title,
+  tone = 'now',
+}) => {
+  const [rotation, setRotation] = useState({ x: -0.08, y: 0 });
+  const dragRef = useRef(null);
+  const draggedRef = useRef(false);
+  const pausedRef = useRef(false);
+
+  const points = useMemo(() => {
+    const tileCount = Math.max(movies.length, 24);
+    const columns = Math.max(8, Math.ceil(tileCount / 3));
+    const rows = Math.ceil(tileCount / columns);
+    return Array.from({ length: tileCount }, (_, index) => {
+      const row = Math.floor(index / columns);
+      const column = index % columns;
+      const latitude = rows === 1 ? 0 : ((row / (rows - 1)) - 0.5) * 1.35;
+      const longitude = (column / columns) * Math.PI * 2
+        + (row % 2 ? Math.PI / columns : 0);
+      return {
+        movie: movies[index % movies.length],
+        tileIndex: index,
+        latitude,
+        longitude,
+      };
+    });
+  }, [movies]);
+
+  useEffect(() => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined;
+    let frameId;
+    let previousTime = performance.now();
+    const animate = (time) => {
+      const elapsed = Math.min(time - previousTime, 40);
+      previousTime = time;
+      if (!pausedRef.current && !dragRef.current) {
+        setRotation((current) => ({ ...current, y: current.y + elapsed * 0.0001 }));
+      }
+      frameId = requestAnimationFrame(animate);
+    };
+    frameId = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(frameId);
+  }, []);
+
+  const projected = points.map((point) => {
+    const longitude = point.longitude + rotation.y;
+    const latitude = point.latitude + rotation.x * 0.52;
+    const latitudeRadius = Math.cos(latitude);
+    return {
+      ...point,
+      screenX: Math.sin(longitude) * latitudeRadius,
+      screenY: Math.sin(latitude),
+      depth: Math.cos(longitude) * latitudeRadius,
+    };
+  });
+
+  const handlePointerDown = (event) => {
+    if (event.button !== 0 || event.target.closest('button, a, input, [role="dialog"]')) return;
+    draggedRef.current = false;
+    dragRef.current = {
+      pointerId: event.pointerId,
+      x: event.clientX,
+      y: event.clientY,
+      rotation,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  };
+
+  const handlePointerMove = (event) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    if (Math.hypot(event.clientX - drag.x, event.clientY - drag.y) > 6) draggedRef.current = true;
+    setRotation({
+      x: Math.max(-0.62, Math.min(0.62, drag.rotation.x - (event.clientY - drag.y) * 0.004)),
+      y: drag.rotation.y + (event.clientX - drag.x) * 0.004,
+    });
+  };
+
+  const finishDrag = (event) => {
+    if (!dragRef.current || dragRef.current.pointerId !== event.pointerId) return;
+    dragRef.current = null;
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  };
+
+  return (
+    <section className={`cinema-planet cinema-planet--${tone}`}>
+      <div
+        className="cinema-globe"
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={finishDrag}
+        onPointerCancel={finishDrag}
+        onPointerLeave={(event) => {
+          finishDrag(event);
+          pausedRef.current = false;
+        }}
+        onClickCapture={(event) => {
+          if (!draggedRef.current) return;
+          event.preventDefault();
+          event.stopPropagation();
+          draggedRef.current = false;
+        }}
+        aria-label={`${title} gồm ${movies.length} phim`}
+      >
+        <div className="cinema-globe__mosaic-glow" />
+
+        {projected.map(({ movie, tileIndex, screenX, screenY, depth }) => {
+          const scale = 0.7 + ((depth + 1) / 2) * 0.34;
+          const opacity = 0.18 + ((depth + 1) / 2) * 0.82;
+          const isFront = depth > 0.02;
+          return (
+            <div
+              key={`${movie.id}-${tileIndex}`}
+              className={`cinema-globe__movie ${isFront ? 'is-front' : ''}`}
+              style={{
+                left: `${50 + screenX * 35}%`,
+                top: `${52 + screenY * 39}%`,
+                transform: `translate3d(-50%, -50%, 0) scale(${scale})`,
+                opacity,
+                zIndex: Math.round((depth + 1) * 100),
+              }}
+              onPointerEnter={() => { pausedRef.current = true; }}
+              onPointerLeave={() => { pausedRef.current = false; }}
+            >
+              <MoviePosterCard movie={movie} />
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
 };
 
 const MoviesPage = () => {
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const [tab, setTab] = useState(() => tabIndexFromQuery(searchParams.get('tab')));
-  const [query, setQuery] = useState('');
-  const [genre, setGenre] = useState('Tất cả');
-  const [page, setPage] = useState(1);
-
   const [allMovies, setAllMovies] = useState([]);
-  const [mysteryShowtimes, setMysteryShowtimes] = useState([]);
+  const [activePlanet, setActivePlanet] = useState('now');
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState('');
 
   const loadMovies = useCallback(async () => {
     setLoading(true);
-    setError(null);
+    setError('');
     try {
-      const [{ movies }, showtimesResponse] = await Promise.all([
-        fetchMovies(),
-        bookingApi.fetchShowtimes().catch(() => ({ data: [] })),
-      ]);
-      setAllMovies(movies);
-      const showtimes = unwrapApiResponse(showtimesResponse);
-      const now = Date.now();
-      setMysteryShowtimes((Array.isArray(showtimes) ? showtimes : [])
-        .filter((showtime) => showtime?.mystery)
-        .filter((showtime) => {
-          const startTime = showtime.startTime ? new Date(showtime.startTime).getTime() : 0;
-          return Number.isFinite(startTime) && startTime > now;
-        })
-        .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
-        .slice(0, 6));
-    } catch (err) {
-      setError(err.message || 'Không tải được danh sách phim.');
+      const result = await fetchMovies();
+      setAllMovies(result.movies || []);
+    } catch (loadError) {
+      setError(loadError.message || 'Không tải được danh sách phim đang chiếu.');
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    // Việc tải dữ liệu là side effect khởi tạo của trang.
+    // Tải dữ liệu khi trang được mở; các cập nhật state thực tế diễn ra sau khi request hoàn tất.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadMovies();
   }, [loadMovies]);
 
-  // Counts for tab badges
-  const nowCount = useMemo(() => allMovies.filter((m) => m.isNowShowing).length, [allMovies]);
-  const soonCount = useMemo(() => allMovies.filter((m) => m.isComingSoon).length, [allMovies]);
+  if (loading) {
+    return (
+      <Box className="cinema-planet-state">
+        <CircularProgress sx={{ color: '#e50914' }} />
+        <Typography>Đang tạo hành tinh phim…</Typography>
+      </Box>
+    );
+  }
 
-  // Active tab pool — filtered from the full list (all data present)
-  const activePool = useMemo(() => {
-    if (tab === 1) return allMovies.filter((m) => m.isNowShowing);
-    if (tab === 2) return allMovies.filter((m) => m.isComingSoon);
-    return allMovies;
-  }, [tab, allMovies]);
+  if (error) {
+    return (
+      <Box className="cinema-planet-state">
+        <Typography sx={{ color: '#f87171' }}>{error}</Typography>
+        <button type="button" onClick={loadMovies}>Thử lại</button>
+      </Box>
+    );
+  }
 
-  const genres = useMemo(
-    () => ['Tất cả', ...Array.from(new Set(allMovies.map((m) => m.genre).filter(Boolean))).sort()],
-    [allMovies]
-  );
+  const nowShowing = allMovies.filter((movie) => movie.isNowShowing);
+  const comingSoon = allMovies.filter((movie) => movie.isComingSoon && !movie.isNowShowing);
+  const showingComingSoon = (activePlanet === 'soon' || !nowShowing.length) && comingSoon.length > 0;
+  const displayedPlanet = showingComingSoon ? 'soon' : 'now';
+  const activeMovies = showingComingSoon ? comingSoon : nowShowing;
 
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return activePool.filter((m) => {
-      if (q && !m.title?.toLowerCase().includes(q)) return false;
-      if (genre !== 'Tất cả' && m.genre !== genre) return false;
-      return true;
-    });
-  }, [activePool, query, genre]);
-
-  const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const safePage = Math.min(page, pageCount);
-  const paged = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
-
-  const handleTabChange = (i) => { setTab(i); setPage(1); };
-  const handleQueryChange = (e) => { setQuery(e.target.value); setPage(1); };
-  const handleGenreChange = (e) => { setGenre(e.target.value); setPage(1); };
-  const handleMysteryBooking = (showtime) => {
-    const mysteryMovie = {
-      id: '',
-      title: showtime.movieTitle || 'Mystery Movie Night',
-      posterUrl: '/placeholder.svg',
-      poster: '/placeholder.svg',
-      genre: 'Sự kiện bí mật',
-      duration: null,
-      isMystery: true,
-    };
-    const mysteryShowtime = {
-      id: String(showtime.id ?? showtime.showtimeId ?? ''),
-      movieId: '',
-      movieTitle: showtime.movieTitle || 'Mystery Movie Night',
-      time: showtime.startTime ? String(showtime.startTime).slice(11, 16) : '',
-      date: showtime.startTime ? String(showtime.startTime).slice(0, 10) : '',
-      room: showtime.cinemaRoomName || showtime.roomName || showtime.room || '',
-      format: showtime.format || '2D',
-      theaterName: showtime.theaterName || 'ThauFilm Cinema',
-      startTime: showtime.startTime,
-      endTime: showtime.endTime,
-      mystery: true,
-      mysteryUnlockAt: showtime.mysteryUnlockAt,
-    };
-    navigate(`/booking/seats/${mysteryShowtime.id}`, {
-      state: { movie: mysteryMovie, showtime: mysteryShowtime },
-    });
-  };
+  if (!nowShowing.length && !comingSoon.length) {
+    return (
+      <Box className="cinema-planet-state">
+        <Typography>Hiện chưa có phim đang chiếu hoặc sắp chiếu.</Typography>
+      </Box>
+    );
+  }
 
   return (
-    <Box sx={{ color: '#fff', pb: 8 }}>
-      {/* Hero banner */}
-      <div className="movies-hero">
-        <div className="movies-hero__inner">
-          <Typography variant="overline" sx={{ color: '#e50914', fontWeight: 800, letterSpacing: '0.12em' }}>
-            THAUFILM
-          </Typography>
-          <h1 className="movies-hero__title">Khám phá thế giới điện ảnh</h1>
-          <p className="movies-hero__sub">Phim đang chiếu, sắp chiếu, bom tấn IMAX — đặt vé chỉ trong vài giây.</p>
-        </div>
-      </div>
+    <main className="movies-planet-page">
+      <nav className="planet-switcher" aria-label="Chuyển loại hành tinh phim">
+        <button
+          type="button"
+          className={displayedPlanet === 'now' ? 'is-active' : ''}
+          onClick={() => setActivePlanet('now')}
+          disabled={!nowShowing.length}
+        >
+          <span className="planet-switcher__dot planet-switcher__dot--now" />
+          <span>
+            <small>Đang phát hành</small>
+            ThauFilm đang chiếu
+          </span>
+          <strong>{nowShowing.length}</strong>
+        </button>
+        <button
+          type="button"
+          className={displayedPlanet === 'soon' ? 'is-active' : ''}
+          onClick={() => setActivePlanet('soon')}
+          disabled={!comingSoon.length}
+        >
+          <span className="planet-switcher__dot planet-switcher__dot--soon" />
+          <span>
+            <small>Sắp ra mắt</small>
+            ThauFilm sắp chiếu
+          </span>
+          <strong>{comingSoon.length}</strong>
+        </button>
+      </nav>
 
-      <Container maxWidth="xl" sx={{ mt: 4 }}>
-        {!loading && !error && mysteryShowtimes.length > 0 && (
-          <section className="mystery-strip">
-            <div className="mystery-strip__head">
-              <div>
-                <Typography variant="overline" sx={{ color: '#fbbf24', fontWeight: 900, letterSpacing: '0.12em' }}>
-                  SỰ KIỆN BÍ MẬT
-                </Typography>
-                <h2>Mystery Movie Night</h2>
-                <p>Mua vé 79.000đ, tên phim sẽ được mở khóa khi đến giờ chiếu.</p>
-              </div>
-            </div>
-            <div className="mystery-strip__grid">
-              {mysteryShowtimes.map((showtime) => (
-                <article key={showtime.id} className="mystery-card">
-                  <div>
-                    <h3>{showtime.movieTitle || 'Mystery Movie Night'}</h3>
-                    <p>{formatMysteryDate(showtime.startTime)}</p>
-                    <span>{showtime.theaterName || 'ThauFilm Cinema'} · {showtime.cinemaRoomName || showtime.roomName || 'Phòng chiếu'}</span>
-                  </div>
-                  <button type="button" onClick={() => handleMysteryBooking(showtime)}>
-                    Đặt vé
-                  </button>
-                </article>
-              ))}
-            </div>
-          </section>
-        )}
-
-        <div className="movies-tabs">
-          <button
-            type="button"
-            className={`movies-tab ${tab === 0 ? 'is-active' : ''}`}
-            onClick={() => handleTabChange(0)}
-          >
-            Tất cả
-            {!loading && allMovies.length > 0 && (
-              <span className="movies-tab-count">{allMovies.length}</span>
-            )}
-          </button>
-          <button
-            type="button"
-            className={`movies-tab ${tab === 1 ? 'is-active' : ''}`}
-            onClick={() => handleTabChange(1)}
-          >
-            Đang Chiếu
-            {!loading && nowCount > 0 && <span className="movies-tab-count">{nowCount}</span>}
-          </button>
-          <button
-            type="button"
-            className={`movies-tab ${tab === 2 ? 'is-active' : ''}`}
-            onClick={() => handleTabChange(2)}
-          >
-            Sắp Chiếu
-            {!loading && soonCount > 0 && <span className="movies-tab-count">{soonCount}</span>}
-          </button>
-        </div>
-
-        {/* Toolbar */}
-        <div className="movies-toolbar">
-          <div className="movies-search">
-            <SearchRoundedIcon sx={{ color: 'rgba(255,255,255,0.5)' }} />
-            <input
-              placeholder="Tìm phim theo tên…"
-              value={query}
-              onChange={handleQueryChange}
-            />
-          </div>
-          <div className="movies-filters">
-            <select value={genre} onChange={handleGenreChange}>
-              {genres.map((g) => (
-                <option key={g} value={g}>
-                  {g === 'Tất cả' ? 'Thể loại' : g}
-                </option>
-              ))}
-            </select>
-          </div>
-        </div>
-
-        {/* Content */}
-        {loading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}>
-            <CircularProgress sx={{ color: '#e50914' }} />
-          </Box>
-        ) : error ? (
-          <Box sx={{ textAlign: 'center', py: 8 }}>
-            <Typography sx={{ color: '#f87171', mb: 2 }}>{error}</Typography>
-            <button
-              type="button"
-              className="movies-tab is-active"
-              onClick={loadMovies}
-              style={{ padding: '10px 22px' }}
-            >
-              Thử lại
-            </button>
-          </Box>
-        ) : paged.length === 0 ? (
-          <Typography sx={{ textAlign: 'center', py: 8, color: 'rgba(255,255,255,0.5)' }}>
-            Không tìm thấy phim phù hợp.
-          </Typography>
-        ) : (
-          <div className="movies-grid">
-            {paged.map((m) => <MoviePosterCard key={m.id} movie={m} />)}
-          </div>
-        )}
-
-        {/* Pagination */}
-        {!loading && !error && pageCount > 1 && (
-          <div className="movies-pagination">
-            <button type="button" disabled={safePage === 1} onClick={() => setPage((p) => p - 1)}>‹</button>
-            {Array.from({ length: pageCount }, (_, i) => i + 1).map((p) => (
-              <button
-                key={p}
-                type="button"
-                className={p === safePage ? 'is-active' : ''}
-                onClick={() => setPage(p)}
-              >
-                {p}
-              </button>
-            ))}
-            <button type="button" disabled={safePage === pageCount} onClick={() => setPage((p) => p + 1)}>›</button>
-          </div>
-        )}
-      </Container>
-    </Box>
+      <MovieGlobe
+        key={showingComingSoon ? 'soon' : 'now'}
+        movies={activeMovies}
+        title={showingComingSoon ? 'Hành tinh phim sắp chiếu' : 'Hành tinh phim đang chiếu'}
+        tone={showingComingSoon ? 'soon' : 'now'}
+      />
+    </main>
   );
 };
 
