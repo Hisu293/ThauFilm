@@ -100,7 +100,7 @@ sudo mkdir -p /opt/thaufilm
 sudo chown ec2-user:ec2-user /opt/thaufilm
 ```
 
-## 1. Copy source từ máy local lên EC2
+## 1A. Copy source từ Linux/macOS lên EC2
 
 Đứng tại thư mục root của project, nơi có `docker-compose.yml`, rồi chạy:
 
@@ -124,13 +124,101 @@ rsync -az --progress \
 Lệnh trên chỉ đồng bộ source. File `.env`, khóa PEM, dependencies và build
 output không được copy lên EC2.
 
+## 1B. Copy source từ Windows lên EC2
+
+Thực hiện phần này bằng **PowerShell** trên Windows 10/11. Đứng tại thư mục root
+của project, nơi có `docker-compose.yml`.
+
+### 1B.1. Kiểm tra công cụ
+
+Windows cần có OpenSSH Client và `tar`:
+
+```powershell
+Get-Command ssh, scp, tar
+```
+
+Nếu không tìm thấy `ssh` hoặc `scp`, mở PowerShell bằng quyền Administrator và
+cài OpenSSH Client:
+
+```powershell
+Add-WindowsCapability -Online -Name OpenSSH.Client~~~~0.0.1.0
+```
+
+Đóng PowerShell, mở lại và chạy lại lệnh kiểm tra.
+
+### 1B.2. Khai báo thông tin deploy
+
+Sửa `$KeyPath` và `$Server` theo file PEM và địa chỉ EC2 thực tế:
+
+```powershell
+$KeyPath = (Resolve-Path ".\lanhkv.pem").Path
+$Server = "ec2-user@ec2-54-255-134-80.ap-southeast-1.compute.amazonaws.com"
+$ProjectPath = (Get-Location).Path
+$Archive = Join-Path (Split-Path $ProjectPath -Parent) "thaufilm-source.tar.gz"
+```
+
+Giới hạn quyền đọc file PEM cho user Windows hiện tại để OpenSSH chấp nhận key:
+
+```powershell
+icacls $KeyPath /inheritance:r
+icacls $KeyPath /grant:r "$($env:USERNAME):(R)"
+```
+
+### 1B.3. Đóng gói và chuyển source lên EC2
+
+Tạo file nén cùng cấp với thư mục source. Ví dụ, nếu source nằm tại
+`D:\project\ThauFilm` thì file nén sẽ nằm tại
+`D:\project\thaufilm-source.tar.gz`. Lệnh này không đưa `.env`, khóa PEM,
+dependencies hoặc build output vào gói deploy:
+
+```powershell
+tar -czf $Archive `
+  --exclude=".git" `
+  --exclude=".env" `
+  --exclude="*.pem" `
+  --exclude="*.key" `
+  --exclude=".DS_Store" `
+  --exclude="backups" `
+  --exclude="frontend/node_modules" `
+  --exclude="frontend/dist" `
+  --exclude="backend/target" `
+  .
+```
+
+Copy gói source vào thư mục tạm trên EC2:
+
+```powershell
+scp -o IdentitiesOnly=yes -i $KeyPath `
+  $Archive "${Server}:/tmp/thaufilm-source.tar.gz"
+```
+
+Giải nén source vào `/opt/thaufilm`. File `.env` đã cấu hình trên server không bị
+ghi đè vì gói deploy không chứa file này:
+
+```powershell
+ssh -o IdentitiesOnly=yes -i $KeyPath $Server `
+  "tar -xzf /tmp/thaufilm-source.tar.gz -C /opt/thaufilm && rm -f /tmp/thaufilm-source.tar.gz"
+```
+
+Xóa file nén trên máy Windows sau khi upload thành công:
+
+```powershell
+Remove-Item -LiteralPath $Archive
+```
+
 ## 2. SSH vào EC2 và chạy Docker
 
-Từ máy local, truy cập EC2:
+Từ Linux/macOS, truy cập EC2:
 
 ```bash
-ssh -o IdentitiesOnly=yes -i ./lanhkv.pem \
+ssh -o IdentitiesOnly=yes -i ./demo.pem \
   ec2-user@ec2-54-255-134-80.ap-southeast-1.compute.amazonaws.com
+```
+
+Từ Windows PowerShell, nếu vẫn đang dùng các biến ở bước 1B:
+
+```powershell
+ssh -o IdentitiesOnly=yes -i $KeyPath $Server
 ```
 
 Sau khi đã vào EC2, chạy:
@@ -150,7 +238,8 @@ docker compose logs -f backend
 
 Nhấn `Ctrl+C` để thoát phần xem log; các container vẫn tiếp tục chạy.
 
-Mỗi lần cập nhật source, chỉ cần lặp lại bước 1 rồi bước 2.
+Mỗi lần cập nhật source, chỉ cần lặp lại bước 1A (Linux/macOS) hoặc 1B (Windows),
+rồi thực hiện bước 2.
 
 Không chạy `docker compose down -v` trên EC2 nếu muốn giữ dữ liệu PostgreSQL,
 vì tùy chọn `-v` sẽ xóa Docker volume của database.
