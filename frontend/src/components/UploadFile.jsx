@@ -17,6 +17,7 @@ export default function UploadFile({
   onChange,
   accept = 'image/jpeg,image/png,image/webp',
   disabled = false,
+  previewSx,
 }) {
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -95,7 +96,12 @@ export default function UploadFile({
       {loading && <LinearProgress variant="determinate" value={progress} />}
       {error && <Alert severity="error">{error}</Alert>}
       {isImageValue && (
-        <Box component="img" src={preview} alt="Preview" sx={{ width: 110, height: 150, objectFit: 'cover', borderRadius: 1.5 }} />
+        <Box
+          component="img"
+          src={preview}
+          alt="Xem trước ảnh đã chọn"
+          sx={{ width: 110, height: 150, objectFit: 'cover', borderRadius: 1.5, ...previewSx }}
+        />
       )}
       {value && (
         <Typography variant="caption" sx={{ wordBreak: 'break-all', color: 'text.secondary' }}>

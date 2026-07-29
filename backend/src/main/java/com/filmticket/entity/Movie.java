@@ -53,6 +53,9 @@ public class Movie {
     private String posterUrl;
 
     @Column(length = 1000)
+    private String heroBannerUrl;
+
+    @Column(length = 1000)
     private String trailerUrl;
 
     @Column(length = 255)

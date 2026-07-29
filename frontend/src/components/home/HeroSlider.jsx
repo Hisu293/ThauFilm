@@ -44,6 +44,7 @@ const HeroSlider = ({ movies = [], loading = false }) => {
           <div className="hero-slide__bg" style={{ backgroundImage: `url(${bgOf(movie)})` }} />
           <div className="hero-slide__overlay" />
           <div className="hero-slide__content">
+            <h2 className="hero-title">{movie.title}</h2>
             <div className="hero-meta">
               <span className="hero-meta__chip hero-meta__chip--rating">{movie.rating || 'P'}</span>
               <span className="hero-meta__chip hero-meta__chip--star">
@@ -53,7 +54,6 @@ const HeroSlider = ({ movies = [], loading = false }) => {
               {movie.genre && <span className="hero-meta__chip">{movie.genre}</span>}
               {movie.releaseYear && <span className="hero-meta__chip">{movie.releaseYear}</span>}
             </div>
-            <h2 className="hero-title">{movie.title}</h2>
             {movie.description && <p className="hero-desc">{movie.description}</p>}
             <div className="hero-actions">
               <button type="button" className="hero-btn hero-btn--solid" onClick={() => navigate(`/movies/${movie.id}?trailer=1`)}>
@@ -85,6 +85,7 @@ const HeroSlider = ({ movies = [], loading = false }) => {
                 type="button"
                 className={`hero-dot ${i === active ? 'is-active' : ''}`}
                 onClick={() => goTo(i)}
+                style={{ backgroundImage: `url(${bgOf(m)})` }}
                 aria-label={`Chuyển tới slide ${i + 1}`}
               />
             ))}

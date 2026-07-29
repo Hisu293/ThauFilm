@@ -88,6 +88,7 @@ public class MovieService {
                 .rating(request.getRating())
                 .active(Boolean.TRUE.equals(request.getActive()))
                 .posterUrl(normalizeNullable(request.getPosterUrl()))
+                .heroBannerUrl(normalizeNullable(request.getHeroBannerUrl()))
                 .trailerUrl(normalizeNullable(request.getTrailerUrl()))
                 .director(normalizeNullable(request.getDirector()))
                 .actors(normalizeNullable(request.getActors()))
@@ -123,6 +124,7 @@ public class MovieService {
         movie.setRating(request.getRating());
         movie.setActive(Boolean.TRUE.equals(request.getActive()));
         movie.setPosterUrl(normalizeNullable(request.getPosterUrl()));
+        movie.setHeroBannerUrl(normalizeNullable(request.getHeroBannerUrl()));
         movie.setTrailerUrl(normalizeNullable(request.getTrailerUrl()));
         movie.setDirector(normalizeNullable(request.getDirector()));
         movie.setActors(normalizeNullable(request.getActors()));
@@ -207,6 +209,7 @@ public class MovieService {
         values.put("trạngThái", movie.getStatus());
         values.put("đangHoạtĐộng", movie.isActive());
         values.put("thểLoại", movie.getGenre());
+        values.put("ảnhHero", movie.getHeroBannerUrl());
         values.put("ngàyPhátHành", movie.getReleaseDate());
         values.put("nhàCungCấpLuồng", movie.getStreamProvider());
         values.put("cóNguồnPhim", movie.getStreamKey() != null && !movie.getStreamKey().isBlank());
@@ -236,6 +239,7 @@ public class MovieService {
         private Boolean active = true;
 
         private String posterUrl;
+        private String heroBannerUrl;
         private String trailerUrl;
         private String director;
         private String actors;

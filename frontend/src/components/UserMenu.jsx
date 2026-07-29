@@ -341,6 +341,8 @@ export const AuthButtons = () => {
         sx={{
           textTransform: 'none',
           fontWeight: 600,
+          whiteSpace: 'nowrap',
+          minWidth: 'max-content',
           borderColor: 'rgba(255,255,255,0.3)',
           borderRadius: '8px',
           '&:hover': { borderColor: '#e50914', color: '#e50914', backgroundColor: 'rgba(229,9,20,0.08)' },
@@ -355,15 +357,21 @@ export const AuthButtons = () => {
   return (
     <Button
       id="nav-login"
-      variant="outlined"
-      color="inherit"
+      variant="contained"
+      startIcon={<AccountCircleRoundedIcon />}
       onClick={() => navigate('/login')}
       sx={{
         textTransform: 'none',
-        fontWeight: 600,
-        borderColor: 'rgba(255,255,255,0.3)',
-        borderRadius: '8px',
-        '&:hover': { borderColor: '#e50914', color: '#e50914' },
+        fontWeight: 800,
+        whiteSpace: 'nowrap',
+        minWidth: 'max-content',
+        height: 44,
+        px: { md: 1.5, xl: 2.25 },
+        color: '#111',
+        bgcolor: '#fff',
+        borderRadius: 999,
+        boxShadow: '0 8px 24px rgba(0,0,0,.18)',
+        '&:hover': { bgcolor: '#f3f3f3', color: '#e50914' },
         transition: 'all 0.2s',
       }}
     >

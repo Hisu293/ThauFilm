@@ -16,6 +16,7 @@ public class MovieCardResponse {
     private UUID id;
     private String title;
     private String posterUrl;
+    private String heroBannerUrl;
     private String trailerUrl;
     private Movie.Status status;
 
@@ -32,6 +33,7 @@ public class MovieCardResponse {
                 .id(movie.getId())
                 .title(movie.getTitle())
                 .posterUrl(posterUrl)
+                .heroBannerUrl(movie.getHeroBannerUrl())
                 .trailerUrl(trailerUrl)
                 .status(movie.getStatus())
                 .build();

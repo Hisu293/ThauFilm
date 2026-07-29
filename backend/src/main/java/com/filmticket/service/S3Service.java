@@ -25,7 +25,7 @@ import java.util.UUID;
 public class S3Service {
     private static final long MAX_IMAGE_SIZE = 5L * 1024 * 1024;
     private static final long MAX_VIDEO_SIZE = 200L * 1024 * 1024;
-    private static final Set<String> ALLOWED_FOLDERS = Set.of("images", "posters", "trailers");
+    private static final Set<String> ALLOWED_FOLDERS = Set.of("images", "posters", "hero-banners", "trailers");
     private static final Set<String> IMAGE_EXTENSIONS = Set.of("jpg", "jpeg", "png", "webp");
     private static final Set<String> VIDEO_EXTENSIONS = Set.of("mp4", "mov");
 

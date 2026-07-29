@@ -13,24 +13,28 @@ const ScrollToTop = () => {
   return null;
 };
 
-const PublicLayout = () => (
-  <>
-    <ScrollToTop />
-    <Box
-      sx={{
-        minHeight: '100vh',
-        display: 'flex',
-        flexDirection: 'column',
-        background: 'radial-gradient(circle at 15% 8%, rgba(251, 191, 36, 0.10) 0%, rgba(251, 191, 36, 0) 34%), radial-gradient(circle at 85% 12%, rgba(229, 9, 20, 0.08) 0%, rgba(229, 9, 20, 0) 30%), #0B1020',
-      }}
-    >
-      <SiteNavbar />
-      <Box component="main" sx={{ flex: 1 }}>
-        <Outlet />
+const PublicLayout = () => {
+  const { pathname } = useLocation();
+
+  return (
+    <>
+      <ScrollToTop />
+      <Box
+        sx={{
+          minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          background: 'radial-gradient(circle at 15% 8%, rgba(251, 191, 36, 0.10) 0%, rgba(251, 191, 36, 0) 34%), radial-gradient(circle at 85% 12%, rgba(229, 9, 20, 0.08) 0%, rgba(229, 9, 20, 0) 30%), #0B1020',
+        }}
+      >
+        <SiteNavbar />
+        <Box component="main" sx={{ flex: 1, pt: pathname === '/' ? 0 : '72px' }}>
+          <Outlet />
+        </Box>
+        <SiteFooter />
       </Box>
-      <SiteFooter />
-    </Box>
-  </>
-);
+    </>
+  );
+};
 
 export default PublicLayout;

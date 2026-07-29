@@ -42,6 +42,7 @@ const emptyMovie = {
   rating: 0,
   active: true,
   posterUrl: '',
+  heroBannerUrl: '',
   trailerUrl: '',
   director: '',
   actors: '',
@@ -367,6 +368,17 @@ export const MoviesSection = ({ crud, genres = [] }) => {
           accept="image/jpeg,image/png,image/webp"
           onChange={(fileUrl) => setForm((current) => ({ ...current, posterUrl: fileUrl }))}
         />
+        <UploadFile
+          label="Chọn ảnh hero/banner ngang để upload lên S3"
+          folder="hero-banners"
+          value={form.heroBannerUrl || ''}
+          accept="image/jpeg,image/png,image/webp"
+          previewSx={{ width: '100%', maxWidth: 520, height: 190, objectFit: 'cover' }}
+          onChange={(fileUrl) => setForm((current) => ({ ...current, heroBannerUrl: fileUrl }))}
+        />
+        <Typography variant="caption" color="text.secondary">
+          Ảnh hero hiển thị ở banner đầu trang chủ. Khuyến nghị tỷ lệ 16:9, tối thiểu 1600 × 900 px.
+        </Typography>
         <UploadFile
           label="Chọn trailer MP4/MOV để upload lên S3"
           folder="trailers"
