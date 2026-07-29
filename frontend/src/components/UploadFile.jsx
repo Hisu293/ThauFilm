@@ -18,6 +18,7 @@ export default function UploadFile({
   accept = 'image/jpeg,image/png,image/webp',
   disabled = false,
   previewSx,
+  onUploadingChange,
 }) {
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -61,6 +62,7 @@ export default function UploadFile({
 
     setError('');
     setLoading(true);
+    onUploadingChange?.(true);
     setProgress(0);
     if (isImage) {
       if (objectUrlRef.current) URL.revokeObjectURL(objectUrlRef.current);
@@ -75,6 +77,7 @@ export default function UploadFile({
       setError(uploadError.message || 'Upload file thất bại.');
     } finally {
       setLoading(false);
+      onUploadingChange?.(false);
     }
   };
 
