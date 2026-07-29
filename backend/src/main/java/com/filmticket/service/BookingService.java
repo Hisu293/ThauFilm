@@ -381,7 +381,7 @@ public class BookingService {
                 .action(AuditAction.BOOKING_SEATS_UPDATED).targetType("BOOKING")
                 .targetId(bookingId.toString()).description("Đã cập nhật ghế trong đơn đặt vé")
                 .actorId(userId).correlationId(bookingId.toString())
-                .metadata(Map.of("mãGhếMới", newSeatIds)).build());
+                .metadata(Map.of("mãGhếMới", requestedSeatIds)).build());
         return toBookingResponse(booking, newSeats);
     }
 
