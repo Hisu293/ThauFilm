@@ -1,4 +1,4 @@
-name: Deploy develop to EC2
+name: Deploy develop frontend to EC2
 
 on:
   push:
@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   deploy:
-    name: Package and deploy
+    name: Package and deploy frontend
     runs-on: ubuntu-latest
     environment: develop
     timeout-minutes: 30
@@ -93,7 +93,7 @@ jobs:
             "${RUNNER_TEMP}/${ARCHIVE_NAME}" \
             "${EC2_USER}@${EC2_HOST}:/tmp/${ARCHIVE_NAME}"
 
-      - name: Rebuild and restart Docker Compose on EC2
+      - name: Rebuild and restart frontend on EC2
         shell: bash
         run: |
           set -Eeuo pipefail

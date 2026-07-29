@@ -28,25 +28,36 @@ if [[ ! -f "${ARCHIVE_PATH}" ]]; then
   exit 1
 fi
 
-if [[ ! -r "${SHARED_ENV}" ]]; then
-  echo "Shared environment file is missing or unreadable: ${SHARED_ENV}" >&2
-  exit 1
-fi
-
 umask 077
 mkdir -p "${RELEASES_DIR}" "${RELEASE_DIR}"
 unzip -q -o "${ARCHIVE_PATH}" -d "${RELEASE_DIR}"
-install -m 0600 "${SHARED_ENV}" "${RELEASE_DIR}/.env"
+
+if [[ -r "${SHARED_ENV}" ]]; then
+  install -m 0600 "${SHARED_ENV}" "${RELEASE_DIR}/.env"
+else
+  echo "Shared .env not found; using Docker Compose defaults for frontend."
+fi
 
 cd "${RELEASE_DIR}"
 
 docker compose config --quiet
+
+running_services="$(docker compose ps --status running --services)"
+for required_service in database backend; do
+  if ! grep -qx "${required_service}" <<<"${running_services}"; then
+    echo "Required service is not running: ${required_service}" >&2
+    echo "This workflow only deploys frontend and does not start dependencies." >&2
+    exit 1
+  fi
+done
+
+docker compose build frontend
 docker compose up \
-  --build \
   --detach \
-  --remove-orphans \
+  --no-deps \
   --wait \
-  --wait-timeout 300
+  --wait-timeout 300 \
+  frontend
 
 ln -sfn "${RELEASE_DIR}" "${DEPLOY_ROOT}/current.next"
 mv -Tf "${DEPLOY_ROOT}/current.next" "${DEPLOY_ROOT}/current"
@@ -54,4 +65,4 @@ mv -Tf "${DEPLOY_ROOT}/current.next" "${DEPLOY_ROOT}/current"
 rm -f -- "${ARCHIVE_PATH}"
 
 docker compose ps
-echo "Deployment completed: ${RELEASE_ID}"
+echo "Frontend deployment completed: ${RELEASE_ID}"

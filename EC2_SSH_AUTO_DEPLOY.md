@@ -1,4 +1,4 @@
-# Auto deploy nhánh `develop` lên EC2 bằng SSH
+# Auto deploy frontend từ nhánh `develop` lên EC2 bằng SSH
 
 Workflow trong project thực hiện quy trình sau:
 
@@ -8,12 +8,16 @@ Commit hoặc merge vào develop
         -> SCP file ZIP lên EC2
         -> SSH vào EC2
         -> Giải nén thành một release mới
-        -> docker compose up --build
+        -> Chỉ build và recreate container frontend
 ```
 
 Workflow nằm tại `.github/workflows/deploy-develop.yml`. Một merge vào
 `develop` cũng tạo sự kiện `push`, vì vậy không cần cấu hình thêm sự kiện
 `pull_request`.
+
+Workflow không rebuild hoặc restart `backend` và `database`. Hai service này
+phải đang chạy sẵn trên EC2; workflow sẽ dừng với thông báo rõ ràng nếu thiếu
+một trong hai service.
 
 ## 1. Chuẩn bị EC2
 
@@ -67,9 +71,13 @@ Sau khi deploy thành công, symlink sau trỏ tới release hiện tại:
 /opt/thaufilm/current
 ```
 
-### 1.3. Tạo `.env` chỉ trên EC2
+### 1.3. Cấu hình `.env` trên EC2 nếu cần
 
-Không lưu `.env` production trong GitHub hoặc trong source ZIP.
+Không lưu `.env` production trong GitHub hoặc trong source ZIP. Với workflow
+frontend-only, file này là tùy chọn: nếu không tồn tại, Docker Compose sử dụng
+giá trị mặc định. Tạo file khi cần đổi `FRONTEND_PORT`,
+`VITE_GOOGLE_CLIENT_ID` thông qua `GOOGLE_CLIENT_ID`, hoặc giữ cấu hình dùng
+chung với stack hiện tại.
 
 ```bash
 cp /path/to/project/.env.example /opt/thaufilm/shared/.env
@@ -248,8 +256,9 @@ Cũng có thể chạy thủ công:
 GitHub -> Actions -> Deploy develop to EC2 -> Run workflow
 ```
 
-Theo dõi log trong tab Actions. Deploy chỉ được đánh dấu thành công khi ba
-container đạt trạng thái running/healthy trong tối đa 300 giây.
+Theo dõi log trong tab Actions. Deploy chỉ được đánh dấu thành công khi
+`database` và `backend` đang chạy sẵn, sau đó container `frontend` mới đạt
+trạng thái running/healthy trong tối đa 300 giây.
 
 ## 7. Kiểm tra trên EC2
 
@@ -283,7 +292,8 @@ Chọn commit SHA cũ rồi chạy:
 ```bash
 OLD_RELEASE=replace-with-old-commit-sha
 cd "/opt/thaufilm/releases/${OLD_RELEASE}"
-docker compose up --build -d --remove-orphans --wait --wait-timeout 300
+docker compose build frontend
+docker compose up -d --no-deps --wait --wait-timeout 300 frontend
 ln -sfn "/opt/thaufilm/releases/${OLD_RELEASE}" /opt/thaufilm/current.next
 mv -Tf /opt/thaufilm/current.next /opt/thaufilm/current
 ```

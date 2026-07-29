@@ -1,6 +1,9 @@
 .env* export-ignore
 *.pem export-ignore
 *.key export-ignore
+*.sh text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
 /backups export-ignore
 /frontend/node_modules export-ignore
 /frontend/dist export-ignore
