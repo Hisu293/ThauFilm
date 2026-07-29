@@ -260,6 +260,20 @@ Theo dõi log trong tab Actions. Deploy chỉ được đánh dấu thành công
 `database` và `backend` đang chạy sẵn, sau đó container `frontend` mới đạt
 trạng thái running/healthy trong tối đa 300 giây.
 
+Workflow gửi SSH keepalive mỗi 30 giây trong lúc Docker build. Nếu log vẫn báo
+`client_loop: send disconnect: Broken pipe` tại bước `npm ci`, kiểm tra RAM,
+swap, dung lượng đĩa và kernel OOM log trên EC2:
+
+```bash
+free -h
+swapon --show
+df -h
+sudo dmesg -T | grep -Ei 'out of memory|oom|killed process'
+```
+
+Node và Docker build có thể làm EC2 1 GB RAM cạn bộ nhớ. Nên dùng instance có
+ít nhất 2 GB RAM hoặc cấu hình swap trước khi tiếp tục deploy.
+
 ## 7. Kiểm tra trên EC2
 
 ```bash

@@ -89,7 +89,10 @@ jobs:
             -o BatchMode=yes \
             -o ConnectTimeout=15 \
             -o IdentitiesOnly=yes \
+            -o ServerAliveCountMax=20 \
+            -o ServerAliveInterval=30 \
             -o StrictHostKeyChecking=yes \
+            -o TCPKeepAlive=yes \
             "${RUNNER_TEMP}/${ARCHIVE_NAME}" \
             "${EC2_USER}@${EC2_HOST}:/tmp/${ARCHIVE_NAME}"
 
@@ -103,7 +106,10 @@ jobs:
             -o BatchMode=yes \
             -o ConnectTimeout=15 \
             -o IdentitiesOnly=yes \
+            -o ServerAliveCountMax=20 \
+            -o ServerAliveInterval=30 \
             -o StrictHostKeyChecking=yes \
+            -o TCPKeepAlive=yes \
             "${EC2_USER}@${EC2_HOST}" \
             "bash -s -- '${GITHUB_SHA}'" \
             < .github/scripts/deploy-ec2.sh
