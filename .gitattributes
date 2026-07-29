@@ -1,0 +1,7 @@
+.env* export-ignore
+*.pem export-ignore
+*.key export-ignore
+/backups export-ignore
+/frontend/node_modules export-ignore
+/frontend/dist export-ignore
+/backend/target export-ignore
