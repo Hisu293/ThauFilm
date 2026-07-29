@@ -1,9 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Box, CircularProgress, Container, Typography } from '@mui/material';
+import {
+  Alert,
+  Box,
+  CircularProgress,
+  Container,
+  Dialog,
+  DialogContent,
+  IconButton,
+  Typography,
+} from '@mui/material';
 import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
 import PlaceRoundedIcon from '@mui/icons-material/PlaceRounded';
 import MeetingRoomRoundedIcon from '@mui/icons-material/MeetingRoomRounded';
 import AccessTimeRoundedIcon from '@mui/icons-material/AccessTimeRounded';
+import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
+import PhoneRoundedIcon from '@mui/icons-material/PhoneRounded';
 import api from '../services/api';
 import { cinemas as fallbackCinemas } from '../data/cinemas';
 import './CinemaPage.css';
@@ -14,6 +25,10 @@ const CinemaPage = () => {
   const [brand, setBrand] = useState('Tất cả');
   const [cinemas, setCinemas] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedCinema, setSelectedCinema] = useState(null);
+  const [cinemaDetail, setCinemaDetail] = useState(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState('');
 
   useEffect(() => {
     let active = true;
@@ -41,6 +56,29 @@ const CinemaPage = () => {
       });
     return () => { active = false; };
   }, []);
+
+  const openCinemaDetail = async (cinema) => {
+    setSelectedCinema(cinema);
+    setCinemaDetail(null);
+    setDetailError('');
+    setDetailLoading(true);
+
+    try {
+      const response = await api.get(`/api/theaters/${cinema.id}`);
+      const detail = response?.data?.data ?? response?.data;
+      setCinemaDetail(detail);
+    } catch {
+      setDetailError('Không thể tải chi tiết rạp. Vui lòng thử lại.');
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const closeCinemaDetail = () => {
+    setSelectedCinema(null);
+    setCinemaDetail(null);
+    setDetailError('');
+  };
 
   const cities = useMemo(() => ['Tất cả', ...new Set(cinemas.map((cinema) => cinema.city).filter(Boolean))], [cinemas]);
   const brands = useMemo(() => ['Tất cả', ...new Set(cinemas.map((cinema) => cinema.brand).filter(Boolean))], [cinemas]);
@@ -107,13 +145,108 @@ const CinemaPage = () => {
                   <div className="cinema-card__facilities">
                     {c.facilities.map((f) => <span key={f} className="cinema-chip">{f}</span>)}
                   </div>
-                  <button type="button" className="cinema-card__btn">Xem chi tiết</button>
+                  <button
+                    type="button"
+                    className="cinema-card__btn"
+                    onClick={() => openCinemaDetail(c)}
+                  >
+                    Xem chi tiết
+                  </button>
                 </div>
               </article>
             ))}
           </div>
         )}
       </Container>
+
+      <Dialog
+        open={Boolean(selectedCinema)}
+        onClose={closeCinemaDetail}
+        fullWidth
+        maxWidth="md"
+        PaperProps={{ className: 'cinema-detail' }}
+      >
+        <DialogContent className="cinema-detail__content">
+          <IconButton
+            className="cinema-detail__close"
+            onClick={closeCinemaDetail}
+            aria-label="Đóng chi tiết rạp"
+          >
+            <CloseRoundedIcon />
+          </IconButton>
+
+          <div className="cinema-detail__cover">
+            <img
+              src={cinemaDetail?.imageUrl || selectedCinema?.image || '/placeholder.svg'}
+              alt={cinemaDetail?.name || selectedCinema?.name || ''}
+            />
+            <div className="cinema-detail__cover-shade" />
+            <div className="cinema-detail__heading">
+              <span>{selectedCinema?.brand}</span>
+              <h2>{cinemaDetail?.name || selectedCinema?.name}</h2>
+            </div>
+          </div>
+
+          <div className="cinema-detail__body">
+            {detailLoading ? (
+              <div className="cinema-detail__loading">
+                <CircularProgress size={34} color="error" />
+                <span>Đang tải thông tin rạp…</span>
+              </div>
+            ) : detailError ? (
+              <Alert severity="error">{detailError}</Alert>
+            ) : (
+              <>
+                <div className="cinema-detail__meta">
+                  <span>
+                    <PlaceRoundedIcon />
+                    {cinemaDetail?.address || selectedCinema?.address}
+                  </span>
+                  {cinemaDetail?.phoneNumber && (
+                    <span>
+                      <PhoneRoundedIcon />
+                      {cinemaDetail.phoneNumber}
+                    </span>
+                  )}
+                  <span>
+                    <AccessTimeRoundedIcon />
+                    {selectedCinema?.openingHours}
+                  </span>
+                </div>
+
+                <div className="cinema-detail__section-heading">
+                  <div>
+                    <span>PHÒNG CHIẾU</span>
+                    <h3>Không gian trải nghiệm</h3>
+                  </div>
+                  <strong>{cinemaDetail?.cinemaRooms?.length ?? 0} phòng</strong>
+                </div>
+
+                {cinemaDetail?.cinemaRooms?.length ? (
+                  <div className="cinema-detail__rooms">
+                    {cinemaDetail.cinemaRooms.map((room) => (
+                      <article key={room.id} className="cinema-room">
+                        <MeetingRoomRoundedIcon />
+                        <div>
+                          <h4>{room.name}</h4>
+                          <p>
+                            {room.type || 'Phòng tiêu chuẩn'}
+                            {room.capacity ? ` · ${room.capacity} ghế` : ''}
+                          </p>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="cinema-detail__empty">
+                    Rạp chưa có phòng chiếu đang hoạt động.
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </Box>
   );
 };
