@@ -1,4 +1,4 @@
-name: Deploy develop frontend to EC2
+name: Deploy develop changes to EC2
 
 on:
   push:
@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   deploy:
-    name: Package and deploy frontend
+    name: Detect, package and deploy changed services
     runs-on: ubuntu-latest
     environment: develop
     timeout-minutes: 30
@@ -30,9 +30,80 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v7
         with:
+          fetch-depth: 0
           persist-credentials: false
 
+      - name: Detect changed services
+        id: changes
+        shell: bash
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -Eeuo pipefail
+
+          deploy_backend=false
+          deploy_frontend=false
+
+          if [[ "${EVENT_NAME}" == "workflow_dispatch" ]]; then
+            deploy_backend=true
+            deploy_frontend=true
+            changed_files=("Manual workflow run")
+          elif [[ -z "${BEFORE_SHA}" || "${BEFORE_SHA}" =~ ^0+$ ]]; then
+            mapfile -t changed_files < <(
+              git diff-tree \
+                --no-commit-id \
+                --name-only \
+                --root \
+                -r \
+                "${GITHUB_SHA}"
+            )
+          else
+            mapfile -t changed_files < <(
+              git diff --name-only "${BEFORE_SHA}" "${GITHUB_SHA}"
+            )
+          fi
+
+          for changed_file in "${changed_files[@]}"; do
+            case "${changed_file}" in
+              backend/*)
+                deploy_backend=true
+                ;;
+              frontend/*)
+                deploy_frontend=true
+                ;;
+              docker-compose.yml)
+                deploy_backend=true
+                deploy_frontend=true
+                ;;
+            esac
+          done
+
+          if [[ "${deploy_backend}" == "true" ||
+                "${deploy_frontend}" == "true" ]]; then
+            deploy=true
+          else
+            deploy=false
+          fi
+
+          {
+            echo "backend=${deploy_backend}"
+            echo "frontend=${deploy_frontend}"
+            echo "deploy=${deploy}"
+          } >>"${GITHUB_OUTPUT}"
+
+          {
+            echo "### Deployment selection"
+            echo
+            echo "- Backend: ${deploy_backend}"
+            echo "- Frontend: ${deploy_frontend}"
+            echo
+            echo "Changed files:"
+            printf -- '- `%s`\n' "${changed_files[@]}"
+          } >>"${GITHUB_STEP_SUMMARY}"
+
       - name: Validate deployment configuration
+        if: steps.changes.outputs.deploy == 'true'
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -42,6 +113,7 @@ jobs:
           (( EC2_SSH_PORT >= 1 && EC2_SSH_PORT <= 65535 ))
 
       - name: Create source ZIP
+        if: steps.changes.outputs.deploy == 'true'
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -60,6 +132,7 @@ jobs:
           unzip -t "${archive_path}" >/dev/null
 
       - name: Configure SSH
+        if: steps.changes.outputs.deploy == 'true'
         shell: bash
         env:
           EC2_SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
@@ -80,6 +153,7 @@ jobs:
           ssh-keygen -y -f "${HOME}/.ssh/ec2_deploy_key" >/dev/null
 
       - name: Upload source ZIP
+        if: steps.changes.outputs.deploy == 'true'
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -96,7 +170,8 @@ jobs:
             "${RUNNER_TEMP}/${ARCHIVE_NAME}" \
             "${EC2_USER}@${EC2_HOST}:/tmp/${ARCHIVE_NAME}"
 
-      - name: Rebuild and restart frontend on EC2
+      - name: Rebuild and restart changed services on EC2
+        if: steps.changes.outputs.deploy == 'true'
         shell: bash
         run: |
           set -Eeuo pipefail
@@ -111,5 +186,7 @@ jobs:
             -o StrictHostKeyChecking=yes \
             -o TCPKeepAlive=yes \
             "${EC2_USER}@${EC2_HOST}" \
-            "bash -s -- '${GITHUB_SHA}'" \
+            "bash -s -- '${GITHUB_SHA}' \
+              '${{ steps.changes.outputs.backend }}' \
+              '${{ steps.changes.outputs.frontend }}'" \
             < .github/scripts/deploy-ec2.sh
