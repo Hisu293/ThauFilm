@@ -18,4 +18,5 @@ public class TheaterResponse {
     private String phoneNumber;
     private String imageUrl;
     private TheaterStatus status;
+    private long roomCount;
 }

@@ -44,15 +44,17 @@ public class TheaterService {
 
     @Transactional(readOnly = true)
     public List<TheaterResponse> getAllActiveTheaters() {
+        Map<UUID, Long> activeRoomCounts = getActiveRoomCounts();
         return theaterRepository.findByStatus(TheaterStatus.ACTIVE).stream()
-                .map(this::toResponse)
+                .map(theater -> toResponse(theater, activeRoomCounts.getOrDefault(theater.getId(), 0L)))
                 .collect(Collectors.toList());
     }
 
     @Transactional(readOnly = true)
     public List<TheaterResponse> getAllTheaters() {
+        Map<UUID, Long> activeRoomCounts = getActiveRoomCounts();
         return theaterRepository.findAll(Sort.by(Sort.Direction.DESC, "createdAt")).stream()
-                .map(this::toResponse)
+                .map(theater -> toResponse(theater, activeRoomCounts.getOrDefault(theater.getId(), 0L)))
                 .collect(Collectors.toList());
     }
 
@@ -163,6 +165,14 @@ public class TheaterService {
     }
 
     private TheaterResponse toResponse(Theater theater) {
+        long activeRoomCount = cinemaRoomRepository.countByTheaterIdAndStatus(
+                theater.getId(),
+                RoomStatus.ACTIVE
+        );
+        return toResponse(theater, activeRoomCount);
+    }
+
+    private TheaterResponse toResponse(Theater theater, long activeRoomCount) {
         return TheaterResponse.builder()
                 .id(theater.getId())
                 .name(theater.getName())
@@ -171,7 +181,13 @@ public class TheaterService {
                 .phoneNumber(theater.getPhoneNumber())
                 .imageUrl(resolveImageUrl(theater.getImageUrl()))
                 .status(theater.getStatus())
+                .roomCount(activeRoomCount)
                 .build();
+    }
+
+    private Map<UUID, Long> getActiveRoomCounts() {
+        return cinemaRoomRepository.findByStatus(RoomStatus.ACTIVE).stream()
+                .collect(Collectors.groupingBy(CinemaRoom::getTheaterId, Collectors.counting()));
     }
 
     private Map<String, Object> theaterAuditValues(Theater theater) {

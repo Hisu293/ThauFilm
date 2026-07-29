@@ -12,4 +12,5 @@ import java.util.UUID;
 public interface CinemaRoomRepository extends JpaRepository<CinemaRoom, UUID> {
     List<CinemaRoom> findByStatus(RoomStatus status);
     List<CinemaRoom> findByTheaterId(UUID theaterId);
+    long countByTheaterIdAndStatus(UUID theaterId, RoomStatus status);
 }
