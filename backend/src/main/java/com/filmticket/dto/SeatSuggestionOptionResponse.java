@@ -11,6 +11,7 @@ import java.util.UUID;
 public class SeatSuggestionOptionResponse {
     private String rowName;
     private boolean exactMatch;
+    private int seatCapacity;
     private List<UUID> seatIds;
     private List<ShowtimeSeatResponse> seats;
 }

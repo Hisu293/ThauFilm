@@ -128,7 +128,8 @@ public class BookingService {
                 .sorted(Comparator.comparing(ShowtimeSeatResponse::getRowName)
                         .thenComparing(ShowtimeSeatResponse::getSeatNumber))
                 .toList();
-        if (availableSeats.size() < count) {
+        int availableCapacity = availableSeats.stream().mapToInt(this::seatCapacity).sum();
+        if (availableCapacity < count) {
             throw new BadRequestException("Không còn đủ " + count + " ghế trống cho suất chiếu này");
         }
 
@@ -138,7 +139,7 @@ public class BookingService {
                     if (candidate == null) return null;
                     int span = candidate.seats().get(candidate.seats().size() - 1).getSeatNumber()
                             - candidate.seats().get(0).getSeatNumber();
-                    return new RankedRowCandidate(entry.getKey(), candidate, span == count - 1);
+                    return new RankedRowCandidate(entry.getKey(), candidate, span == candidate.seats().size() - 1);
                 })
                 .filter(Objects::nonNull)
                 .sorted(Comparator.comparing(RankedRowCandidate::exactMatch).reversed()
@@ -153,7 +154,8 @@ public class BookingService {
                 .map(candidate -> toSeatSuggestionOption(
                         candidate.rowName(),
                         candidate.exactMatch(),
-                        candidate.candidate().seats()
+                        candidate.candidate().seats(),
+                        candidate.candidate().capacity()
                 ))
                 .toList();
         SeatSuggestionOptionResponse recommended = options.get(0);
@@ -169,22 +171,30 @@ public class BookingService {
     }
 
     private Candidate bestWindow(List<ShowtimeSeatResponse> rowSeats, int count, boolean requireAdjacent) {
-        if (rowSeats.size() < count) return null;
+        if (rowSeats.isEmpty()) return null;
         Candidate best = null;
-        int rowCenter = rowSeats.get(0).getSeatNumber()
-                + rowSeats.get(rowSeats.size() - 1).getSeatNumber();
-        for (int start = 0; start <= rowSeats.size() - count; start++) {
-            List<ShowtimeSeatResponse> window = rowSeats.subList(start, start + count);
-            int span = window.get(window.size() - 1).getSeatNumber() - window.get(0).getSeatNumber();
-            if (requireAdjacent && span != count - 1) continue;
-            int gaps = span - (count - 1);
-            int candidateCenter = window.get(0).getSeatNumber()
-                    + window.get(window.size() - 1).getSeatNumber();
-            int centerPenalty = Math.abs(candidateCenter - rowCenter);
-            Candidate candidate = new Candidate(List.copyOf(window), span * 100 + gaps * 1_000 + centerPenalty);
-            if (best == null || candidate.score() < best.score()) best = candidate;
+        int rowCenter = rowSeats.get(0).getSeatNumber() + rowSeats.get(rowSeats.size() - 1).getSeatNumber();
+        for (int start = 0; start < rowSeats.size(); start++) {
+            int capacity = 0;
+            for (int end = start; end < rowSeats.size(); end++) {
+                capacity += seatCapacity(rowSeats.get(end));
+                if (capacity > count) break;
+                if (capacity < count) continue;
+                List<ShowtimeSeatResponse> window = List.copyOf(rowSeats.subList(start, end + 1));
+                int span = window.get(window.size() - 1).getSeatNumber() - window.get(0).getSeatNumber();
+                if (requireAdjacent && span != window.size() - 1) continue;
+                int gaps = span - (window.size() - 1);
+                int candidateCenter = window.get(0).getSeatNumber() + window.get(window.size() - 1).getSeatNumber();
+                int centerPenalty = Math.abs(candidateCenter - rowCenter);
+                Candidate candidate = new Candidate(window, capacity, span * 100 + gaps * 1_000 + centerPenalty);
+                if (best == null || candidate.score() < best.score()) best = candidate;
+            }
         }
         return best;
+    }
+
+    private int seatCapacity(ShowtimeSeatResponse seat) {
+        return "COUPLE".equalsIgnoreCase(seat.getType()) ? 2 : 1;
     }
 
     private Map<String, List<ShowtimeSeatResponse>> seatsByRow(List<ShowtimeSeatResponse> seats) {
@@ -199,17 +209,19 @@ public class BookingService {
     private SeatSuggestionOptionResponse toSeatSuggestionOption(
             String rowName,
             boolean exactMatch,
-            List<ShowtimeSeatResponse> seats
+            List<ShowtimeSeatResponse> seats,
+            int seatCapacity
     ) {
         return SeatSuggestionOptionResponse.builder()
                 .rowName(rowName)
                 .exactMatch(exactMatch)
+                .seatCapacity(seatCapacity)
                 .seatIds(seats.stream().map(ShowtimeSeatResponse::getSeatId).toList())
                 .seats(seats)
                 .build();
     }
 
-    private record Candidate(List<ShowtimeSeatResponse> seats, int score) {}
+    private record Candidate(List<ShowtimeSeatResponse> seats, int capacity, int score) {}
     private record RankedRowCandidate(String rowName, Candidate candidate, boolean exactMatch) {}
 
     @Transactional

@@ -476,7 +476,7 @@ export const SeatSelectionPage = () => {
       const options = (suggestion?.options ?? []).map((option) => ({
         ...option,
         seats: bookingService.normalizeSeats(option?.seats ?? []),
-      })).filter((option) => option.seats.length === count);
+      })).filter((option) => (option.seatCapacity ?? option.seats.length) === count);
       if (options.length === 0) {
         throw new Error('Hệ thống chưa tìm được đủ ghế phù hợp. Vui lòng thử lại.');
       }
@@ -962,7 +962,7 @@ export const SeatSelectionPage = () => {
                               {index === 0 && <Chip size="small" color="primary" label="Tốt nhất" sx={{ height: 20 }} />}
                             </Stack>
                             <Typography variant="caption" color="text.secondary" noWrap sx={{ display: 'block', mt: 0.25 }}>
-                              {firstSeat}–{lastSeat} · {option.seats.length} ghế · {option.exactMatch ? 'liền nhau' : 'gần nhất'}
+                              {firstSeat}–{lastSeat} · {option.seatCapacity ?? option.seats.length} chỗ · {option.exactMatch ? 'liền nhau' : 'gần nhất'}
                             </Typography>
                           </Paper>
                         );
