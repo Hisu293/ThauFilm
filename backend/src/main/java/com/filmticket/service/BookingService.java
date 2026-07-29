@@ -53,6 +53,7 @@ public class BookingService {
     private final LoyaltyService loyaltyService;
     private final BookingComboItemRepository bookingComboItemRepository;
     private final ShowtimeService showtimeService;
+    private final AuditLogService auditLogService;
 
     @Value("${app.mail.from:onboarding@resend.dev}")
     private String mailFrom;
@@ -127,7 +128,8 @@ public class BookingService {
                 .sorted(Comparator.comparing(ShowtimeSeatResponse::getRowName)
                         .thenComparing(ShowtimeSeatResponse::getSeatNumber))
                 .toList();
-        if (availableSeats.size() < count) {
+        int availableCapacity = availableSeats.stream().mapToInt(this::seatCapacity).sum();
+        if (availableCapacity < count) {
             throw new BadRequestException("Không còn đủ " + count + " ghế trống cho suất chiếu này");
         }
 
@@ -137,7 +139,7 @@ public class BookingService {
                     if (candidate == null) return null;
                     int span = candidate.seats().get(candidate.seats().size() - 1).getSeatNumber()
                             - candidate.seats().get(0).getSeatNumber();
-                    return new RankedRowCandidate(entry.getKey(), candidate, span == count - 1);
+                    return new RankedRowCandidate(entry.getKey(), candidate, span == candidate.seats().size() - 1);
                 })
                 .filter(Objects::nonNull)
                 .sorted(Comparator.comparing(RankedRowCandidate::exactMatch).reversed()
@@ -152,7 +154,8 @@ public class BookingService {
                 .map(candidate -> toSeatSuggestionOption(
                         candidate.rowName(),
                         candidate.exactMatch(),
-                        candidate.candidate().seats()
+                        candidate.candidate().seats(),
+                        candidate.candidate().capacity()
                 ))
                 .toList();
         SeatSuggestionOptionResponse recommended = options.get(0);
@@ -168,22 +171,30 @@ public class BookingService {
     }
 
     private Candidate bestWindow(List<ShowtimeSeatResponse> rowSeats, int count, boolean requireAdjacent) {
-        if (rowSeats.size() < count) return null;
+        if (rowSeats.isEmpty()) return null;
         Candidate best = null;
-        int rowCenter = rowSeats.get(0).getSeatNumber()
-                + rowSeats.get(rowSeats.size() - 1).getSeatNumber();
-        for (int start = 0; start <= rowSeats.size() - count; start++) {
-            List<ShowtimeSeatResponse> window = rowSeats.subList(start, start + count);
-            int span = window.get(window.size() - 1).getSeatNumber() - window.get(0).getSeatNumber();
-            if (requireAdjacent && span != count - 1) continue;
-            int gaps = span - (count - 1);
-            int candidateCenter = window.get(0).getSeatNumber()
-                    + window.get(window.size() - 1).getSeatNumber();
-            int centerPenalty = Math.abs(candidateCenter - rowCenter);
-            Candidate candidate = new Candidate(List.copyOf(window), span * 100 + gaps * 1_000 + centerPenalty);
-            if (best == null || candidate.score() < best.score()) best = candidate;
+        int rowCenter = rowSeats.get(0).getSeatNumber() + rowSeats.get(rowSeats.size() - 1).getSeatNumber();
+        for (int start = 0; start < rowSeats.size(); start++) {
+            int capacity = 0;
+            for (int end = start; end < rowSeats.size(); end++) {
+                capacity += seatCapacity(rowSeats.get(end));
+                if (capacity > count) break;
+                if (capacity < count) continue;
+                List<ShowtimeSeatResponse> window = List.copyOf(rowSeats.subList(start, end + 1));
+                int span = window.get(window.size() - 1).getSeatNumber() - window.get(0).getSeatNumber();
+                if (requireAdjacent && span != window.size() - 1) continue;
+                int gaps = span - (window.size() - 1);
+                int candidateCenter = window.get(0).getSeatNumber() + window.get(window.size() - 1).getSeatNumber();
+                int centerPenalty = Math.abs(candidateCenter - rowCenter);
+                Candidate candidate = new Candidate(window, capacity, span * 100 + gaps * 1_000 + centerPenalty);
+                if (best == null || candidate.score() < best.score()) best = candidate;
+            }
         }
         return best;
+    }
+
+    private int seatCapacity(ShowtimeSeatResponse seat) {
+        return "COUPLE".equalsIgnoreCase(seat.getType()) ? 2 : 1;
     }
 
     private Map<String, List<ShowtimeSeatResponse>> seatsByRow(List<ShowtimeSeatResponse> seats) {
@@ -198,17 +209,19 @@ public class BookingService {
     private SeatSuggestionOptionResponse toSeatSuggestionOption(
             String rowName,
             boolean exactMatch,
-            List<ShowtimeSeatResponse> seats
+            List<ShowtimeSeatResponse> seats,
+            int seatCapacity
     ) {
         return SeatSuggestionOptionResponse.builder()
                 .rowName(rowName)
                 .exactMatch(exactMatch)
+                .seatCapacity(seatCapacity)
                 .seatIds(seats.stream().map(ShowtimeSeatResponse::getSeatId).toList())
                 .seats(seats)
                 .build();
     }
 
-    private record Candidate(List<ShowtimeSeatResponse> seats, int score) {}
+    private record Candidate(List<ShowtimeSeatResponse> seats, int capacity, int score) {}
     private record RankedRowCandidate(String rowName, Candidate candidate, boolean exactMatch) {}
 
     @Transactional
@@ -265,6 +278,13 @@ public class BookingService {
             bookingSeatRepository.save(bs);
         }
 
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(AuditAction.CINEMA_BOOKING_CREATED).targetType("BOOKING")
+                .targetId(booking.getId().toString())
+                .description("Đã tạo đơn đặt vé tại rạp")
+                .actorId(userId).correlationId(booking.getId().toString())
+                .newValues(bookingAuditValues(booking))
+                .metadata(Map.of("mãGhế", requestedSeatIds, "kênhĐặtVé", request.getChannel())).build());
         return toBookingResponse(booking, seats);
     }
 
@@ -303,6 +323,13 @@ public class BookingService {
                 .build();
 
         booking = bookingRepository.save(booking);
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(AuditAction.ONLINE_BOOKING_CREATED).targetType("BOOKING")
+                .targetId(booking.getId().toString())
+                .description("Đã tạo đơn mua quyền xem phim online")
+                .actorId(userId).correlationId(booking.getId().toString())
+                .newValues(bookingAuditValues(booking))
+                .metadata(Map.of("mãPhim", movie.getId(), "mãSuấtChiếu", showtime.getId())).build());
         return toBookingResponse(booking, List.of());
     }
 
@@ -362,6 +389,11 @@ public class BookingService {
         booking = bookingRepository.save(booking);
         replaceBookingCombos(booking.getId(), request.getComboIds());
 
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(AuditAction.BOOKING_SEATS_UPDATED).targetType("BOOKING")
+                .targetId(bookingId.toString()).description("Đã cập nhật ghế trong đơn đặt vé")
+                .actorId(userId).correlationId(bookingId.toString())
+                .metadata(Map.of("mãGhếMới", requestedSeatIds)).build());
         return toBookingResponse(booking, newSeats);
     }
 
@@ -436,6 +468,11 @@ public class BookingService {
                 .paidAt(isExternalProvider(paymentMethod) ? null : now())
                 .build();
         payment = paymentRepository.save(payment);
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(AuditAction.PAYMENT_CREATED).targetType("PAYMENT")
+                .targetId(payment.getId().toString()).description("Đã khởi tạo thanh toán cho đơn đặt vé")
+                .actorId(userId).correlationId(bookingId.toString())
+                .newValues(paymentAuditValues(payment)).sensitive(true).build());
 
         if (isExternalProvider(paymentMethod)) {
             PaymentGatewayService.GatewayPayment gatewayPayment = paymentGatewayService.createGatewayPayment(
@@ -553,6 +590,20 @@ public class BookingService {
         BookingPaymentResponse response = BookingPaymentResponse.fromPaymentResult(
                 booking, payment, ticketResponses, originalAmount, discountAmount, discountCode);
 
+        boolean onlineBooking = isOnlineBooking(booking);
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(AuditAction.PAYMENT_SUCCEEDED).targetType("PAYMENT")
+                .targetId(payment.getId().toString()).description("Thanh toán đơn đặt vé thành công")
+                .actorId(booking.getUserId()).correlationId(booking.getId().toString())
+                .newValues(paymentAuditValues(payment)).sensitive(true).build());
+        if (onlineBooking) {
+            auditLogService.success(AuditLogService.AuditCommand.builder()
+                    .action(AuditAction.ONLINE_ACCESS_GRANTED).targetType("BOOKING")
+                    .targetId(booking.getId().toString()).description("Đã cấp quyền xem phim online")
+                    .actorId(booking.getUserId()).correlationId(booking.getId().toString())
+                    .metadata(Map.of("mãSuấtChiếu", booking.getShowtimeId())).build());
+        }
+
         loyaltyService.awardBookingPoints(booking.getId(), booking.getUserId(), payment.getAmount());
 
         realtimeEventService.notifyUser(booking.getUserId(), "BOOKING_CONFIRMED", "Đặt vé thành công",
@@ -606,6 +657,12 @@ public class BookingService {
         ticket.setCheckedIn(true);
         ticket.setCheckedInAt(now());
         ticket = ticketRepository.save(ticket);
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(AuditAction.TICKET_CHECKED_IN).targetType("TICKET")
+                .targetId(ticket.getId().toString()).description("Soát vé thành công")
+                .correlationId(ticket.getBookingId().toString())
+                .metadata(Map.of("mãVé", ticket.getTicketCode(), "thờiGianSoátVé", ticket.getCheckedInAt()))
+                .build());
         return TicketResponse.fromTicket(ticket);
     }
 
@@ -627,6 +684,10 @@ public class BookingService {
             releaseSeats(booking);
             booking.setStatus(BookingStatus.EXPIRED);
             bookingRepository.save(booking);
+            auditLogService.success(AuditLogService.AuditCommand.builder()
+                    .action(AuditAction.BOOKING_EXPIRED).targetType("BOOKING")
+                    .targetId(bookingId.toString()).description("Đơn đặt vé đã hết thời gian giữ chỗ")
+                    .actorId(booking.getUserId()).correlationId(bookingId.toString()).build());
         }
     }
 
@@ -634,6 +695,8 @@ public class BookingService {
     public void cancelBooking(UUID bookingId, UUID userId) {
         Booking booking = bookingRepository.findByIdAndUserId(bookingId, userId)
                 .orElseThrow(() -> new BadRequestException("Booking not found"));
+        boolean onlineBooking = isOnlineBooking(booking);
+        BookingStatus oldStatus = booking.getStatus();
 
         if (booking.getStatus() == BookingStatus.HOLD) {
             releaseSeats(booking);
@@ -645,6 +708,13 @@ public class BookingService {
         } else {
             throw new BadRequestException("Cannot cancel booking with status: " + booking.getStatus());
         }
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(onlineBooking ? AuditAction.ONLINE_BOOKING_CANCELLED : AuditAction.CINEMA_BOOKING_CANCELLED)
+                .targetType("BOOKING").targetId(bookingId.toString())
+                .description(onlineBooking ? "Đã hủy đơn xem phim online" : "Đã hủy đơn đặt vé tại rạp")
+                .actorId(userId).correlationId(bookingId.toString())
+                .oldValues(Map.of("trạngThái", oldStatus))
+                .newValues(Map.of("trạngThái", booking.getStatus())).build());
     }
 
     @Transactional
@@ -659,6 +729,34 @@ public class BookingService {
                 seatAvailabilityRepository.save(av);
             }
         }
+    }
+
+    private boolean isOnlineBooking(Booking booking) {
+        return showtimeRepository.findById(booking.getShowtimeId())
+                .map(Showtime::isOnline)
+                .orElse(false);
+    }
+
+    private Map<String, Object> bookingAuditValues(Booking booking) {
+        Map<String, Object> values = new LinkedHashMap<>();
+        values.put("mãNgườiDùng", booking.getUserId());
+        values.put("mãSuấtChiếu", booking.getShowtimeId());
+        values.put("tổngTiền", booking.getTotalAmount());
+        values.put("trạngThái", booking.getStatus());
+        values.put("mãXácNhận", booking.getConfirmationCode());
+        values.put("hếtHạnGiữChỗ", booking.getHoldExpiresAt());
+        return values;
+    }
+
+    private Map<String, Object> paymentAuditValues(Payment payment) {
+        Map<String, Object> values = new LinkedHashMap<>();
+        values.put("mãĐơnĐặtVé", payment.getBookingId());
+        values.put("sốTiền", payment.getAmount());
+        values.put("phươngThức", payment.getPaymentMethod());
+        values.put("nhàCungCấp", payment.getProvider());
+        values.put("trạngThái", payment.getStatus());
+        values.put("mãGiaoDịch", payment.getTransactionId());
+        return values;
     }
 
     private List<UUID> normalizeSeatIds(List<UUID> seatIds) {
@@ -772,7 +870,7 @@ public class BookingService {
         helper.addAttachment("ticket.pdf", new ByteArrayResource(pdfBytes));
 
         mailSender.send(message);
-        log.info("Ticket email sent to {} for booking {}", to, booking.getId());
+        log.info("Đã gửi email vé đến {} cho đơn đặt vé {}", to, booking.getId());
     }
 
     public void sendConfirmedBookingEmail(Booking booking) {
@@ -783,14 +881,14 @@ public class BookingService {
         List<Ticket> tickets = ticketRepository.findByBookingId(booking.getId());
         if (user == null || user.getEmail() == null || user.getEmail().isBlank()
                 || payment == null || tickets.isEmpty()) {
-            log.warn("Skip ticket email for booking {} because user, payment, email or ticket is missing", booking.getId());
+            log.warn("Bỏ qua email vé cho đơn đặt vé {} vì thiếu người dùng, thanh toán, email hoặc vé", booking.getId());
             return;
         }
 
         try {
             sendTicketEmail(user.getEmail(), booking, tickets, payment, BigDecimal.ZERO, payment.getAmount());
         } catch (Exception ex) {
-            log.error("Failed to send group ticket email for booking {}", booking.getId(), ex);
+            log.error("Không thể gửi email vé nhóm cho đơn đặt vé {}", booking.getId(), ex);
         }
     }
 
@@ -804,14 +902,14 @@ public class BookingService {
         List<Ticket> tickets = ticketRepository.findByBookingId(bookingId);
         if (user == null || user.getEmail() == null || user.getEmail().isBlank()
                 || payment == null || tickets.isEmpty()) {
-            log.warn("Skip ticket email for booking {} because user, payment, email or ticket is missing", bookingId);
+            log.warn("Bỏ qua email vé cho đơn đặt vé {} vì thiếu người dùng, thanh toán, email hoặc vé", bookingId);
             return;
         }
 
         try {
             sendTicketEmail(user.getEmail(), booking, tickets, payment, discountAmount, finalAmount);
         } catch (Exception ex) {
-            log.error("Failed to send ticket email for booking {}", bookingId, ex);
+            log.error("Không thể gửi email vé cho đơn đặt vé {}", bookingId, ex);
         }
     }
 

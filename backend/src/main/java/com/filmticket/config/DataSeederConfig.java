@@ -51,9 +51,9 @@ public class DataSeederConfig {
 
         if (changed) {
             userRepository.save(existingAdmin);
-            log.info("Reset default admin account credentials: {} / {}", ADMIN_EMAIL, DEFAULT_ADMIN_PASSWORD);
+            log.info("Đã đặt lại thông tin đăng nhập tài khoản quản trị mặc định: {} / {}", ADMIN_EMAIL, DEFAULT_ADMIN_PASSWORD);
         } else {
-            log.info("Default admin account is ready: {}", ADMIN_EMAIL);
+            log.info("Tài khoản quản trị mặc định đã sẵn sàng: {}", ADMIN_EMAIL);
         }
     }
 
@@ -69,6 +69,6 @@ public class DataSeederConfig {
                 .build();
 
         userRepository.save(admin);
-        log.info("Seeded default admin account: {} / {}", ADMIN_EMAIL, DEFAULT_ADMIN_PASSWORD);
+        log.info("Đã tạo dữ liệu tài khoản quản trị mặc định: {} / {}", ADMIN_EMAIL, DEFAULT_ADMIN_PASSWORD);
     }
 }

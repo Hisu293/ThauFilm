@@ -22,6 +22,7 @@ public class MovieResponse {
     private BigDecimal rating;
     private boolean active;
     private String posterUrl;
+    private String heroBannerUrl;
     private String trailerUrl;
     private String trailerKey;
     private String director;
@@ -45,9 +46,14 @@ public class MovieResponse {
     }
 
     public static MovieResponse fromMovie(Movie movie, String posterUrl, String trailerUrl) {
+        return fromMovie(movie, posterUrl, trailerUrl, movie.getHeroBannerUrl());
+    }
+
+    public static MovieResponse fromMovie(Movie movie, String posterUrl, String trailerUrl, String heroBannerUrl) {
         MovieResponse response = fromMovie(movie, false);
         response.setPosterUrl(posterUrl);
         response.setTrailerUrl(trailerUrl);
+        response.setHeroBannerUrl(heroBannerUrl);
         return response;
     }
 
@@ -62,9 +68,14 @@ public class MovieResponse {
     }
 
     public static MovieResponse fromMovieWithStream(Movie movie, String posterUrl, String trailerUrl) {
+        return fromMovieWithStream(movie, posterUrl, trailerUrl, movie.getHeroBannerUrl());
+    }
+
+    public static MovieResponse fromMovieWithStream(Movie movie, String posterUrl, String trailerUrl, String heroBannerUrl) {
         MovieResponse response = fromMovie(movie, true);
         response.setPosterUrl(posterUrl);
         response.setTrailerUrl(trailerUrl);
+        response.setHeroBannerUrl(heroBannerUrl);
         return response;
     }
 
@@ -77,6 +88,7 @@ public class MovieResponse {
                 .rating(movie.getRating())
                 .active(movie.isActive())
                 .posterUrl(movie.getPosterUrl())
+                .heroBannerUrl(movie.getHeroBannerUrl())
                 .trailerUrl(movie.getTrailerUrl())
                 .trailerKey(includeStream ? movie.getTrailerUrl() : null)
                 .director(movie.getDirector())

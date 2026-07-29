@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -31,32 +32,37 @@ public class MovieService {
     private final MovieRepository movieRepository;
     private final MovieEventService movieEventService;
     private final S3PresignedUrlService s3PresignedUrlService;
+    private final AuditLogService auditLogService;
 
     @Transactional(readOnly = true)
     public List<MovieResponse> getAllMovies() {
         return movieRepository.findAll().stream()
-                .map(movie -> MovieResponse.fromMovieWithStream(movie, resolvePosterUrl(movie), resolveTrailerUrl(movie)))
+                .map(movie -> MovieResponse.fromMovieWithStream(
+                        movie, resolvePosterUrl(movie), resolveTrailerUrl(movie), resolveHeroBannerUrl(movie)))
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public List<MovieResponse> getActiveMovies() {
         return movieRepository.findAllByActiveTrue().stream()
-                .map(movie -> MovieResponse.fromMovie(movie, resolvePosterUrl(movie), resolveTrailerUrl(movie)))
+                .map(movie -> MovieResponse.fromMovie(
+                        movie, resolvePosterUrl(movie), resolveTrailerUrl(movie), resolveHeroBannerUrl(movie)))
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public List<MovieCardResponse> getActiveMovieCards() {
         return movieRepository.findAllByActiveTrue().stream()
-                .map(movie -> MovieCardResponse.fromMovie(movie, resolvePosterUrl(movie), resolveTrailerUrl(movie)))
+                .map(movie -> MovieCardResponse.fromMovie(
+                        movie, resolvePosterUrl(movie), resolveTrailerUrl(movie), resolveHeroBannerUrl(movie)))
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public List<MovieCardResponse> getActiveMovieCardsByStatus(Movie.Status status) {
         return movieRepository.findAllByActiveTrueAndStatus(status).stream()
-                .map(movie -> MovieCardResponse.fromMovie(movie, resolvePosterUrl(movie), resolveTrailerUrl(movie)))
+                .map(movie -> MovieCardResponse.fromMovie(
+                        movie, resolvePosterUrl(movie), resolveTrailerUrl(movie), resolveHeroBannerUrl(movie)))
                 .toList();
     }
 
@@ -66,13 +72,15 @@ public class MovieService {
         if (!movie.isActive()) {
             throw new BadRequestException("Movie is not available");
         }
-        return MovieResponse.fromMovie(movie, resolvePosterUrl(movie), resolveTrailerUrl(movie));
+        return MovieResponse.fromMovie(
+                movie, resolvePosterUrl(movie), resolveTrailerUrl(movie), resolveHeroBannerUrl(movie));
     }
 
     @Transactional(readOnly = true)
     public MovieResponse getMovieById(UUID movieId) {
         Movie movie = getMovieEntityOrThrow(movieId);
-        return MovieResponse.fromMovieWithStream(movie, resolvePosterUrl(movie), resolveTrailerUrl(movie));
+        return MovieResponse.fromMovieWithStream(
+                movie, resolvePosterUrl(movie), resolveTrailerUrl(movie), resolveHeroBannerUrl(movie));
     }
 
     @Transactional
@@ -86,6 +94,7 @@ public class MovieService {
                 .rating(request.getRating())
                 .active(Boolean.TRUE.equals(request.getActive()))
                 .posterUrl(normalizeNullable(request.getPosterUrl()))
+                .heroBannerUrl(normalizeNullable(request.getHeroBannerUrl()))
                 .trailerUrl(normalizeNullable(request.getTrailerUrl()))
                 .director(normalizeNullable(request.getDirector()))
                 .actors(normalizeNullable(request.getActors()))
@@ -99,7 +108,12 @@ public class MovieService {
                 .build();
 
         Movie saved = movieRepository.save(movie);
-        MovieResponse response = MovieResponse.fromMovieWithStream(saved, resolvePosterUrl(saved), resolveTrailerUrl(saved));
+        MovieResponse response = MovieResponse.fromMovieWithStream(
+                saved, resolvePosterUrl(saved), resolveTrailerUrl(saved), resolveHeroBannerUrl(saved));
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(AuditAction.MOVIE_CREATED).targetType("MOVIE").targetId(saved.getId().toString())
+                .description("Đã tạo phim \"" + saved.getTitle() + "\"")
+                .newValues(movieAuditValues(saved)).build());
         movieEventService.publishMovieCreated(response);
         return response;
     }
@@ -107,6 +121,8 @@ public class MovieService {
     @Transactional
     public MovieResponse updateMovie(UUID movieId, @Valid UpsertMovieRequest request) {
         Movie movie = getMovieEntityOrThrow(movieId);
+        Map<String, Object> oldValues = movieAuditValues(movie);
+        String oldStreamKey = movie.getStreamKey();
         validateTitleUniqueness(request.getTitle(), movieId);
 
         movie.setTitle(normalize(request.getTitle()));
@@ -115,6 +131,7 @@ public class MovieService {
         movie.setRating(request.getRating());
         movie.setActive(Boolean.TRUE.equals(request.getActive()));
         movie.setPosterUrl(normalizeNullable(request.getPosterUrl()));
+        movie.setHeroBannerUrl(normalizeNullable(request.getHeroBannerUrl()));
         movie.setTrailerUrl(normalizeNullable(request.getTrailerUrl()));
         movie.setDirector(normalizeNullable(request.getDirector()));
         movie.setActors(normalizeNullable(request.getActors()));
@@ -127,7 +144,23 @@ public class MovieService {
         movie.setStatus(request.getStatus() == null ? Movie.Status.COMING_SOON : request.getStatus());
 
         Movie saved = movieRepository.save(movie);
-        MovieResponse response = MovieResponse.fromMovieWithStream(saved, resolvePosterUrl(saved), resolveTrailerUrl(saved));
+        MovieResponse response = MovieResponse.fromMovieWithStream(
+                saved, resolvePosterUrl(saved), resolveTrailerUrl(saved), resolveHeroBannerUrl(saved));
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(AuditAction.MOVIE_UPDATED).targetType("MOVIE").targetId(saved.getId().toString())
+                .description("Đã cập nhật phim \"" + saved.getTitle() + "\"")
+                .oldValues(oldValues).newValues(movieAuditValues(saved)).build());
+        if (!java.util.Objects.equals(oldStreamKey, saved.getStreamKey())) {
+            auditLogService.success(AuditLogService.AuditCommand.builder()
+                    .action(saved.getStreamKey() == null ? AuditAction.STREAM_SOURCE_DELETED : AuditAction.STREAM_SOURCE_CHANGED)
+                    .targetType("MOVIE").targetId(saved.getId().toString())
+                    .description(saved.getStreamKey() == null
+                            ? "Đã xóa nguồn xem online của phim \"" + saved.getTitle() + "\""
+                            : "Đã thay đổi nguồn xem online của phim \"" + saved.getTitle() + "\"")
+                    .oldValues(Map.of("cóNguồnPhim", oldStreamKey != null))
+                    .newValues(Map.of("cóNguồnPhim", saved.getStreamKey() != null))
+                    .sensitive(true).build());
+        }
         movieEventService.publishMovieUpdated(response);
         return response;
     }
@@ -135,7 +168,12 @@ public class MovieService {
     @Transactional
     public void deleteMovie(UUID movieId) {
         Movie movie = getMovieEntityOrThrow(movieId);
+        Map<String, Object> oldValues = movieAuditValues(movie);
         movieRepository.delete(movie);
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(AuditAction.MOVIE_DELETED).targetType("MOVIE").targetId(movieId.toString())
+                .description("Đã xóa phim \"" + movie.getTitle() + "\"")
+                .oldValues(oldValues).build());
         movieEventService.publishMovieDeleted(movieId);
     }
 
@@ -172,6 +210,24 @@ public class MovieService {
         return s3PresignedUrlService.resolveTrailerUrl(movie.getTrailerUrl());
     }
 
+    private String resolveHeroBannerUrl(Movie movie) {
+        return s3PresignedUrlService.resolvePosterUrl(movie.getHeroBannerUrl());
+    }
+
+    private Map<String, Object> movieAuditValues(Movie movie) {
+        Map<String, Object> values = new java.util.LinkedHashMap<>();
+        values.put("tiêuĐề", movie.getTitle());
+        values.put("thờiLượngPhút", movie.getDurationMinutes());
+        values.put("trạngThái", movie.getStatus());
+        values.put("đangHoạtĐộng", movie.isActive());
+        values.put("thểLoại", movie.getGenre());
+        values.put("ảnhHero", movie.getHeroBannerUrl());
+        values.put("ngàyPhátHành", movie.getReleaseDate());
+        values.put("nhàCungCấpLuồng", movie.getStreamProvider());
+        values.put("cóNguồnPhim", movie.getStreamKey() != null && !movie.getStreamKey().isBlank());
+        return values;
+    }
+
     @Data
     @Builder
     @NoArgsConstructor
@@ -195,6 +251,7 @@ public class MovieService {
         private Boolean active = true;
 
         private String posterUrl;
+        private String heroBannerUrl;
         private String trailerUrl;
         private String director;
         private String actors;

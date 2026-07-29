@@ -16,6 +16,7 @@ import PunchClockRoundedIcon from '@mui/icons-material/PunchClockRounded';
 import WorkHistoryRoundedIcon from '@mui/icons-material/WorkHistoryRounded';
 import Inventory2RoundedIcon from '@mui/icons-material/Inventory2Rounded';
 import CurrencyExchangeRoundedIcon from '@mui/icons-material/CurrencyExchangeRounded';
+import FactCheckRoundedIcon from '@mui/icons-material/FactCheckRounded';
 
 export const ADMIN_VIEWS = {
   DASHBOARD: 'dashboard',
@@ -36,6 +37,7 @@ export const ADMIN_VIEWS = {
   REPORT_TICKETS: 'report-tickets',
   REPORT_CUSTOMERS: 'report-customers',
   INTELLIGENCE: 'intelligence',
+  AUDIT_LOGS: 'audit-logs',
 };
 
 export const ADMIN_NAV_GROUPS = [
@@ -82,6 +84,7 @@ export const ADMIN_NAV_GROUPS = [
       { id: ADMIN_VIEWS.WORKFORCE, label: 'Ca làm & bảng lương', icon: WorkHistoryRoundedIcon },
       { id: ADMIN_VIEWS.INVENTORY, label: 'Dự đoán tồn kho', icon: Inventory2RoundedIcon },
       { id: ADMIN_VIEWS.REFUNDS, label: 'Duyệt hoàn tiền', icon: CurrencyExchangeRoundedIcon },
+      { id: ADMIN_VIEWS.AUDIT_LOGS, label: 'Nhật ký hệ thống', icon: FactCheckRoundedIcon },
     ],
   },
   {
@@ -115,4 +118,5 @@ export const VIEW_META = {
   [ADMIN_VIEWS.REPORT_TICKETS]: { title: 'Thống kê vé', subtitle: 'Vé bán ra và vé hủy' },
   [ADMIN_VIEWS.REPORT_CUSTOMERS]: { title: 'Thống kê khách hàng', subtitle: 'Khách mới và khách thân thiết' },
   [ADMIN_VIEWS.INTELLIGENCE]: { title: 'AI Cinema Intelligence', subtitle: 'Tối ưu ghế, giá vé và lịch chiếu' },
+  [ADMIN_VIEWS.AUDIT_LOGS]: { title: 'Nhật ký hệ thống', subtitle: 'Theo dõi các thay đổi nghiệp vụ và sự kiện bảo mật quan trọng' },
 };

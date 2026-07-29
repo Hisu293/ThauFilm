@@ -53,7 +53,7 @@ public class RefundStatusScheduler {
                 userRepository.findById(booking.getUserId()).ifPresent(user -> refundEmailService.sendSuccess(user, booking, payment));
                 history.setStatus(RefundHistoryStatus.SUCCEEDED);
                 historyRepository.save(history);
-                log.info("PayOS đã hoàn tiền thành công sau khi chờ: bookingId={}, paymentId={}, payoutId={}",
+                log.info("PayOS đã hoàn tiền thành công sau khi chờ: mã đơn đặt vé={}, mã thanh toán={}, mã chi trả={}",
                         booking.getId(), payment.getId(), history.getPayosRefundId());
             } else if (!payout.processing()) {
                 Payment payment = paymentRepository.findById(history.getPaymentId()).orElse(null);
@@ -64,11 +64,11 @@ public class RefundStatusScheduler {
                 }
                 history.setStatus(RefundHistoryStatus.FAILED);
                 historyRepository.save(history);
-                log.error("PayOS hoàn tiền thất bại sau khi kiểm tra: bookingId={}, payoutId={}, trạng thái={}",
+                log.error("PayOS hoàn tiền thất bại sau khi kiểm tra: mã đơn đặt vé={}, mã chi trả={}, trạng thái={}",
                         history.getBookingId(), history.getPayosRefundId(), payout.state());
             }
         } catch (Exception ex) {
-            log.error("Lỗi kiểm tra hoàn tiền PayOS: bookingId={}, payoutId={}, lỗi={}",
+            log.error("Lỗi kiểm tra hoàn tiền PayOS: mã đơn đặt vé={}, mã chi trả={}, lỗi={}",
                     history.getBookingId(), history.getPayosRefundId(), ex.getMessage(), ex);
         }
     }

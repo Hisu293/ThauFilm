@@ -46,7 +46,7 @@ public class BookingExpiredScheduler {
             return;
         }
 
-        log.info("Found {} expired bookings to process", expiredBookings.size());
+        log.info("Tìm thấy {} đơn đặt vé hết hạn cần xử lý", expiredBookings.size());
 
         for (Booking booking : expiredBookings) {
             try {
@@ -57,10 +57,10 @@ public class BookingExpiredScheduler {
                 booking.setStatus(BookingStatus.EXPIRED);
                 bookingRepository.save(booking);
                 List<BookingSeat> seats = bookingSeatRepository.findByBookingId(booking.getId());
-                log.info("Expired booking {} and released {} seats",
+                log.info("Đã hết hạn đơn đặt vé {} và giải phóng {} ghế",
                         booking.getId(), seats.size());
             } catch (Exception e) {
-                log.error("Failed to expire booking {}: {}", booking.getId(), e.getMessage());
+                log.error("Không thể đánh dấu hết hạn đơn đặt vé {}: {}", booking.getId(), e.getMessage());
             }
         }
     }

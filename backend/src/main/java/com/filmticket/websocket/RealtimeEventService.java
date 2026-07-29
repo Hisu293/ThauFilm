@@ -23,12 +23,12 @@ public class RealtimeEventService {
 
     public void register(WebSocketSession session) {
         UUID userId = (UUID) session.getAttributes().get("userId");
-        log.info("[WS Register] sessionId={}, userId={}", session.getId(), userId);
+        log.info("[WS Đăng ký] sessionId={}, userId={}", session.getId(), userId);
         sessions.add(session);
     }
     public void unregister(WebSocketSession session) {
         UUID userId = (UUID) session.getAttributes().get("userId");
-        log.info("[WS Unregister] sessionId={}, userId={}", session.getId(), userId);
+        log.info("[WS Hủy đăng ký] sessionId={}, userId={}", session.getId(), userId);
         sessions.remove(session);
     }
 
@@ -92,10 +92,10 @@ public class RealtimeEventService {
         try {
             String payload = objectMapper.writeValueAsString(event);
             long matchingCount = sessions.stream().filter(WebSocketSession::isOpen).filter(predicate).count();
-            log.info("[WS Send] type={}, target={}, matchingSessions={}", eventType, targetId, matchingCount);
+            log.info("[WS Gửi] loại={}, đích={}, số phiên phù hợp={}", eventType, targetId, matchingCount);
             sessions.stream().filter(WebSocketSession::isOpen).filter(predicate).forEach(session -> send(session, payload));
         } catch (Exception exception) {
-            log.warn("[WS Send] Could not serialize realtime event: {}", exception.getMessage());
+            log.warn("[WS Gửi] Không thể tuần tự hóa sự kiện thời gian thực: {}", exception.getMessage());
         }
     }
 
@@ -104,7 +104,7 @@ public class RealtimeEventService {
             synchronized (session) { session.sendMessage(new TextMessage(payload)); }
         } catch (IOException exception) {
             sessions.remove(session);
-            log.debug("Removed closed WebSocket session {}", session.getId());
+            log.debug("Đã xóa phiên WebSocket đóng {}", session.getId());
         }
     }
 }

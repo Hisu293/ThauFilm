@@ -25,7 +25,7 @@ import java.util.UUID;
 public class S3Service {
     private static final long MAX_IMAGE_SIZE = 5L * 1024 * 1024;
     private static final long MAX_VIDEO_SIZE = 200L * 1024 * 1024;
-    private static final Set<String> ALLOWED_FOLDERS = Set.of("images", "posters", "trailers");
+    private static final Set<String> ALLOWED_FOLDERS = Set.of("images", "posters", "hero-banners", "trailers");
     private static final Set<String> IMAGE_EXTENSIONS = Set.of("jpg", "jpeg", "png", "webp");
     private static final Set<String> VIDEO_EXTENSIONS = Set.of("mp4", "mov");
 
@@ -70,10 +70,10 @@ public class S3Service {
             throw new BadRequestException("Không thể đọc file upload");
         } catch (S3Exception exception) {
             String errorCode = exception.awsErrorDetails() == null ? "unknown" : exception.awsErrorDetails().errorCode();
-            log.error("S3 upload failed: status={}, code={}", exception.statusCode(), errorCode);
+            log.error("Tải lên S3 thất bại: trạng thái={}, mã lỗi={}", exception.statusCode(), errorCode);
             throw new BadRequestException("Không thể upload file lên Amazon S3");
         } catch (SdkClientException exception) {
-            log.error("S3 client configuration/connection failed", exception);
+            log.error("Cấu hình hoặc kết nối máy khách S3 thất bại", exception);
             throw new BadRequestException("Không thể kết nối Amazon S3. Kiểm tra bucket, region và AWS credentials trên Railway");
         }
     }

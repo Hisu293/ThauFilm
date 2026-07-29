@@ -74,7 +74,7 @@ public class PayOSRefundClient {
 
             var response = restTemplate.postForEntity(PAYOUT_URL, new HttpEntity<>(payload, headers), String.class);
             responseJson = response.getBody();
-            log.info("Hoàn tiền PayOS: referenceId={}, amount={}, thời gian={}ms, response={} ",
+            log.info("Hoàn tiền PayOS: mã tham chiếu={}, số tiền={}, thời gian={}ms, phản hồi={} ",
                     referenceId, amountInVnd, System.currentTimeMillis() - startedAt, responseJson);
 
             if (!response.getStatusCode().is2xxSuccessful() || responseJson == null) {
@@ -93,11 +93,11 @@ public class PayOSRefundClient {
             }
             return new PayoutResult(payoutId, state, responseJson);
         } catch (BadRequestException ex) {
-            log.error("Hoàn tiền PayOS thất bại: referenceId={}, amount={}, response={}, lỗi={}",
+            log.error("Hoàn tiền PayOS thất bại: mã tham chiếu={}, số tiền={}, phản hồi={}, lỗi={}",
                     referenceId, amountInVnd, responseJson, ex.getMessage(), ex);
             throw ex;
         } catch (Exception ex) {
-            log.error("Lỗi kết nối PayOS khi hoàn tiền: referenceId={}, amount={}, response={}",
+            log.error("Lỗi kết nối PayOS khi hoàn tiền: mã tham chiếu={}, số tiền={}, phản hồi={}",
                     referenceId, amountInVnd, responseJson, ex);
             throw new BadRequestException("Không thể kết nối PayOS để hoàn tiền");
         }

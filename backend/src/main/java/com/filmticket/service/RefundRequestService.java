@@ -36,6 +36,7 @@ public class RefundRequestService {
     private final BookingService bookingService;
     private final RealtimeEventService realtimeEventService;
     private final CloudinaryStorageService cloudinaryStorageService;
+    private final AuditLogService auditLogService;
 
     @Value("${refund.staff-approval-threshold:200000}")
     private BigDecimal staffApprovalThreshold;
@@ -47,6 +48,13 @@ public class RefundRequestService {
         RefundRequest request = createRequest(booking, null, ticketCode, reason);
         saveMessage(request, customerId, "MEMBER", reason);
         notifyShiftLeaders("Yêu cầu hoàn tiền mới", "Khách hàng vừa gửi yêu cầu cho vé " + request.getTicketCode());
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(AuditAction.REFUND_REQUESTED).targetType("REFUND_REQUEST")
+                .targetId(request.getId().toString()).actorId(customerId)
+                .description("Khách hàng đã gửi yêu cầu hoàn tiền")
+                .reason(request.getReason()).correlationId(bookingId.toString())
+                .newValues(Map.of("sốTiền", request.getAmount(), "trạngThái", request.getStatus()))
+                .sensitive(true).build());
         return toDto(request);
     }
 
@@ -57,6 +65,13 @@ public class RefundRequestService {
         saveMessage(request, staffId, "STAFF", reason);
         realtimeEventService.notifyUser(request.getCustomerId(), "REFUND_REQUESTED", "Đã tiếp nhận yêu cầu hoàn tiền",
                 "Staff trưởng đã tạo yêu cầu hoàn tiền cho vé " + request.getTicketCode(), "/my-bookings/" + bookingId);
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(AuditAction.REFUND_REQUESTED).targetType("REFUND_REQUEST")
+                .targetId(request.getId().toString()).actorId(staffId)
+                .description("Nhân viên đã tạo yêu cầu hoàn tiền")
+                .reason(request.getReason()).correlationId(bookingId.toString())
+                .newValues(Map.of("sốTiền", request.getAmount(), "trạngThái", request.getStatus()))
+                .sensitive(true).build());
         return toDto(request);
     }
 
@@ -104,7 +119,15 @@ public class RefundRequestService {
         RefundRequest request = requireStatus(requestId, RefundRequestStatus.PENDING_APPROVAL);
         validateEligibility(request);
         requireRefundQr(request);
-        return completeRefund(request, adminId);
+        RefundRequestDto result = completeRefund(request, adminId);
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(AuditAction.REFUND_APPROVED).targetType("REFUND_REQUEST")
+                .targetId(requestId.toString()).actorId(adminId)
+                .description("Quản trị viên đã phê duyệt hoàn tiền")
+                .reason(request.getReason()).correlationId(request.getBookingId().toString())
+                .newValues(Map.of("sốTiền", request.getAmount(), "trạngThái", request.getStatus()))
+                .sensitive(true).build());
+        return result;
     }
 
     @Transactional
@@ -115,7 +138,15 @@ public class RefundRequestService {
 
     @Transactional
     public RefundRequestDto adminReject(UUID adminId, UUID requestId, String reason) {
-        return reject(requireStatus(requestId, RefundRequestStatus.PENDING_APPROVAL), adminId, reason);
+        RefundRequest request = requireStatus(requestId, RefundRequestStatus.PENDING_APPROVAL);
+        RefundRequestDto result = reject(request, adminId, reason);
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(AuditAction.REFUND_REJECTED).targetType("REFUND_REQUEST")
+                .targetId(requestId.toString()).actorId(adminId)
+                .description("Quản trị viên đã từ chối hoàn tiền")
+                .reason(reason).correlationId(request.getBookingId().toString())
+                .newValues(Map.of("trạngThái", request.getStatus())).sensitive(true).build());
+        return result;
     }
 
     public Map<String, Object> staffAccess(UUID staffId) {

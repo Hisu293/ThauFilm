@@ -36,6 +36,7 @@ public class GroupBookingService {
     private final PaymentGatewayService paymentGatewayService;
     private final GroupBookingRealtimeService groupBookingRealtimeService;
     private final LoyaltyService loyaltyService;
+    private final AuditLogService auditLogService;
 
     @Transactional
     public GroupBooking createForAcceptedInvitation(MovieMatchInvitation invitation) {
@@ -49,6 +50,13 @@ public class GroupBookingService {
                     .groupBookingId(group.getId()).userId(invitation.getSenderId()).build());
             memberRepository.save(GroupBookingMember.builder()
                     .groupBookingId(group.getId()).userId(invitation.getRecipientId()).build());
+            auditLogService.success(AuditLogService.AuditCommand.builder()
+                    .action(AuditAction.GROUP_BOOKING_CREATED).targetType("GROUP_BOOKING")
+                    .targetId(group.getId().toString()).actorId(invitation.getSenderId())
+                    .description("Đã tạo đơn đặt vé nhóm")
+                    .correlationId(group.getId().toString())
+                    .metadata(Map.of("mãLờiMời", invitation.getId(), "mãSuấtChiếu", invitation.getShowtimeId(),
+                            "thànhViên", List.of(invitation.getSenderId(), invitation.getRecipientId()))).build());
             return group;
         });
     }
@@ -312,6 +320,11 @@ public class GroupBookingService {
         group.setStatus(GroupBookingStatus.CONFIRMED);
         group.setConfirmedAt(now);
         groupBookingRepository.save(group);
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(AuditAction.GROUP_BOOKING_PAYMENT_COMPLETED).targetType("GROUP_BOOKING")
+                .targetId(group.getId().toString()).description("Cả nhóm đã hoàn tất thanh toán")
+                .correlationId(group.getId().toString())
+                .metadata(Map.of("sốThànhViên", members.size(), "trạngThái", group.getStatus())).build());
         broadcastUpdate(group);
         notifyMembers(group.getId(), "GROUP_BOOKING_CONFIRMED", "Đặt vé nhóm thành công", "Cả hai đã thanh toán. Vé đã được phát hành.");
         confirmedBookings.forEach(bookingService::sendConfirmedBookingEmail);

@@ -12,6 +12,8 @@ import com.filmticket.service.DemandPredictionService;
 import com.filmticket.service.StaffReportService;
 import com.filmticket.service.S3PresignedUrlService;
 import com.filmticket.service.UserService;
+import com.filmticket.service.AuditAction;
+import com.filmticket.service.AuditLogService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import jakarta.validation.Valid;
@@ -54,6 +56,7 @@ public class AdminController {
     private final DemandPredictionService demandPredictionService;
     private final StaffReportService staffReportService;
     private final S3PresignedUrlService s3PresignedUrlService;
+    private final AuditLogService auditLogService;
 
     @Operation(summary = "Admin test endpoint")
     @GetMapping("/ping")
@@ -212,9 +215,16 @@ public class AdminController {
             @Valid @RequestBody UpdateUserRoleRequest request
     ) {
         User user = getUserOrThrow(userId);
+        User.Role oldRole = user.getRole();
         validateRoleChange(user, request.getRole());
         user.setRole(request.getRole());
         User saved = userRepository.save(user);
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(AuditAction.USER_ROLE_CHANGED).targetType("USER").targetId(userId.toString())
+                .description("Đã thay đổi quyền của người dùng " + saved.getEmail())
+                .oldValues(Map.of("quyền", oldRole))
+                .newValues(Map.of("quyền", saved.getRole()))
+                .sensitive(true).build());
         return ResponseEntity.ok(ApiResponse.success("User role updated successfully", UserResponse.fromUser(saved)));
     }
 
@@ -225,6 +235,12 @@ public class AdminController {
         validateDisable(user);
         user.setEnabled(false);
         User saved = userRepository.save(user);
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(AuditAction.ACCOUNT_LOCKED).targetType("USER").targetId(userId.toString())
+                .description("Đã khóa tài khoản " + saved.getEmail())
+                .oldValues(Map.of("đượcPhépTruyCập", true))
+                .newValues(Map.of("đượcPhépTruyCập", false))
+                .sensitive(true).build());
         return ResponseEntity.ok(ApiResponse.success("User disabled successfully", UserResponse.fromUser(saved)));
     }
 
@@ -234,6 +250,12 @@ public class AdminController {
         User user = getUserOrThrow(userId);
         user.setEnabled(true);
         User saved = userRepository.save(user);
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(AuditAction.ACCOUNT_UNLOCKED).targetType("USER").targetId(userId.toString())
+                .description("Đã mở khóa tài khoản " + saved.getEmail())
+                .oldValues(Map.of("đượcPhépTruyCập", false))
+                .newValues(Map.of("đượcPhépTruyCập", true))
+                .sensitive(true).build());
         return ResponseEntity.ok(ApiResponse.success("User enabled successfully", UserResponse.fromUser(saved)));
     }
 
@@ -244,6 +266,10 @@ public class AdminController {
             @Valid @RequestBody UpdateUserAccessRequest request
     ) {
         User user = getUserOrThrow(userId);
+        Map<String, Object> oldValues = Map.of(
+                "quyền", user.getRole(),
+                "đượcPhépTruyCập", user.isEnabled()
+        );
 
         if (request.getRole() != null) {
             validateRoleChange(user, request.getRole());
@@ -257,6 +283,12 @@ public class AdminController {
         }
 
         User saved = userRepository.save(user);
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(AuditAction.USER_ACCESS_CHANGED).targetType("USER").targetId(userId.toString())
+                .description("Đã thay đổi quyền truy cập của người dùng " + saved.getEmail())
+                .oldValues(oldValues)
+                .newValues(Map.of("quyền", saved.getRole(), "đượcPhépTruyCập", saved.isEnabled()))
+                .sensitive(true).build());
         return ResponseEntity.ok(ApiResponse.success("User access updated successfully", UserResponse.fromUser(saved)));
     }
 

@@ -25,7 +25,20 @@ export default function NotificationBell() {
   const select = (item) => { setAnchor(null); if (item.link) navigate(item.link); };
 
   return <>
-    <IconButton color="inherit" onClick={open} aria-label="Thông báo realtime">
+    <IconButton
+      color="inherit"
+      onClick={open}
+      aria-label="Thông báo realtime"
+      sx={{
+        width: 42,
+        height: 42,
+        flex: '0 0 42px',
+        color: '#fff',
+        bgcolor: 'rgba(255,255,255,.07)',
+        border: '1px solid rgba(255,255,255,.12)',
+        '&:hover': { bgcolor: 'rgba(255,255,255,.14)' },
+      }}
+    >
       <Badge badgeContent={unread} color="error"><NotificationsNoneRoundedIcon /></Badge>
     </IconButton>
     <Menu anchorEl={anchor} open={Boolean(anchor)} onClose={() => setAnchor(null)} slotProps={{ paper: { sx: { width: 360, maxWidth: '92vw', maxHeight: 480 } } }}>

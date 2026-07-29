@@ -8,7 +8,7 @@ const buildWebSocketUrl = (movieId) => {
   base.pathname = '/ws';
   base.search = '';
   const token = getAccessToken();
-  console.debug('[WS] buildWebSocketUrl - token exists:', !!token, token ? `(${token.substring(0, 20)}...)` : '');
+  console.debug('[WS] Tạo URL WebSocket - có token:', !!token, token ? `(${token.substring(0, 20)}...)` : '');
   if (token) base.searchParams.set('token', token);
   if (movieId) base.searchParams.set('movieId', movieId);
   return base.toString();
@@ -31,32 +31,32 @@ const createSharedConnection = (movieId) => {
   const connect = () => {
     if (connection.listeners.size === 0 || connection.socket?.readyState === WebSocket.CONNECTING || connection.socket?.readyState === WebSocket.OPEN) return;
     const url = buildWebSocketUrl(movieId);
-    console.debug('[WS] Connecting to:', url.replace(/token=[^&]+/, 'token=***'));
+    console.debug('[WS] Đang kết nối tới:', url.replace(/token=[^&]+/, 'token=***'));
     const socket = new WebSocket(url);
     connection.socket = socket;
     let opened = false;
     emitStatus('connecting');
     socket.onopen = () => {
       opened = true;
-      console.info('[WS] Connected successfully');
+      console.info('[WS] Kết nối thành công');
       connection.attempts = 0;
       emitStatus('connected');
     };
     socket.onmessage = (message) => {
       try {
         const event = JSON.parse(message.data);
-        console.debug('[WS] Received event:', event.type);
+        console.debug('[WS] Đã nhận sự kiện:', event.type);
         connection.listeners.forEach((listener) => listener?.(event));
       } catch (e) {
-        console.warn('[WS] Failed to parse message:', e);
+        console.warn('[WS] Không thể phân tích tin nhắn:', e);
       }
     };
     socket.onerror = (error) => {
-      console.error('[WS] Connection error:', error);
+      console.error('[WS] Lỗi kết nối:', error);
       emitStatus('error');
     };
     socket.onclose = (event) => {
-      console.info('[WS] Connection closed, code:', event.code, 'reason:', event.reason);
+      console.info('[WS] Kết nối đã đóng, mã:', event.code, 'lý do:', event.reason);
       if (connection.socket === socket) connection.socket = null;
       emitStatus('disconnected');
       if (!opened && getAccessToken() && !movieId) {
@@ -67,7 +67,7 @@ const createSharedConnection = (movieId) => {
       if (connection.listeners.size > 0) {
         connection.attempts += 1;
         const delay = Math.min(1000 * (2 ** connection.attempts), 15000);
-        console.info('[WS] Reconnecting in', delay, 'ms, attempt:', connection.attempts);
+        console.info('[WS] Sẽ kết nối lại sau', delay, 'ms, lần thử:', connection.attempts);
         connection.reconnectTimer = window.setTimeout(connect, delay);
       }
     };
@@ -109,13 +109,13 @@ export const connectMatchChat = ({ matchId, onEvent, onStatus }) => {
   const connect = () => {
     if (stopped) return;
     const url = buildWebSocketUrl();
-    console.debug('[WS Match] Connecting to:', url.replace(/token=[^&]+/, 'token=***'));
+    console.debug('[WS Trận đấu] Đang kết nối tới:', url.replace(/token=[^&]+/, 'token=***'));
     socket = new WebSocket(url);
     let opened = false;
     onStatus?.('connecting');
     socket.onopen = () => {
       opened = true;
-      console.info('[WS Match] Connected, subscribing to match:', matchId);
+      console.info('[WS Trận đấu] Đã kết nối, đang đăng ký theo dõi trận đấu:', matchId);
       attempts = 0;
       socket.send(JSON.stringify({ type: 'MATCH_SUBSCRIBE', data: { matchId } }));
       onStatus?.('connected');
@@ -123,18 +123,18 @@ export const connectMatchChat = ({ matchId, onEvent, onStatus }) => {
     socket.onmessage = (message) => {
       try {
         const event = JSON.parse(message.data);
-        console.debug('[WS Match] Received event:', event.type);
+        console.debug('[WS Trận đấu] Đã nhận sự kiện:', event.type);
         onEvent?.(event);
       } catch (e) {
-        console.warn('[WS Match] Failed to parse message:', e);
+        console.warn('[WS Trận đấu] Không thể phân tích tin nhắn:', e);
       }
     };
     socket.onerror = (error) => {
-      console.error('[WS Match] Connection error:', error);
+      console.error('[WS Trận đấu] Lỗi kết nối:', error);
       onStatus?.('error');
     };
     socket.onclose = (event) => {
-      console.info('[WS Match] Connection closed, code:', event.code);
+      console.info('[WS Trận đấu] Kết nối đã đóng, mã:', event.code);
       onStatus?.('disconnected');
       if (!opened && getAccessToken()) {
         clearAuthStorage();
@@ -144,7 +144,7 @@ export const connectMatchChat = ({ matchId, onEvent, onStatus }) => {
       if (!stopped) {
         attempts += 1;
         const delay = Math.min(1000 * (2 ** attempts), 15000);
-        console.info('[WS Match] Reconnecting in', delay, 'ms');
+        console.info('[WS Trận đấu] Sẽ kết nối lại sau', delay, 'ms');
         reconnectTimer = window.setTimeout(connect, delay);
       }
     };
@@ -154,10 +154,10 @@ export const connectMatchChat = ({ matchId, onEvent, onStatus }) => {
   return {
     sendMessage: (matchId, content) => {
       if (socket?.readyState !== WebSocket.OPEN) {
-        console.warn('[WS Match] Cannot send, socket not open:', socket?.readyState);
+        console.warn('[WS Trận đấu] Không thể gửi vì socket chưa mở:', socket?.readyState);
         return false;
       }
-      console.debug('[WS Match] Sending message to match:', matchId);
+      console.debug('[WS Trận đấu] Đang gửi tin nhắn tới trận đấu:', matchId);
       socket.send(JSON.stringify({
         type: 'MATCH_SEND_MESSAGE',
         data: { matchId, content, clientMessageId: crypto.randomUUID() },
@@ -181,13 +181,13 @@ export const connectGroupBooking = ({ groupId, onEvent, onStatus }) => {
   const connect = () => {
     if (stopped) return;
     const url = buildWebSocketUrl();
-    console.debug('[WS Group] Connecting to:', url.replace(/token=[^&]+/, 'token=***'));
+    console.debug('[WS Nhóm] Đang kết nối tới:', url.replace(/token=[^&]+/, 'token=***'));
     socket = new WebSocket(url);
     let opened = false;
     onStatus?.('connecting');
     socket.onopen = () => {
       opened = true;
-      console.info('[WS Group] Connected, subscribing to group:', groupId);
+      console.info('[WS Nhóm] Đã kết nối, đang đăng ký theo dõi nhóm:', groupId);
       attempts = 0;
       socket.send(JSON.stringify({ type: 'GROUP_SUBSCRIBE', data: { groupId } }));
       onStatus?.('connected');
@@ -195,18 +195,18 @@ export const connectGroupBooking = ({ groupId, onEvent, onStatus }) => {
     socket.onmessage = (message) => {
       try {
         const event = JSON.parse(message.data);
-        console.debug('[WS Group] Received event:', event.type);
+        console.debug('[WS Nhóm] Đã nhận sự kiện:', event.type);
         onEvent?.(event);
       } catch (e) {
-        console.warn('[WS Group] Failed to parse message:', e);
+        console.warn('[WS Nhóm] Không thể phân tích tin nhắn:', e);
       }
     };
     socket.onerror = (error) => {
-      console.error('[WS Group] Connection error:', error);
+      console.error('[WS Nhóm] Lỗi kết nối:', error);
       onStatus?.('error');
     };
     socket.onclose = (event) => {
-      console.info('[WS Group] Connection closed, code:', event.code);
+      console.info('[WS Nhóm] Kết nối đã đóng, mã:', event.code);
       onStatus?.('disconnected');
       if (!opened && getAccessToken()) {
         clearAuthStorage();
@@ -216,7 +216,7 @@ export const connectGroupBooking = ({ groupId, onEvent, onStatus }) => {
       if (!stopped) {
         attempts += 1;
         const delay = Math.min(1000 * (2 ** attempts), 15000);
-        console.info('[WS Group] Reconnecting in', delay, 'ms');
+        console.info('[WS Nhóm] Sẽ kết nối lại sau', delay, 'ms');
         reconnectTimer = window.setTimeout(connect, delay);
       }
     };
@@ -226,10 +226,10 @@ export const connectGroupBooking = ({ groupId, onEvent, onStatus }) => {
   return {
     toggleSeat: (seatId) => {
       if (socket?.readyState !== WebSocket.OPEN) {
-        console.warn('[WS Group] Cannot toggle, socket not open:', socket?.readyState);
+        console.warn('[WS Nhóm] Không thể đổi trạng thái vì socket chưa mở:', socket?.readyState);
         return false;
       }
-      console.debug('[WS Group] Toggling seat:', seatId);
+      console.debug('[WS Nhóm] Đang đổi trạng thái ghế:', seatId);
       socket.send(JSON.stringify({ type: 'GROUP_SEAT_TOGGLE', data: { groupId, seatId } }));
       return true;
     },
@@ -249,7 +249,7 @@ export const connectWatchParty = ({ roomId, onEvent, onStatus }) => {
 
   const sendPayload = (payload) => {
     if (socket?.readyState !== WebSocket.OPEN) {
-      console.warn('[WS WatchParty] Cannot send, socket not open:', socket?.readyState);
+      console.warn('[WS Xem chung] Không thể gửi vì socket chưa mở:', socket?.readyState);
       return false;
     }
     socket.send(JSON.stringify(payload));
@@ -259,7 +259,7 @@ export const connectWatchParty = ({ roomId, onEvent, onStatus }) => {
   const connect = () => {
     if (stopped) return;
     const url = buildWebSocketUrl();
-    console.debug('[WS WatchParty] Connecting to:', url.replace(/token=[^&]+/, 'token=***'));
+    console.debug('[WS Xem chung] Đang kết nối tới:', url.replace(/token=[^&]+/, 'token=***'));
     socket = new WebSocket(url);
     let opened = false;
     onStatus?.('connecting');
@@ -273,7 +273,7 @@ export const connectWatchParty = ({ roomId, onEvent, onStatus }) => {
       try {
         onEvent?.(JSON.parse(message.data));
       } catch (e) {
-        console.warn('[WS WatchParty] Failed to parse message:', e);
+        console.warn('[WS Xem chung] Không thể phân tích tin nhắn:', e);
       }
     };
     socket.onerror = () => onStatus?.('error');

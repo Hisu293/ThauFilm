@@ -32,6 +32,7 @@ public class StaffBookingService {
     private final BookingService bookingService;
     private final TheaterRepository theaterRepository;
     private final PaymentGatewayService paymentGatewayService;
+    private final AuditLogService auditLogService;
 
     public List<BookingResponse> listBookings() {
         List<Booking> bookings = bookingRepository.findAll(Sort.by(Sort.Direction.DESC, "createdAt"));
@@ -206,6 +207,11 @@ public class StaffBookingService {
 
         booking.setStatus(BookingStatus.CONFIRMED);
         bookingRepository.save(booking);
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(AuditAction.ADMIN_MANUAL_OVERRIDE).targetType("BOOKING")
+                .targetId(bookingId.toString()).description("Nhân viên đã hủy đơn đặt vé thủ công")
+                .correlationId(bookingId.toString())
+                .newValues(Map.of("trạngThái", booking.getStatus())).sensitive(true).build());
         return getBooking(bookingId);
     }
 
@@ -253,6 +259,15 @@ public class StaffBookingService {
             payment.setRefundedAt(java.time.LocalDateTime.now());
         }
         paymentRepository.save(payment);
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(refund.status() == PaymentStatus.REFUNDED
+                        ? AuditAction.REFUND_SUCCEEDED : AuditAction.REFUND_FAILED)
+                .targetType("PAYMENT").targetId(payment.getId().toString())
+                .description(refund.status() == PaymentStatus.REFUNDED
+                        ? "Nhân viên hoàn tiền thành công" : "Nhân viên thực hiện hoàn tiền chưa thành công")
+                .reason("Nhân viên hủy đơn đặt vé").correlationId(bookingId.toString())
+                .newValues(Map.of("sốTiền", payment.getAmount(), "trạngThái", payment.getStatus()))
+                .sensitive(true).build());
 
         if (refund.status() == PaymentStatus.REFUND_FAILED || refund.status() == PaymentStatus.REFUND_PENDING) {
             return getBooking(bookingId);

@@ -28,7 +28,7 @@ public class AwsS3Config {
         String resolvedAccessKey = firstNonBlank(accessKey, awsAccessKey, System.getenv("AWS_ACCESS_KEY_ID"));
         String resolvedSecretKey = firstNonBlank(secretKey, awsSecretKey, System.getenv("AWS_SECRET_ACCESS_KEY"));
         String resolvedRegion = firstNonBlank(region, awsRegion, System.getenv("AWS_REGION"), "ap-southeast-1");
-        log.info("Initializing S3 client: region={}, accessKeyConfigured={}, secretKeyConfigured={}",
+        log.info("Đang khởi tạo máy khách S3: khu vực={}, đã cấu hình khóa truy cập={}, đã cấu hình khóa bí mật={}",
                 resolvedRegion, resolvedAccessKey != null, resolvedSecretKey != null);
         AwsCredentialsProvider credentialsProvider = resolvedAccessKey != null
                 && resolvedSecretKey != null

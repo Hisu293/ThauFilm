@@ -55,7 +55,7 @@ public class AiReviewSummaryService {
             }
             summary.setAiSummary(stripMarkdownFence(result));
         } catch (Exception exception) {
-            log.warn("AI summary failed for movie {}: {}", movieId, exception.getMessage());
+            log.warn("AI không thể tóm tắt đánh giá cho phim {}: {}", movieId, exception.getMessage());
             summary.setAiSummary(buildStatisticalFallback(summary));
         }
         return summary;

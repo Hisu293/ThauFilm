@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -28,6 +29,7 @@ public class CinemaRoomService {
     private final CinemaRoomRepository cinemaRoomRepository;
     private final SeatRepository seatRepository;
     private final TheaterRepository theaterRepository;
+    private final AuditLogService auditLogService;
 
     private CinemaRoomResponse convertToResponse(CinemaRoom room) {
         return CinemaRoomResponse.builder()
@@ -122,13 +124,21 @@ public class CinemaRoomService {
         }
 
         seatRepository.saveAll(seats);
-
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(AuditAction.CINEMA_ROOM_CREATED).targetType("CINEMA_ROOM")
+                .targetId(savedRoom.getId().toString())
+                .description("Đã tạo phòng chiếu \"" + savedRoom.getName() + "\"")
+                .newValues(roomAuditValues(savedRoom))
+                .theaterId(savedRoom.getTheaterId())
+                .metadata(Map.of("sốHàng", request.getRowsCount(), "sốGhếMỗiHàng", request.getSeatsPerRow(),
+                        "tổngSốGhế", seats.size())).build());
         return convertToResponse(savedRoom);
     }
 
     @Transactional
     public CinemaRoomResponse updateRoom(UUID roomId, CinemaRoomUpdateRequest request) {
         CinemaRoom room = getRoomEntityOrThrow(roomId);
+        Map<String, Object> oldValues = roomAuditValues(room);
 
         room.setName(request.getName());
         if (request.getStatus() != null) {
@@ -136,13 +146,36 @@ public class CinemaRoomService {
         }
 
         CinemaRoom saved = cinemaRoomRepository.save(room);
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(AuditAction.CINEMA_ROOM_UPDATED).targetType("CINEMA_ROOM")
+                .targetId(saved.getId().toString())
+                .description("Đã cập nhật phòng chiếu \"" + saved.getName() + "\"")
+                .oldValues(oldValues).newValues(roomAuditValues(saved))
+                .theaterId(saved.getTheaterId()).build());
         return convertToResponse(saved);
     }
 
     @Transactional
     public void deleteRoom(UUID roomId) {
         CinemaRoom room = getRoomEntityOrThrow(roomId);
+        Map<String, Object> oldValues = roomAuditValues(room);
         room.setStatus(RoomStatus.INACTIVE);
         cinemaRoomRepository.save(room);
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(AuditAction.CINEMA_ROOM_DELETED).targetType("CINEMA_ROOM")
+                .targetId(roomId.toString())
+                .description("Đã ngừng hoạt động phòng chiếu \"" + room.getName() + "\"")
+                .oldValues(oldValues).newValues(roomAuditValues(room))
+                .theaterId(room.getTheaterId()).build());
+    }
+
+    private Map<String, Object> roomAuditValues(CinemaRoom room) {
+        Map<String, Object> values = new java.util.LinkedHashMap<>();
+        values.put("tênPhòng", room.getName());
+        values.put("loạiPhòng", room.getType());
+        values.put("sứcChứa", room.getCapacity());
+        values.put("trạngThái", room.getStatus());
+        values.put("mãRạp", room.getTheaterId());
+        return values;
     }
 }

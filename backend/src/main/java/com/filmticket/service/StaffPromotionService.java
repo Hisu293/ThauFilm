@@ -13,6 +13,7 @@ import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
@@ -21,6 +22,7 @@ import java.util.UUID;
 public class StaffPromotionService {
 
     private final DiscountRepository discountRepository;
+    private final AuditLogService auditLogService;
 
     public List<DiscountResponse> listPromotions() {
         return discountRepository.findAll().stream()
@@ -50,6 +52,10 @@ public class StaffPromotionService {
         discount.setActive(Boolean.TRUE.equals(request.getActive()));
         discount.setApplicableSeatTypes(normalizeApplicableSeatTypes(request.getApplicableSeatTypes()));
         Discount saved = discountRepository.save(discount);
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(AuditAction.VOUCHER_CREATED).targetType("VOUCHER").targetId(saved.getId().toString())
+                .description("Đã tạo voucher \"" + saved.getCode() + "\"")
+                .newValues(voucherAuditValues(saved)).build());
         return DiscountResponse.fromDiscount(saved);
     }
 
@@ -57,6 +63,7 @@ public class StaffPromotionService {
     public DiscountResponse updatePromotion(UUID promotionId, StaffPromotionRequest request) {
         Discount discount = discountRepository.findById(promotionId)
                 .orElseThrow(() -> new BadRequestException("Promotion not found"));
+        Map<String, Object> oldValues = voucherAuditValues(discount);
         discount.setName(request.getName());
         discount.setType(normalizeType(request.getType()));
         discount.setValue(request.getValue());
@@ -68,6 +75,10 @@ public class StaffPromotionService {
         discount.setActive(Boolean.TRUE.equals(request.getActive()));
         discount.setApplicableSeatTypes(normalizeApplicableSeatTypes(request.getApplicableSeatTypes()));
         Discount saved = discountRepository.save(discount);
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(AuditAction.VOUCHER_UPDATED).targetType("VOUCHER").targetId(saved.getId().toString())
+                .description("Đã cập nhật voucher \"" + saved.getCode() + "\"")
+                .oldValues(oldValues).newValues(voucherAuditValues(saved)).build());
         return DiscountResponse.fromDiscount(saved);
     }
 
@@ -77,6 +88,8 @@ public class StaffPromotionService {
                 .orElseThrow(() -> new BadRequestException("Promotion not found"));
         discount.setActive(true);
         Discount saved = discountRepository.save(discount);
+        auditLogService.success(AuditAction.VOUCHER_UPDATED, "VOUCHER", saved.getId(),
+                "Đã kích hoạt voucher \"" + saved.getCode() + "\"");
         return DiscountResponse.fromDiscount(saved);
     }
 
@@ -86,6 +99,8 @@ public class StaffPromotionService {
                 .orElseThrow(() -> new BadRequestException("Promotion not found"));
         discount.setActive(false);
         Discount saved = discountRepository.save(discount);
+        auditLogService.success(AuditAction.VOUCHER_UPDATED, "VOUCHER", saved.getId(),
+                "Đã ngừng sử dụng voucher \"" + saved.getCode() + "\"");
         return DiscountResponse.fromDiscount(saved);
     }
 
@@ -98,6 +113,19 @@ public class StaffPromotionService {
                 "usageCount", discount.getUsageCount(),
                 "usageLimit", discount.getUsageLimit()
         );
+    }
+
+    private Map<String, Object> voucherAuditValues(Discount discount) {
+        Map<String, Object> values = new java.util.LinkedHashMap<>();
+        values.put("mã", discount.getCode());
+        values.put("tên", discount.getName());
+        values.put("loại", discount.getType());
+        values.put("giáTrị", discount.getValue());
+        values.put("bắtĐầu", discount.getValidFrom());
+        values.put("kếtThúc", discount.getValidTo());
+        values.put("giớiHạnLượtDùng", discount.getUsageLimit());
+        values.put("đangHoạtĐộng", discount.isActive());
+        return values;
     }
 
     private String normalizeType(String type) {

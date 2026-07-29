@@ -19,7 +19,7 @@ public class DatabaseRoleConstraintConfig {
         return args -> {
             jdbcTemplate.execute("ALTER TABLE users DROP CONSTRAINT IF EXISTS users_role_check");
             jdbcTemplate.execute("ALTER TABLE users ADD CONSTRAINT users_role_check CHECK (role IN ('ADMIN', 'MEMBER', 'STAFF'))");
-            log.info("Ensured users_role_check supports ADMIN, MEMBER, and STAFF");
+            log.info("Đã bảo đảm users_role_check hỗ trợ ADMIN, MEMBER và STAFF");
         };
     }
 }

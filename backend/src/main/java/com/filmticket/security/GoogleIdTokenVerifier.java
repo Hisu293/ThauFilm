@@ -30,7 +30,7 @@ public class GoogleIdTokenVerifier {
                 return Optional.of(token.getPayload());
             }
         } catch (Exception e) {
-            log.error("Google ID token verification failed: {}", e.getMessage());
+            log.error("Xác minh token ID Google thất bại: {}", e.getMessage());
         }
         return Optional.empty();
     }

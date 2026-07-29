@@ -369,18 +369,18 @@ const RoomRow = ({ room, crud, theaterName, expanded, onToggle, onEdit, onDelete
 
   const loadSeats = async () => {
     setLoading(true);
-    console.groupCollapsed(`%c[ADMIN][loadSeats] GET /api/admin/rooms/${room.id}/seats`, 'color:#A78BFA;font-weight:bold');
+    console.groupCollapsed(`%c[QUẢN TRỊ][Tải ghế] GET /api/admin/rooms/${room.id}/seats`, 'color:#A78BFA;font-weight:bold');
     try {
       const data = await crud.getSeatsByRoom(room.id);
       console.log('%c✓ API trả về:', 'color:#22C55E', Array.isArray(data) ? `${data.length} ghế` : data, data);
       if (Array.isArray(data) && data.length > 0) {
         console.table(data.map((s) => ({ id: s.id ?? s.seatId, rowName: s.rowName, seatNumber: s.seatNumber, type: s.type, status: s.status })));
       } else {
-        console.warn('⚠ Phòng này chưa có ghế hoặc trả về sai shape.');
+        console.warn('⚠ Phòng này chưa có ghế hoặc dữ liệu trả về sai cấu trúc.');
       }
       setSeats(Array.isArray(data) ? data : []);
     } catch (err) {
-      console.error('%c✗ [ADMIN] Lỗi khi tải ghế:', 'color:#EF4444;font-weight:bold', {
+      console.error('%c✗ [QUẢN TRỊ] Lỗi khi tải ghế:', 'color:#EF4444;font-weight:bold', {
         message: err?.message,
         status: err?.response?.status,
         raw: err?.response?.data,

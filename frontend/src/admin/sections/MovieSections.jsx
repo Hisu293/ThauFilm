@@ -42,6 +42,7 @@ const emptyMovie = {
   rating: 0,
   active: true,
   posterUrl: '',
+  heroBannerUrl: '',
   trailerUrl: '',
   director: '',
   actors: '',
@@ -71,6 +72,8 @@ export const MoviesSection = ({ crud, genres = [] }) => {
   const [editLoadingId, setEditLoadingId] = useState(null);
   const [streamUploading, setStreamUploading] = useState(false);
   const [streamUploadProgress, setStreamUploadProgress] = useState(0);
+  const [mediaUploading, setMediaUploading] = useState({ poster: false, hero: false, trailer: false });
+  const hasMediaUpload = Object.values(mediaUploading).some(Boolean);
 
   // ── Bộ lọc ──
   const [search, setSearch] = useState('');
@@ -161,8 +164,8 @@ export const MoviesSection = ({ crud, genres = [] }) => {
     }
   };
   const save = async () => {
-    if (streamUploading) {
-      setFormError('Vui lòng chờ upload phim lên S3 hoàn tất trước khi lưu.');
+    if (streamUploading || hasMediaUpload) {
+      setFormError('Vui lòng chờ tất cả ảnh và video upload lên S3 hoàn tất trước khi lưu.');
       return;
     }
     setSaving(true);
@@ -328,7 +331,7 @@ export const MoviesSection = ({ crud, genres = [] }) => {
         title={dialog === 'add' ? 'Thêm phim' : 'Sửa phim'}
         onClose={() => setDialog(null)}
         onSave={save}
-        saving={saving || streamUploading}
+        saving={saving || streamUploading || hasMediaUpload}
       >
         {formError && <Alert severity="error" sx={{ mb: 1 }}>{formError}</Alert>}
         <Box sx={{ p: 2, borderRadius: 2.5, bgcolor: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.08)' }}>
@@ -365,13 +368,27 @@ export const MoviesSection = ({ crud, genres = [] }) => {
           folder="posters"
           value={form.posterUrl || ''}
           accept="image/jpeg,image/png,image/webp"
+          onUploadingChange={(uploading) => setMediaUploading((current) => ({ ...current, poster: uploading }))}
           onChange={(fileUrl) => setForm((current) => ({ ...current, posterUrl: fileUrl }))}
         />
+        <UploadFile
+          label="Chọn ảnh hero/banner ngang để upload lên S3"
+          folder="hero-banners"
+          value={form.heroBannerUrl || ''}
+          accept="image/jpeg,image/png,image/webp"
+          previewSx={{ width: '100%', maxWidth: 520, height: 190, objectFit: 'cover' }}
+          onUploadingChange={(uploading) => setMediaUploading((current) => ({ ...current, hero: uploading }))}
+          onChange={(fileUrl) => setForm((current) => ({ ...current, heroBannerUrl: fileUrl }))}
+        />
+        <Typography variant="caption" color="text.secondary">
+          Ảnh hero hiển thị ở banner đầu trang chủ. Khuyến nghị tỷ lệ 16:9, tối thiểu 1600 × 900 px.
+        </Typography>
         <UploadFile
           label="Chọn trailer MP4/MOV để upload lên S3"
           folder="trailers"
           value={form.trailerUrl || ''}
           accept="video/mp4,video/quicktime,.mp4,.mov"
+          onUploadingChange={(uploading) => setMediaUploading((current) => ({ ...current, trailer: uploading }))}
           onChange={(fileUrl) => setForm((current) => ({ ...current, trailerUrl: fileUrl }))}
         />
           </Stack>

@@ -47,6 +47,7 @@ public class ShowtimeService {
     private final SeatAvailabilityRepository seatAvailabilityRepository;
     private final TheaterRepository theaterRepository;
     private final PricingService pricingService;
+    private final AuditLogService auditLogService;
 
     private List<ShowtimeResponse> enrich(List<Showtime> showtimes) {
         return enrich(showtimes, true);
@@ -175,6 +176,14 @@ public class ShowtimeService {
 
         Showtime savedShowtime = showtimeRepository.save(showtime);
         ensureSeatAvailabilities(savedShowtime);
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(AuditAction.SHOWTIME_CREATED).targetType("SHOWTIME")
+                .targetId(savedShowtime.getId().toString())
+                .description(savedShowtime.isOnline()
+                        ? "Đã tạo lịch chiếu online"
+                        : "Đã tạo lịch chiếu tại rạp")
+                .newValues(showtimeAuditValues(savedShowtime))
+                .correlationId(savedShowtime.getId().toString()).build());
         return enrich(List.of(savedShowtime)).get(0);
     }
 
@@ -187,6 +196,7 @@ public class ShowtimeService {
         }
 
         Showtime showtime = getShowtimeEntityOrThrow(showtimeId);
+        Map<String, Object> oldValues = showtimeAuditValues(showtime);
 
         Movie movie = movieRepository.findById(request.getMovieId())
                 .orElseThrow(() -> new BadRequestException("Movie not found"));
@@ -236,14 +246,26 @@ public class ShowtimeService {
 
         Showtime savedShowtime = showtimeRepository.save(showtime);
         ensureSeatAvailabilities(savedShowtime);
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(AuditAction.SHOWTIME_UPDATED).targetType("SHOWTIME")
+                .targetId(savedShowtime.getId().toString())
+                .description("Đã cập nhật lịch chiếu")
+                .oldValues(oldValues).newValues(showtimeAuditValues(savedShowtime))
+                .correlationId(savedShowtime.getId().toString()).build());
         return enrich(List.of(savedShowtime)).get(0);
     }
 
     @Transactional
     public void deleteShowtime(UUID showtimeId) {
         Showtime showtime = getShowtimeEntityOrThrow(showtimeId);
+        Map<String, Object> oldValues = showtimeAuditValues(showtime);
         showtime.setStatus(ShowtimeStatus.CANCELLED);
         showtimeRepository.save(showtime);
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(AuditAction.SHOWTIME_CANCELLED).targetType("SHOWTIME")
+                .targetId(showtimeId.toString()).description("Đã hủy lịch chiếu")
+                .oldValues(oldValues).newValues(showtimeAuditValues(showtime))
+                .correlationId(showtimeId.toString()).build());
     }
 
     @Transactional
@@ -255,6 +277,18 @@ public class ShowtimeService {
     public Showtime getShowtimeEntityOrThrow(UUID showtimeId) {
         return showtimeRepository.findById(showtimeId)
                 .orElseThrow(() -> new BadRequestException("Showtime not found"));
+    }
+
+    private Map<String, Object> showtimeAuditValues(Showtime showtime) {
+        Map<String, Object> values = new java.util.LinkedHashMap<>();
+        values.put("mãPhim", showtime.getMovieId());
+        values.put("mãPhòng", showtime.getCinemaRoomId());
+        values.put("bắtĐầu", showtime.getStartTime());
+        values.put("kếtThúc", showtime.getEndTime());
+        values.put("trạngThái", showtime.getStatus());
+        values.put("chiếuOnline", showtime.isOnline());
+        values.put("suấtChiếuBíMật", showtime.isMystery());
+        return values;
     }
 
     @Transactional(readOnly = true)

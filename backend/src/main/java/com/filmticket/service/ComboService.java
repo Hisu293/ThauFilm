@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -17,6 +18,7 @@ import java.util.UUID;
 public class ComboService {
 
     private final ComboRepository comboRepository;
+    private final AuditLogService auditLogService;
 
     @Transactional(readOnly = true)
     public List<ComboResponse> getCombos(List<UUID> ids) {
@@ -41,6 +43,11 @@ public class ComboService {
                 .price(request.getPrice())
                 .build();
         Combo saved = comboRepository.save(combo);
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(AuditAction.COMBO_CREATED).targetType("COMBO").targetId(saved.getId().toString())
+                .description("Đã tạo combo \"" + saved.getName() + "\"")
+                .newValues(Map.of("tên", saved.getName(), "giá", saved.getPrice(), "đangHoạtĐộng", saved.isActive()))
+                .build());
         return toResponse(saved);
     }
 
@@ -48,10 +55,18 @@ public class ComboService {
     public ComboResponse updateCombo(UUID id, ComboRequest request) {
         Combo combo = comboRepository.findById(id)
                 .orElseThrow(() -> new BadRequestException("Combo not found"));
+        Map<String, Object> oldValues = Map.of(
+                "tên", combo.getName(), "giá", combo.getPrice(), "đangHoạtĐộng", combo.isActive());
         combo.setName(request.getName());
         combo.setDescription(request.getDescription());
         combo.setPrice(request.getPrice());
         Combo saved = comboRepository.save(combo);
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(AuditAction.COMBO_UPDATED).targetType("COMBO").targetId(saved.getId().toString())
+                .description("Đã cập nhật combo \"" + saved.getName() + "\"")
+                .oldValues(oldValues)
+                .newValues(Map.of("tên", saved.getName(), "giá", saved.getPrice(), "đangHoạtĐộng", saved.isActive()))
+                .build());
         return toResponse(saved);
     }
 
@@ -61,6 +76,11 @@ public class ComboService {
                 .orElseThrow(() -> new BadRequestException("Combo not found"));
         combo.setActive(active);
         comboRepository.save(combo);
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(AuditAction.COMBO_UPDATED).targetType("COMBO").targetId(combo.getId().toString())
+                .description(active ? "Đã kích hoạt combo" : "Đã ngừng sử dụng combo")
+                .oldValues(Map.of("đangHoạtĐộng", !active))
+                .newValues(Map.of("đangHoạtĐộng", active)).build());
     }
 
     private ComboResponse toResponse(Combo combo) {

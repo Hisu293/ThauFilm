@@ -49,12 +49,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(authentication);
 
-                log.info("Authenticated request path={} user={} authorities={}", request.getServletPath(), username, authorities);
+                log.info("Đã xác thực yêu cầu: đường dẫn={}, người dùng={}, quyền={}", request.getServletPath(), username, authorities);
             } else if (StringUtils.hasText(jwt) && !isPublicRequest(request)) {
-                log.warn("Invalid JWT for path={}", request.getServletPath());
+                log.warn("JWT không hợp lệ cho đường dẫn={}", request.getServletPath());
             }
         } catch (Exception ex) {
-            log.error("Could not set user authentication in security context", ex);
+            log.error("Không thể thiết lập xác thực người dùng trong ngữ cảnh bảo mật", ex);
         }
 
         filterChain.doFilter(request, response);
