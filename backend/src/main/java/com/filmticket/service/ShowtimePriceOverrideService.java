@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -19,6 +20,7 @@ public class ShowtimePriceOverrideService {
 
     private final ShowtimeRepository showtimeRepository;
     private final ShowtimePriceOverrideRepository showtimePriceOverrideRepository;
+    private final AuditLogService auditLogService;
 
     @Transactional(readOnly = true)
     public List<ShowtimePriceOverrideResponse> getOverrides(UUID showtimeId) {
@@ -45,8 +47,16 @@ public class ShowtimePriceOverrideService {
                         .showtimeId(request.getShowtimeId())
                         .seatType(request.getSeatType())
                         .build());
+        java.math.BigDecimal oldPrice = override.getPrice();
         override.setPrice(request.getPrice());
         ShowtimePriceOverride saved = showtimePriceOverrideRepository.save(override);
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(AuditAction.SHOWTIME_PRICE_OVERRIDE_UPDATED).targetType("SHOWTIME_PRICE")
+                .targetId(saved.getId().toString()).description("Đã thay đổi giá riêng của suất chiếu")
+                .oldValues(oldPrice == null ? null : Map.of("giá", oldPrice))
+                .newValues(Map.of("mãSuấtChiếu", saved.getShowtimeId(), "loạiGhế", saved.getSeatType(),
+                        "giá", saved.getPrice()))
+                .correlationId(saved.getShowtimeId().toString()).build());
         return ShowtimePriceOverrideResponse.builder()
                 .id(saved.getId())
                 .showtimeId(saved.getShowtimeId())

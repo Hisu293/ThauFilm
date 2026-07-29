@@ -78,7 +78,7 @@ public class JwtTokenProvider {
     public boolean validateToken(String token) {
         try {
             if (blacklist.containsKey(token)) {
-                log.debug("Token is blacklisted");
+                log.debug("Token nằm trong danh sách chặn");
                 return false;
             }
             Jwts.parser()
@@ -87,15 +87,15 @@ public class JwtTokenProvider {
                     .parseSignedClaims(token);
             return true;
         } catch (ExpiredJwtException e) {
-            log.error("JWT token is expired");
+            log.error("Token JWT đã hết hạn");
         } catch (MalformedJwtException e) {
-            log.error("Invalid JWT token");
+            log.error("Token JWT không hợp lệ");
         } catch (UnsupportedJwtException e) {
-            log.error("JWT token is unsupported");
+            log.error("Token JWT không được hỗ trợ");
         } catch (JwtException e) {
-            log.warn("Invalid JWT token: {}", e.getMessage());
+            log.warn("Token JWT không hợp lệ: {}", e.getMessage());
         } catch (IllegalArgumentException e) {
-            log.error("JWT claims string is empty");
+            log.error("Chuỗi thông tin xác nhận JWT trống");
         }
         return false;
     }
@@ -110,10 +110,10 @@ public class JwtTokenProvider {
             long remaining = claims.getExpiration().getTime() - System.currentTimeMillis();
             if (remaining > 0) {
                 blacklist.put(token, remaining);
-                log.info("Token blacklisted, will expire in {}ms", remaining);
+                log.info("Đã đưa token vào danh sách chặn, token sẽ hết hạn sau {}ms", remaining);
             }
         } catch (Exception e) {
-            log.warn("Could not blacklist token: {}", e.getMessage());
+            log.warn("Không thể đưa token vào danh sách chặn: {}", e.getMessage());
         }
     }
 }

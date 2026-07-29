@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -17,6 +18,7 @@ import java.util.UUID;
 public class SeatTypePriceConfigService {
 
     private final SeatTypePriceConfigRepository seatTypePriceConfigRepository;
+    private final AuditLogService auditLogService;
 
     @Transactional(readOnly = true)
     public List<SeatTypePriceConfigResponse> getAllActive() {
@@ -35,11 +37,17 @@ public class SeatTypePriceConfigService {
     public SeatTypePriceConfigResponse upsert(SeatTypePriceConfigRequest request) {
         SeatTypePriceConfig config = seatTypePriceConfigRepository.findBySeatTypeAndActiveTrue(request.getSeatType())
                 .orElseGet(SeatTypePriceConfig::new);
+        java.math.BigDecimal oldPrice = config.getPrice();
         config.setSeatType(request.getSeatType());
         config.setPrice(request.getPrice());
         config.setActive(true);
 
         SeatTypePriceConfig saved = seatTypePriceConfigRepository.save(config);
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(AuditAction.SEAT_TYPE_PRICE_CHANGED).targetType("SEAT_TYPE_PRICE")
+                .targetId(saved.getId().toString()).description("Đã thay đổi giá loại ghế " + saved.getSeatType())
+                .oldValues(oldPrice == null ? null : Map.of("giá", oldPrice))
+                .newValues(Map.of("loạiGhế", saved.getSeatType(), "giá", saved.getPrice())).build());
         return SeatTypePriceConfigResponse.builder()
                 .id(saved.getId())
                 .seatType(saved.getSeatType())
@@ -52,9 +60,15 @@ public class SeatTypePriceConfigService {
     public SeatTypePriceConfigResponse update(UUID id, SeatTypePriceConfigRequest request) {
         SeatTypePriceConfig config = seatTypePriceConfigRepository.findById(id)
                 .orElseThrow(() -> new BadRequestException("Price config not found"));
+        java.math.BigDecimal oldPrice = config.getPrice();
         config.setSeatType(request.getSeatType());
         config.setPrice(request.getPrice());
         SeatTypePriceConfig saved = seatTypePriceConfigRepository.save(config);
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(AuditAction.SEAT_TYPE_PRICE_CHANGED).targetType("SEAT_TYPE_PRICE")
+                .targetId(saved.getId().toString()).description("Đã thay đổi giá loại ghế " + saved.getSeatType())
+                .oldValues(Map.of("giá", oldPrice))
+                .newValues(Map.of("loạiGhế", saved.getSeatType(), "giá", saved.getPrice())).build());
         return SeatTypePriceConfigResponse.builder()
                 .id(saved.getId())
                 .seatType(saved.getSeatType())

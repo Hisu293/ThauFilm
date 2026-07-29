@@ -52,7 +52,7 @@ public class RefundEmailService {
                     + "Cảm ơn bạn đã sử dụng ThauFilm.");
             mailSender.send(message);
         } catch (Exception ex) {
-            log.error("Gửi email hoàn tiền thất bại: bookingId={}, email={}", booking.getId(), customer.getEmail(), ex);
+            log.error("Gửi email hoàn tiền thất bại: mã đơn đặt vé={}, email={}", booking.getId(), customer.getEmail(), ex);
         }
     }
 }

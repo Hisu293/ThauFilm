@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.EnumSet;
+import java.util.Map;
 import java.util.UUID;
 
 @Slf4j
@@ -28,6 +29,7 @@ public class RefundService {
     private final BookingService bookingService;
     private final PayOSRefundClient payOSRefundClient;
     private final RefundEmailService refundEmailService;
+    private final AuditLogService auditLogService;
 
     @Value("${refund.window-hours:3}")
     private long refundWindowHours;
@@ -72,6 +74,13 @@ public class RefundService {
         PayOSRefundClient.PayoutResult payout = payOSRefundClient.refund(
                 referenceId, payment.getAmount(), safeReason, bankBin.trim(), accountNumber.trim());
         if (!payout.succeeded() && !payout.processing()) {
+            auditLogService.failure(AuditLogService.AuditCommand.builder()
+                    .action(AuditAction.REFUND_FAILED).targetType("PAYMENT")
+                    .targetId(payment.getId().toString()).actorId(requesterId)
+                    .description("Hoàn tiền qua PayOS thất bại").reason(safeReason)
+                    .correlationId(bookingId.toString()).providerEventId(payout.payoutId())
+                    .sensitive(true).metadata(Map.of("trạngTháiPayOS", String.valueOf(payout.state()))).build(),
+                    new IllegalStateException("PayOS trả về trạng thái: " + payout.state()));
             throw new BadRequestException("PayOS hoàn tiền thất bại với trạng thái: " + payout.state());
         }
         RefundHistoryStatus historyStatus = payout.succeeded() ? RefundHistoryStatus.SUCCEEDED
@@ -94,7 +103,17 @@ public class RefundService {
             bookingRepository.save(booking);
             userRepository.findById(booking.getUserId()).ifPresent(user -> refundEmailService.sendSuccess(user, booking, payment));
         }
-        log.info("Hoàn tiền tự động hoàn tất: bookingId={}, paymentId={}, orderCode={}, refundAmount={}, trạng thái={}, payoutId={}, thời gian={}ms",
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(payout.succeeded() ? AuditAction.REFUND_SUCCEEDED : AuditAction.REFUND_REQUESTED)
+                .targetType("PAYMENT").targetId(payment.getId().toString()).actorId(requesterId)
+                .description(payout.succeeded()
+                        ? "Hoàn tiền qua PayOS thành công"
+                        : "Đã tạo yêu cầu hoàn tiền và đang chờ PayOS xử lý")
+                .reason(safeReason).correlationId(bookingId.toString())
+                .providerEventId(payout.payoutId()).sensitive(true)
+                .newValues(Map.of("sốTiềnHoàn", payment.getAmount(), "trạngThái", payment.getStatus()))
+                .metadata(Map.of("quảnTrịThựcHiện", admin)).build());
+        log.info("Hoàn tiền tự động hoàn tất: mã đơn đặt vé={}, mã thanh toán={}, mã đơn hàng={}, số tiền hoàn={}, trạng thái={}, mã chi trả={}, thời gian={}ms",
                 bookingId, payment.getId(), payment.getProviderCheckoutId(), payment.getAmount(), payment.getStatus(), payout.payoutId(), System.currentTimeMillis() - startedAt);
         return new RefundResult(payout.succeeded() || payout.processing(),
                 payout.succeeded() ? "Hoàn tiền thành công"

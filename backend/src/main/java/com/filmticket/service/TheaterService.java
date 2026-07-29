@@ -20,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -31,6 +32,7 @@ public class TheaterService {
     private final ShowtimeRepository showtimeRepository;
     private final CinemaRoomRepository cinemaRoomRepository;
     private final S3PresignedUrlService s3PresignedUrlService;
+    private final AuditLogService auditLogService;
 
     @Transactional(readOnly = true)
     public List<TheaterResponse> getTheatersByCity(String city) {
@@ -101,12 +103,17 @@ public class TheaterService {
                 .build();
 
         Theater saved = theaterRepository.save(theater);
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(AuditAction.THEATER_CREATED).targetType("THEATER").targetId(saved.getId().toString())
+                .description("Đã tạo rạp \"" + saved.getName() + "\"")
+                .newValues(theaterAuditValues(saved)).theaterId(saved.getId()).build());
         return toResponse(saved);
     }
 
     @Transactional
     public TheaterResponse updateTheater(UUID theaterId, TheaterRequest request) {
         Theater theater = getTheaterEntityOrThrow(theaterId);
+        Map<String, Object> oldValues = theaterAuditValues(theater);
         theater.setName(request.getName());
         theater.setAddress(request.getAddress());
         theater.setCity(request.getCity());
@@ -117,14 +124,23 @@ public class TheaterService {
         }
 
         Theater saved = theaterRepository.save(theater);
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(AuditAction.THEATER_UPDATED).targetType("THEATER").targetId(saved.getId().toString())
+                .description("Đã cập nhật rạp \"" + saved.getName() + "\"")
+                .oldValues(oldValues).newValues(theaterAuditValues(saved)).theaterId(saved.getId()).build());
         return toResponse(saved);
     }
 
     @Transactional
     public void deleteTheater(UUID theaterId) {
         Theater theater = getTheaterEntityOrThrow(theaterId);
+        Map<String, Object> oldValues = theaterAuditValues(theater);
         theater.setStatus(TheaterStatus.INACTIVE);
         theaterRepository.save(theater);
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(AuditAction.THEATER_DELETED).targetType("THEATER").targetId(theaterId.toString())
+                .description("Đã ngừng hoạt động rạp \"" + theater.getName() + "\"")
+                .oldValues(oldValues).newValues(theaterAuditValues(theater)).theaterId(theaterId).build());
     }
 
     @Transactional(readOnly = true)
@@ -156,6 +172,16 @@ public class TheaterService {
                 .imageUrl(resolveImageUrl(theater.getImageUrl()))
                 .status(theater.getStatus())
                 .build();
+    }
+
+    private Map<String, Object> theaterAuditValues(Theater theater) {
+        Map<String, Object> values = new java.util.LinkedHashMap<>();
+        values.put("tênRạp", theater.getName());
+        values.put("địaChỉ", theater.getAddress());
+        values.put("thànhPhố", theater.getCity());
+        values.put("sốĐiệnThoại", theater.getPhoneNumber());
+        values.put("trạngThái", theater.getStatus());
+        return values;
     }
 
     private TheaterWithRoomsResponse toWithRoomsResponse(Theater theater) {

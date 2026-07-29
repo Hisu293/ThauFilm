@@ -22,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -31,6 +32,7 @@ public class MovieService {
     private final MovieRepository movieRepository;
     private final MovieEventService movieEventService;
     private final S3PresignedUrlService s3PresignedUrlService;
+    private final AuditLogService auditLogService;
 
     @Transactional(readOnly = true)
     public List<MovieResponse> getAllMovies() {
@@ -100,6 +102,10 @@ public class MovieService {
 
         Movie saved = movieRepository.save(movie);
         MovieResponse response = MovieResponse.fromMovieWithStream(saved, resolvePosterUrl(saved), resolveTrailerUrl(saved));
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(AuditAction.MOVIE_CREATED).targetType("MOVIE").targetId(saved.getId().toString())
+                .description("Đã tạo phim \"" + saved.getTitle() + "\"")
+                .newValues(movieAuditValues(saved)).build());
         movieEventService.publishMovieCreated(response);
         return response;
     }
@@ -107,6 +113,8 @@ public class MovieService {
     @Transactional
     public MovieResponse updateMovie(UUID movieId, @Valid UpsertMovieRequest request) {
         Movie movie = getMovieEntityOrThrow(movieId);
+        Map<String, Object> oldValues = movieAuditValues(movie);
+        String oldStreamKey = movie.getStreamKey();
         validateTitleUniqueness(request.getTitle(), movieId);
 
         movie.setTitle(normalize(request.getTitle()));
@@ -128,6 +136,21 @@ public class MovieService {
 
         Movie saved = movieRepository.save(movie);
         MovieResponse response = MovieResponse.fromMovieWithStream(saved, resolvePosterUrl(saved), resolveTrailerUrl(saved));
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(AuditAction.MOVIE_UPDATED).targetType("MOVIE").targetId(saved.getId().toString())
+                .description("Đã cập nhật phim \"" + saved.getTitle() + "\"")
+                .oldValues(oldValues).newValues(movieAuditValues(saved)).build());
+        if (!java.util.Objects.equals(oldStreamKey, saved.getStreamKey())) {
+            auditLogService.success(AuditLogService.AuditCommand.builder()
+                    .action(saved.getStreamKey() == null ? AuditAction.STREAM_SOURCE_DELETED : AuditAction.STREAM_SOURCE_CHANGED)
+                    .targetType("MOVIE").targetId(saved.getId().toString())
+                    .description(saved.getStreamKey() == null
+                            ? "Đã xóa nguồn xem online của phim \"" + saved.getTitle() + "\""
+                            : "Đã thay đổi nguồn xem online của phim \"" + saved.getTitle() + "\"")
+                    .oldValues(Map.of("cóNguồnPhim", oldStreamKey != null))
+                    .newValues(Map.of("cóNguồnPhim", saved.getStreamKey() != null))
+                    .sensitive(true).build());
+        }
         movieEventService.publishMovieUpdated(response);
         return response;
     }
@@ -135,7 +158,12 @@ public class MovieService {
     @Transactional
     public void deleteMovie(UUID movieId) {
         Movie movie = getMovieEntityOrThrow(movieId);
+        Map<String, Object> oldValues = movieAuditValues(movie);
         movieRepository.delete(movie);
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(AuditAction.MOVIE_DELETED).targetType("MOVIE").targetId(movieId.toString())
+                .description("Đã xóa phim \"" + movie.getTitle() + "\"")
+                .oldValues(oldValues).build());
         movieEventService.publishMovieDeleted(movieId);
     }
 
@@ -170,6 +198,19 @@ public class MovieService {
 
     private String resolveTrailerUrl(Movie movie) {
         return s3PresignedUrlService.resolveTrailerUrl(movie.getTrailerUrl());
+    }
+
+    private Map<String, Object> movieAuditValues(Movie movie) {
+        Map<String, Object> values = new java.util.LinkedHashMap<>();
+        values.put("tiêuĐề", movie.getTitle());
+        values.put("thờiLượngPhút", movie.getDurationMinutes());
+        values.put("trạngThái", movie.getStatus());
+        values.put("đangHoạtĐộng", movie.isActive());
+        values.put("thểLoại", movie.getGenre());
+        values.put("ngàyPhátHành", movie.getReleaseDate());
+        values.put("nhàCungCấpLuồng", movie.getStreamProvider());
+        values.put("cóNguồnPhim", movie.getStreamKey() != null && !movie.getStreamKey().isBlank());
+        return values;
     }
 
     @Data

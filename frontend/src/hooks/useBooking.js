@@ -16,35 +16,35 @@ export const useBooking = () => {
   const getSeats = useCallback(async (showtimeId) => {
     setLoading(true);
     setError(null);
-    console.groupCollapsed(`%c[USER][getSeats] GET /api/member/booking/showtimes/${showtimeId}/seats`, 'color:#38BDF8;font-weight:bold');
+    console.groupCollapsed(`%c[NGƯỜI DÙNG][Lấy ghế] GET /api/member/booking/showtimes/${showtimeId}/seats`, 'color:#38BDF8;font-weight:bold');
     try {
       const response = await bookingApi.fetchShowtimeSeats(showtimeId);
-      console.log('%c✓ API trả về (raw envelope):', 'color:#22C55E', response);
+      console.log('%c✓ API trả về (dữ liệu gốc):', 'color:#22C55E', response);
       const rawSeats = response?.data ?? response ?? [];
-      console.log('→ rawSeats (mảng ghế trước normalize):', Array.isArray(rawSeats) ? `${rawSeats.length} ghế` : rawSeats, rawSeats);
+      console.log('→ Mảng ghế gốc (trước khi chuẩn hóa):', Array.isArray(rawSeats) ? `${rawSeats.length} ghế` : rawSeats, rawSeats);
       const normalized = bookingService.normalizeSeats(rawSeats);
-      console.log('→ Sau normalize:', `${normalized.length} ghế`, normalized);
+      console.log('→ Sau khi chuẩn hóa:', `${normalized.length} ghế`, normalized);
       if (normalized.length > 0) {
         console.table(normalized.map((s) => ({ id: s.id, label: s.label, row: s.row, col: s.col, type: s.type, price: s.price, isSold: s.isSold })));
 
-        // Cảnh báo nếu backend trả dữ liệu mẫu/placeholder (mọi ghế trùng label)
+        // Cảnh báo nếu máy chủ trả dữ liệu mẫu (mọi ghế trùng nhãn)
         const uniqueLabels = new Set(normalized.map((s) => s.label));
         if (uniqueLabels.size === 1 && normalized.length > 1) {
           console.warn(
-            `⚠ TẤT CẢ ${normalized.length} ghế đều có label "${[...uniqueLabels][0]}". ` +
-            'Frontend normalize ĐÚNG — đây là do BACKEND trả dữ liệu mẫu (rowName/seatNumber giống nhau cho mọi ghế). ' +
-            'Kiểm tra response API: mỗi ghế cần rowName (A,B,C…) + seatNumber (1,2,3…) khác nhau.'
+            `⚠ TẤT CẢ ${normalized.length} ghế đều có nhãn "${[...uniqueLabels][0]}". ` +
+            'Phía giao diện đã chuẩn hóa ĐÚNG — máy chủ đang trả dữ liệu mẫu (tên hàng/số ghế giống nhau cho mọi ghế). ' +
+            'Kiểm tra dữ liệu API trả về: mỗi ghế cần tên hàng (A, B, C…) và số ghế (1, 2, 3…) khác nhau.'
           );
         }
       } else {
-        console.warn('⚠ Mảng ghế rỗng — backend chưa cấu hình sơ đồ ghế cho showtime này, hoặc trả về sai shape.');
+        console.warn('⚠ Mảng ghế rỗng — máy chủ chưa cấu hình sơ đồ ghế cho suất chiếu này hoặc trả về sai cấu trúc.');
       }
 
       // Cấu trúc 2 chiều dùng để render sơ đồ (tham khảo nhanh trong console)
-      console.log('→ Gom theo hàng (groupSeatsByRow):', bookingService.groupSeatsByRow(normalized));
+      console.log('→ Gom ghế theo hàng:', bookingService.groupSeatsByRow(normalized));
       return normalized;
     } catch (err) {
-      console.error('%c✗ getSeats LỖI:', 'color:#EF4444;font-weight:bold', {
+      console.error('%c✗ Lỗi lấy danh sách ghế:', 'color:#EF4444;font-weight:bold', {
         message: err.message,
         status: err.status,
         details: err.details,
@@ -62,17 +62,17 @@ export const useBooking = () => {
   const create = useCallback(async (showtimeId, seatIds, channel = 'ONLINE', comboIds = []) => {
     setLoading(true);
     setError(null);
-    console.groupCollapsed('%c[USER][create] POST /api/member/booking (giữ ghế)', 'color:#FBBF24;font-weight:bold');
-    console.log('→ Payload:', { showtimeId, seatIds, channel, comboIds });
+    console.groupCollapsed('%c[NGƯỜI DÙNG][Tạo đơn] POST /api/member/booking (giữ ghế)', 'color:#FBBF24;font-weight:bold');
+    console.log('→ Dữ liệu gửi đi:', { showtimeId, seatIds, channel, comboIds });
     try {
       const res = await bookingApi.createBooking(showtimeId, seatIds, channel, comboIds);
-      console.log('%c✓ API trả về (raw envelope):', 'color:#22C55E', res);
+      console.log('%c✓ API trả về (dữ liệu gốc):', 'color:#22C55E', res);
       const rawBooking = res?.data ?? res;
       const normalized = bookingService.normalizeBooking(rawBooking);
-      console.log('→ Booking sau normalize:', normalized);
+      console.log('→ Đơn đặt vé sau khi chuẩn hóa:', normalized);
       return normalized;
     } catch (err) {
-      console.error('%c✗ create LỖI:', 'color:#EF4444;font-weight:bold', {
+      console.error('%c✗ Lỗi tạo đơn đặt vé:', 'color:#EF4444;font-weight:bold', {
         message: err.message,
         status: err.status,
         details: err.details,

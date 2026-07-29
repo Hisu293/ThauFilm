@@ -26,7 +26,7 @@ public class WebSocketAuthInterceptor implements HandshakeInterceptor {
     public boolean beforeHandshake(ServerHttpRequest request, ServerHttpResponse response,
                                    WebSocketHandler wsHandler, Map<String, Object> attributes) {
         String remoteAddr = request.getRemoteAddress() != null ? request.getRemoteAddress().getAddress().getHostAddress() : "unknown";
-        log.info("[WS Handshake] Incoming connection from {} to {}", remoteAddr, request.getURI());
+        log.info("[WS Bắt tay] Kết nối đến từ {} tới {}", remoteAddr, request.getURI());
 
         MultiValueMap<String, String> query = UriComponentsBuilder.fromUri(request.getURI()).build().getQueryParams();
         String movieId = query.getFirst("movieId");
@@ -34,29 +34,29 @@ public class WebSocketAuthInterceptor implements HandshakeInterceptor {
             try {
                 UUID parsedMovieId = UUID.fromString(movieId);
                 attributes.put("movieId", parsedMovieId);
-                log.debug("[WS Handshake] movieId parsed: {}", parsedMovieId);
+                log.debug("[WS Bắt tay] Đã phân tích movieId: {}", parsedMovieId);
             } catch (IllegalArgumentException e) {
-                log.warn("[WS Handshake] Invalid movieId format: {}", movieId);
+                log.warn("[WS Bắt tay] Định dạng movieId không hợp lệ: {}", movieId);
                 return false;
             }
         }
 
         String token = query.getFirst("token");
-        log.debug("[WS Handshake] Token present: {}", token != null);
+        log.debug("[WS Bắt tay] Có token: {}", token != null);
         if (token != null && jwtTokenProvider.validateToken(token)) {
             String email = jwtTokenProvider.getUsernameFromToken(token);
-            log.debug("[WS Handshake] Token valid for user: {}", email);
+            log.debug("[WS Bắt tay] Token hợp lệ cho người dùng: {}", email);
             userRepository.findByEmail(email).ifPresent(user -> {
                 attributes.put("userId", user.getId());
-                log.info("[WS Handshake] userId set: {} ({})", user.getId(), email);
+                log.info("[WS Bắt tay] Đã thiết lập userId: {} ({})", user.getId(), email);
             });
         } else if (token != null) {
-            log.warn("[WS Handshake] Token present but INVALID: {}", token.substring(0, Math.min(20, token.length())) + "...");
+            log.warn("[WS Bắt tay] Có token nhưng KHÔNG HỢP LỆ: {}", token.substring(0, Math.min(20, token.length())) + "...");
         }
 
         boolean hasMovieId = attributes.containsKey("movieId");
         boolean hasUserId = attributes.containsKey("userId");
-        log.info("[WS Handshake] Result - hasMovieId: {}, hasUserId: {}, ACCEPTED: {}",
+        log.info("[WS Bắt tay] Kết quả - có movieId: {}, có userId: {}, ĐƯỢC CHẤP NHẬN: {}",
                 hasMovieId, hasUserId, hasMovieId || hasUserId);
         return hasMovieId || hasUserId;
     }
@@ -65,7 +65,7 @@ public class WebSocketAuthInterceptor implements HandshakeInterceptor {
     public void afterHandshake(ServerHttpRequest request, ServerHttpResponse response,
                                WebSocketHandler wsHandler, Exception exception) {
         if (exception != null) {
-            log.error("[WS Handshake] afterHandshake error", exception);
+            log.error("[WS Bắt tay] Lỗi sau khi bắt tay", exception);
         }
     }
 }

@@ -33,6 +33,7 @@ public class WatchPartyService {
     private final RealtimeEventService realtimeEventService;
     private final PaymentGatewayService paymentGatewayService;
     private final MovieStreamService movieStreamService;
+    private final AuditLogService auditLogService;
     private final Map<UUID, WatchPartyRoom> rooms = new ConcurrentHashMap<>();
     private final Map<String, PendingWatchPartyPayment> pendingPayments = new ConcurrentHashMap<>();
 
@@ -42,6 +43,11 @@ public class WatchPartyService {
         WatchPartyRoom room = new WatchPartyRoom(UUID.randomUUID(), movie);
         room.members.put(userId, new WatchPartyMember(user, true));
         rooms.put(room.id, room);
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(AuditAction.WATCH_PARTY_CREATED).targetType("WATCH_PARTY")
+                .targetId(room.id.toString()).actorId(userId)
+                .description("Đã tạo phòng xem chung cho phim \"" + movie.getTitle() + "\"")
+                .metadata(Map.of("mãPhim", movieId, "giáMỗiThànhViên", DEFAULT_MOVIE_PRICE)).build());
         return toResponse(room, userId);
     }
 
@@ -101,6 +107,13 @@ public class WatchPartyService {
             WatchPartyMember member = room.members.get(pending.userId());
             if (member == null) return false;
             markMemberPaid(member, orderCode, paymentId);
+            auditLogService.success(AuditLogService.AuditCommand.builder()
+                    .action(AuditAction.PAYMENT_SUCCEEDED).targetType("WATCH_PARTY")
+                    .targetId(room.id.toString()).actorId(pending.userId())
+                    .description("Thành viên thanh toán phòng xem chung thành công")
+                    .correlationId(room.id.toString()).providerEventId(paymentId)
+                    .newValues(Map.of("sốTiền", DEFAULT_MOVIE_PRICE, "trạngThái", "ĐÃ THANH TOÁN"))
+                    .sensitive(true).build());
             realtimeEventService.sendWatchPartyEvent(room.id, "WATCH_PARTY_UPDATED", toResponse(room, pending.userId()));
             if (orderCode != null) pendingPayments.remove(orderCode);
             if (paymentId != null) pendingPayments.remove(paymentId);

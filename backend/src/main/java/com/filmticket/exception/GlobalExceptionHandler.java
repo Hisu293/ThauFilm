@@ -25,7 +25,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(BadRequestException.class)
     public ResponseEntity<ApiResponse<Void>> handleBadRequest(BadRequestException ex) {
-        log.error("BadRequestException: {}", ex.getMessage());
+        log.error("Lỗi yêu cầu không hợp lệ: {}", ex.getMessage());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error(ex.getMessage()));
     }
@@ -38,7 +38,7 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(BadCredentialsException.class)
     public ResponseEntity<ApiResponse<Void>> handleBadCredentials(BadCredentialsException ex) {
-        log.error("BadCredentialsException: {}", ex.getMessage());
+        log.error("Lỗi thông tin đăng nhập không chính xác: {}", ex.getMessage());
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                 .body(ApiResponse.error("Invalid email or password"));
     }
@@ -52,7 +52,7 @@ public class GlobalExceptionHandler {
             String errorMessage = error.getDefaultMessage();
             errors.put(fieldName, errorMessage);
         });
-        log.error("Validation errors: {}", errors);
+        log.error("Các lỗi xác thực dữ liệu: {}", errors);
         ApiResponse<Map<String, String>> response = ApiResponse.<Map<String, String>>builder()
                 .success(false)
                 .message("Validation failed")
@@ -63,14 +63,14 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiResponse<Void>> handleHttpMessageNotReadable(HttpMessageNotReadableException ex) {
-        log.error("Malformed JSON request: {}", ex.getMostSpecificCause().getMessage());
+        log.error("Yêu cầu JSON sai định dạng: {}", ex.getMostSpecificCause().getMessage());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                 .body(ApiResponse.error("Malformed JSON request body"));
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiResponse<Void>> handleDataIntegrityViolation(DataIntegrityViolationException ex) {
-        log.error("DataIntegrityViolationException: {}", ex.getMessage());
+        log.error("Lỗi vi phạm tính toàn vẹn dữ liệu: {}", ex.getMessage());
 
         String message = ex.getMessage();
         String returnMessage = "Không thể xóa dữ liệu do có ràng buộc liên quan hệ thống!";
@@ -92,13 +92,13 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(ClientAbortException.class)
     public ResponseEntity<Void> handleClientAbort(ClientAbortException ex) {
-        log.debug("Client aborted the connection: {}", ex.getMessage());
+        log.debug("Máy khách đã ngắt kết nối: {}", ex.getMessage());
         return ResponseEntity.noContent().build();
     }
 
     @ExceptionHandler(NoResourceFoundException.class)
     public ResponseEntity<ApiResponse<Void>> handleNoResourceFound(NoResourceFoundException ex) {
-        log.debug("Static resource not found: {}", ex.getResourcePath());
+        log.debug("Không tìm thấy tài nguyên tĩnh: {}", ex.getResourcePath());
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(ApiResponse.error("Resource not found"));
     }
@@ -106,11 +106,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleGenericException(Exception ex) {
         if (isClientAbort(ex)) {
-            log.debug("Client aborted the connection: {}", ex.getMessage());
+            log.debug("Máy khách đã ngắt kết nối: {}", ex.getMessage());
             return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
         }
 
-        log.error("Unhandled exception: ", ex);
+        log.error("Ngoại lệ chưa được xử lý: ", ex);
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                 .body(ApiResponse.error("Internal server error"));
     }

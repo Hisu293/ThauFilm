@@ -21,6 +21,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.Map;
+import java.util.UUID;
 
 @Slf4j
 @Service
@@ -33,6 +35,7 @@ public class AuthService {
     private final JwtTokenProvider jwtTokenProvider;
     private final GoogleIdTokenVerifier googleIdTokenVerifier;
     private final UserService userService; // BỔ SUNG: Tiêm UserService để gọi các hàm xử lý câu hỏi bảo mật
+    private final AuditLogService auditLogService;
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
@@ -56,37 +59,44 @@ public class AuthService {
                 .build();
 
         User saved = userRepository.save(user);
-        log.info("User registered: {}", saved.getEmail());
+        log.info("Người dùng đã đăng ký: {}", saved.getEmail());
 
         return issueTokens(saved);
     }
 
     @Transactional
     public AuthResponse login(LoginRequest request) {
-        log.info("Login attempt: {}", request.getEmail());
-
-        User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new BadRequestException("Invalid email or password"));
-
-        if (!user.isEnabled()) {
-            throw new BadRequestException("Account is disabled");
+        log.info("Đang thử đăng nhập: {}", request.getEmail());
+        try {
+            User user = userRepository.findByEmail(request.getEmail())
+                    .orElseThrow(() -> new BadRequestException("Invalid email or password"));
+            if (!user.isEnabled()) throw new BadRequestException("Account is disabled");
+            if (user.getProvider() != User.AuthProvider.EMAIL) {
+                throw new BadRequestException("Please use " + user.getProvider().name().toLowerCase() + " login for this account");
+            }
+            if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+                throw new BadRequestException("Invalid email or password");
+            }
+            auditLogService.success(AuditLogService.AuditCommand.builder()
+                    .action(AuditAction.AUTH_LOGIN_SUCCEEDED)
+                    .actorId(user.getId()).actorEmail(user.getEmail()).actorRole(user.getRole().name())
+                    .targetType("USER").targetId(user.getId().toString())
+                    .description("Người dùng đăng nhập thành công").sensitive(true).build());
+            log.info("Người dùng đã đăng nhập: {}", user.getEmail());
+            return issueTokens(user);
+        } catch (RuntimeException exception) {
+            auditLogService.failure(AuditLogService.AuditCommand.builder()
+                    .action(AuditAction.AUTH_LOGIN_FAILED)
+                    .actorEmail(maskEmail(request.getEmail())).targetType("USER")
+                    .description("Đăng nhập thất bại").sensitive(true)
+                    .metadata(Map.of("emailĐãChe", maskEmail(request.getEmail()))).build(), exception);
+            throw exception;
         }
-
-        if (user.getProvider() != User.AuthProvider.EMAIL) {
-            throw new BadRequestException("Please use " + user.getProvider().name().toLowerCase() + " login for this account");
-        }
-
-        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new BadRequestException("Invalid email or password");
-        }
-
-        log.info("User logged in: {}", user.getEmail());
-        return issueTokens(user);
     }
 
     @Transactional
     public AuthResponse googleLogin(GoogleLoginRequest request) {
-        log.info("Google login attempt");
+        log.info("Đang thử đăng nhập bằng Google");
 
         GoogleIdToken.Payload payload = googleIdTokenVerifier.verify(request.getIdToken())
                 .orElseThrow(() -> new BadRequestException("Invalid Google ID token"));
@@ -104,7 +114,7 @@ public class AuthService {
                     .role(User.Role.MEMBER)
                     .enabled(true)
                     .build();
-            log.info("New user created via Google: {}", email);
+            log.info("Đã tạo người dùng mới qua Google: {}", email);
             return userRepository.save(newUser);
         });
 
@@ -112,7 +122,12 @@ public class AuthService {
             throw new BadRequestException("Account is disabled");
         }
 
-        log.info("Google login success: {}", user.getEmail());
+        log.info("Đăng nhập bằng Google thành công: {}", user.getEmail());
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(AuditAction.AUTH_GOOGLE_LOGIN_SUCCEEDED)
+                .actorId(user.getId()).actorEmail(user.getEmail()).actorRole(user.getRole().name())
+                .targetType("USER").targetId(user.getId().toString())
+                .description("Người dùng đăng nhập Google thành công").sensitive(true).build());
         return issueTokens(user);
     }
 
@@ -174,15 +189,22 @@ public class AuthService {
 
     @Transactional
     public void logout(String refreshTokenValue) {
+        UUID revokedUserId = null;
         if (refreshTokenValue != null && !refreshTokenValue.isBlank()) {
-            refreshTokenRepository.findByToken(refreshTokenValue).ifPresent(token -> {
+            RefreshToken token = refreshTokenRepository.findByToken(refreshTokenValue).orElse(null);
+            if (token != null) {
+                revokedUserId = token.getUserId();
                 token.setRevoked(true);
                 token.setRevokedAt(Instant.now());
                 refreshTokenRepository.save(token);
-            });
+            }
         }
 
-        log.info("User logged out");
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(AuditAction.AUTH_LOGOUT).targetType("USER")
+                .targetId(revokedUserId == null ? null : revokedUserId.toString())
+                .description("Người dùng đăng xuất").sensitive(true).build());
+        log.info("Người dùng đã đăng xuất");
     }
 
     @Transactional
@@ -212,5 +234,12 @@ public class AuthService {
                 .provider(user.getProvider().name())
                 .avatarUrl(user.getAvatarUrl())
                 .build();
+    }
+    private String maskEmail(String email) {
+        if (email == null || email.isBlank() || !email.contains("@")) return "***";
+        String[] parts = email.trim().split("@", 2);
+        String name = parts[0];
+        String visible = name.isEmpty() ? "*" : name.substring(0, 1);
+        return visible + "***@" + parts[1];
     }
 }

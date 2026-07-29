@@ -10,7 +10,6 @@ public class RepairFlyway {
                 )
                 .load();
         flyway.repair();
-        System.out.println("Flyway repair completed.");
+        System.out.println("Đã sửa chữa Flyway thành công.");
     }
 }
-

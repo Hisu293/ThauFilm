@@ -29,6 +29,7 @@ public class WorkforceService {
     private final StaffAttendanceRepository attendanceRepository;
     private final PayrollRecordRepository payrollRepository;
     private final AttendanceAccessCodeService attendanceAccessCodeService;
+    private final AuditLogService auditLogService;
 
     public List<Map<String, Object>> shiftDefinitions() {
         return Arrays.stream(WorkShiftType.values()).map(type -> {
@@ -60,7 +61,12 @@ public class WorkforceService {
         profile.setOvertimeHourlyRate(nonNegative(overtimeHourlyRate, "Lương OT"));
         profile.setDefaultAllowance(nonNegative(defaultAllowance, "Phụ cấp"));
         if (shiftLeader != null) profile.setShiftLeader(shiftLeader);
-        return profileRow(staff, profileRepository.save(profile));
+        Map<String, Object> result = profileRow(staff, profileRepository.save(profile));
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(AuditAction.STAFF_PROFILE_UPDATED).targetType("STAFF")
+                .targetId(staffId.toString()).description("Đã cập nhật hồ sơ nhân viên " + staff.getEmail())
+                .newValues(result).sensitive(true).build());
+        return result;
     }
 
     @Transactional
@@ -125,7 +131,12 @@ public class WorkforceService {
         assignment.setNote(note == null ? null : note.trim());
         assignment.setAssignmentSource(ShiftAssignmentSource.ADMIN);
         assignment.setApprovalStatus(ShiftApprovalStatus.APPROVED);
-        return assignmentRow(shiftRepository.save(assignment), staff);
+        Map<String, Object> result = assignmentRow(shiftRepository.save(assignment), staff);
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(AuditAction.STAFF_SHIFT_ASSIGNED).targetType("STAFF_SHIFT")
+                .targetId(assignment.getId().toString()).description("Đã phân ca cho nhân viên " + staff.getEmail())
+                .newValues(result).build());
+        return result;
     }
 
     @Transactional
@@ -160,6 +171,8 @@ public class WorkforceService {
     public void deleteShift(UUID assignmentId) {
         if (!shiftRepository.existsById(assignmentId)) throw new BadRequestException("Không tìm thấy ca làm");
         shiftRepository.deleteById(assignmentId);
+        auditLogService.success(AuditAction.STAFF_SHIFT_REMOVED, "STAFF_SHIFT", assignmentId,
+                "Đã xóa ca làm của nhân viên");
     }
 
     @Transactional
@@ -240,7 +253,12 @@ public class WorkforceService {
         if (status != null) record.setStatus(status);
         record.setNote(note == null ? record.getNote() : note.trim());
         record.setTotalSalary(total(record));
-        return payrollRow(payrollRepository.save(record), staff, profile);
+        Map<String, Object> result = payrollRow(payrollRepository.save(record), staff, profile);
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(AuditAction.STAFF_PAYROLL_UPDATED).targetType("PAYROLL")
+                .targetId(payrollId.toString()).description("Đã cập nhật bảng lương của nhân viên " + staff.getEmail())
+                .reason(note).newValues(result).sensitive(true).build());
+        return result;
     }
 
     private List<User> staffUsers() {

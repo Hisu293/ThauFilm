@@ -47,6 +47,7 @@ public class MovieStreamService {
     private final BookingRepository bookingRepository;
     private final OnlineMovieViewRepository onlineMovieViewRepository;
     private final OnlineViewingSessionRepository onlineViewingSessionRepository;
+    private final AuditLogService auditLogService;
 
     @Value("${app.streaming.session-timeout-seconds:90}")
     private long sessionTimeoutSeconds;
@@ -134,10 +135,19 @@ public class MovieStreamService {
         if (session != null
                 && !session.getDeviceId().equals(deviceId)
                 && session.getLastHeartbeatAt().isAfter(staleBefore)) {
+            auditLogService.failure(AuditLogService.AuditCommand.builder()
+                    .action(AuditAction.CONCURRENT_STREAM_BLOCKED).targetType("BOOKING")
+                    .targetId(booking.getId().toString()).actorId(userId)
+                    .description("Đã chặn xem phim đồng thời trên thiết bị khác")
+                    .correlationId(booking.getId().toString()).sensitive(true)
+                    .metadata(Map.of("mãPhim", movieId, "dấuVânTayThiếtBị", hex(sha256(deviceId)))).build(),
+                    new IllegalStateException("Vé đang được sử dụng trên một thiết bị khác"));
             throw new BadRequestException(
                     "Vé này đang được xem trên một thiết bị khác. Hãy đóng phiên đó hoặc thử lại sau.");
         }
 
+        boolean newSession = session == null;
+        boolean replacedDevice = session != null && !session.getDeviceId().equals(deviceId);
         if (session == null) {
             session = OnlineViewingSession.builder()
                     .bookingId(booking.getId())
@@ -155,6 +165,16 @@ public class MovieStreamService {
             session.setLastHeartbeatAt(now);
         }
         onlineViewingSessionRepository.save(session);
+        if (newSession || replacedDevice) {
+            auditLogService.success(AuditLogService.AuditCommand.builder()
+                    .action(replacedDevice ? AuditAction.STREAM_DEVICE_REPLACED : AuditAction.STREAM_DEVICE_REGISTERED)
+                    .targetType("ONLINE_VIEWING_SESSION").targetId(session.getId().toString())
+                    .actorId(userId).description(replacedDevice
+                            ? "Đã thay thế thiết bị xem phim online"
+                            : "Đã đăng ký thiết bị xem phim online")
+                    .correlationId(booking.getId().toString()).sensitive(true)
+                    .metadata(Map.of("mãPhim", movieId, "dấuVânTayThiếtBị", hex(sha256(deviceId)))).build());
+        }
     }
 
     private String requireDeviceId(String deviceId) {

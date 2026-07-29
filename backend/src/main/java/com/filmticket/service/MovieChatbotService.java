@@ -536,9 +536,9 @@ public class MovieChatbotService {
     private void handleGeminiFailure(Exception exception) {
         if (exception.getMessage() != null && exception.getMessage().contains("HTTP 429")) {
             geminiRetryAfterMillis = System.currentTimeMillis() + Duration.ofMinutes(5).toMillis();
-            log.info("Gemini quota/rate limit reached. Falling back to local responses for 5 minutes.");
+            log.info("Đã đạt hạn mức hoặc giới hạn tần suất của Gemini. Chuyển sang phản hồi cục bộ trong 5 phút.");
         } else {
-            log.warn("Movie chatbot AI failed: {}", exception.getMessage());
+            log.warn("AI của chatbot phim gặp lỗi: {}", exception.getMessage());
         }
     }
 

@@ -41,6 +41,7 @@ public class StaffTicketService {
     private final BookingService bookingService;
     private final TicketPdfGenerator ticketPdfGenerator;
     private final TheaterRepository theaterRepository;
+    private final AuditLogService auditLogService;
 
     public List<TicketResponse> listTickets() {
         List<Ticket> tickets = ticketRepository.findAll(Sort.by(Sort.Direction.DESC, "createdAt"));
@@ -202,6 +203,10 @@ public class StaffTicketService {
         }
         booking.setStatus(BookingStatus.CANCELLED);
         bookingRepository.save(booking);
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(AuditAction.TICKET_CANCELLED).targetType("TICKET")
+                .targetId(ticketId.toString()).description("Nhân viên đã hủy vé")
+                .correlationId(booking.getId().toString()).sensitive(true).build());
         List<TicketResponse> responses = listTickets();
         return responses.stream()
                 .filter(t -> t.getId().equals(ticketId))
@@ -224,6 +229,11 @@ public class StaffTicketService {
         try {
             byte[] pdf = ticketPdfGenerator.generateTicketPdf(booking, tickets);
             ByteArrayResource resource = new ByteArrayResource(pdf);
+            auditLogService.success(AuditLogService.AuditCommand.builder()
+                    .action(AuditAction.TICKET_REPRINTED).targetType("TICKET")
+                    .targetId(ticketId.toString()).description("Nhân viên đã in lại vé")
+                    .correlationId(booking.getId().toString())
+                    .metadata(Map.of("mãVé", ticket.getTicketCode())).build());
             return ResponseEntity.ok()
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=ticket-" + ticket.getTicketCode() + ".pdf")
                     .contentType(MediaType.APPLICATION_PDF)

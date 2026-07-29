@@ -558,7 +558,7 @@ export const SeatSelectionPage = () => {
 
       setSnackbarMessage(`${localMessage} Vui lòng tải lại trang hoặc chọn lại suất chiếu.`);
       setSnackbarOpen(true);
-      console.error('Create booking blocked by local UUID validation', {
+      console.error('Tạo đơn đặt vé bị chặn do xác thực UUID cục bộ', {
         showtimeId,
         seatIds,
         invalidShowtimeId,
@@ -627,7 +627,7 @@ export const SeatSelectionPage = () => {
           ? 'Không thể cập nhật ghế cho booking này.'
           : 'Không thể giữ ghế. Có thể các ghế này đang nằm trong một đơn chờ thanh toán khác.')
       );
-      console.error(editingBookingId ? 'Update booking seats failed' : 'Create booking failed', {
+      console.error(editingBookingId ? 'Cập nhật ghế trong đơn đặt vé thất bại' : 'Tạo đơn đặt vé thất bại', {
         message: err.message,
         details: err.details,
         raw: err.raw,

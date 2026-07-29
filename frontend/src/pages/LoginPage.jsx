@@ -186,7 +186,7 @@ const LoginPage = () => {
 
     try {
       const { data: body } = await authService.login({ email, password });
-      console.log('Login API success:', body);
+      console.log('API đăng nhập thành công:', body);
       completeLogin(body);
     } catch (err) {
       setServerError(err.message || 'Đăng nhập thất bại. Vui lòng thử lại.');

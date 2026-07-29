@@ -31,7 +31,7 @@ public class UserService {
                 .or(() -> userRepository.findByEmail(username))
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        log.info("Fetched current user: {}", user.getEmail());
+        log.info("Đã lấy thông tin người dùng hiện tại: {}", user.getEmail());
         return UserResponse.fromUser(user);
     }
 
