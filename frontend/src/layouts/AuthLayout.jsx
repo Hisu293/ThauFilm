@@ -1,90 +1,82 @@
-import {
-  Box,
-  Container,
-  CssBaseline,
-  Paper,
-  ThemeProvider,
-} from '@mui/material';
+import { Box, CssBaseline, Paper, ThemeProvider } from '@mui/material';
+import LocalActivityRoundedIcon from '@mui/icons-material/LocalActivityRounded';
+import PlayCircleOutlineRoundedIcon from '@mui/icons-material/PlayCircleOutlineRounded';
+import StarsRoundedIcon from '@mui/icons-material/StarsRounded';
 import { cinemaTheme as authTheme } from '../theme/cinemaTheme';
+import './AuthLayout.css';
 
-const AuthLayout = ({ children, maxFormWidth = 460 }) => (
-  <ThemeProvider theme={authTheme}>
-    <CssBaseline />
-    <Box
-      sx={{
-        minHeight: '100vh',
-        backgroundImage: `
-          linear-gradient(rgba(0, 0, 0, 0.46), rgba(0, 0, 0, 0.68)),
-          radial-gradient(circle at 50% 35%, rgba(229, 9, 20, 0.12) 0%, transparent 55%),
-          url('/auth-background.jpg')
-        `,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat',
-        display: 'flex',
-        alignItems: 'center',
-        py: { xs: 2, sm: 4 },
-        fontFamily: '"Be Vietnam Pro", "Inter", "Roboto", "Helvetica", "Arial", sans-serif',
-      }}
-    >
-      <Container
-        maxWidth="sm"
-        sx={{
-          display: 'flex',
-          justifyContent: 'center',
-          width: '100%',
-        }}
-      >
-        <Paper
-          elevation={0}
-          sx={{
-            width: '100%',
-            maxWidth: maxFormWidth,
-            borderRadius: { xs: '14px', sm: '20px' },
-            p: { xs: 2.5, sm: 4 },
-            border: { xs: 'none', sm: '1px solid rgba(255, 255, 255, 0.10)' },
-            background: { xs: 'transparent', sm: 'rgba(20, 20, 20, 0.93)' },
-            boxShadow: {
-              xs: 'none',
-              sm: '0 14px 52px rgba(0, 0, 0, 0.55), inset 0 1.5px 0 rgba(255, 255, 255, 0.07)',
-            },
-            backdropFilter: { xs: 'none', sm: 'blur(14px)' },
-            '& .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline': {
-              borderColor: 'rgba(255, 255, 255, 0.50) !important',
-            },
-            '& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline': {
-              borderColor: '#e50914 !important',
-              borderWidth: '2px !important',
-            },
-            '& .MuiInputLabel-root.Mui-focused': { color: '#e50914 !important' },
-            '& .MuiFormHelperText-root': { ml: 0.25, fontSize: '0.76rem' },
-            '& .MuiCheckbox-root.Mui-checked': { color: '#e50914' },
-            '& .MuiDivider-root::before, & .MuiDivider-root::after': {
-              borderColor: 'rgba(255, 255, 255, 0.14)',
-            },
-            '& .MuiButton-containedPrimary': {
-              boxShadow: '0 4px 24px rgba(229, 9, 20, 0.32)',
-              transition: 'box-shadow 0.25s, transform 0.18s',
-              '&:hover': {
-                boxShadow: '0 6px 32px rgba(229, 9, 20, 0.52)',
-                transform: 'translateY(-1px)',
-              },
-              '&:active': {
-                transform: 'translateY(0)',
-                boxShadow: '0 2px 12px rgba(229, 9, 20, 0.28)',
-              },
-            },
-            '& .MuiButton-outlined': {
-              transition: 'background 0.22s, border-color 0.22s, transform 0.18s',
-              '&:active': { transform: 'scale(0.98)' },
-            },
-          }}
-        >
-          {children}
-        </Paper>
-      </Container>
-    </Box>
-  </ThemeProvider>
-);
+const AuthLayout = ({ children, maxFormWidth = 460, mode = 'login' }) => {
+  const isRegister = mode === 'register';
+
+  return (
+    <ThemeProvider theme={authTheme}>
+      <CssBaseline />
+      <main className={`auth-page auth-page--${mode}`}>
+        <div className="auth-page__ambient auth-page__ambient--one" />
+        <div className="auth-page__ambient auth-page__ambient--two" />
+
+        <section className="auth-shell">
+          <aside className="auth-story">
+            <div className="auth-story__backdrop" />
+            <div className="auth-story__shade" />
+
+            <a className="auth-story__brand" href="/" aria-label="Về trang chủ ThauFilm">
+              <img src="/logo-removebg-preview.png" alt="" />
+              <span>ThauFilm</span>
+            </a>
+
+            <div className="auth-story__content">
+              <span className="auth-story__eyebrow">
+                {isRegister ? 'GIA NHẬP CỘNG ĐỒNG ĐIỆN ẢNH' : 'RẠP PHIM TRONG TẦM TAY'}
+              </span>
+              <h1 className="auth-story__title">
+                {isRegister
+                  ? (
+                    <>
+                      <span>Mỗi bộ phim hay</span>
+                      <span>bắt đầu từ</span>
+                      <span className="auth-story__title-accent">một tấm vé.</span>
+                    </>
+                  )
+                  : (
+                    <>
+                      <span>Trở lại với</span>
+                      <span className="auth-story__title-accent">thế giới điện ảnh</span>
+                      <span>của riêng bạn.</span>
+                    </>
+                  )}
+              </h1>
+              <p>
+                {isRegister
+                  ? 'Tạo tài khoản để giữ chỗ, nhận ưu đãi và lưu lại mọi hành trình điện ảnh tại ThauFilm.'
+                  : 'Đăng nhập để tiếp tục đặt vé, quản lý lịch xem và khám phá những câu chuyện đang chờ bạn.'}
+              </p>
+
+              <div className="auth-story__features">
+                <span><LocalActivityRoundedIcon /> Đặt vé nhanh</span>
+                <span><PlayCircleOutlineRoundedIcon /> Xem trailer</span>
+                <span><StarsRoundedIcon /> Ưu đãi thành viên</span>
+              </div>
+            </div>
+
+            <div className="auth-story__filmstrip" aria-hidden="true">
+              <span /><span /><span /><span /><span /><span />
+            </div>
+          </aside>
+
+          <Box className="auth-form-zone">
+            <Paper
+              className="auth-form-card"
+              elevation={0}
+              sx={{ maxWidth: maxFormWidth }}
+            >
+              {children}
+            </Paper>
+          </Box>
+        </section>
+      </main>
+    </ThemeProvider>
+  );
+};
 
 export default AuthLayout;

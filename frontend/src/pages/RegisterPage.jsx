@@ -155,7 +155,7 @@ const RegisterPage = () => {
   };
 
   return (
-    <AuthLayout maxFormWidth={460}>
+    <AuthLayout maxFormWidth={460} mode="register">
 
       <Stack direction="row" alignItems="center" spacing={1.2} sx={{ mb: 0.5 }}>
         <Box component="img" src="/logo-removebg-preview.png" alt="ThauFilm" sx={{ height: 36, width: 'auto', objectFit: 'contain' }} />

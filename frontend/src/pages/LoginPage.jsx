@@ -196,7 +196,7 @@ const LoginPage = () => {
   };
 
   return (
-    <AuthLayout maxFormWidth={420}>
+    <AuthLayout maxFormWidth={420} mode="login">
       <Stack direction="row" alignItems="center" spacing={1.2} sx={{ mb: 0.5 }}>
         <Box component="img" src="/logo-removebg-preview.png" alt="ThauFilm" sx={{ height: 36, width: 'auto', objectFit: 'contain' }} />
         <Typography
