@@ -4,6 +4,7 @@ import com.filmticket.entity.*;
 import com.filmticket.exception.BadRequestException;
 import com.filmticket.repository.*;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,6 +20,7 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class WorkforceService {
     private static final Map<WorkShiftType, Integer> MINIMUM_STAFF = Map.of(
             WorkShiftType.MORNING, 2, WorkShiftType.AFTERNOON, 3,
@@ -30,6 +32,7 @@ public class WorkforceService {
     private final PayrollRecordRepository payrollRepository;
     private final AttendanceAccessCodeService attendanceAccessCodeService;
     private final AuditLogService auditLogService;
+    private final OutboundEmailService outboundEmailService;
 
     public List<Map<String, Object>> shiftDefinitions() {
         return Arrays.stream(WorkShiftType.values()).map(type -> {
@@ -119,8 +122,15 @@ public class WorkforceService {
     }
 
     @Transactional
-    public Map<String, Object> assignShift(UUID staffId, LocalDate workDate, WorkShiftType shiftType, String note) {
+    public Map<String, Object> assignShift(UUID staffId, LocalDate workDate, WorkShiftType shiftType,
+                                           String workplace, String tasks, String note) {
         User staff = requireStaff(staffId);
+        if (workDate != null && workDate.isBefore(LocalDate.now()))
+            throw new BadRequestException("Không thể phân ca trong quá khứ");
+        if (workplace == null || workplace.isBlank())
+            throw new BadRequestException("Địa điểm làm việc là bắt buộc");
+        if (tasks == null || tasks.isBlank())
+            throw new BadRequestException("Nhiệm vụ làm việc là bắt buộc");
         if (workDate == null || shiftType == null) throw new BadRequestException("Ngày làm và ca làm là bắt buộc");
         StaffShiftAssignment assignment = shiftRepository.findByStaffIdAndWorkDate(staffId, workDate)
                 .orElseGet(() -> StaffShiftAssignment.builder().staffId(staffId).workDate(workDate).build());
@@ -129,13 +139,17 @@ public class WorkforceService {
         assignment.setScheduledStart(window.start);
         assignment.setScheduledEnd(window.end);
         assignment.setNote(note == null ? null : note.trim());
+        assignment.setWorkplace(workplace.trim());
+        assignment.setTasks(tasks.trim());
         assignment.setAssignmentSource(ShiftAssignmentSource.ADMIN);
         assignment.setApprovalStatus(ShiftApprovalStatus.APPROVED);
-        Map<String, Object> result = assignmentRow(shiftRepository.save(assignment), staff);
+        StaffShiftAssignment saved = shiftRepository.save(assignment);
+        Map<String, Object> result = assignmentRow(saved, staff);
         auditLogService.success(AuditLogService.AuditCommand.builder()
                 .action(AuditAction.STAFF_SHIFT_ASSIGNED).targetType("STAFF_SHIFT")
                 .targetId(assignment.getId().toString()).description("Đã phân ca cho nhân viên " + staff.getEmail())
                 .newValues(result).build());
+        sendShiftAssignmentEmail(saved, staff);
         return result;
     }
 
@@ -305,8 +319,45 @@ public class WorkforceService {
                 "staffEmail", staff.getEmail(), "workDate", item.getWorkDate(), "shiftType", item.getShiftType(),
                 "shiftName", shiftName(item.getShiftType()), "shiftTime", shiftTime(item.getShiftType()),
                 "scheduledStart", item.getScheduledStart(), "scheduledEnd", item.getScheduledEnd(),
-                "description", shiftDescription(item.getShiftType()), "note", item.getNote(),
+                "description", shiftDescription(item.getShiftType()), "workplace", item.getWorkplace(),
+                "tasks", item.getTasks(), "note", item.getNote(),
                 "assignmentSource", item.getAssignmentSource(), "approvalStatus", item.getApprovalStatus());
+    }
+
+    private void sendShiftAssignmentEmail(StaffShiftAssignment assignment, User staff) {
+        if (staff.getEmail() == null || staff.getEmail().isBlank()) return;
+        String staffName = staff.getFullName() == null || staff.getFullName().isBlank()
+                ? staff.getEmail() : staff.getFullName();
+        String subject = "[ThauFilm] Thông báo ca làm việc " + assignment.getWorkDate();
+        String html = """
+                <div style="font-family:Arial,sans-serif;line-height:1.6;color:#172033">
+                  <h2 style="color:#d71920">Thông báo ca làm việc ThauFilm</h2>
+                  <p>Xin chào <strong>%s</strong>,</p>
+                  <p>Admin đã phân công ca làm việc mới cho bạn:</p>
+                  <table style="border-collapse:collapse;width:100%%;max-width:640px">
+                    <tr><td style="padding:8px;border:1px solid #ddd"><strong>Ngày làm</strong></td><td style="padding:8px;border:1px solid #ddd">%s</td></tr>
+                    <tr><td style="padding:8px;border:1px solid #ddd"><strong>Ca làm</strong></td><td style="padding:8px;border:1px solid #ddd">%s · %s</td></tr>
+                    <tr><td style="padding:8px;border:1px solid #ddd"><strong>Địa điểm</strong></td><td style="padding:8px;border:1px solid #ddd">%s</td></tr>
+                    <tr><td style="padding:8px;border:1px solid #ddd"><strong>Nhiệm vụ</strong></td><td style="padding:8px;border:1px solid #ddd;white-space:pre-line">%s</td></tr>
+                    <tr><td style="padding:8px;border:1px solid #ddd"><strong>Ghi chú</strong></td><td style="padding:8px;border:1px solid #ddd">%s</td></tr>
+                  </table>
+                  <p>Vui lòng có mặt đúng giờ và thực hiện chấm công theo quy định.</p>
+                </div>
+                """.formatted(escapeHtml(staffName), assignment.getWorkDate(),
+                escapeHtml(shiftName(assignment.getShiftType())), escapeHtml(shiftTime(assignment.getShiftType())),
+                escapeHtml(assignment.getWorkplace()), escapeHtml(assignment.getTasks()),
+                escapeHtml(assignment.getNote() == null ? "Không có" : assignment.getNote()));
+        try {
+            outboundEmailService.send("SHIFT-" + assignment.getId() + "-" + assignment.getUpdatedAt(),
+                    staff.getEmail(), subject, html, true, List.of());
+        } catch (Exception ex) {
+            log.error("Không thể gửi email thông báo ca {} cho nhân viên {}", assignment.getId(), staff.getId(), ex);
+        }
+    }
+
+    private String escapeHtml(String value) {
+        return value == null ? "" : value.replace("&", "&amp;").replace("<", "&lt;")
+                .replace(">", "&gt;").replace("\"", "&quot;").replace("'", "&#39;");
     }
 
     private List<Map<String, Object>> coverage(YearMonth month, List<StaffShiftAssignment> assignments) {

@@ -34,6 +34,12 @@ public class StaffShiftAssignment {
     @Column(length = 500)
     private String note;
 
+    @Column(length = 255)
+    private String workplace;
+
+    @Column(columnDefinition = "TEXT")
+    private String tasks;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "assignment_source", nullable = false, length = 20)
     private ShiftAssignmentSource assignmentSource;

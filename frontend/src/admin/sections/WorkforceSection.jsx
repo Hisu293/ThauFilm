@@ -26,7 +26,10 @@ const WorkforceSection = () => {
   const [tab, setTab] = useState(0);
   const [month, setMonth] = useState(monthNow);
   const [state, setState] = useState({ loading: true, error: '', staff: [], schedule: null, payroll: null });
-  const [shiftForm, setShiftForm] = useState({ staffId: '', workDate: today(), shiftType: 'MORNING', note: '' });
+  const [shiftForm, setShiftForm] = useState({
+    staffId: '', workDate: today(), shiftType: 'MORNING',
+    workplace: '', tasks: '', note: '',
+  });
   const [busy, setBusy] = useState(false);
   const [profile, setProfile] = useState(null);
   const [payroll, setPayroll] = useState(null);
@@ -66,7 +69,7 @@ const WorkforceSection = () => {
     setBusy(true);
     try {
       await adminService.assignShift(shiftForm);
-      setShiftForm((old) => ({ ...old, note: '' }));
+      setShiftForm((old) => ({ ...old, tasks: '', note: '' }));
       await load();
     } catch (error) {
       setState((old) => ({ ...old, error: error.message || 'Không phân được ca làm.' }));
@@ -145,18 +148,20 @@ const WorkforceSection = () => {
           </Box>
           <Box className="admin-panel" sx={{ p: 2.5 }}>
             <Typography variant="h6" fontWeight={850} sx={{ mb: 2 }}>Phân ca cho nhân viên</Typography>
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1.3fr 1fr 1fr 1.4fr auto' }, gap: 1.5, alignItems: 'center' }}>
+            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1.3fr 1fr 1fr' }, gap: 1.5, alignItems: 'center' }}>
               <FormControl size="small"><InputLabel>Nhân viên</InputLabel><Select label="Nhân viên" value={shiftForm.staffId} onChange={(event) => setShiftForm((old) => ({ ...old, staffId: event.target.value }))}>{state.staff.map((item) => <MenuItem key={item.staffId} value={item.staffId}>{item.staffName || item.staffEmail}</MenuItem>)}</Select></FormControl>
               <TextField type="date" size="small" label="Ngày làm" value={shiftForm.workDate} onChange={(event) => setShiftForm((old) => ({ ...old, workDate: event.target.value }))} slotProps={{ inputLabel: { shrink: true } }} />
               <FormControl size="small"><InputLabel>Ca làm</InputLabel><Select label="Ca làm" value={shiftForm.shiftType} onChange={(event) => setShiftForm((old) => ({ ...old, shiftType: event.target.value }))}>{definitions.map((item) => <MenuItem key={item.type} value={item.type}>{item.name}</MenuItem>)}</Select></FormControl>
+              <TextField size="small" label="Địa điểm làm việc" value={shiftForm.workplace} onChange={(event) => setShiftForm((old) => ({ ...old, workplace: event.target.value }))} />
+              <TextField size="small" label="Nhiệm vụ làm việc" multiline minRows={2} value={shiftForm.tasks} onChange={(event) => setShiftForm((old) => ({ ...old, tasks: event.target.value }))} />
               <TextField size="small" label="Ghi chú" value={shiftForm.note} onChange={(event) => setShiftForm((old) => ({ ...old, note: event.target.value }))} />
-              <Button variant="contained" startIcon={<AddRoundedIcon />} disabled={busy || !shiftForm.staffId} onClick={assign}>Phân ca</Button>
+              <Button variant="contained" startIcon={<AddRoundedIcon />} disabled={busy || !shiftForm.staffId || !shiftForm.workplace.trim() || !shiftForm.tasks.trim()} onClick={assign}>Phân ca và gửi email</Button>
             </Box>
           </Box>
           <Box className="admin-panel" sx={{ overflow: 'hidden' }}>
             <Box sx={{ p: 2.5, pb: 1 }}><Typography variant="h6" fontWeight={850}>Lịch phân ca tháng</Typography><Typography variant="body2" color="text.secondary">{assignedDays} ngày công đã được xếp lịch</Typography></Box>
             <TableContainer><Table><TableHead><TableRow><TableCell>Ngày</TableCell><TableCell>Nhân viên</TableCell><TableCell>Loại nhân sự</TableCell><TableCell>Ca</TableCell><TableCell>Thời gian</TableCell><TableCell>Ghi chú</TableCell><TableCell align="right" /></TableRow></TableHead><TableBody>
-              {assignments.map((item) => { const staff = state.staff.find((candidate) => candidate.staffId === item.staffId); return <TableRow key={item.id} className="admin-table-row"><TableCell>{new Date(`${item.workDate}T00:00:00`).toLocaleDateString('vi-VN')}</TableCell><TableCell><Typography fontWeight={800}>{item.staffName}</Typography><Typography variant="caption" color="text.secondary">{item.staffEmail}</Typography></TableCell><TableCell><Chip size="small" label={employmentLabel(staff?.employmentType)} color={staff?.employmentType === 'FULL_TIME' ? 'primary' : 'info'} /></TableCell><TableCell>{item.shiftName}</TableCell><TableCell>{item.shiftTime}</TableCell><TableCell><Stack spacing={.5}><Typography variant="body2">{item.note || '—'}</Typography><Chip size="small" variant="outlined" color={item.approvalStatus === 'APPROVED' ? 'success' : item.approvalStatus === 'REJECTED' ? 'error' : 'warning'} label={item.assignmentSource === 'EMPLOYEE' ? `Nhân viên đăng ký · ${item.approvalStatus}` : 'Quản lý phân ca'} /></Stack></TableCell><TableCell align="right">{item.approvalStatus === 'PENDING' && <><Button color="success" size="small" onClick={() => updateStatus(item.id, 'APPROVED')}>Duyệt</Button><Button color="warning" size="small" onClick={() => updateStatus(item.id, 'REJECTED')}>Từ chối</Button></>}<Button color="error" size="small" onClick={() => removeAssignment(item.id)} disabled={busy}><DeleteOutlineRoundedIcon fontSize="small" /></Button></TableCell></TableRow>; })}
+              {assignments.map((item) => { const staff = state.staff.find((candidate) => candidate.staffId === item.staffId); return <TableRow key={item.id} className="admin-table-row"><TableCell>{new Date(`${item.workDate}T00:00:00`).toLocaleDateString('vi-VN')}</TableCell><TableCell><Typography fontWeight={800}>{item.staffName}</Typography><Typography variant="caption" color="text.secondary">{item.staffEmail}</Typography></TableCell><TableCell><Chip size="small" label={employmentLabel(staff?.employmentType)} color={staff?.employmentType === 'FULL_TIME' ? 'primary' : 'info'} /></TableCell><TableCell>{item.shiftName}</TableCell><TableCell>{item.shiftTime}</TableCell><TableCell><Stack spacing={.5}><Typography variant="body2"><b>{item.workplace || 'Chưa có địa điểm'}</b></Typography><Typography variant="caption">{item.tasks || 'Chưa có nhiệm vụ'}</Typography><Typography variant="caption" color="text.secondary">{item.note || '—'}</Typography><Chip size="small" variant="outlined" color={item.approvalStatus === 'APPROVED' ? 'success' : item.approvalStatus === 'REJECTED' ? 'error' : 'warning'} label={item.assignmentSource === 'EMPLOYEE' ? `Nhân viên đăng ký · ${item.approvalStatus}` : 'Quản lý phân ca'} /></Stack></TableCell><TableCell align="right">{item.approvalStatus === 'PENDING' && <><Button color="success" size="small" onClick={() => updateStatus(item.id, 'APPROVED')}>Duyệt</Button><Button color="warning" size="small" onClick={() => updateStatus(item.id, 'REJECTED')}>Từ chối</Button></>}<Button color="error" size="small" onClick={() => removeAssignment(item.id)} disabled={busy}><DeleteOutlineRoundedIcon fontSize="small" /></Button></TableCell></TableRow>; })}
               {!assignments.length && <TableRow><TableCell colSpan={7} align="center" sx={{ py: 6, color: 'text.secondary' }}>Chưa phân ca trong tháng này.</TableCell></TableRow>}
             </TableBody></Table></TableContainer>
           </Box>

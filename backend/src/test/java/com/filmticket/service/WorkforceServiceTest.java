@@ -34,9 +34,10 @@ class WorkforceServiceTest {
         });
         WorkforceService service = service(users, shifts, mock(StaffEmploymentProfileRepository.class),
                 mock(StaffAttendanceRepository.class), mock(PayrollRecordRepository.class));
-        LocalDate workDate = LocalDate.of(2026, 7, 15);
+        LocalDate workDate = LocalDate.now().plusDays(1);
 
-        Map<String, Object> result = service.assignShift(staffId, workDate, WorkShiftType.LATE, null);
+        Map<String, Object> result = service.assignShift(
+                staffId, workDate, WorkShiftType.LATE, "Rạp ThauFilm", "Trực vận hành", null);
 
         assertEquals(workDate.atTime(22, 0), result.get("scheduledStart"));
         assertEquals(workDate.plusDays(1).atTime(1, 0), result.get("scheduledEnd"));
@@ -93,7 +94,8 @@ class WorkforceServiceTest {
                                      StaffEmploymentProfileRepository profiles, StaffAttendanceRepository attendance,
                                      PayrollRecordRepository payroll) {
         return new WorkforceService(users, profiles, shifts, attendance, payroll,
-                mock(AttendanceAccessCodeService.class), mock(AuditLogService.class));
+                mock(AttendanceAccessCodeService.class), mock(AuditLogService.class),
+                mock(OutboundEmailService.class));
     }
 
     private User staff(String name) {
