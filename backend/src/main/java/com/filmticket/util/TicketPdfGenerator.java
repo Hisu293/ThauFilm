@@ -2,6 +2,7 @@ package com.filmticket.util;
 
 import com.filmticket.entity.*;
 import com.filmticket.repository.*;
+import com.filmticket.service.S3PresignedUrlService;
 import com.lowagie.text.Document;
 import com.lowagie.text.Element;
 import com.lowagie.text.PageSize;
@@ -15,6 +16,7 @@ import com.lowagie.text.pdf.PdfPTable;
 import com.lowagie.text.pdf.PdfWriter;
 import com.lowagie.text.pdf.BaseFont;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import javax.imageio.ImageIO;
@@ -35,6 +37,7 @@ import java.util.Locale;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class TicketPdfGenerator {
 
     private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm");
@@ -47,6 +50,7 @@ public class TicketPdfGenerator {
     private final SeatRepository seatRepository;
     private final PaymentRepository paymentRepository;
     private final BookingSeatRepository bookingSeatRepository;
+    private final S3PresignedUrlService s3PresignedUrlService;
 
     public byte[] generateTicketPdf(Booking booking, List<Ticket> tickets) throws Exception {
         Document document = new Document(PageSize.A4, 40, 40, 40, 40);
@@ -76,7 +80,12 @@ public class TicketPdfGenerator {
         movieTitle.setSpacingAfter(10);
         document.add(movieTitle);
 
-        addPoster(document, booking);
+        try {
+            addPoster(document, booking);
+        } catch (Exception ex) {
+            log.warn("Không thể tải poster khi tạo PDF vé cho booking {}; tiếp tục không có poster (loại lỗi={})",
+                    booking.getId(), ex.getClass().getSimpleName());
+        }
     }
 
     private String getMovieTitle(Booking booking) {
@@ -107,7 +116,7 @@ public class TicketPdfGenerator {
     }
 
     private void addPoster(Document document, Booking booking) throws Exception {
-        String posterUrl = getMoviePosterUrl(booking);
+        String posterUrl = s3PresignedUrlService.resolvePosterUrl(getMoviePosterUrl(booking));
         if (posterUrl == null || posterUrl.isBlank()) {
             return;
         }
