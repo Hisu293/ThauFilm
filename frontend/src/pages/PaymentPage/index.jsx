@@ -700,8 +700,11 @@ export const PaymentPage = () => {
 
             {!isOnlineMovieBooking && (
             <SectionCard title="Chọn Khuyến Mãi">
-              <Stack spacing={2.5}>
-                <Alert severity="info" sx={{ borderRadius: 3 }}>
+              <Stack spacing={2}>
+                <Alert
+                  severity="info"
+                  sx={{ borderRadius: 2.5, py: 0.25, '& .MuiAlert-message': { py: 0.5 } }}
+                >
                   {promotionNotice || 'Danh sách ưu đãi đang đồng bộ từ API thành viên.'}
                 </Alert>
 
@@ -713,33 +716,52 @@ export const PaymentPage = () => {
                     description="Tài khoản của bạn hiện chưa có khuyến mãi hoặc combo nào đang hoạt động."
                   />
                 ) : (
-                  <Stack spacing={3}>
+                  <Stack spacing={2.5}>
                     <Box>
-                      <Stack direction="row" spacing={1.25} alignItems="center" sx={{ mb: 1.5 }}>
+                      <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.25 }}>
                         <LocalOfferRoundedIcon sx={{ color: 'primary.main' }} />
                         <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
                           Mã giảm giá hiện có
                         </Typography>
                       </Stack>
 
-                      <Stack spacing={1.5}>
+                      <Stack
+                        spacing={1}
+                        sx={{
+                          maxHeight: 360,
+                          overflowY: 'auto',
+                          pr: 0.75,
+                          scrollbarWidth: 'thin',
+                          scrollbarColor: 'rgba(251,191,36,.55) rgba(15,23,42,.35)',
+                          '&::-webkit-scrollbar': { width: 6 },
+                          '&::-webkit-scrollbar-thumb': {
+                            bgcolor: 'rgba(251,191,36,.55)',
+                            borderRadius: 99,
+                          },
+                        }}
+                      >
                         <Card
                           onClick={() => setSelectedDiscountId('')}
                           sx={{
+                            flexShrink: 0,
                             cursor: 'pointer',
                             border: selectedDiscountId === '' ? '2px solid #FBBF24' : '1px solid rgba(148, 163, 184, 0.1)',
                             bgcolor: selectedDiscountId === '' ? 'rgba(251, 191, 36, 0.04)' : 'background.default',
                           }}
                         >
-                          <CardContent sx={{ p: 2.25, '&:last-child': { pb: 2.25 } }}>
-                            <Stack direction="row" spacing={2} alignItems="center">
-                              <Radio checked={selectedDiscountId === ''} onChange={() => setSelectedDiscountId('')} />
+                          <CardContent sx={{ p: 1.35, '&:last-child': { pb: 1.35 } }}>
+                            <Stack direction="row" spacing={1.25} alignItems="center">
+                              <Radio
+                                size="small"
+                                checked={selectedDiscountId === ''}
+                                onChange={() => setSelectedDiscountId('')}
+                              />
                               <Box>
                                 <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-                                  Không áp dụng mã giảm giá
+                                  Không dùng mã giảm giá
                                 </Typography>
-                                <Typography variant="body2" color="text.secondary">
-                                  Tiếp tục thanh toán theo giá vé hiện tại.
+                                <Typography variant="caption" color="text.secondary">
+                                  Thanh toán theo giá hiện tại
                                 </Typography>
                               </Box>
                             </Stack>
@@ -757,6 +779,7 @@ export const PaymentPage = () => {
                                 if (!unavailableReason) setSelectedDiscountId(discount.id);
                               }}
                               sx={{
+                                flexShrink: 0,
                                 cursor: unavailableReason ? 'not-allowed' : 'pointer',
                                 opacity: unavailableReason ? 0.55 : 1,
                                 border:
@@ -767,37 +790,47 @@ export const PaymentPage = () => {
                                   selectedDiscount?.id === discount.id ? 'rgba(251, 191, 36, 0.04)' : 'background.default',
                               }}
                             >
-                              <CardContent sx={{ p: 2.25, '&:last-child': { pb: 2.25 } }}>
-                                <Stack direction="row" spacing={2} alignItems="flex-start">
+                              <CardContent sx={{ p: 1.35, '&:last-child': { pb: 1.35 } }}>
+                                <Stack direction="row" spacing={1.25} alignItems="center">
                                   <Radio
+                                    size="small"
                                     checked={selectedDiscount?.id === discount.id}
                                     onChange={() => setSelectedDiscountId(discount.id)}
                                     disabled={Boolean(unavailableReason)}
                                   />
-                                  <Stack spacing={1} sx={{ flex: 1 }}>
-                                    <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={1}>
-                                      <Box>
-                                        <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>
-                                          {discount.name}
-                                        </Typography>
-                                        <Typography variant="body2" color="text.secondary">
-                                          Mã: {discount.code}
-                                        </Typography>
-                                      </Box>
-                                      <Chip label={formatDiscountLabel(discount)} color="primary" size="small" />
+                                  <Box sx={{ flex: 1, minWidth: 0 }}>
+                                    <Stack direction="row" alignItems="center" justifyContent="space-between" spacing={1}>
+                                      <Typography
+                                        variant="subtitle2"
+                                        noWrap
+                                        title={discount.name}
+                                        sx={{ minWidth: 0, fontWeight: 800 }}
+                                      >
+                                        {discount.name}
+                                      </Typography>
+                                      <Chip
+                                        label={formatDiscountLabel(discount)}
+                                        color="primary"
+                                        size="small"
+                                        sx={{ flexShrink: 0, height: 25, fontWeight: 800 }}
+                                      />
                                     </Stack>
-                                    <Typography variant="body2" color="text.secondary">
-                                      Đơn tối thiểu {formatCurrency(discount.minPurchaseAmount)}
+                                    <Typography
+                                      variant="caption"
+                                      color="text.secondary"
+                                      sx={{ display: 'block', mt: 0.25 }}
+                                    >
+                                      {discount.code} · Đơn từ {formatCurrency(discount.minPurchaseAmount)}
                                       {discount.maxDiscountAmount > 0 ? ` • Giảm tối đa ${formatCurrency(discount.maxDiscountAmount)}` : ''}
                                     </Typography>
                                     <Typography
-                                      variant="body2"
+                                      variant="caption"
                                       color={unavailableReason ? 'text.secondary' : 'primary.main'}
-                                      sx={{ fontWeight: 600 }}
+                                      sx={{ display: 'block', mt: 0.25, fontWeight: 700 }}
                                     >
-                                      {unavailableReason || `Tạm giảm ${formatCurrency(previewDiscount)} cho đơn này`}
+                                      {unavailableReason || `Giảm ${formatCurrency(previewDiscount)} cho đơn này`}
                                     </Typography>
-                                  </Stack>
+                                  </Box>
                                 </Stack>
                               </CardContent>
                             </Card>

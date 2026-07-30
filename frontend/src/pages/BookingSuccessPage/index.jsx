@@ -287,32 +287,57 @@ export const BookingSuccessPage = () => {
     : '';
 
   return (
-    <Container maxWidth="md" sx={{ pb: 8, pt: 2, position: 'relative' }}>
+    <Container maxWidth="lg" sx={{ pb: 6, pt: 1.5, position: 'relative' }}>
       <LoadingOverlay open={apiLoading} message="Đang nạp dữ liệu..." blur />
 
       {/* Step Indicator */}
       <BookingStepper activeStep={4} />
 
       {/* Success Badge */}
-      <Box sx={{ textAlign: 'center', mb: 5, mt: 2 }}>
-        <CheckCircleRoundedIcon 
-          sx={{ 
-            fontSize: 76, 
-            color: '#10B981', 
-            mb: 1.5,
-            filter: 'drop-shadow(0 0 12px rgba(16, 185, 129, 0.4))'
-          }} 
-        />
-        <Typography variant="h4" sx={{ fontWeight: 900, mb: 1 }}>
+      <Box sx={{ textAlign: 'center', mb: 3.5, mt: 1.5 }}>
+        <Box
+          sx={{
+            width: 68,
+            height: 68,
+            display: 'grid',
+            placeItems: 'center',
+            mx: 'auto',
+            mb: 1.25,
+            border: '1px solid rgba(52,211,153,.35)',
+            borderRadius: '50%',
+            bgcolor: 'rgba(16,185,129,.11)',
+            boxShadow: '0 0 0 10px rgba(16,185,129,.035), 0 18px 45px rgba(16,185,129,.18)',
+          }}
+        >
+          <CheckCircleRoundedIcon sx={{ fontSize: 42, color: '#34D399' }} />
+        </Box>
+        <Typography variant="h4" sx={{ fontWeight: 900, mb: 0.5 }}>
           Đặt Vé Thành Công
         </Typography>
-        <Typography color="text.secondary" variant="body1">
+        <Typography color="text.secondary" variant="body2">
           Giao dịch của bạn đã được thực hiện thành công. Cảm ơn bạn đã đồng hành cùng ThauFilm!
         </Typography>
       </Box>
 
       {/* Ticket Layout Card */}
-      <SectionCard sx={{ border: '2px solid rgba(251, 191, 36, 0.2)', position: 'relative' }}>
+      <SectionCard
+        contentSx={{ p: { xs: 2, sm: 2.5 }, '&:last-child': { pb: { xs: 2, sm: 2.5 } } }}
+        sx={{
+          overflow: 'hidden',
+          border: '1px solid rgba(251,191,36,.28)',
+          borderRadius: { xs: 4, sm: 5 },
+          position: 'relative',
+          background: 'radial-gradient(circle at 88% 5%, rgba(251,191,36,.12), transparent 24%), linear-gradient(145deg, rgba(30,41,59,.98), rgba(15,23,42,.98))',
+          boxShadow: '0 30px 90px rgba(0,0,0,.38)',
+          '&::before': {
+            content: '""',
+            position: 'absolute',
+            inset: '0 0 auto',
+            height: 3,
+            background: 'linear-gradient(90deg, transparent, #FBBF24 35%, #F59E0B 65%, transparent)',
+          },
+        }}
+      >
         {/* Ticket perforation side dots */}
         <Box 
           sx={{ 
@@ -324,7 +349,8 @@ export const BookingSuccessPage = () => {
             borderRadius: '50%', 
             bgcolor: 'background.default', 
             borderRight: '1px solid rgba(148, 163, 184, 0.08)',
-            zIndex: 3
+            zIndex: 3,
+            display: 'none',
           }} 
         />
         <Box 
@@ -337,7 +363,8 @@ export const BookingSuccessPage = () => {
             borderRadius: '50%', 
             bgcolor: 'background.default', 
             borderLeft: '1px solid rgba(148, 163, 184, 0.08)',
-            zIndex: 3
+            zIndex: 3,
+            display: 'none',
           }} 
         />
 
@@ -346,74 +373,168 @@ export const BookingSuccessPage = () => {
           sx={{
             position: 'relative',
             zIndex: 1,
-            mb: 4,
-            py: 3,
+            mb: 2.5,
+            py: 1.75,
             px: 2,
-            borderRadius: 3,
-            border: '1px dashed rgba(251, 191, 36, 0.35)',
-            bgcolor: 'rgba(251, 191, 36, 0.06)',
+            borderRadius: 3.5,
+            border: '1px solid rgba(251,191,36,.28)',
+            bgcolor: 'rgba(251,191,36,.075)',
             display: 'flex',
-            flexDirection: 'column',
+            flexDirection: { xs: 'column', sm: 'row' },
             alignItems: 'center',
-            justifyContent: 'center',
+            justifyContent: 'space-between',
             textAlign: 'center',
-            gap: 1,
+            gap: { xs: 0.5, sm: 1.5 },
           }}
         >
-          <ConfirmationNumberRoundedIcon sx={{ color: 'primary.main', fontSize: 30 }} />
-          <Typography
-            variant="caption"
-            color="text.secondary"
-            sx={{ textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.12em' }}
-          >
-            Mã đặt vé (Booking Code)
-          </Typography>
-          <Typography
-            variant="h4"
-            sx={{ fontWeight: 900, color: 'primary.main', letterSpacing: '0.18em', lineHeight: 1, pl: '0.18em' }}
-          >
-            {bookingCode}
-          </Typography>
+          <Stack direction="row" alignItems="center" spacing={1.25}>
+            <Box
+              sx={{
+                width: 42,
+                height: 42,
+                display: 'grid',
+                placeItems: 'center',
+                borderRadius: 2.5,
+                color: '#FBBF24',
+                bgcolor: 'rgba(251,191,36,.12)',
+              }}
+            >
+              <ConfirmationNumberRoundedIcon />
+            </Box>
+            <Box sx={{ textAlign: 'left' }}>
+              <Typography color="text.secondary" sx={{ fontSize: '.68rem', fontWeight: 800, letterSpacing: '.14em' }}>
+                THAUFILM E-TICKET
+              </Typography>
+              <Typography variant="body2" sx={{ fontWeight: 750 }}>Vé xem phim của bạn</Typography>
+            </Box>
+          </Stack>
+          <Box sx={{ textAlign: { xs: 'center', sm: 'right' } }}>
+            <Typography
+              variant="caption"
+              color="text.secondary"
+              sx={{ display: 'block', textTransform: 'uppercase', fontWeight: 700, letterSpacing: '0.1em' }}
+            >
+              Booking code
+            </Typography>
+            <Typography
+              variant="h5"
+              sx={{ fontWeight: 950, color: '#FBBF24', letterSpacing: '0.16em', lineHeight: 1.1 }}
+            >
+              {bookingCode}
+            </Typography>
+          </Box>
         </Box>
 
         {!isOnlineBooking && ticketQrs.length > 0 && (
           <Box
             sx={{
-              mb: 4,
-              p: 2.5,
-              borderRadius: 3,
-              bgcolor: 'rgba(15, 23, 42, 0.26)',
+              mb: 2.5,
+              p: { xs: 1.5, sm: 2 },
+              border: '1px solid rgba(148,163,184,.1)',
+              borderRadius: 3.5,
+              bgcolor: 'rgba(2,6,23,.3)',
             }}
           >
             <Stack direction="row" spacing={1} alignItems="center" justifyContent="center">
               <QrCode2RoundedIcon sx={{ color: 'primary.main' }} />
-              <Typography variant="h6" sx={{ fontWeight: 850 }}>QR check-in từng vé</Typography>
+              <Typography variant="subtitle1" sx={{ fontWeight: 850 }}>QR check-in từng vé</Typography>
             </Stack>
-            <Typography variant="body2" color="text.secondary" textAlign="center" sx={{ mt: .75, mb: 2.5 }}>
-              Mỗi QR chứa ticket code riêng. Nhân viên quét đúng mã này để check-in vé tại rạp.
+            <Typography variant="caption" color="text.secondary" textAlign="center" sx={{ display: 'block', mt: .35, mb: 1.5 }}>
+              Mỗi vé có một mã riêng để nhân viên quét khi check-in.
             </Typography>
-            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: ticketQrs.length === 1 ? '1fr' : 'repeat(2, minmax(0, 1fr))' }, gap: 2 }}>
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: ticketQrs.length === 1
+                  ? { xs: 'minmax(0, 280px)' }
+                  : {
+                    xs: 'repeat(2, minmax(0, 1fr))',
+                    sm: `repeat(${Math.min(ticketQrs.length, 3)}, minmax(0, 1fr))`,
+                    md: `repeat(${Math.min(ticketQrs.length, 4)}, minmax(0, 1fr))`,
+                  },
+                justifyContent: 'center',
+                gap: { xs: 1, sm: 1.25 },
+                maxHeight: ticketQrs.length > 8 ? 390 : 'none',
+                overflowY: ticketQrs.length > 8 ? 'auto' : 'visible',
+                pr: ticketQrs.length > 8 ? 0.75 : 0,
+              }}
+            >
               {ticketQrs.map(({ ticket, dataUrl, index }) => {
                 const seat = ticket.seatLabel || selectedSeats?.[index]?.label || selectedSeats?.[index]?.id || '—';
-                return <Box key={ticket.id || ticket.ticketCode} sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: 'center', justifyContent: 'center', gap: 2, p: 2, borderRadius: 3, border: '1px solid rgba(251,191,36,.2)', bgcolor: 'rgba(251,191,36,.04)' }}>
-                <Box sx={{ width: 160, height: 160, p: 1, flexShrink: 0, borderRadius: 3, bgcolor: '#fff', display: 'grid', placeItems: 'center', boxShadow: '0 12px 30px rgba(0, 0, 0, 0.28)' }}>
-                <Box
-                  component="img"
-                  src={dataUrl}
-                  alt={`Mã QR ticket ${ticket.ticketCode}`}
-                  sx={{ width: '100%', height: '100%', display: 'block' }}
-                />
-                </Box>
-                <Box sx={{ textAlign: { xs: 'center', sm: 'left' } }}><Typography variant="caption" color="text.secondary">TICKET CODE</Typography><Typography fontWeight={950} color="primary.main" sx={{ letterSpacing: '.08em', wordBreak: 'break-all' }}>{ticket.ticketCode}</Typography><Typography variant="body2" color="text.secondary" sx={{ mt: .75 }}>Ghế <b>{seat}</b></Typography></Box>
-              </Box>;
+                return (
+                  <Box
+                    key={ticket.id || ticket.ticketCode}
+                    sx={{
+                      minWidth: 0,
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: { xs: 0.75, sm: 1.25 },
+                      p: { xs: 0.75, sm: 1 },
+                      borderRadius: 3,
+                      border: '1px solid rgba(251,191,36,.2)',
+                      bgcolor: 'rgba(255,255,255,.035)',
+                      overflow: 'hidden',
+                      transition: 'transform .2s ease, border-color .2s ease, background .2s ease',
+                      '&:hover': {
+                        transform: 'translateY(-2px)',
+                        borderColor: 'rgba(251,191,36,.48)',
+                        bgcolor: 'rgba(251,191,36,.055)',
+                      },
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        width: { xs: 72, sm: 92, md: 104 },
+                        aspectRatio: '1',
+                        p: 0.5,
+                        flexShrink: 0,
+                        borderRadius: 2.25,
+                        bgcolor: '#fff',
+                        overflow: 'hidden',
+                        boxShadow: '0 10px 26px rgba(0,0,0,.3)',
+                      }}
+                    >
+                      <Box
+                        component="img"
+                        src={dataUrl}
+                        alt={`Mã QR ticket ${ticket.ticketCode}`}
+                        sx={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
+                      />
+                    </Box>
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography variant="caption" color="text.secondary">GHẾ</Typography>
+                      <Typography color="primary.main" sx={{ fontSize: '1rem', fontWeight: 950, lineHeight: 1.1 }}>
+                        {seat}
+                      </Typography>
+                      <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        title={ticket.ticketCode}
+                        sx={{ display: 'block', mt: 0.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+                      >
+                        {ticket.ticketCode}
+                      </Typography>
+                    </Box>
+                  </Box>
+                );
               })}
             </Box>
           </Box>
         )}
 
-        <Stack spacing={3} sx={{ position: 'relative', zIndex: 1, alignItems: 'center' }}>
+        <Stack spacing={2} sx={{ position: 'relative', zIndex: 1, alignItems: 'center' }}>
           {/* Tên phim — căn giữa khung, nổi bật */}
-          <Box sx={{ textAlign: 'center', width: '100%' }}>
+          <Box
+            sx={{
+              width: '100%',
+              p: 2,
+              textAlign: 'center',
+              border: '1px solid rgba(148,163,184,.09)',
+              borderRadius: 3,
+              bgcolor: 'rgba(255,255,255,.025)',
+            }}
+          >
             <Typography variant="caption" color="text.secondary" sx={{ textTransform: 'uppercase', fontWeight: 600, letterSpacing: '0.1em' }}>
               Tên Phim
             </Typography>
@@ -430,7 +551,7 @@ export const BookingSuccessPage = () => {
               width: '100%',
               display: 'grid',
               gridTemplateColumns: { xs: 'repeat(2, 1fr)', sm: 'repeat(5, 1fr)' },
-              gap: 2,
+              gap: 1,
             }}
           >
             {[
@@ -440,8 +561,18 @@ export const BookingSuccessPage = () => {
               { label: 'Suất chiếu', value: `${showtime?.time ?? ''} (${showtime?.format ?? ''})` },
               { label: 'Danh sách ghế', value: selectedSeats.map((s) => s.label || s.id).join(', '), highlight: true },
             ].map((field) => (
-              <Box key={field.label} sx={{ textAlign: 'center' }}>
-                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.75 }}>
+              <Box
+                key={field.label}
+                sx={{
+                  minWidth: 0,
+                  p: { xs: 1.25, sm: 1.5 },
+                  textAlign: 'left',
+                  border: '1px solid rgba(148,163,184,.09)',
+                  borderRadius: 2.5,
+                  bgcolor: 'rgba(255,255,255,.025)',
+                }}
+              >
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5, fontSize: '.68rem', textTransform: 'uppercase', letterSpacing: '.06em' }}>
                   {field.label}
                 </Typography>
                 <Typography
@@ -460,7 +591,13 @@ export const BookingSuccessPage = () => {
 
           <Divider sx={{ borderStyle: 'dashed', width: '100%' }} />
 
-          <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ width: '100%' }}>
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
+            justifyContent="space-between"
+            alignItems={{ xs: 'stretch', sm: 'center' }}
+            spacing={1.5}
+            sx={{ width: '100%', p: 2, borderRadius: 3, bgcolor: 'rgba(2,6,23,.24)' }}
+          >
             <Box>
               <Typography variant="caption" color="text.secondary">Phương thức</Typography>
               <Typography variant="body2" sx={{ fontWeight: 600 }}>{getMethodName(paymentMethod)}</Typography>
@@ -486,7 +623,10 @@ export const BookingSuccessPage = () => {
         </Stack>
       </SectionCard>
 
-      <SectionCard sx={{ mt: 3, border: '1px solid rgba(96, 165, 250, 0.2)' }}>
+      <SectionCard
+        contentSx={{ p: { xs: 2, sm: 2.5 }, '&:last-child': { pb: { xs: 2, sm: 2.5 } } }}
+        sx={{ mt: 2, border: '1px solid rgba(96, 165, 250, 0.2)' }}
+      >
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2.5} alignItems={{ xs: 'flex-start', sm: 'center' }}>
           <Box sx={{ width: 52, height: 52, flexShrink: 0, borderRadius: 3, display: 'grid', placeItems: 'center', bgcolor: 'rgba(96,165,250,.14)', color: '#93C5FD' }}>
             <EventAvailableRoundedIcon sx={{ fontSize: 30 }} />
@@ -537,7 +677,7 @@ export const BookingSuccessPage = () => {
       </SectionCard>
 
       {/* Home / ticket list navigation */}
-      <Stack direction="row" spacing={2} justifyContent="center" sx={{ mt: 5 }}>
+      <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} justifyContent="center" sx={{ mt: 3 }}>
         <CustomButton 
           variant="outlined" 
           onClick={() => navigate('/')}
