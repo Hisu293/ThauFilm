@@ -2,6 +2,8 @@ package com.thaufilm.gateway;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
@@ -20,6 +22,7 @@ import java.util.TreeMap;
 @Service
 public class PayoutService {
     private static final String PAYOUT_URL = "https://api-merchant.payos.vn/v1/payouts";
+    private static final Logger log = LoggerFactory.getLogger(PayoutService.class);
     private final ObjectMapper objectMapper;
     private final RestTemplate restTemplate = new RestTemplate();
 
@@ -93,8 +96,8 @@ public class PayoutService {
     private HttpHeaders headers() {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.set("x-client-id", clientId);
-        headers.set("x-api-key", apiKey);
+        headers.set("x-client-id", clientId.trim());
+        headers.set("x-api-key", apiKey.trim());
         return headers;
     }
 
@@ -105,7 +108,7 @@ public class PayoutService {
                 .reduce((left, right) -> left + "&" + right).orElse("");
         try {
             Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(checksumKey.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
+            mac.init(new SecretKeySpec(checksumKey.trim().getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
             return HexFormat.of().formatHex(mac.doFinal(raw.getBytes(StandardCharsets.UTF_8)));
         } catch (Exception ex) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Cannot sign PayOS payout");
@@ -123,6 +126,8 @@ public class PayoutService {
         }
         if (detail == null || detail.isBlank()) detail = "empty response";
         detail = detail.substring(0, Math.min(300, detail.length()));
+        log.error("PayOS payout request failed: HTTP={}, response={}",
+                ex.getStatusCode().value(), detail);
         return new ResponseStatusException(HttpStatus.BAD_GATEWAY,
                 "PayOS HTTP " + ex.getStatusCode().value() + ": " + detail);
     }
