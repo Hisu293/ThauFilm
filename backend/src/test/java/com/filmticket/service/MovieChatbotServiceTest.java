@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -54,8 +55,8 @@ class MovieChatbotServiceTest {
 
         assertTrue(response.getAnswer().contains("Staff Trưởng"));
         assertTrue(response.getAnswer().contains("Admin"));
-        assertTrue(response.getAnswer().contains("tải ảnh QR nhận tiền"));
-        assertTrue(response.getAnswer().contains("BIN ngân hàng"));
+        assertTrue(response.getAnswer().contains("tải QR code lên"));
+        assertTrue(response.getAnswer().contains("BIN/STK ngân hàng"));
         assertTrue(response.getAnswer().contains("PayOS/Bảo Kim"));
         assertTrue(response.getRecommendations().isEmpty());
     }
@@ -66,10 +67,11 @@ class MovieChatbotServiceTest {
 
         MovieChatResponse response = service.chat("Hướng dẫn đặt vé");
 
-        assertTrue(response.getAnswer().contains("chọn combo"));
-        assertTrue(response.getAnswer().contains("voucher"));
-        assertTrue(response.getAnswer().contains("Thanh toán qua PayOS"));
-        assertTrue(response.getAnswer().contains("Vé của tôi"));
+        assertEquals("""
+                Để đặt vé, bạn có thể thực hiện theo các bước sau:
+                Bước 1: Tìm kiếm phim và rạp mong muốn trên trang web ThauFilm.
+                Bước 2: Chọn suất chiếu phù hợp và số lượng ghế cần đặt.
+                Bước 3: Nhập voucher (nếu có) để thanh toán và hoàn tất đặt vé.""", response.getAnswer());
         assertTrue(response.getRecommendations().isEmpty());
     }
 
@@ -108,6 +110,20 @@ class MovieChatbotServiceTest {
     }
 
     @Test
+    void nearbyTheaterRequestDoesNotFallIntoMovieRecommendations() {
+        when(movieRepository.findAllByActiveTrue()).thenReturn(sampleMovies());
+        when(theaterRepository.findByStatus(TheaterStatus.ACTIVE)).thenReturn(List.of(
+                Theater.builder().name("ThauFilm Quận 1").address("123 Nguyễn Huệ").city("TP.HCM").build()));
+
+        MovieChatResponse response = service.chat("đề xuất rạp phim gần tôi");
+
+        assertTrue(response.getAnswer().contains("chưa có quyền truy cập vị trí"));
+        assertTrue(response.getAnswer().contains("ThauFilm Quận 1"));
+        assertTrue(response.getAnswer().contains("quận, thành phố hoặc khu vực"));
+        assertTrue(response.getRecommendations().isEmpty());
+    }
+
+    @Test
     void nonsenseDoesNotReturnDefaultMovieList() {
         when(movieRepository.findAllByActiveTrue()).thenReturn(sampleMovies());
 
@@ -137,6 +153,46 @@ class MovieChatbotServiceTest {
         assertEquals("Biệt đội tốc độ", response.getRecommendations().get(0).getTitle());
         assertTrue(response.getRecommendations().stream()
                 .allMatch(movie -> movie.getGenre().toLowerCase().contains("action")));
+    }
+
+    @Test
+    void statusCatalogRequestsReturnEveryMatchingMovieWithoutRecommendationLimit() {
+        List<Movie> movies = new ArrayList<>();
+        for (int index = 1; index <= 7; index++) {
+            movies.add(Movie.builder()
+                    .id(UUID.randomUUID())
+                    .title("Phim đang chiếu " + index)
+                    .genre("Action")
+                    .description("Phim trong hệ thống")
+                    .durationMinutes(100)
+                    .rating(BigDecimal.valueOf(7))
+                    .status(Movie.Status.NOW_SHOWING)
+                    .posterUrl("now-" + index + ".jpg")
+                    .build());
+        }
+        for (int index = 1; index <= 6; index++) {
+            movies.add(Movie.builder()
+                    .id(UUID.randomUUID())
+                    .title("Phim sắp chiếu " + index)
+                    .genre("Animation")
+                    .description("Phim trong hệ thống")
+                    .durationMinutes(95)
+                    .rating(BigDecimal.valueOf(7))
+                    .status(Movie.Status.COMING_SOON)
+                    .posterUrl("soon-" + index + ".jpg")
+                    .build());
+        }
+        when(movieRepository.findAllByActiveTrue()).thenReturn(movies);
+
+        MovieChatResponse nowShowing = service.chat("phim đang chiếu");
+        MovieChatResponse comingSoon = service.chat("phim sắp chiếu");
+
+        assertEquals(7, nowShowing.getRecommendations().size());
+        assertTrue(nowShowing.getRecommendations().stream()
+                .allMatch(movie -> "NOW_SHOWING".equals(movie.getStatus())));
+        assertEquals(6, comingSoon.getRecommendations().size());
+        assertTrue(comingSoon.getRecommendations().stream()
+                .allMatch(movie -> "COMING_SOON".equals(movie.getStatus())));
     }
 
     @Test

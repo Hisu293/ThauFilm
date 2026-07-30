@@ -178,8 +178,9 @@ public class MovieChatbotService {
         }
 
         List<ScoredMovie> ranked = rankMovies(context, movies);
+        boolean fullStatusCatalog = isFullStatusCatalogRequest(context.currentQuery());
         List<MovieChatResponse.MovieRecommendation> recommendations = ranked.stream()
-                .limit(5)
+                .limit(fullStatusCatalog ? ranked.size() : 5)
                 .map(item -> toRecommendation(item.movie(), item.reason()))
                 .toList();
 
@@ -204,7 +205,11 @@ public class MovieChatbotService {
             return MessageIntent.PAYMENT_HELP;
         if (containsAny(query, Set.of("hoan tien", "hoan ve", "huy ve", "refund")))
             return MessageIntent.REFUND_HELP;
-        if (containsAny(query, Set.of("chi duong", "dia chi rap", "dia chi cac rap", "rap o dau", "duong toi rap", "vi tri rap")))
+        if (containsAny(query, Set.of(
+                "chi duong", "dia chi rap", "dia chi cac rap", "rap o dau", "duong toi rap", "vi tri rap",
+                "rap gan toi", "rap phim gan toi", "rap gan day", "rap phim gan day",
+                "rap nao gan", "tim rap gan", "de xuat rap", "goi y rap"
+        )))
             return MessageIntent.DIRECTIONS;
         if (containsAny(query, Set.of("tom tat", "noi dung phim", "spoiler")))
             return MessageIntent.SUMMARY;
@@ -322,12 +327,10 @@ public class MovieChatbotService {
     }
 
     private String buildBookingHelp() {
-        return "Để đặt vé, bạn thực hiện theo các bước sau:"
-                + "\n1. Tìm phim và rạp mong muốn trên ThauFilm."
-                + "\n2. Chọn suất chiếu phù hợp và các ghế cần đặt."
-                + "\n3. Kiểm tra thông tin vé, chọn combo và nhập voucher nếu có."
-                + "\n4. Thanh toán qua PayOS để hoàn tất đặt vé."
-                + "\nSau khi thanh toán thành công, hệ thống chuyển đến Vé của tôi và gửi vé PDF qua email.";
+        return "Để đặt vé, bạn có thể thực hiện theo các bước sau:"
+                + "\nBước 1: Tìm kiếm phim và rạp mong muốn trên trang web ThauFilm."
+                + "\nBước 2: Chọn suất chiếu phù hợp và số lượng ghế cần đặt."
+                + "\nBước 3: Nhập voucher (nếu có) để thanh toán và hoàn tất đặt vé.";
     }
 
     private String buildPaymentHelp() {
@@ -339,11 +342,9 @@ public class MovieChatbotService {
 
     private String buildRefundHelp() {
         return "Luồng hoàn tiền:\n1. Vé của tôi → Chi tiết/Hoàn tiền."
-                + "\n2. Chọn phương thức hoàn tiền:"
-                + "\n- Thủ công: chat với Staff Trưởng và tải ảnh QR nhận tiền lên."
-                + "\n- Tự động PayOS/Bảo Kim: nhập BIN ngân hàng, số tài khoản và lý do hủy để gửi yêu cầu chờ duyệt."
-                + "\n3. Staff Trưởng kiểm tra và xác minh yêu cầu."
-                + "\n4. Admin duyệt, sau đó hệ thống mới thực hiện hoàn tiền."
+                + "\n2. Chọn thủ công thì sẽ chat với Staff Trưởng để tải QR code lên; hoặc chọn tự động PayOS/Bảo Kim thì nhập BIN/STK ngân hàng và lý do hủy để đợi duyệt."
+                + "\n3. Staff Trưởng xác minh."
+                + "\n4. Admin duyệt rồi hệ thống mới hoàn."
                 + "\nVé đã check-in, phim online đã mở xem hoặc suất chiếu đã bắt đầu không được hoàn.";
     }
 
@@ -356,11 +357,17 @@ public class MovieChatbotService {
                 .toList();
         List<Theater> result = matched.isEmpty() ? theaters : matched;
         if (result.isEmpty()) return "Hiện hệ thống chưa có địa chỉ rạp đang hoạt động.";
-        StringBuilder answer = new StringBuilder("Địa chỉ rạp ThauFilm:\n");
+        boolean nearbyRequest = containsAny(context.currentQuery(), Set.of(
+                "gan toi", "gan day", "rap nao gan", "tim rap gan", "de xuat rap", "goi y rap"));
+        StringBuilder answer = new StringBuilder(nearbyRequest
+                ? "Mình chưa có quyền truy cập vị trí hiện tại của bạn. Các rạp ThauFilm đang hoạt động:\n"
+                : "Địa chỉ rạp ThauFilm:\n");
         result.stream().limit(6).forEach(theater -> answer.append("- ").append(theater.getName())
                 .append(": ").append(safe(theater.getAddress()))
                 .append(hasText(theater.getCity()) ? ", " + theater.getCity() : "").append('\n'));
-        return answer.append("Bạn có thể sao chép địa chỉ vào Google Maps để chỉ đường.").toString();
+        return answer.append(nearbyRequest
+                ? "Bạn cho mình biết quận, thành phố hoặc khu vực để mình lọc rạp phù hợp hơn."
+                : "Bạn có thể sao chép địa chỉ vào Google Maps để chỉ đường.").toString();
     }
 
     private boolean matchesKnownText(String query, String value) {
@@ -648,6 +655,14 @@ public class MovieChatbotService {
         return null;
     }
 
+    private boolean isFullStatusCatalogRequest(String query) {
+        return containsAny(query, Set.of(
+                "phim dang chieu", "danh sach phim dang chieu", "tat ca phim dang chieu",
+                "phim sap chieu", "danh sach phim sap chieu", "tat ca phim sap chieu",
+                "now showing", "coming soon"
+        ));
+    }
+
     private boolean matchesFreeText(String query, Movie movie) {
         Set<String> queryTokens = tokens(query);
         queryTokens.removeAll(Set.of(
@@ -793,7 +808,8 @@ public class MovieChatbotService {
     }
 
     private String normalize(String value) {
-        String normalized = Normalizer.normalize(safe(value), Normalizer.Form.NFD)
+        String vietnameseDNormalized = safe(value).replace('đ', 'd').replace('Đ', 'D');
+        String normalized = Normalizer.normalize(vietnameseDNormalized, Normalizer.Form.NFD)
                 .replaceAll("\\p{M}", "");
         return normalized.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9\\s]", " ").replaceAll("\\s+", " ").trim();
     }

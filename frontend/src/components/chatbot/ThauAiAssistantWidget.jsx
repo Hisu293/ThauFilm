@@ -106,7 +106,7 @@ const ThauAiAssistantWidget = () => {
                 <p>{item.text}</p>
                 {item.recommendations?.length > 0 && (
                   <div className="thau-ai__movies">
-                    {item.recommendations.slice(0, 3).map((movie) => (
+                    {item.recommendations.map((movie) => (
                       <Link to={`/movies/${movie.id}`} key={movie.id} onClick={() => setOpen(false)}>
                         <img src={movie.posterUrl || '/placeholder.svg'} alt="" />
                         <span>{movie.title}</span>
