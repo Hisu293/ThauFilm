@@ -29,6 +29,7 @@ public class PayOSRefundClient {
     private static final String PAYOUT_URL = "https://api-merchant.payos.vn/v1/payouts";
 
     private final ObjectMapper objectMapper;
+    private final SensitiveGatewayClient sensitiveGatewayClient;
     private final RestTemplate restTemplate = new RestTemplate();
 
     @Value("${payos.payout.enabled:true}")
@@ -48,7 +49,8 @@ public class PayOSRefundClient {
         if (!enabled) {
             throw new BadRequestException("Hoàn tiền tự động qua PayOS/Bảo Kim đang tắt");
         }
-        if (isBlank(clientId) || isBlank(apiKey) || isBlank(checksumKey)) {
+        if (!sensitiveGatewayClient.isConfigured()
+                && (isBlank(clientId) || isBlank(apiKey) || isBlank(checksumKey))) {
             throw new BadRequestException("PayOS chưa được cấu hình đầy đủ để hoàn tiền tự động");
         }
 
@@ -60,6 +62,11 @@ public class PayOSRefundClient {
         }
 
         String description = normalizeDescription(reason);
+        if (sensitiveGatewayClient.isConfigured()) {
+            SensitiveGatewayClient.GatewayPayout payout = sensitiveGatewayClient.createPayout(
+                    referenceId, amountInVnd, description, bankBin, accountNumber);
+            return new PayoutResult(payout.payoutId(), payout.state(), payout.responseJson());
+        }
         Map<String, Object> payload = new TreeMap<>();
         payload.put("amount", amountInVnd);
         payload.put("description", description);
@@ -117,11 +124,17 @@ public class PayOSRefundClient {
     }
 
     public PayoutResult getStatus(String payoutId) {
-        if (!enabled || isBlank(clientId) || isBlank(apiKey)) {
+        if (!enabled || (!sensitiveGatewayClient.isConfigured()
+                && (isBlank(clientId) || isBlank(apiKey)))) {
             throw new BadRequestException("Kênh chi PayOS/Bảo Kim chưa được cấu hình");
         }
         if (payoutId == null || payoutId.isBlank()) {
             throw new BadRequestException("Mã lệnh hoàn tiền PayOS không hợp lệ");
+        }
+        if (sensitiveGatewayClient.isConfigured()) {
+            SensitiveGatewayClient.GatewayPayout payout =
+                    sensitiveGatewayClient.getPayout(payoutId);
+            return new PayoutResult(payout.payoutId(), payout.state(), payout.responseJson());
         }
         try {
             HttpHeaders headers = new HttpHeaders();
@@ -199,7 +212,8 @@ public class PayOSRefundClient {
     }
 
     public boolean isAvailable() {
-        return enabled && !isBlank(clientId) && !isBlank(apiKey) && !isBlank(checksumKey);
+        return enabled && (sensitiveGatewayClient.isConfigured()
+                || (!isBlank(clientId) && !isBlank(apiKey) && !isBlank(checksumKey)));
     }
 
     public record PayoutResult(String payoutId, String state, String responseJson) {

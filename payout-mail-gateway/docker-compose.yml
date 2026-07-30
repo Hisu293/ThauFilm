@@ -1,0 +1,9 @@
+services:
+  gateway:
+    build: .
+    container_name: thaufilm-sensitive-gateway
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    ports:
+      - "127.0.0.1:8090:8090"

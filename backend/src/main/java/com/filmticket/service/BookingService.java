@@ -10,15 +10,10 @@ import com.filmticket.websocket.RealtimeEventService;
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.core.io.ByteArrayResource;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import jakarta.mail.internet.MimeMessage;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.NumberFormat;
@@ -45,7 +40,7 @@ public class BookingService {
     private final SeatRepository seatRepository;
     private final ComboService comboService;
     private final DiscountService discountService;
-    private final JavaMailSender mailSender;
+    private final OutboundEmailService outboundEmailService;
     private final TicketPdfGenerator ticketPdfGenerator;
     private final RealtimeEventService realtimeEventService;
     private final ApplicationEventPublisher eventPublisher;
@@ -54,9 +49,6 @@ public class BookingService {
     private final BookingComboItemRepository bookingComboItemRepository;
     private final ShowtimeService showtimeService;
     private final AuditLogService auditLogService;
-
-    @Value("${app.mail.from:onboarding@resend.dev}")
-    private String mailFrom;
 
     private static final int HOLD_MINUTES = 10;
     private static final ZoneId VIETNAM_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
@@ -857,19 +849,15 @@ public class BookingService {
 
         String html = buildHtmlBody(booking, tickets, payment, discountAmount, finalAmount, movieTitle);
 
-        MimeMessage message = mailSender.createMimeMessage();
-        MimeMessageHelper helper = new MimeMessageHelper(message, true, "UTF-8");
-        if (mailFrom != null && !mailFrom.isBlank()) {
-            helper.setFrom(mailFrom);
-        }
-        helper.setTo(to);
-        helper.setSubject(subject);
-        helper.setText(html, true);
-
         byte[] pdfBytes = ticketPdfGenerator.generateTicketPdf(booking, tickets);
-        helper.addAttachment("ticket.pdf", new ByteArrayResource(pdfBytes));
-
-        mailSender.send(message);
+        outboundEmailService.send(
+                "BOOKING_CONFIRMED_" + booking.getId(),
+                to,
+                subject,
+                html,
+                true,
+                List.of(new OutboundEmailService.Attachment(
+                        "ticket.pdf", "application/pdf", pdfBytes)));
         log.info("Đã gửi email vé đến {} cho đơn đặt vé {}", to, booking.getId());
     }
 
