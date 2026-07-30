@@ -1,0 +1,176 @@
+.thau-ai {
+  position: fixed;
+  z-index: 1450;
+  right: 22px;
+  bottom: 22px;
+  display: grid;
+  justify-items: end;
+  gap: 12px;
+  font-family: inherit;
+}
+
+.thau-ai__launcher {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 62px;
+  height: 62px;
+  padding: 0 18px;
+  border: 1px solid rgba(255,255,255,.25);
+  border-radius: 999px;
+  color: #fff;
+  background: linear-gradient(145deg, #ee1824, #a70816);
+  box-shadow: 0 14px 42px rgba(229,9,20,.36), inset 0 1px rgba(255,255,255,.24);
+  font: inherit;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.thau-ai__launcher svg { font-size: 28px; }
+
+.thau-ai__panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  width: min(390px, calc(100vw - 28px));
+  height: min(650px, calc(100vh - 112px));
+  overflow: hidden;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 24px;
+  color: #f8fafc;
+  background: rgba(10, 13, 22, .98);
+  box-shadow: 0 28px 90px rgba(0,0,0,.62);
+  animation: thau-ai-enter .22s ease-out;
+}
+
+@keyframes thau-ai-enter {
+  from { opacity: 0; transform: translateY(16px) scale(.97); }
+}
+
+.thau-ai__header {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 16px;
+  background:
+    radial-gradient(circle at 85% -20%, rgba(255,255,255,.18), transparent 36%),
+    linear-gradient(135deg, #c20b18, #760817);
+}
+
+.thau-ai__avatar {
+  display: grid;
+  place-items: center;
+  width: 43px;
+  height: 43px;
+  border-radius: 50%;
+  color: #e50914;
+  background: #fff;
+}
+
+.thau-ai__header > div { display: grid; gap: 3px; flex: 1; }
+.thau-ai__header strong { font-size: 1rem; }
+.thau-ai__header small { display: flex; align-items: center; gap: 6px; color: rgba(255,255,255,.75); }
+.thau-ai__header small i { width: 7px; height: 7px; border-radius: 50%; background: #42e68b; box-shadow: 0 0 10px #42e68b; }
+.thau-ai__header button,
+.thau-ai__composer button {
+  display: grid;
+  place-items: center;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+}
+.thau-ai__header button { width: 38px; height: 38px; border-radius: 50%; background: rgba(0,0,0,.18); }
+
+.thau-ai__timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  padding: 16px;
+  background:
+    radial-gradient(circle at 20% 0, rgba(229,9,20,.08), transparent 34%),
+    #0c101a;
+}
+
+.thau-ai__intro {
+  display: grid;
+  justify-items: center;
+  gap: 5px;
+  padding: 10px 8px 14px;
+  color: rgba(255,255,255,.58);
+  text-align: center;
+}
+.thau-ai__intro svg { color: #ff3441; }
+.thau-ai__intro strong { color: #fff; }
+.thau-ai__intro span { font-size: .75rem; }
+
+.thau-ai__message { display: flex; flex-direction: column; max-width: 88%; }
+.thau-ai__message--user { align-self: flex-end; }
+.thau-ai__message--bot { align-self: flex-start; }
+.thau-ai__message p {
+  margin: 0;
+  padding: 10px 13px;
+  border-radius: 16px 16px 16px 4px;
+  background: #1a2030;
+  font-size: .88rem;
+  line-height: 1.48;
+  white-space: pre-line;
+}
+.thau-ai__message--user p {
+  border-radius: 16px 16px 4px;
+  background: linear-gradient(135deg, #e50914, #b40714);
+}
+
+.thau-ai__movies { display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; margin-top: 8px; }
+.thau-ai__movies a { overflow: hidden; border: 1px solid rgba(255,255,255,.1); border-radius: 10px; color: #fff; background: #151a25; text-decoration: none; }
+.thau-ai__movies img { display: block; width: 100%; aspect-ratio: 2/3; object-fit: cover; }
+.thau-ai__movies span { display: block; overflow: hidden; padding: 6px; font-size: .68rem; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
+
+.thau-ai__typing { display: flex; gap: 4px; align-self: flex-start; padding: 12px 15px; border-radius: 16px; background: #1a2030; }
+.thau-ai__typing i { width: 6px; height: 6px; border-radius: 50%; background: #f87171; animation: thau-ai-dot .9s infinite alternate; }
+.thau-ai__typing i:nth-child(2) { animation-delay: .18s; }
+.thau-ai__typing i:nth-child(3) { animation-delay: .36s; }
+@keyframes thau-ai-dot { to { opacity: .3; transform: translateY(-3px); } }
+
+.thau-ai__quick {
+  display: flex;
+  gap: 7px;
+  overflow-x: auto;
+  padding: 10px 12px;
+  border-top: 1px solid rgba(255,255,255,.08);
+}
+.thau-ai__quick button {
+  flex: 0 0 auto;
+  padding: 7px 10px;
+  border: 1px solid rgba(229,9,20,.32);
+  border-radius: 999px;
+  color: #fca5a5;
+  background: rgba(229,9,20,.08);
+  font: inherit;
+  font-size: .7rem;
+  cursor: pointer;
+}
+
+.thau-ai__composer { display: flex; gap: 9px; padding: 11px 12px 13px; background: #101522; }
+.thau-ai__composer input {
+  min-width: 0;
+  flex: 1;
+  padding: 11px 13px;
+  border: 1px solid rgba(255,255,255,.1);
+  border-radius: 13px;
+  outline: 0;
+  color: #fff;
+  background: #171d2b;
+  font: inherit;
+  font-size: .84rem;
+}
+.thau-ai__composer input:focus { border-color: rgba(229,9,20,.72); }
+.thau-ai__composer button { width: 43px; border-radius: 13px; background: #e50914; }
+.thau-ai__composer button:disabled,
+.thau-ai__quick button:disabled { opacity: .45; cursor: not-allowed; }
+
+@media (max-width: 600px) {
+  .thau-ai { right: 10px; bottom: 10px; }
+  .thau-ai__panel { width: calc(100vw - 20px); height: min(680px, calc(100dvh - 86px)); border-radius: 20px; }
+  .thau-ai__launcher { height: 56px; min-width: 56px; padding: 0 14px; }
+}

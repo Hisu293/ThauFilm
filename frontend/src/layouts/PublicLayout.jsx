@@ -3,6 +3,7 @@ import { Box } from '@mui/material';
 import { Outlet, useLocation } from 'react-router-dom';
 import SiteNavbar from '../components/layout/SiteNavbar';
 import SiteFooter from '../components/layout/SiteFooter';
+import ThauAiAssistantWidget from '../components/chatbot/ThauAiAssistantWidget';
 
 // Cuộn lên đầu trang mỗi khi đổi route (vd: bấm link ở footer)
 const ScrollToTop = () => {
@@ -32,6 +33,7 @@ const PublicLayout = () => {
           <Outlet />
         </Box>
         <SiteFooter />
+        <ThauAiAssistantWidget />
       </Box>
     </>
   );

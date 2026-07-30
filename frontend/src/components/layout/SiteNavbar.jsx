@@ -34,8 +34,8 @@ const SiteNavbar = () => {
 
   const isActive = (to) => (to === '/' ? pathname === '/' : pathname.startsWith(to));
   const solidHeader = pathname !== '/' || scrolled;
-  const primaryLinks = NAV_LINKS.slice(0, 5);
-  const communityLinks = NAV_LINKS.slice(5);
+  const primaryLinks = NAV_LINKS.slice(0, 4);
+  const communityLinks = NAV_LINKS.slice(4);
   const communityActive = communityLinks.some((link) => isActive(link.to));
 
   useEffect(() => {

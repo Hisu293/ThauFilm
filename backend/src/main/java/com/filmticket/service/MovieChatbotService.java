@@ -39,8 +39,6 @@ import java.util.regex.Pattern;
 @Service
 @RequiredArgsConstructor
 public class MovieChatbotService {
-    private static final String GEMINI_ENDPOINT =
-            "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent";
     private static final int DURATION_TOLERANCE_MINUTES = 10;
     private static final Pattern MAX_DURATION_PATTERN = Pattern.compile(
             "(?:duoi|under|less than|khong qua|toi da|<=?)\\s*(\\d{1,3})\\s*(tieng|h|hour|hours|phut|p|min|minutes)?",
@@ -103,13 +101,16 @@ public class MovieChatbotService {
     private final HttpClient httpClient = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(10))
             .build();
-    private volatile long geminiRetryAfterMillis = 0;
+    private volatile long groqRetryAfterMillis = 0;
 
-    @Value("${app.ai.gemini.api-key:}")
-    private String geminiApiKey;
+    @Value("${app.ai.groq.api-key:}")
+    private String groqApiKey;
 
-    @Value("${app.ai.gemini.model:gemini-2.0-flash}")
-    private String geminiModel;
+    @Value("${app.ai.groq.model:llama-3.1-8b-instant}")
+    private String groqModel;
+
+    @Value("${app.ai.groq.api-url:https://api.groq.com/openai/v1/chat/completions}")
+    private String groqApiUrl;
 
     public MovieChatResponse chat(String message) {
         return chat(message, List.of());
@@ -138,11 +139,11 @@ public class MovieChatbotService {
                 .toList();
 
         String answer = buildFallbackAnswer(recommendations);
-        if (hasText(geminiApiKey) && !recommendations.isEmpty() && System.currentTimeMillis() >= geminiRetryAfterMillis) {
+        if (hasText(groqApiKey) && !recommendations.isEmpty() && System.currentTimeMillis() >= groqRetryAfterMillis) {
             try {
-                answer = callGemini(context, recommendations);
+                answer = callGroq(buildPrompt(context, recommendations), 350);
             } catch (Exception exception) {
-                handleGeminiFailure(exception);
+                handleGroqFailure(exception);
             }
         }
 
@@ -208,12 +209,12 @@ public class MovieChatbotService {
         };
 
         if (intent == MessageIntent.GENERAL_CONVERSATION
-                && hasText(geminiApiKey)
-                && System.currentTimeMillis() >= geminiRetryAfterMillis) {
+                && hasText(groqApiKey)
+                && System.currentTimeMillis() >= groqRetryAfterMillis) {
             try {
-                answer = callGeminiConversation(context);
+                answer = callGroq(buildConversationPrompt(context), 220);
             } catch (Exception exception) {
-                handleGeminiFailure(exception);
+                handleGroqFailure(exception);
             }
         }
 
@@ -602,30 +603,36 @@ public class MovieChatbotService {
         return builder.toString();
     }
 
-    private String callGemini(ConversationContext context, List<MovieChatResponse.MovieRecommendation> recommendations) throws Exception {
+    private String callGroq(String prompt, int maxTokens) throws Exception {
         ObjectNode root = objectMapper.createObjectNode();
-        ObjectNode content = root.putArray("contents").addObject();
-        content.putArray("parts").addObject().put("text", buildPrompt(context, recommendations));
-        root.putObject("generationConfig")
-                .put("temperature", 0.35)
-                .put("maxOutputTokens", 350);
+        root.put("model", groqModel);
+        root.put("temperature", 0.3);
+        root.put("max_tokens", maxTokens);
+        var messages = root.putArray("messages");
+        messages.addObject()
+                .put("role", "system")
+                .put("content", "Bạn là ThauBot, trợ lý AI chính thức của ThauFilm. "
+                        + "Chỉ trả lời bằng tiếng Việt, thân thiện, súc tích, không hiển thị quá trình suy luận. "
+                        + "Không bịa dữ liệu phim, lịch chiếu, rạp, giá hoặc chính sách.");
+        messages.addObject().put("role", "user").put("content", prompt);
 
-        HttpRequest request = HttpRequest.newBuilder(URI.create(GEMINI_ENDPOINT.formatted(geminiModel)))
+        HttpRequest request = HttpRequest.newBuilder(URI.create(groqApiUrl))
                 .timeout(Duration.ofSeconds(30))
-                .header("x-goog-api-key", geminiApiKey)
+                .header("Authorization", "Bearer " + groqApiKey)
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(root.toString()))
                 .build();
         HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
-            throw new IllegalStateException("Gemini returned HTTP " + response.statusCode());
+            throw new IllegalStateException("Groq returned HTTP " + response.statusCode());
         }
-        String text = objectMapper.readTree(response.body()).path("candidates").path(0)
-                .path("content").path("parts").path(0).path("text").asText();
-        return hasText(text) ? text.trim() : buildFallbackAnswer(recommendations);
+        String text = objectMapper.readTree(response.body()).path("choices").path(0)
+                .path("message").path("content").asText();
+        if (!hasText(text)) throw new IllegalStateException("Groq returned an empty response");
+        return sanitizeAiReply(text);
     }
 
-    private String callGeminiConversation(ConversationContext context) throws Exception {
+    private String buildConversationPrompt(ConversationContext context) {
         String prompt = """
                 Bạn là trợ lý trò chuyện của rạp phim ThauFilm.
                 Trả lời câu hỏi của khách bằng tiếng Việt, thân thiện, chính xác và tối đa 4 câu.
@@ -636,35 +643,25 @@ public class MovieChatbotService {
                 Câu hỏi của khách: "%s"
                 """.formatted(context.currentMessage().replace("\"", "'"));
 
-        ObjectNode root = objectMapper.createObjectNode();
-        ObjectNode content = root.putArray("contents").addObject();
-        content.putArray("parts").addObject().put("text", prompt);
-        root.putObject("generationConfig")
-                .put("temperature", 0.25)
-                .put("maxOutputTokens", 220);
-
-        HttpRequest request = HttpRequest.newBuilder(URI.create(GEMINI_ENDPOINT.formatted(geminiModel)))
-                .timeout(Duration.ofSeconds(20))
-                .header("x-goog-api-key", geminiApiKey)
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(root.toString()))
-                .build();
-        HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        if (response.statusCode() < 200 || response.statusCode() >= 300) {
-            throw new IllegalStateException("Gemini returned HTTP " + response.statusCode());
-        }
-        String text = objectMapper.readTree(response.body()).path("candidates").path(0)
-                .path("content").path("parts").path(0).path("text").asText();
-        return hasText(text) ? text.trim() : buildGeneralFallback();
+        return prompt;
     }
 
-    private void handleGeminiFailure(Exception exception) {
+    private void handleGroqFailure(Exception exception) {
         if (exception.getMessage() != null && exception.getMessage().contains("HTTP 429")) {
-            geminiRetryAfterMillis = System.currentTimeMillis() + Duration.ofMinutes(5).toMillis();
-            log.info("Đã đạt hạn mức hoặc giới hạn tần suất của Gemini. Chuyển sang phản hồi cục bộ trong 5 phút.");
+            groqRetryAfterMillis = System.currentTimeMillis() + Duration.ofMinutes(5).toMillis();
+            log.info("Đã đạt hạn mức hoặc giới hạn tần suất của Groq. Chuyển sang phản hồi cục bộ trong 5 phút.");
         } else {
-            log.warn("AI của chatbot phim gặp lỗi: {}", exception.getMessage());
+            log.warn("AI Groq của chatbot phim gặp lỗi: {}", exception.getMessage());
         }
+    }
+
+    private String sanitizeAiReply(String raw) {
+        String cleaned = raw
+                .replaceAll("(?is)<\\s*(?:think|thinking|reasoning)\\s*>.*?<\\s*/\\s*(?:think|thinking|reasoning)\\s*>", "")
+                .replaceAll("(?is)</?\\s*(?:think|thinking|reasoning)\\s*>", "")
+                .replaceAll("[\\r\\n]{3,}", "\n\n")
+                .trim();
+        return hasText(cleaned) ? cleaned : buildGeneralFallback();
     }
 
     private String buildPrompt(ConversationContext context, List<MovieChatResponse.MovieRecommendation> recommendations) {

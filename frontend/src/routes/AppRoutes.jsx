@@ -22,7 +22,6 @@ import CommunityConnectionsPage from '../pages/CommunityConnectionsPage';
 import CommunityFeedPage from '../pages/CommunityFeedPage';
 import CommunityMessagesPage from '../pages/CommunityMessagesPage';
 import MovieDatingPage from '../pages/MovieDatingPage';
-import MovieChatbotPage from '../pages/MovieChatbotPage';
 
 // Booking Pages
 import SeatSelectionPage from '../pages/SeatSelectionPage';
@@ -67,7 +66,6 @@ const AppRoutes = () => {
         <Route path="/community/messages" element={<CommunityMessagesPage />} />
         <Route path="/dating" element={<MovieDatingPage />} />
         <Route path="/intelligence" element={<Navigate to="/dating" replace />} />
-        <Route path="/movie-chatbot" element={<MovieChatbotPage />} />
         <Route path="/dashboard" element={<DashboardPage />} />
          
         <Route path="/booking/seats/:showtimeId" element={<SeatSelectionPage />} />

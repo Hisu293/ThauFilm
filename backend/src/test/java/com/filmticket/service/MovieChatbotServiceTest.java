@@ -41,7 +41,7 @@ class MovieChatbotServiceTest {
     }
 
     @Test
-    void refundQuestionUsesControlledPolicyInsteadOfGenericGeminiAnswer() {
+    void refundQuestionUsesControlledPolicyInsteadOfGenericAiAnswer() {
         when(movieRepository.findAllByActiveTrue()).thenReturn(sampleMovies());
 
         MovieChatResponse response = service.chat("Tôi muốn hoàn tiền vé thì làm sao?");

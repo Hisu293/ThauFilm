@@ -18,12 +18,12 @@
   translate: -50% 0;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  width: min(calc(100% - 40px), 660px);
+  width: min(calc(100% - 40px), 560px);
   margin: 0 auto;
   padding: 8px;
   border: 1px solid rgba(255,255,255,.1);
   border-bottom-color: rgba(255,255,255,.05);
-  border-radius: 20px;
+  border-radius: 999px;
   background:
     linear-gradient(180deg, rgba(255,255,255,.045), transparent),
     rgba(14, 15, 20, .96);
@@ -36,10 +36,10 @@
   grid-template-columns: auto 1fr auto;
   align-items: center;
   gap: 12px;
-  min-height: 64px;
-  padding: 9px 22px;
+  min-height: 52px;
+  padding: 7px 18px;
   border: 0;
-  border-radius: 15px;
+  border-radius: 999px;
   color: rgba(255,255,255,.64);
   background: transparent;
   font: inherit;
@@ -117,8 +117,8 @@
   border-radius: 0;
   background:
     linear-gradient(180deg, rgba(255,255,255,.035), transparent 18%),
-    radial-gradient(circle at 50% 52%, rgba(229, 9, 20, 0.17), transparent 25%),
-    radial-gradient(circle at 50% 50%, #17131d 0%, #0b0c12 55%, #07080b 100%);
+    radial-gradient(ellipse at 50% 45%, rgba(229, 9, 20, 0.14), transparent 34%),
+    linear-gradient(90deg, #05070b 0%, #0d1016 22%, #121016 50%, #0d1016 78%, #05070b 100%);
   box-shadow: inset 0 1px rgba(255, 255, 255, 0.06), 0 36px 100px rgba(0, 0, 0, 0.45);
 }
 
@@ -161,7 +161,10 @@
 }
 
 .cinema-planet::after {
-  background: linear-gradient(90deg, rgba(7,8,11,.9), transparent 12%, transparent 88%, rgba(7,8,11,.9));
+  z-index: 210;
+  background:
+    linear-gradient(180deg, rgba(4,5,8,.38), transparent 16%, transparent 76%, rgba(4,5,8,.82)),
+    linear-gradient(90deg, rgba(3,5,8,.96), transparent 13%, transparent 87%, rgba(3,5,8,.96));
 }
 
 .cinema-planet__header {
@@ -229,6 +232,7 @@
   cursor: grab;
   touch-action: none;
   user-select: none;
+  perspective: 1200px;
 }
 
 .cinema-globe:active { cursor: grabbing; }
@@ -238,23 +242,24 @@
   top: 50%;
   left: 50%;
   translate: -50% -50%;
-  width: min(82vw, 1080px);
-  height: min(78vh, 760px);
+  width: min(90vw, 1420px);
+  height: min(88vh, 900px);
   border-radius: 50%;
   pointer-events: none;
   background:
     radial-gradient(circle at 38% 32%, rgba(255,255,255,.055), transparent 16%),
-    radial-gradient(circle, rgba(111, 9, 22, .3), rgba(29, 8, 15, .16) 54%, transparent 72%);
-  box-shadow: inset 0 0 130px rgba(229, 9, 20, .13), 0 0 95px rgba(229, 9, 20, .11);
+    radial-gradient(ellipse, rgba(111, 9, 22, .24), rgba(29, 8, 15, .1) 58%, transparent 76%);
+  box-shadow: inset 0 0 160px rgba(229, 9, 20, .1), 0 0 110px rgba(229, 9, 20, .08);
 }
 
 .cinema-globe__movie {
   position: absolute;
-  width: clamp(112px, 9.5vw, 154px);
+  width: clamp(150px, 11.7vw, 224px);
   transform-origin: center;
-  filter: saturate(.68) brightness(.62);
+  filter: saturate(.58) brightness(.5);
   pointer-events: none;
   will-change: transform, opacity;
+  transform-style: preserve-3d;
 }
 
 .cinema-globe__movie.is-front {
@@ -269,18 +274,12 @@
 
 .cinema-globe__movie .mp-card {
   border-color: rgba(255,255,255,.16);
-  border-radius: 5px;
-  box-shadow: 0 18px 48px rgba(0,0,0,.72);
+  border-radius: 18px;
+  box-shadow: 0 22px 54px rgba(0,0,0,.78);
 }
 
 .cinema-globe__movie .mp-card__body {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  left: 0;
-  z-index: 2;
-  padding: 26px 7px 7px;
-  background: linear-gradient(transparent, rgba(0,0,0,.92));
+  display: none;
 }
 .cinema-globe__movie .mp-card__title { margin: 0; font-size: .8rem; }
 .cinema-globe__movie .mp-card__meta { display: none; }
@@ -297,6 +296,50 @@
 .cinema-globe__movie .mp-card__status-now,
 .cinema-globe__movie .mp-card__status-soon {
   display: none;
+}
+
+.cinema-planet__caption {
+  position: absolute;
+  z-index: 240;
+  right: clamp(18px, 5vw, 76px);
+  bottom: 28px;
+  left: clamp(18px, 5vw, 76px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+  min-height: 72px;
+  padding: 14px 22px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 18px;
+  background: rgba(12, 12, 16, .84);
+  box-shadow: 0 18px 55px rgba(0,0,0,.42);
+  backdrop-filter: blur(18px);
+  pointer-events: none;
+}
+
+.cinema-planet__caption > div {
+  display: grid;
+  gap: 2px;
+}
+
+.cinema-planet__caption span {
+  color: #ff3441;
+  font-size: .68rem;
+  font-weight: 900;
+  letter-spacing: .14em;
+}
+
+.cinema-planet--soon .cinema-planet__caption span { color: #61c9ff; }
+
+.cinema-planet__caption strong {
+  font-size: clamp(1rem, 1.5vw, 1.3rem);
+}
+
+.cinema-planet__caption p {
+  margin: 0;
+  color: rgba(255,255,255,.62);
+  font-size: .88rem;
 }
 
 .cinema-planet-state {
@@ -324,8 +367,9 @@
 @media (max-width: 900px) {
   .cinema-planet { min-height: 700px; }
   .cinema-globe { height: calc(100vh - 68px); min-height: 700px; }
-  .cinema-globe__movie { width: clamp(104px, 15vw, 126px); }
+  .cinema-globe__movie { width: clamp(132px, 20vw, 172px); }
   .cinema-globe__mosaic-glow { width: 560px; height: 470px; }
+  .cinema-planet__caption p { display: none; }
 }
 
 @media (max-width: 600px) {
@@ -347,8 +391,15 @@
   .planet-switcher small { font-size: .55rem; }
   .cinema-planet { min-height: 660px; border-radius: 0; }
   .cinema-globe { height: calc(100vh - 62px); min-height: 660px; }
-  .cinema-globe__movie { width: 96px; }
+  .cinema-globe__movie { width: 118px; }
   .cinema-globe__mosaic-glow { width: 420px; height: 390px; }
+  .cinema-planet__caption {
+    right: 10px;
+    bottom: 12px;
+    left: 10px;
+    min-height: 62px;
+    padding: 10px 14px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

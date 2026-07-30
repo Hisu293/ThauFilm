@@ -15,19 +15,20 @@ const MovieGlobe = ({
   const pausedRef = useRef(false);
 
   const points = useMemo(() => {
-    const tileCount = Math.max(movies.length, 24);
-    const columns = Math.max(8, Math.ceil(tileCount / 3));
-    const rows = Math.ceil(tileCount / columns);
+    const columns = 12;
+    const rows = 4;
+    const tileCount = columns * rows;
     return Array.from({ length: tileCount }, (_, index) => {
       const row = Math.floor(index / columns);
       const column = index % columns;
-      const latitude = rows === 1 ? 0 : ((row / (rows - 1)) - 0.5) * 1.35;
       const longitude = (column / columns) * Math.PI * 2
-        + (row % 2 ? Math.PI / columns : 0);
+        + (row % 2 ? Math.PI / columns : 0)
+        + ((row - 1.5) * 0.025);
       return {
         movie: movies[index % movies.length],
         tileIndex: index,
-        latitude,
+        row,
+        rows,
         longitude,
       };
     });
@@ -51,13 +52,14 @@ const MovieGlobe = ({
 
   const projected = points.map((point) => {
     const longitude = point.longitude + rotation.y;
-    const latitude = point.latitude + rotation.x * 0.52;
-    const latitudeRadius = Math.cos(latitude);
+    const rowProgress = point.row / (point.rows - 1);
+    const screenX = Math.sin(longitude);
+    const depth = Math.cos(longitude);
     return {
       ...point,
-      screenX: Math.sin(longitude) * latitudeRadius,
-      screenY: Math.sin(latitude),
-      depth: Math.cos(longitude) * latitudeRadius,
+      screenX,
+      screenY: (rowProgress - 0.5) + rotation.x,
+      depth,
     };
   });
 
@@ -114,17 +116,17 @@ const MovieGlobe = ({
         <div className="cinema-globe__mosaic-glow" />
 
         {projected.map(({ movie, tileIndex, screenX, screenY, depth }) => {
-          const scale = 0.7 + ((depth + 1) / 2) * 0.34;
-          const opacity = 0.18 + ((depth + 1) / 2) * 0.82;
-          const isFront = depth > 0.02;
+          const scale = 0.68 + ((depth + 1) / 2) * 0.42;
+          const opacity = Math.max(0, Math.min(1, (depth + 0.42) / 1.08));
+          const isFront = depth > 0.08;
           return (
             <div
               key={`${movie.id}-${tileIndex}`}
               className={`cinema-globe__movie ${isFront ? 'is-front' : ''}`}
               style={{
-                left: `${50 + screenX * 35}%`,
-                top: `${52 + screenY * 39}%`,
-                transform: `translate3d(-50%, -50%, 0) scale(${scale})`,
+                left: `${50 + screenX * 52}%`,
+                top: `${50 + screenY * 70}%`,
+                transform: `translate3d(-50%, -50%, 0) scale(${scale}) rotateY(${-screenX * 32}deg)`,
                 opacity,
                 zIndex: Math.round((depth + 1) * 100),
               }}
@@ -135,6 +137,14 @@ const MovieGlobe = ({
             </div>
           );
         })}
+      </div>
+
+      <div className="cinema-planet__caption">
+        <div>
+          <span>{tone === 'soon' ? 'SẮP RA MẮT' : 'ĐANG PHÁT HÀNH'}</span>
+          <strong>{title}</strong>
+        </div>
+        <p>Kéo để xoay thế giới điện ảnh · Chạm vào poster để xem chi tiết</p>
       </div>
     </section>
   );
