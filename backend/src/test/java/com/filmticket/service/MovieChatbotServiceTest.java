@@ -14,6 +14,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 
@@ -22,20 +24,24 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class MovieChatbotServiceTest {
     private MovieRepository movieRepository;
+    private ShowtimeRepository showtimeRepository;
     private TheaterRepository theaterRepository;
     private MovieChatbotService service;
 
     @BeforeEach
     void setUp() {
         movieRepository = mock(MovieRepository.class);
+        showtimeRepository = mock(ShowtimeRepository.class);
         theaterRepository = mock(TheaterRepository.class);
         S3PresignedUrlService s3PresignedUrlService = mock(S3PresignedUrlService.class);
         when(s3PresignedUrlService.resolvePosterUrl(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        service = new MovieChatbotService(movieRepository, mock(ShowtimeRepository.class),
+        service = new MovieChatbotService(movieRepository, showtimeRepository,
                 mock(CinemaRoomRepository.class), theaterRepository,
                 s3PresignedUrlService, new ObjectMapper());
     }
@@ -48,6 +54,22 @@ class MovieChatbotServiceTest {
 
         assertTrue(response.getAnswer().contains("Staff Trưởng"));
         assertTrue(response.getAnswer().contains("Admin"));
+        assertTrue(response.getAnswer().contains("tải ảnh QR nhận tiền"));
+        assertTrue(response.getAnswer().contains("BIN ngân hàng"));
+        assertTrue(response.getAnswer().contains("PayOS/Bảo Kim"));
+        assertTrue(response.getRecommendations().isEmpty());
+    }
+
+    @Test
+    void bookingHelpMatchesTheCurrentThauFilmCheckoutFlow() {
+        when(movieRepository.findAllByActiveTrue()).thenReturn(sampleMovies());
+
+        MovieChatResponse response = service.chat("Hướng dẫn đặt vé");
+
+        assertTrue(response.getAnswer().contains("chọn combo"));
+        assertTrue(response.getAnswer().contains("voucher"));
+        assertTrue(response.getAnswer().contains("Thanh toán qua PayOS"));
+        assertTrue(response.getAnswer().contains("Vé của tôi"));
         assertTrue(response.getRecommendations().isEmpty());
     }
 
@@ -56,6 +78,20 @@ class MovieChatbotServiceTest {
         MovieChatResponse response = service.chat("địt mẹ chatbot");
 
         assertEquals("Vui lòng nhắn nội dung phù hợp.", response.getAnswer());
+        assertTrue(response.getRecommendations().isEmpty());
+    }
+
+    @Test
+    void todayShowtimesUseExactVietnamDateInsteadOfAllUpcomingDates() {
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Ho_Chi_Minh"));
+        when(movieRepository.findAllByActiveTrue()).thenReturn(sampleMovies());
+        when(showtimeRepository.findByDate(today)).thenReturn(List.of());
+
+        MovieChatResponse response = service.chat("Lịch chiếu hôm nay");
+
+        verify(showtimeRepository).findByDate(today);
+        verify(showtimeRepository, never()).findUpcoming(any());
+        assertTrue(response.getAnswer().contains("hôm nay"));
         assertTrue(response.getRecommendations().isEmpty());
     }
 

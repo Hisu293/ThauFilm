@@ -25,7 +25,9 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.text.Normalizer;
 import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
@@ -40,6 +42,7 @@ import java.util.regex.Pattern;
 @RequiredArgsConstructor
 public class MovieChatbotService {
     private static final int DURATION_TOLERANCE_MINUTES = 10;
+    private static final ZoneId VIETNAM_ZONE = ZoneId.of("Asia/Ho_Chi_Minh");
     private static final Pattern MAX_DURATION_PATTERN = Pattern.compile(
             "(?:duoi|under|less than|khong qua|toi da|<=?)\\s*(\\d{1,3})\\s*(tieng|h|hour|hours|phut|p|min|minutes)?",
             Pattern.CASE_INSENSITIVE
@@ -180,14 +183,9 @@ public class MovieChatbotService {
                 .map(item -> toRecommendation(item.movie(), item.reason()))
                 .toList();
 
+        // The live ThauFilm catalog exclusively decides movie names and cards.
+        // Groq handles general conversation only; it never selects or rewrites recommendations.
         String answer = buildFallbackAnswer(recommendations);
-        if (hasText(groqApiKey) && !recommendations.isEmpty() && System.currentTimeMillis() >= groqRetryAfterMillis) {
-            try {
-                answer = callGroq(buildPrompt(context, recommendations), 350);
-            } catch (Exception exception) {
-                handleGroqFailure(exception);
-            }
-        }
 
         return MovieChatResponse.builder()
                 .answer(answer)
@@ -273,17 +271,33 @@ public class MovieChatbotService {
     private String buildShowtimeAnswer(ConversationContext context) {
         List<Movie> movies = movieRepository.findAllByActiveTrue();
         Movie requestedMovie = findReferenceMovie(context.currentQuery(), movies);
-        List<Showtime> source = requestedMovie == null
-                ? showtimeRepository.findUpcoming(java.time.LocalDate.now())
-                : showtimeRepository.findByMovieIdOrderByStartTimeAsc(requestedMovie.getId());
+        LocalDate requestedDate = detectRequestedShowtimeDate(context.currentQuery());
+        LocalDate today = LocalDate.now(VIETNAM_ZONE);
+        LocalDateTime now = LocalDateTime.now(VIETNAM_ZONE);
+        List<Showtime> source;
+        if (requestedDate != null) {
+            source = requestedMovie == null
+                    ? showtimeRepository.findByDate(requestedDate)
+                    : showtimeRepository.findByMovieIdAndDate(requestedMovie.getId(), requestedDate);
+        } else {
+            source = requestedMovie == null
+                    ? showtimeRepository.findUpcoming(today)
+                    : showtimeRepository.findByMovieIdOrderByStartTimeAsc(requestedMovie.getId());
+        }
         List<Showtime> upcoming = source.stream()
-                .filter(item -> item.getStartTime() != null && item.getStartTime().isAfter(LocalDateTime.now()))
+                .filter(item -> item.getStartTime() != null && item.getStartTime().isAfter(now))
+                .filter(item -> requestedDate == null || item.getStartTime().toLocalDate().equals(requestedDate))
                 .limit(8).toList();
+        String dateLabel = requestedDate == null ? "sắp tới"
+                : requestedDate.equals(today) ? "hôm nay"
+                : requestedDate.equals(today.plusDays(1)) ? "ngày mai"
+                : requestedDate.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy"));
         if (upcoming.isEmpty()) return requestedMovie == null
-                ? "Hiện chưa có suất chiếu sắp tới trong hệ thống."
-                : "Hiện chưa có suất chiếu sắp tới cho " + requestedMovie.getTitle() + ".";
+                ? "Hiện chưa có suất chiếu " + dateLabel + " trong hệ thống."
+                : "Hiện chưa có suất chiếu " + dateLabel + " cho " + requestedMovie.getTitle() + ".";
         StringBuilder answer = new StringBuilder(requestedMovie == null
-                ? "Các suất chiếu sắp tới:\n" : "Lịch chiếu của " + requestedMovie.getTitle() + ":\n");
+                ? "Các suất chiếu " + dateLabel + ":\n"
+                : "Lịch chiếu " + dateLabel + " của " + requestedMovie.getTitle() + ":\n");
         for (Showtime showtime : upcoming) {
             Movie movie = movieRepository.findById(showtime.getMovieId()).orElse(null);
             CinemaRoom room = showtime.getCinemaRoomId() == null ? null
@@ -300,10 +314,20 @@ public class MovieChatbotService {
         return answer.append("Bạn mở chi tiết phim để chọn ghế và đặt vé.").toString();
     }
 
+    private LocalDate detectRequestedShowtimeDate(String query) {
+        LocalDate today = LocalDate.now(VIETNAM_ZONE);
+        if (containsAny(query, Set.of("hom nay", "today"))) return today;
+        if (containsAny(query, Set.of("ngay mai", "tomorrow"))) return today.plusDays(1);
+        return null;
+    }
+
     private String buildBookingHelp() {
-        return "Cách đặt vé:\n1. Chọn phim và suất chiếu.\n2. Chọn ghế còn trống."
-                + "\n3. Kiểm tra giá, mã giảm giá và combo.\n4. Thanh toán trong thời gian giữ ghế."
-                + "\n5. Thành công sẽ mở trang Vé của tôi và gửi vé qua email.";
+        return "Để đặt vé, bạn thực hiện theo các bước sau:"
+                + "\n1. Tìm phim và rạp mong muốn trên ThauFilm."
+                + "\n2. Chọn suất chiếu phù hợp và các ghế cần đặt."
+                + "\n3. Kiểm tra thông tin vé, chọn combo và nhập voucher nếu có."
+                + "\n4. Thanh toán qua PayOS để hoàn tất đặt vé."
+                + "\nSau khi thanh toán thành công, hệ thống chuyển đến Vé của tôi và gửi vé PDF qua email.";
     }
 
     private String buildPaymentHelp() {
@@ -315,8 +339,11 @@ public class MovieChatbotService {
 
     private String buildRefundHelp() {
         return "Luồng hoàn tiền:\n1. Vé của tôi → Chi tiết/Hoàn tiền."
-                + "\n2. Chọn thủ công hoặc tự động PayOS/Bảo Kim."
-                + "\n3. Staff Trưởng xác minh.\n4. Admin duyệt rồi hệ thống mới hoàn."
+                + "\n2. Chọn phương thức hoàn tiền:"
+                + "\n- Thủ công: chat với Staff Trưởng và tải ảnh QR nhận tiền lên."
+                + "\n- Tự động PayOS/Bảo Kim: nhập BIN ngân hàng, số tài khoản và lý do hủy để gửi yêu cầu chờ duyệt."
+                + "\n3. Staff Trưởng kiểm tra và xác minh yêu cầu."
+                + "\n4. Admin duyệt, sau đó hệ thống mới thực hiện hoàn tiền."
                 + "\nVé đã check-in, phim online đã mở xem hoặc suất chiếu đã bắt đầu không được hoàn.";
     }
 
@@ -586,7 +613,10 @@ public class MovieChatbotService {
     }
 
     private boolean containsGenreAlias(String value, GenreDefinition definition) {
-        return definition.aliases().stream().anyMatch(alias -> containsPhrase(value, alias));
+        String normalizedValue = normalize(value);
+        return definition.aliases().stream()
+                .map(this::normalize)
+                .anyMatch(alias -> containsPhrase(normalizedValue, alias));
     }
 
     private static GenreDefinition genre(String key, String label, String... aliases) {
@@ -702,28 +732,6 @@ public class MovieChatbotService {
                 .replaceAll("[\\r\\n]{3,}", "\n\n")
                 .trim();
         return hasText(cleaned) ? cleaned : buildGeneralFallback();
-    }
-
-    private String buildPrompt(ConversationContext context, List<MovieChatResponse.MovieRecommendation> recommendations) {
-        StringBuilder prompt = new StringBuilder("""
-                Bạn là chatbot tư vấn phim cho rạp ThauFilm. Trả lời bằng tiếng Việt, thân thiện, ngắn gọn.
-                Chỉ được gợi ý phim trong danh sách bên dưới, không bịa phim ngoài hệ thống.
-                Câu hỏi của khách: "%s"
-
-                Danh sách phim phù hợp:
-                """.formatted(context.currentMessage().replace("\"", "'")));
-        prompt.append("Ngu canh gan day: ")
-                .append(context.intentQuery().replace("\"", "'"))
-                .append('\n');
-        recommendations.forEach(movie -> prompt.append("- ")
-                .append(movie.getTitle())
-                .append(" | thể loại: ").append(safe(movie.getGenre()))
-                .append(" | thời lượng: ").append(movie.getDurationMinutes()).append(" phút")
-                .append(" | điểm: ").append(movie.getRating())
-                .append(" | lý do: ").append(movie.getReason())
-                .append('\n'));
-        prompt.append("Hãy trả lời dạng 1 đoạn ngắn và 3-5 bullet phim.");
-        return prompt.toString();
     }
 
     private MovieChatResponse.MovieRecommendation toRecommendation(Movie movie, String reason) {
