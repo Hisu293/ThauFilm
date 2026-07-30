@@ -14,6 +14,7 @@ import WarningAmberRoundedIcon from '@mui/icons-material/WarningAmberRounded';
 import QRCode from 'qrcode';
 import SectionHeader from '../components/SectionHeader';
 import { adminService } from '../../services/adminService';
+import { adminTheaterService } from '../../services/adminTheaterService';
 
 const monthNow = () => new Date().toISOString().slice(0, 7);
 const today = () => new Date().toISOString().slice(0, 10);
@@ -25,10 +26,10 @@ const payrollStatus = { DRAFT: 'Nháp', APPROVED: 'Đã duyệt', PAID: 'Đã tr
 const WorkforceSection = () => {
   const [tab, setTab] = useState(0);
   const [month, setMonth] = useState(monthNow);
-  const [state, setState] = useState({ loading: true, error: '', staff: [], schedule: null, payroll: null });
+  const [state, setState] = useState({ loading: true, error: '', staff: [], theaters: [], schedule: null, payroll: null });
   const [shiftForm, setShiftForm] = useState({
     staffId: '', workDate: today(), shiftType: 'MORNING',
-    workplace: '', tasks: '', note: '',
+    theaterId: '', tasks: '', note: '',
   });
   const [busy, setBusy] = useState(false);
   const [profile, setProfile] = useState(null);
@@ -41,13 +42,19 @@ const WorkforceSection = () => {
     const [year, selectedMonth] = month.split('-').map(Number);
     setState((old) => ({ ...old, loading: true, error: '' }));
     try {
-      const [staff, schedule, payrollData] = await Promise.all([
+      const [staff, theaters, schedule, payrollData] = await Promise.all([
         adminService.getWorkforceStaff(),
+        adminTheaterService.list(),
         adminService.getShiftSchedule(year, selectedMonth),
         adminService.getPayroll(year, selectedMonth),
       ]);
-      setState({ loading: false, error: '', staff: staff || [], schedule, payroll: payrollData });
-      setShiftForm((old) => ({ ...old, staffId: old.staffId || staff?.[0]?.staffId || '' }));
+      const activeTheaters = (theaters || []).filter((item) => item.status === 'ACTIVE');
+      setState({ loading: false, error: '', staff: staff || [], theaters: activeTheaters, schedule, payroll: payrollData });
+      setShiftForm((old) => ({
+        ...old,
+        staffId: old.staffId || staff?.[0]?.staffId || '',
+        theaterId: old.theaterId || activeTheaters[0]?.id || '',
+      }));
     } catch (error) {
       setState((old) => ({ ...old, loading: false, error: error.message || 'Không tải được dữ liệu nhân sự.' }));
     }
@@ -152,10 +159,19 @@ const WorkforceSection = () => {
               <FormControl size="small"><InputLabel>Nhân viên</InputLabel><Select label="Nhân viên" value={shiftForm.staffId} onChange={(event) => setShiftForm((old) => ({ ...old, staffId: event.target.value }))}>{state.staff.map((item) => <MenuItem key={item.staffId} value={item.staffId}>{item.staffName || item.staffEmail}</MenuItem>)}</Select></FormControl>
               <TextField type="date" size="small" label="Ngày làm" value={shiftForm.workDate} onChange={(event) => setShiftForm((old) => ({ ...old, workDate: event.target.value }))} slotProps={{ inputLabel: { shrink: true } }} />
               <FormControl size="small"><InputLabel>Ca làm</InputLabel><Select label="Ca làm" value={shiftForm.shiftType} onChange={(event) => setShiftForm((old) => ({ ...old, shiftType: event.target.value }))}>{definitions.map((item) => <MenuItem key={item.type} value={item.type}>{item.name}</MenuItem>)}</Select></FormControl>
-              <TextField size="small" label="Địa điểm làm việc" value={shiftForm.workplace} onChange={(event) => setShiftForm((old) => ({ ...old, workplace: event.target.value }))} />
+              <FormControl size="small">
+                <InputLabel>Rạp làm việc</InputLabel>
+                <Select label="Rạp làm việc" value={shiftForm.theaterId} onChange={(event) => setShiftForm((old) => ({ ...old, theaterId: event.target.value }))}>
+                  {state.theaters.map((theater) => (
+                    <MenuItem key={theater.id} value={theater.id}>
+                      {theater.name} · {theater.address || 'Chưa có địa chỉ'}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
               <TextField size="small" label="Nhiệm vụ làm việc" multiline minRows={2} value={shiftForm.tasks} onChange={(event) => setShiftForm((old) => ({ ...old, tasks: event.target.value }))} />
               <TextField size="small" label="Ghi chú" value={shiftForm.note} onChange={(event) => setShiftForm((old) => ({ ...old, note: event.target.value }))} />
-              <Button variant="contained" startIcon={<AddRoundedIcon />} disabled={busy || !shiftForm.staffId || !shiftForm.workplace.trim() || !shiftForm.tasks.trim()} onClick={assign}>Phân ca và gửi email</Button>
+              <Button variant="contained" startIcon={<AddRoundedIcon />} disabled={busy || !shiftForm.staffId || !shiftForm.theaterId || !shiftForm.tasks.trim()} onClick={assign}>Phân ca và gửi email</Button>
             </Box>
           </Box>
           <Box className="admin-panel" sx={{ overflow: 'hidden' }}>

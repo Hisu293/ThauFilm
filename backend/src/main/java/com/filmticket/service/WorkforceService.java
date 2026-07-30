@@ -33,6 +33,7 @@ public class WorkforceService {
     private final AttendanceAccessCodeService attendanceAccessCodeService;
     private final AuditLogService auditLogService;
     private final OutboundEmailService outboundEmailService;
+    private final TheaterRepository theaterRepository;
 
     public List<Map<String, Object>> shiftDefinitions() {
         return Arrays.stream(WorkShiftType.values()).map(type -> {
@@ -123,14 +124,18 @@ public class WorkforceService {
 
     @Transactional
     public Map<String, Object> assignShift(UUID staffId, LocalDate workDate, WorkShiftType shiftType,
-                                           String workplace, String tasks, String note) {
+                                           UUID theaterId, String tasks, String note) {
         User staff = requireStaff(staffId);
         if (workDate != null && workDate.isBefore(LocalDate.now()))
             throw new BadRequestException("Không thể phân ca trong quá khứ");
-        if (workplace == null || workplace.isBlank())
-            throw new BadRequestException("Địa điểm làm việc là bắt buộc");
+        if (theaterId == null) throw new BadRequestException("Rạp làm việc là bắt buộc");
         if (tasks == null || tasks.isBlank())
             throw new BadRequestException("Nhiệm vụ làm việc là bắt buộc");
+        Theater theater = theaterRepository.findById(theaterId)
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy rạp làm việc"));
+        if (theater.getAddress() == null || theater.getAddress().isBlank())
+            throw new BadRequestException("Rạp chưa được cấu hình địa chỉ");
+        String workplace = theater.getName() + " - " + theater.getAddress();
         if (workDate == null || shiftType == null) throw new BadRequestException("Ngày làm và ca làm là bắt buộc");
         StaffShiftAssignment assignment = shiftRepository.findByStaffIdAndWorkDate(staffId, workDate)
                 .orElseGet(() -> StaffShiftAssignment.builder().staffId(staffId).workDate(workDate).build());
@@ -140,6 +145,7 @@ public class WorkforceService {
         assignment.setScheduledEnd(window.end);
         assignment.setNote(note == null ? null : note.trim());
         assignment.setWorkplace(workplace.trim());
+        assignment.setTheaterId(theater.getId());
         assignment.setTasks(tasks.trim());
         assignment.setAssignmentSource(ShiftAssignmentSource.ADMIN);
         assignment.setApprovalStatus(ShiftApprovalStatus.APPROVED);
@@ -319,7 +325,8 @@ public class WorkforceService {
                 "staffEmail", staff.getEmail(), "workDate", item.getWorkDate(), "shiftType", item.getShiftType(),
                 "shiftName", shiftName(item.getShiftType()), "shiftTime", shiftTime(item.getShiftType()),
                 "scheduledStart", item.getScheduledStart(), "scheduledEnd", item.getScheduledEnd(),
-                "description", shiftDescription(item.getShiftType()), "workplace", item.getWorkplace(),
+                "description", shiftDescription(item.getShiftType()), "theaterId", item.getTheaterId(),
+                "workplace", item.getWorkplace(),
                 "tasks", item.getTasks(), "note", item.getNote(),
                 "assignmentSource", item.getAssignmentSource(), "approvalStatus", item.getApprovalStatus());
     }

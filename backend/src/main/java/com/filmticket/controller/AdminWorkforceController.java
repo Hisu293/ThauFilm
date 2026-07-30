@@ -50,7 +50,7 @@ public class AdminWorkforceController {
     @PostMapping("/shifts")
     public ResponseEntity<ApiResponse<Map<String, Object>>> assign(@RequestBody ShiftRequest request) {
         return ResponseEntity.ok(ApiResponse.success("Shift assigned", workforceService.assignShift(
-                request.staffId(), request.workDate(), request.shiftType(), request.workplace(),
+                request.staffId(), request.workDate(), request.shiftType(), request.theaterId(),
                 request.tasks(), request.note())));
     }
 
@@ -92,7 +92,7 @@ public class AdminWorkforceController {
     }
 
     public record ShiftRequest(UUID staffId, LocalDate workDate, WorkShiftType shiftType,
-                               String workplace, String tasks, String note) {}
+                               UUID theaterId, String tasks, String note) {}
     public record ProfileRequest(EmploymentType employmentType, BigDecimal hourlyRate, BigDecimal monthlySalary,
                                  BigDecimal overtimeHourlyRate, BigDecimal defaultAllowance, Boolean shiftLeader) {}
     public record PayrollRequest(BigDecimal allowance, BigDecimal bonus, BigDecimal deduction, PayrollStatus status, String note) {}

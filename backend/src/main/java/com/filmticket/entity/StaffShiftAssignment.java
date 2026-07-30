@@ -37,6 +37,9 @@ public class StaffShiftAssignment {
     @Column(length = 255)
     private String workplace;
 
+    @Column(name = "theater_id")
+    private UUID theaterId;
+
     @Column(columnDefinition = "TEXT")
     private String tasks;
 

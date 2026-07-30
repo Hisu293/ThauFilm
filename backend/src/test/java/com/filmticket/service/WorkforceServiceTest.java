@@ -32,12 +32,16 @@ class WorkforceServiceTest {
             assignment.setId(UUID.randomUUID());
             return assignment;
         });
+        Theater theater = Theater.builder().id(UUID.randomUUID()).name("ThauFilm")
+                .address("123 Nguyễn Huệ").build();
+        TheaterRepository theaters = mock(TheaterRepository.class);
+        when(theaters.findById(theater.getId())).thenReturn(Optional.of(theater));
         WorkforceService service = service(users, shifts, mock(StaffEmploymentProfileRepository.class),
-                mock(StaffAttendanceRepository.class), mock(PayrollRecordRepository.class));
+                mock(StaffAttendanceRepository.class), mock(PayrollRecordRepository.class), theaters);
         LocalDate workDate = LocalDate.now().plusDays(1);
 
         Map<String, Object> result = service.assignShift(
-                staffId, workDate, WorkShiftType.LATE, "Rạp ThauFilm", "Trực vận hành", null);
+                staffId, workDate, WorkShiftType.LATE, theater.getId(), "Trực vận hành", null);
 
         assertEquals(workDate.atTime(22, 0), result.get("scheduledStart"));
         assertEquals(workDate.plusDays(1).atTime(1, 0), result.get("scheduledEnd"));
@@ -93,9 +97,15 @@ class WorkforceServiceTest {
     private WorkforceService service(UserRepository users, StaffShiftAssignmentRepository shifts,
                                      StaffEmploymentProfileRepository profiles, StaffAttendanceRepository attendance,
                                      PayrollRecordRepository payroll) {
+        return service(users, shifts, profiles, attendance, payroll, mock(TheaterRepository.class));
+    }
+
+    private WorkforceService service(UserRepository users, StaffShiftAssignmentRepository shifts,
+                                     StaffEmploymentProfileRepository profiles, StaffAttendanceRepository attendance,
+                                     PayrollRecordRepository payroll, TheaterRepository theaters) {
         return new WorkforceService(users, profiles, shifts, attendance, payroll,
                 mock(AttendanceAccessCodeService.class), mock(AuditLogService.class),
-                mock(OutboundEmailService.class));
+                mock(OutboundEmailService.class), theaters);
     }
 
     private User staff(String name) {
