@@ -52,6 +52,14 @@ class MovieChatbotServiceTest {
     }
 
     @Test
+    void inappropriateMessageIsBlockedBeforeCallingRepositoriesOrAi() {
+        MovieChatResponse response = service.chat("địt mẹ chatbot");
+
+        assertEquals("Vui lòng nhắn nội dung phù hợp.", response.getAnswer());
+        assertTrue(response.getRecommendations().isEmpty());
+    }
+
+    @Test
     void directionsComeFromActiveTheaterData() {
         when(movieRepository.findAllByActiveTrue()).thenReturn(sampleMovies());
         when(theaterRepository.findByStatus(TheaterStatus.ACTIVE)).thenReturn(List.of(
