@@ -11,7 +11,9 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriUtils;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -96,6 +98,13 @@ public class PayOSRefundClient {
                 throw new BadRequestException("PayOS trả về mã hoàn tiền không hợp lệ");
             }
             return new PayoutResult(payoutId, state, responseJson);
+        } catch (HttpStatusCodeException ex) {
+            responseJson = ex.getResponseBodyAsString();
+            String providerMessage = providerError(responseJson);
+            log.error("PayOS từ chối lệnh hoàn tiền: mã tham chiếu={}, HTTP={}, phản hồi={}",
+                    referenceId, ex.getStatusCode().value(), responseJson);
+            throw new BadRequestException("PayOS từ chối lệnh chi (HTTP "
+                    + ex.getStatusCode().value() + "): " + providerMessage);
         } catch (BadRequestException ex) {
             log.error("Hoàn tiền PayOS thất bại: mã tham chiếu={}, số tiền={}, phản hồi={}, lỗi={}",
                     referenceId, amountInVnd, responseJson, ex.getMessage(), ex);
@@ -129,6 +138,12 @@ public class PayOSRefundClient {
             String state = data.path("transactions").path(0).path("state").asText(
                     data.path("approvalState").asText("PROCESSING"));
             return new PayoutResult(data.path("id").asText(payoutId), state, responseJson);
+        } catch (HttpStatusCodeException ex) {
+            String responseJson = ex.getResponseBodyAsString();
+            log.error("PayOS từ chối truy vấn payout: mã chi trả={}, HTTP={}, phản hồi={}",
+                    payoutId, ex.getStatusCode().value(), responseJson);
+            throw new BadRequestException("PayOS từ chối kiểm tra lệnh chi (HTTP "
+                    + ex.getStatusCode().value() + "): " + providerError(responseJson));
         } catch (BadRequestException ex) {
             throw ex;
         } catch (Exception ex) {
@@ -138,7 +153,8 @@ public class PayOSRefundClient {
 
     private String sign(Map<String, Object> data) {
         String raw = data.entrySet().stream()
-                .map(entry -> entry.getKey() + "=" + entry.getValue())
+                .map(entry -> entry.getKey() + "="
+                        + UriUtils.encode(String.valueOf(entry.getValue()), StandardCharsets.UTF_8))
                 .reduce((left, right) -> left + "&" + right)
                 .orElse("");
         try {
@@ -165,6 +181,21 @@ public class PayOSRefundClient {
 
     private boolean isBlank(String value) {
         return value == null || value.isBlank();
+    }
+
+    private String providerError(String responseJson) {
+        if (responseJson == null || responseJson.isBlank()) return "không có nội dung phản hồi";
+        try {
+            JsonNode root = objectMapper.readTree(responseJson);
+            String description = root.path("desc").asText("");
+            if (description.isBlank()) description = root.path("message").asText("");
+            String code = root.path("code").asText("");
+            if (!code.isBlank() && !description.isBlank()) return code + " - " + description;
+            if (!description.isBlank()) return description;
+        } catch (Exception ignored) {
+            // Return a bounded raw response when PayOS does not send JSON.
+        }
+        return responseJson.substring(0, Math.min(300, responseJson.length()));
     }
 
     public boolean isAvailable() {

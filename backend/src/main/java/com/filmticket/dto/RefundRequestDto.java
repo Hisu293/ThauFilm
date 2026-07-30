@@ -29,6 +29,7 @@ public class RefundRequestDto {
     private String bankBin;
     private String bankAccountNumber;
     private String bankAccountMasked;
+    private boolean automaticRetryAvailable;
     private RefundRequestStatus status;
     private boolean requiresAdmin;
     private boolean ticketCheckedIn;

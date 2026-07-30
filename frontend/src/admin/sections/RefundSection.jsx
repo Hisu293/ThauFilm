@@ -166,6 +166,18 @@ const RefundSection = () => {
     }
   };
 
+  const retryAutomatic = async (item) => {
+    setBusy(true);
+    setError('');
+    try {
+      patchItem(await adminService.retryAutomaticRefund(item.id));
+    } catch (err) {
+      setError(err.message || 'Không thể thử lại lệnh chi PayOS/Bảo Kim.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const metrics = [
     { label: 'Chờ Admin duyệt', value: stats.pending, icon: PendingActionsRoundedIcon, color: '#f59e0b' },
     { label: 'Tổng tiền đang chờ', value: money(stats.amount), icon: CurrencyExchangeRoundedIcon, color: '#ef4444' },
@@ -272,10 +284,17 @@ const RefundSection = () => {
                     : <Chip size="small" color="error" variant="outlined" label="Thiếu QR" />}
                   <Chip size="small" label={meta.label} color={meta.color} sx={{ maxWidth: '100%', fontWeight: 750, '& .MuiChip-label': { overflow: 'hidden', textOverflow: 'ellipsis' } }} />
                 </Stack></TableCell>
-                <TableCell align="right">{item.status === 'PENDING_APPROVAL' ? <Stack alignItems="flex-end" spacing={0.5}>
-                  <Button size="small" variant="contained" color="success" disabled={busy} onClick={() => setApproving(item)} sx={{ minWidth: 72 }}>Duyệt</Button>
-                  <Button size="small" color="error" disabled={busy} onClick={() => setRejecting(item)} sx={{ minWidth: 72 }}>Từ chối</Button>
-                </Stack> : <Typography variant="caption" color="text.disabled">Đã xử lý</Typography>}</TableCell>
+                <TableCell align="right">
+                  {item.status === 'PENDING_APPROVAL' ? <Stack alignItems="flex-end" spacing={0.5}>
+                    <Button size="small" variant="contained" color="success" disabled={busy} onClick={() => setApproving(item)} sx={{ minWidth: 72 }}>Duyệt</Button>
+                    <Button size="small" color="error" disabled={busy} onClick={() => setRejecting(item)} sx={{ minWidth: 72 }}>Từ chối</Button>
+                  </Stack> : item.automaticRetryAvailable ? (
+                    <Button size="small" variant="contained" color="warning" startIcon={<RefreshRoundedIcon />}
+                      disabled={busy} onClick={() => retryAutomatic(item)}>
+                      Thử lại
+                    </Button>
+                  ) : <Typography variant="caption" color="text.disabled">Đã xử lý</Typography>}
+                </TableCell>
               </TableRow>;
             })}
             {!filteredItems.length && <TableRow><TableCell colSpan={7}>

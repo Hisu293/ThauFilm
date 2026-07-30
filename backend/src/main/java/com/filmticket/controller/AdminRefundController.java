@@ -42,5 +42,13 @@ public class AdminRefundController {
                 refundService.adminReject(currentUserService.requireUserId(principal), requestId, body.reason())));
     }
 
+    @PostMapping("/{requestId}/retry-automatic")
+    public ResponseEntity<ApiResponse<RefundRequestDto>> retryAutomatic(
+            @AuthenticationPrincipal UserDetails principal, @PathVariable UUID requestId) {
+        return ResponseEntity.ok(ApiResponse.success("Automatic refund retried",
+                refundService.retryAutomaticRefund(
+                        currentUserService.requireUserId(principal), requestId)));
+    }
+
     public record RejectRefundBody(String reason) {}
 }

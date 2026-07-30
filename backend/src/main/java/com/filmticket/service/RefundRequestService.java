@@ -160,6 +160,51 @@ public class RefundRequestService {
         return result;
     }
 
+    @Transactional
+    public RefundRequestDto retryAutomaticRefund(UUID adminId, UUID requestId) {
+        RefundRequest request = requireStatus(requestId, RefundRequestStatus.REFUND_PENDING);
+        if (!isAutomatic(request)) {
+            throw new BadRequestException("Chỉ yêu cầu hoàn tiền tự động mới có thể thử lại qua PayOS");
+        }
+        Payment payment = paymentRepository.findById(request.getPaymentId())
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy thanh toán"));
+        if (payment.getStatus() != PaymentStatus.REFUND_PENDING) {
+            throw new BadRequestException("Thanh toán không ở trạng thái chờ hoàn tiền");
+        }
+        if (payment.getProviderRefundId() != null && !payment.getProviderRefundId().isBlank()) {
+            throw new BadRequestException("Lệnh chi đã có trên PayOS; hệ thống sẽ tiếp tục đối soát thay vì tạo lại");
+        }
+        validateEligibility(request);
+
+        PaymentGatewayService.GatewayRefund result = executeAutomaticRefund(request, payment);
+        payment.setStatus(result.status());
+        payment.setProviderRefundId(result.refundId());
+        payment.setRefundReason(request.getReason());
+        payment.setRefundFailedReason(result.failureReason());
+        if (result.status() == PaymentStatus.REFUNDED) payment.setRefundedAt(LocalDateTime.now());
+        paymentRepository.save(payment);
+
+        request.setReviewedBy(adminId);
+        request.setReviewedAt(LocalDateTime.now());
+        request.setRejectionReason(result.failureReason());
+        if (result.status() == PaymentStatus.REFUNDED) {
+            request.setStatus(RefundRequestStatus.APPROVED);
+            Booking booking = requireBooking(request.getBookingId());
+            booking.setStatus(BookingStatus.CANCELLED);
+            bookingService.releaseSeats(booking);
+            bookingRepository.save(booking);
+            notifyCustomer(request, "Hoàn tiền thành công",
+                    "PayOS/Bảo Kim đã hoàn tiền cho vé " + request.getTicketCode() + ".");
+        } else {
+            request.setStatus(RefundRequestStatus.REFUND_PENDING);
+            if (result.failureReason() == null) {
+                notifyCustomer(request, "Đang xử lý hoàn tiền",
+                        "PayOS/Bảo Kim đã tiếp nhận lệnh chi và đang xử lý.");
+            }
+        }
+        return toDto(refundRepository.save(request));
+    }
+
     public Map<String, Object> staffAccess(UUID staffId) {
         boolean leader = profileRepository.findById(staffId).map(StaffEmploymentProfile::isShiftLeader).orElse(false);
         return Map.of("staffId", staffId, "shiftLeader", leader,
@@ -431,6 +476,13 @@ public class RefundRequestService {
         Movie movie = showtime == null ? null : movieRepository.findById(showtime.getMovieId()).orElse(null);
         String refundQrImageUrl = request.getRefundQrMessageId() == null ? null
                 : messageRepository.findById(request.getRefundQrMessageId()).map(RefundMessage::getImageUrl).orElse(null);
+        Payment refundPayment = paymentRepository.findById(request.getPaymentId()).orElse(null);
+        boolean automaticRetryAvailable = isAutomatic(request)
+                && request.getStatus() == RefundRequestStatus.REFUND_PENDING
+                && refundPayment != null
+                && refundPayment.getStatus() == PaymentStatus.REFUND_PENDING
+                && (refundPayment.getProviderRefundId() == null
+                    || refundPayment.getProviderRefundId().isBlank());
         return RefundRequestDto.builder().id(request.getId()).bookingId(request.getBookingId())
                 .bookingCode(booking == null ? null : booking.getConfirmationCode()).ticketCode(request.getTicketCode())
                 .customerId(request.getCustomerId()).customerName(customer == null ? null : customer.getFullName())
@@ -442,6 +494,7 @@ public class RefundRequestService {
                 .bankBin(request.getBankBin())
                 .bankAccountNumber(request.getBankAccountNumber())
                 .bankAccountMasked(maskAccount(request.getBankAccountNumber()))
+                .automaticRetryAvailable(automaticRetryAvailable)
                 .status(request.getStatus()).requiresAdmin(request.isRequiresAdmin())
                 .ticketCheckedIn(ticketRepository.findByBookingId(request.getBookingId()).stream().anyMatch(Ticket::isCheckedIn))
                 .showtimeStart(showtime == null ? null : showtime.getStartTime()).createdAt(request.getCreatedAt())

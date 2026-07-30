@@ -77,6 +77,7 @@ export const adminService = {
   getRefundRequests: () => api.get('/api/admin/refunds').then(unwrap),
   approveRefund: (id) => api.post(`/api/admin/refunds/${id}/approve`).then(unwrap),
   rejectRefund: (id, reason) => api.post(`/api/admin/refunds/${id}/reject`, { reason }).then(unwrap),
+  retryAutomaticRefund: (id) => api.post(`/api/admin/refunds/${id}/retry-automatic`).then(unwrap),
   getAuditLogs: (params) => api.get('/api/admin/audit-logs', { params }).then(unwrap),
   getAuditActions: () => api.get('/api/admin/audit-logs/actions').then(unwrap),
 };
