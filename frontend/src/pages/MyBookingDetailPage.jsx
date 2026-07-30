@@ -89,6 +89,7 @@ const MyBookingDetailPage = () => {
   const [refundReason, setRefundReason] = useState('');
   const [refundTicketCode, setRefundTicketCode] = useState('');
   const [refundRequest, setRefundRequest] = useState(null);
+  const [automaticRefundAvailable, setAutomaticRefundAvailable] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [messages, setMessages] = useState([]);
   const [messageText, setMessageText] = useState('');
@@ -106,8 +107,9 @@ const MyBookingDetailPage = () => {
       getTickets(bookingId).catch(() => []),
       bookingApi.fetchShowtimes().catch(() => []),
       bookingApi.fetchMyRefundRequests().catch(() => null),
+      bookingApi.fetchAutomaticRefundAvailability().catch(() => null),
     ])
-      .then(([bookingDetail, ticketList, showtimeResponse, refundResponse]) => {
+      .then(([bookingDetail, ticketList, showtimeResponse, refundResponse, automaticRefundResponse]) => {
         if (!active) return;
         const rawShowtimes = showtimeResponse?.data ?? showtimeResponse ?? [];
         const showtimeMap = new Map(
@@ -122,6 +124,10 @@ const MyBookingDetailPage = () => {
         setRefundRequest(Array.isArray(refundList)
           ? refundList.find((item) => String(item.bookingId) === String(bookingId)) || null
           : null);
+        const automaticRefundData = automaticRefundResponse?.data?.data
+          ?? automaticRefundResponse?.data
+          ?? {};
+        setAutomaticRefundAvailable(Boolean(automaticRefundData.available));
         if (normalizedTickets[0]?.ticketCode) setRefundTicketCode(normalizedTickets[0].ticketCode);
         if (payosReturnedPaid && String(enrichedBooking?.status || '').toUpperCase() === 'CONFIRMED') {
           navigate('/booking/success', {
@@ -193,15 +199,20 @@ const MyBookingDetailPage = () => {
   const handleAutomaticRefund = async () => {
     setActionLoading(true);
     try {
-      const response = await bookingApi.refundBookingAutomatically(
-        bookingId, refundBankBin.trim(), refundAccountNumber.trim(), autoRefundReason.trim(),
+      const response = await bookingApi.requestRefund(
+        bookingId,
+        refundTicketCode,
+        autoRefundReason.trim(),
+        'AUTOMATIC',
+        refundBankBin.trim(),
+        refundAccountNumber.trim(),
       );
-      const result = response?.data?.data ?? response?.data;
+      const created = response?.data?.data ?? response?.data ?? null;
+      setRefundRequest(created);
       setAutoRefundOpen(false);
-      setBooking((current) => current ? { ...current, status: result?.status === 'REFUNDED' ? 'CANCELLED' : current.status } : current);
-      setSnackbar(result?.message || 'Đã tiếp nhận yêu cầu hoàn tiền tự động.');
+      setSnackbar('Đã gửi yêu cầu. PayOS/Bảo Kim chỉ chuyển tiền sau khi staff/admin duyệt.');
     } catch (err) {
-      setSnackbar(err?.message || 'Không thể hoàn tiền tự động.');
+      setSnackbar(err?.message || 'Không thể gửi yêu cầu hoàn tiền tự động.');
     } finally {
       setActionLoading(false);
     }
@@ -354,9 +365,11 @@ const MyBookingDetailPage = () => {
             )}
             {booking.status === 'CONFIRMED' && !refundRequest && (
               <>
-                <Button color="success" variant="contained" onClick={() => setAutoRefundOpen(true)}>
-                  Hoàn tiền tự động
-                </Button>
+                {automaticRefundAvailable && (
+                  <Button color="success" variant="contained" onClick={() => setAutoRefundOpen(true)}>
+                    Hoàn tiền tự động
+                  </Button>
+                )}
                 <Button color="warning" variant="outlined" onClick={() => setRefundOpen(true)}>
                   Yêu cầu hoàn tiền thủ công
                 </Button>
@@ -402,10 +415,10 @@ const MyBookingDetailPage = () => {
       </Dialog>
 
       <Dialog open={autoRefundOpen} onClose={() => !actionLoading && setAutoRefundOpen(false)} fullWidth maxWidth="sm">
-        <DialogTitle>Hoàn tiền tự động qua PayOS</DialogTitle>
+        <DialogTitle>Yêu cầu hoàn tiền tự động qua PayOS/Bảo Kim</DialogTitle>
         <DialogContent>
           <Stack spacing={2} sx={{ pt: 1 }}>
-            <Alert severity="info">PayOS sẽ chuyển tiền vào tài khoản ngân hàng bạn nhập. Chỉ khi PayOS báo thành công hệ thống mới giải phóng ghế và hủy vé.</Alert>
+            <Alert severity="info">Staff/Admin sẽ kiểm tra theo chính sách hiện tại. Chỉ sau khi được duyệt, PayOS/Bảo Kim mới chuyển tiền vào tài khoản bạn nhập.</Alert>
             <TextField label="Mã BIN ngân hàng" value={refundBankBin} onChange={(event) => setRefundBankBin(event.target.value.replace(/\D/g, '').slice(0, 10))} helperText="Ví dụ: 970422" inputProps={{ inputMode: 'numeric' }} />
             <TextField label="Số tài khoản nhận tiền" value={refundAccountNumber} onChange={(event) => setRefundAccountNumber(event.target.value.replace(/\D/g, '').slice(0, 20))} inputProps={{ inputMode: 'numeric' }} />
             <TextField multiline minRows={2} label="Lý do hoàn tiền" value={autoRefundReason} onChange={(event) => setAutoRefundReason(event.target.value)} />
@@ -413,8 +426,8 @@ const MyBookingDetailPage = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setAutoRefundOpen(false)}>Hủy</Button>
-          <Button variant="contained" color="success" onClick={handleAutomaticRefund} disabled={actionLoading || !/^\d{6,10}$/.test(refundBankBin) || !/^\d{5,20}$/.test(refundAccountNumber)}>
-            Xác nhận hoàn tiền
+          <Button variant="contained" color="success" onClick={handleAutomaticRefund} disabled={actionLoading || !refundTicketCode || !/^\d{6,10}$/.test(refundBankBin) || !/^\d{5,20}$/.test(refundAccountNumber)}>
+            Gửi yêu cầu duyệt
           </Button>
         </DialogActions>
       </Dialog>

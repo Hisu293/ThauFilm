@@ -39,6 +39,16 @@ public class RefundRequest {
     @Column(name = "refund_qr_message_id")
     private UUID refundQrMessageId;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "refund_method", nullable = false, length = 20)
+    private RefundMethod refundMethod;
+
+    @Column(name = "bank_bin", length = 10)
+    private String bankBin;
+
+    @Column(name = "bank_account_number", length = 20)
+    private String bankAccountNumber;
+
     @Column(name = "ticket_code", nullable = false, length = 20)
     private String ticketCode;
 
@@ -78,6 +88,7 @@ public class RefundRequest {
         if (id == null) id = UUID.randomUUID();
         createdAt = updatedAt = LocalDateTime.now();
         if (status == null) status = RefundRequestStatus.REQUESTED;
+        if (refundMethod == null) refundMethod = RefundMethod.MANUAL;
     }
 
     @PreUpdate

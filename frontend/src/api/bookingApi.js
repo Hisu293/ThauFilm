@@ -125,11 +125,12 @@ export const bookingApi = {
     return axiosClient.post(`/api/member/booking/${bookingId}/cancel`);
   },
 
-  requestRefund: (bookingId, ticketCode, reason) =>
-    axiosClient.post(`/api/member/booking/${bookingId}/refund-requests`, { ticketCode, reason }),
-
-  refundBookingAutomatically: (bookingId, bankBin, accountNumber, reason) =>
-    axiosClient.post(`/api/bookings/${bookingId}/refund`, { bankBin, accountNumber, reason }),
+  requestRefund: (bookingId, ticketCode, reason, refundMethod = 'MANUAL', bankBin = null, accountNumber = null) =>
+    axiosClient.post(`/api/member/booking/${bookingId}/refund-requests`, {
+      ticketCode, reason, refundMethod, bankBin, accountNumber,
+    }),
+  fetchAutomaticRefundAvailability: () =>
+    axiosClient.get('/api/bookings/refund/automatic-availability'),
 
   fetchMyRefundRequests: () => axiosClient.get('/api/member/booking/refund-requests/me'),
   fetchRefundMessages: (requestId) => axiosClient.get(`/api/member/booking/refund-requests/${requestId}/messages`),

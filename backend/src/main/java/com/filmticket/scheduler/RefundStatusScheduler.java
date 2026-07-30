@@ -12,12 +12,14 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Slf4j
 @Component
 @RequiredArgsConstructor
 public class RefundStatusScheduler {
     private final RefundHistoryRepository historyRepository;
+    private final RefundRequestRepository refundRequestRepository;
     private final BookingRepository bookingRepository;
     private final PaymentRepository paymentRepository;
     private final UserRepository userRepository;
@@ -53,6 +55,13 @@ public class RefundStatusScheduler {
                 userRepository.findById(booking.getUserId()).ifPresent(user -> refundEmailService.sendSuccess(user, booking, payment));
                 history.setStatus(RefundHistoryStatus.SUCCEEDED);
                 historyRepository.save(history);
+                refundRequestRepository.findFirstByBookingIdAndStatusIn(
+                                history.getBookingId(), List.of(RefundRequestStatus.REFUND_PENDING))
+                        .ifPresent(request -> {
+                            request.setStatus(RefundRequestStatus.APPROVED);
+                            request.setRejectionReason(null);
+                            refundRequestRepository.save(request);
+                        });
                 log.info("PayOS đã hoàn tiền thành công sau khi chờ: mã đơn đặt vé={}, mã thanh toán={}, mã chi trả={}",
                         booking.getId(), payment.getId(), history.getPayosRefundId());
             } else if (!payout.processing()) {
@@ -64,6 +73,13 @@ public class RefundStatusScheduler {
                 }
                 history.setStatus(RefundHistoryStatus.FAILED);
                 historyRepository.save(history);
+                refundRequestRepository.findFirstByBookingIdAndStatusIn(
+                                history.getBookingId(), List.of(RefundRequestStatus.REFUND_PENDING))
+                        .ifPresent(request -> {
+                            request.setRejectionReason("Chi tự động không thành công: " + payout.state()
+                                    + ". Đã chuyển sang chờ hoàn tiền thủ công.");
+                            refundRequestRepository.save(request);
+                        });
                 log.error("PayOS hoàn tiền thất bại sau khi kiểm tra: mã đơn đặt vé={}, mã chi trả={}, trạng thái={}",
                         history.getBookingId(), history.getPayosRefundId(), payout.state());
             }

@@ -140,6 +140,7 @@ WebSocket tại `/ws` có interceptor xác thực riêng và dùng cùng danh s�
 |---|---|---|
 | Google OAuth | Xác minh Google ID token | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` |
 | PayOS | Tạo thanh toán và xác minh webhook | `PAYOS_CLIENT_ID`, `PAYOS_API_KEY`, `PAYOS_CHECKSUM_KEY` |
+| PayOS/Bảo Kim Kênh chi | Hoàn tiền tự động; dùng khóa PayOS chung nếu không khai báo bộ riêng | `PAYOS_PAYOUT_ENABLED`, `PAYOS_PAYOUT_CLIENT_ID`, `PAYOS_PAYOUT_API_KEY`, `PAYOS_PAYOUT_CHECKSUM_KEY` |
 | SMTP | Email xác nhận và thông báo | `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD` |
 | Amazon S3 | Video streaming/poster và URL có thời hạn | `STREAMING_S3_BUCKET`, `STREAMING_S3_REGION`, access/secret key |
 | Cloudinary | Lưu ảnh cộng đồng | `CLOUDINARY_CLOUD_NAME`, API key/secret |

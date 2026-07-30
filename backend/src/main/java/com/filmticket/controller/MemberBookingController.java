@@ -229,7 +229,8 @@ public class MemberBookingController {
     public ResponseEntity<ApiResponse<RefundRequestDto>> requestRefund(
             @PathVariable UUID bookingId, @RequestBody RefundRequestBody request) {
         return ResponseEntity.ok(ApiResponse.success("Refund request submitted",
-                refundRequestService.requestByCustomer(getCurrentUserId(), bookingId, request.ticketCode(), request.reason())));
+                refundRequestService.requestByCustomer(getCurrentUserId(), bookingId, request.ticketCode(),
+                        request.reason(), request.refundMethod(), request.bankBin(), request.accountNumber())));
     }
 
     @Operation(summary = "List my refund requests")
@@ -261,7 +262,8 @@ public class MemberBookingController {
                 refundRequestService.customerQrMessage(getCurrentUserId(), requestId, image, content)));
     }
 
-    public record RefundRequestBody(String ticketCode, String reason) {}
+    public record RefundRequestBody(String ticketCode, String reason, String refundMethod,
+                                    String bankBin, String accountNumber) {}
     public record RefundMessageBody(String content) {}
 
     private UUID getCurrentUserId() {

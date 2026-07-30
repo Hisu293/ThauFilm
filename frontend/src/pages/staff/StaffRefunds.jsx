@@ -277,7 +277,8 @@ export default function StaffRefunds() {
           <TableBody>
             {filteredItems.map((item) => {
               const status = statusMeta[item.status] || { label: item.status, color: 'default' };
-              const needsQr = Number(item.amount || 0) >= Number(access?.refundApprovalThreshold || 200000);
+              const needsQr = item.refundMethod !== 'AUTOMATIC'
+                && Number(item.amount || 0) >= Number(access?.refundApprovalThreshold || 200000);
               return <TableRow key={item.id} hover sx={{ '& td': { py: 2 } }}>
                 <TableCell>
                   <Stack direction="row" spacing={1.25} alignItems="center">
@@ -298,6 +299,11 @@ export default function StaffRefunds() {
                 <TableCell><Typography fontWeight={900}>{money(item.amount)}</Typography></TableCell>
                 <TableCell sx={{ maxWidth: 280 }}>
                   <Typography variant="body2" sx={{ whiteSpace: 'normal' }}>{item.reason}</Typography>
+                  {item.refundMethod === 'AUTOMATIC' && (
+                    <Typography variant="caption" display="block" color="success.main">
+                      Tự động · BIN {item.bankBin} · STK {item.bankAccountNumber}
+                    </Typography>
+                  )}
                   {item.rejectionReason && <Typography variant="caption" color="error">Từ chối: {item.rejectionReason}</Typography>}
                 </TableCell>
                 <TableCell><Chip size="small" label={status.label} color={status.color} sx={{ fontWeight: 700 }} /></TableCell>

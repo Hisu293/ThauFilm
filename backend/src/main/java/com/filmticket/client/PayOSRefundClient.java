@@ -12,7 +12,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
-import org.springframework.web.util.UriUtils;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -20,7 +19,6 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
 import java.util.TreeMap;
-import java.util.UUID;
 
 @Slf4j
 @Component
@@ -31,18 +29,24 @@ public class PayOSRefundClient {
     private final ObjectMapper objectMapper;
     private final RestTemplate restTemplate = new RestTemplate();
 
-    @Value("${payos.client-id:}")
+    @Value("${payos.payout.enabled:true}")
+    private boolean enabled;
+
+    @Value("${payos.payout.client-id:${payos.client-id:}}")
     private String clientId;
 
-    @Value("${payos.api-key:}")
+    @Value("${payos.payout.api-key:${payos.api-key:}}")
     private String apiKey;
 
-    @Value("${payos.checksum-key:}")
+    @Value("${payos.payout.checksum-key:${payos.checksum-key:}}")
     private String checksumKey;
 
     public PayoutResult refund(String referenceId, BigDecimal amount, String reason,
                                String bankBin, String accountNumber) {
-        if (clientId.isBlank() || apiKey.isBlank() || checksumKey.isBlank()) {
+        if (!enabled) {
+            throw new BadRequestException("Hoàn tiền tự động qua PayOS/Bảo Kim đang tắt");
+        }
+        if (isBlank(clientId) || isBlank(apiKey) || isBlank(checksumKey)) {
             throw new BadRequestException("PayOS chưa được cấu hình đầy đủ để hoàn tiền tự động");
         }
 
@@ -104,6 +108,9 @@ public class PayOSRefundClient {
     }
 
     public PayoutResult getStatus(String payoutId) {
+        if (!enabled || isBlank(clientId) || isBlank(apiKey)) {
+            throw new BadRequestException("Kênh chi PayOS/Bảo Kim chưa được cấu hình");
+        }
         if (payoutId == null || payoutId.isBlank()) {
             throw new BadRequestException("Mã lệnh hoàn tiền PayOS không hợp lệ");
         }
@@ -131,8 +138,7 @@ public class PayOSRefundClient {
 
     private String sign(Map<String, Object> data) {
         String raw = data.entrySet().stream()
-                .map(entry -> UriUtils.encode(entry.getKey(), StandardCharsets.UTF_8)
-                        + "=" + UriUtils.encode(String.valueOf(entry.getValue()), StandardCharsets.UTF_8))
+                .map(entry -> entry.getKey() + "=" + entry.getValue())
                 .reduce((left, right) -> left + "&" + right)
                 .orElse("");
         try {
@@ -155,6 +161,14 @@ public class PayOSRefundClient {
                 .replaceAll("\\s+", " ").trim();
         return (value.isBlank() ? "Hoan tien ve xem phim" : value).substring(0,
                 Math.min(100, (value.isBlank() ? "Hoan tien ve xem phim" : value).length()));
+    }
+
+    private boolean isBlank(String value) {
+        return value == null || value.isBlank();
+    }
+
+    public boolean isAvailable() {
+        return enabled && !isBlank(clientId) && !isBlank(apiKey) && !isBlank(checksumKey);
     }
 
     public record PayoutResult(String payoutId, String state, String responseJson) {

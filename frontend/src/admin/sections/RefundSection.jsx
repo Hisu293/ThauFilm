@@ -259,12 +259,15 @@ const RefundSection = () => {
                   <Stack spacing={0.4}>
                     <Stack direction="row" spacing={0.5} alignItems="center"><PersonRoundedIcon sx={{ fontSize: 17 }} color="action" /><Typography variant="body2">{item.staffName || 'Chưa chỉ định'}</Typography></Stack>
                     <Typography variant="caption" color="text.secondary" sx={{ overflowWrap: 'anywhere' }}>{item.reason || 'Không có lý do'}</Typography>
+                    {item.refundMethod === 'AUTOMATIC' && <Typography variant="caption" color="success.main">Tự động · BIN {item.bankBin} · STK {item.bankAccountNumber}</Typography>}
                     {item.rejectionReason && <Typography variant="caption" color="error">Từ chối: {item.rejectionReason}</Typography>}
                   </Stack>
                 </TableCell>
                 <TableCell><Typography noWrap fontWeight={950} color={item.status === 'PENDING_APPROVAL' ? 'warning.main' : 'text.primary'}>{money(item.amount)}</Typography></TableCell>
                 <TableCell><Stack spacing={0.75} alignItems="flex-start">
-                  {item.refundQrImageUrl
+                  {item.refundMethod === 'AUTOMATIC'
+                    ? <Chip size="small" color="success" variant="outlined" label="PayOS/Bảo Kim" />
+                    : item.refundQrImageUrl
                     ? <Button size="small" variant="outlined" startIcon={<QrCode2RoundedIcon />} href={item.refundQrImageUrl} target="_blank" rel="noreferrer" sx={{ minWidth: 0, whiteSpace: 'nowrap' }}>Mở QR</Button>
                     : <Chip size="small" color="error" variant="outlined" label="Thiếu QR" />}
                   <Chip size="small" label={meta.label} color={meta.color} sx={{ maxWidth: '100%', fontWeight: 750, '& .MuiChip-label': { overflow: 'hidden', textOverflow: 'ellipsis' } }} />
@@ -307,7 +310,7 @@ const RefundSection = () => {
           </Box> : <Alert severity="error">Không có QR nhận tiền. Yêu cầu staff liên hệ khách trước khi duyệt.</Alert>}
         </Stack>
       </DialogContent>
-      <DialogActions sx={{ p: 2 }}><Button onClick={() => setApproving(null)}>Quay lại</Button><Button variant="contained" color="success" startIcon={<PaidRoundedIcon />} disabled={busy || !approving?.refundQrImageUrl} onClick={approve}>Xác nhận hoàn tiền</Button></DialogActions>
+      <DialogActions sx={{ p: 2 }}><Button onClick={() => setApproving(null)}>Quay lại</Button><Button variant="contained" color="success" startIcon={<PaidRoundedIcon />} disabled={busy || (approving?.refundMethod !== 'AUTOMATIC' && !approving?.refundQrImageUrl)} onClick={approve}>Xác nhận hoàn tiền</Button></DialogActions>
     </Dialog>
 
     <Dialog open={Boolean(rejecting)} onClose={() => !busy && setRejecting(null)} fullWidth maxWidth="sm">

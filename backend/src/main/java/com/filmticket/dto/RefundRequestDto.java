@@ -1,6 +1,7 @@
 package com.filmticket.dto;
 
 import com.filmticket.entity.RefundRequestStatus;
+import com.filmticket.entity.RefundMethod;
 import lombok.Builder;
 import lombok.Data;
 
@@ -24,6 +25,10 @@ public class RefundRequestDto {
     private String reason;
     private String rejectionReason;
     private String refundQrImageUrl;
+    private RefundMethod refundMethod;
+    private String bankBin;
+    private String bankAccountNumber;
+    private String bankAccountMasked;
     private RefundRequestStatus status;
     private boolean requiresAdmin;
     private boolean ticketCheckedIn;
