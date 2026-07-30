@@ -5,6 +5,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
+import java.math.BigDecimal;
 
 @Getter
 @Setter
@@ -27,4 +28,15 @@ public class CinemaRoomRequest {
     @NotNull(message = "Seats per row is required")
     @Min(value = 1, message = "Seats per row must be greater than 0")
     private Integer seatsPerRow;
+
+    @Min(0)
+    private Integer standardSeats;
+    @Min(0)
+    private Integer vipSeats;
+    @Min(0)
+    private Integer coupleSeats;
+
+    private BigDecimal standardPrice;
+    private BigDecimal vipPrice;
+    private BigDecimal couplePrice;
 }

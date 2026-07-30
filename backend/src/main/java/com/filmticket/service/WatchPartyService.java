@@ -7,6 +7,7 @@ import com.filmticket.entity.Payment;
 import com.filmticket.entity.User;
 import com.filmticket.exception.BadRequestException;
 import com.filmticket.repository.MovieRepository;
+import com.filmticket.repository.PaymentRepository;
 import com.filmticket.repository.UserRepository;
 import com.filmticket.websocket.RealtimeEventService;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +35,8 @@ public class WatchPartyService {
     private final PaymentGatewayService paymentGatewayService;
     private final MovieStreamService movieStreamService;
     private final AuditLogService auditLogService;
+    private final PaymentRepository paymentRepository;
+    private final RefundRequestService refundRequestService;
     private final Map<UUID, WatchPartyRoom> rooms = new ConcurrentHashMap<>();
     private final Map<String, PendingWatchPartyPayment> pendingPayments = new ConcurrentHashMap<>();
 
@@ -75,6 +78,7 @@ public class WatchPartyService {
                     .status(com.filmticket.entity.PaymentStatus.PENDING)
                     .transactionId(UUID.randomUUID().toString())
                     .build();
+            payment = paymentRepository.save(payment);
             String partyPath = "/watch-party/" + room.id;
             PaymentGatewayService.GatewayPayment gatewayPayment = paymentGatewayService.createGatewayPayment(
                     "PAYOS",
@@ -83,10 +87,17 @@ public class WatchPartyService {
                     partyPath,
                     partyPath
             );
+            payment.setProviderCheckoutId(gatewayPayment.checkoutId());
+            payment.setProviderPaymentId(gatewayPayment.paymentId());
+            payment.setCheckoutUrl(gatewayPayment.checkoutUrl());
+            payment.setQrCode(gatewayPayment.qrCode());
+            payment.setTransactionId(gatewayPayment.checkoutId());
+            paymentRepository.save(payment);
             member.checkoutUrl = gatewayPayment.checkoutUrl();
             member.qrCode = gatewayPayment.qrCode();
             member.checkoutId = gatewayPayment.checkoutId();
             member.paymentId = gatewayPayment.paymentId();
+            member.paymentRecordId = payment.getId();
             pendingPayments.put(gatewayPayment.checkoutId(), new PendingWatchPartyPayment(room.id, userId));
             pendingPayments.put(gatewayPayment.paymentId(), new PendingWatchPartyPayment(room.id, userId));
             WatchPartyDto.Response response = toResponse(room, userId);
@@ -139,6 +150,19 @@ public class WatchPartyService {
                 realtimeEventService.sendWatchPartyEvent(room.id, "WATCH_PARTY_UPDATED", toResponse(room, userId));
             }
             return toResponse(room, userId);
+        }
+    }
+
+    public void requestRefund(UUID roomId, UUID userId, String method, String bankBin, String accountNumber) {
+        WatchPartyRoom room = requireRoom(roomId);
+        synchronized (room) {
+            WatchPartyMember member = ensureMember(room, userId);
+            if (!member.paid || member.paymentRecordId == null)
+                throw new BadRequestException("Bạn chưa thanh toán Watch Party");
+            if (room.openedForWatch)
+                throw new BadRequestException("Phòng đã mở phim nên không thể hoàn tiền");
+            refundRequestService.requestForWatchParty(
+                    userId, roomId, member.paymentRecordId, method, bankBin, accountNumber);
         }
     }
 
@@ -300,6 +324,14 @@ public class WatchPartyService {
             member.paymentId = paymentId;
             pendingPayments.remove(paymentId);
         }
+        if (member.paymentRecordId != null) {
+            paymentRepository.findById(member.paymentRecordId).ifPresent(payment -> {
+                payment.setStatus(com.filmticket.entity.PaymentStatus.PAID);
+                payment.setPaidAt(java.time.LocalDateTime.now());
+                payment.setProviderPaymentId(paymentId);
+                paymentRepository.save(payment);
+            });
+        }
     }
 
     private String blankToNull(String value) {
@@ -348,6 +380,7 @@ public class WatchPartyService {
         private String qrCode;
         private String checkoutId;
         private String paymentId;
+        private UUID paymentRecordId;
 
         private WatchPartyMember(User user, boolean creator) {
             this.user = user;

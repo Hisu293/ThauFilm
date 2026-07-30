@@ -33,6 +33,7 @@ public class RefundRequestService {
     private final StaffEmploymentProfileRepository profileRepository;
     private final ShowtimeRepository showtimeRepository;
     private final MovieRepository movieRepository;
+    private final OnlineMovieViewRepository onlineMovieViewRepository;
     private final PaymentGatewayService paymentGatewayService;
     private final PayOSRefundClient payOSRefundClient;
     private final RefundHistoryRepository refundHistoryRepository;
@@ -86,6 +87,57 @@ public class RefundRequestService {
         return toDto(request);
     }
 
+    @Transactional
+    public RefundRequestDto requestForCancelledGroupBooking(UUID bookingId, String reason) {
+        Booking booking = requireBooking(bookingId);
+        Payment payment = paymentRepository.findByBookingId(bookingId)
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy thanh toán của thành viên"));
+        if (payment.getStatus() != PaymentStatus.PAID) {
+            throw new BadRequestException("Thành viên chưa có khoản thanh toán cần hoàn");
+        }
+        Optional<RefundRequest> existing = refundRepository.findFirstByBookingIdAndStatusIn(bookingId, ACTIVE);
+        if (existing.isPresent()) return toDto(existing.get());
+
+        RefundRequest request = refundRepository.save(RefundRequest.builder()
+                .bookingId(bookingId).paymentId(payment.getId()).customerId(booking.getUserId())
+                .ticketCode("SYS-GROUP-" + bookingId.toString().substring(0, 8).toUpperCase(Locale.ROOT))
+                .amount(payment.getAmount()).refundMethod(RefundMethod.MANUAL)
+                .reason(reason).ticketCheckedIn(false).requiresAdmin(true)
+                .status(RefundRequestStatus.REQUESTED).build());
+        saveMessage(request, booking.getUserId(), "SYSTEM", reason);
+        notifyShiftLeaders("Nhóm đã hủy/hết hạn cần hoàn tiền",
+                "Có khoản thanh toán " + payment.getAmount() + "đ đang chờ Staff Trưởng xác minh.");
+        notifyCustomer(request, "Đã tạo yêu cầu hoàn tiền",
+                "Yêu cầu đang chờ Staff Trưởng xác minh trước khi chuyển Admin duyệt.");
+        return toDto(request);
+    }
+
+    @Transactional
+    public RefundRequestDto requestForWatchParty(UUID customerId, UUID roomId, UUID paymentId,
+                                                  String refundMethod, String bankBin, String accountNumber) {
+        RefundMethod method = parseRefundMethod(refundMethod);
+        if (method == RefundMethod.AUTOMATIC && !payOSRefundClient.isAvailable())
+            throw new BadRequestException("Kênh chi PayOS/Bảo Kim chưa sẵn sàng");
+        validateDestination(method, bankBin, accountNumber);
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy thanh toán Watch Party"));
+        if (payment.getStatus() != PaymentStatus.PAID)
+            throw new BadRequestException("Thanh toán Watch Party không đủ điều kiện hoàn");
+        Optional<RefundRequest> existing = refundRepository.findFirstByBookingIdAndStatusIn(paymentId, ACTIVE);
+        if (existing.isPresent()) return toDto(existing.get());
+        RefundRequest request = refundRepository.save(RefundRequest.builder()
+                .bookingId(paymentId).paymentId(paymentId).customerId(customerId)
+                .ticketCode("SYS-WATCH-" + roomId.toString().substring(0, 8).toUpperCase(Locale.ROOT))
+                .amount(payment.getAmount()).refundMethod(method)
+                .bankBin(method == RefundMethod.AUTOMATIC ? bankBin.trim() : null)
+                .bankAccountNumber(method == RefundMethod.AUTOMATIC ? accountNumber.trim() : null)
+                .reason("Khách hàng yêu cầu hoàn tiền phòng xem phim nhóm")
+                .ticketCheckedIn(false).requiresAdmin(true).status(RefundRequestStatus.REQUESTED).build());
+        saveMessage(request, customerId, "MEMBER", request.getReason());
+        notifyShiftLeaders("Watch Party cần hoàn tiền", "Yêu cầu đang chờ Staff Trưởng xác minh.");
+        return toDto(request);
+    }
+
     @Transactional(readOnly = true)
     public List<RefundRequestDto> customerRequests(UUID customerId) {
         return enrich(refundRepository.findByCustomerIdOrderByCreatedAtDesc(customerId));
@@ -113,16 +165,12 @@ public class RefundRequestService {
         request.setStaffId(staffId);
         request.setReviewedBy(staffId);
         request.setReviewedAt(LocalDateTime.now());
-        if (request.getAmount().compareTo(staffApprovalThreshold) >= 0) {
-            request.setRequiresAdmin(true);
-            request.setStatus(RefundRequestStatus.PENDING_APPROVAL);
-            RefundRequest saved = refundRepository.save(request);
+        request.setRequiresAdmin(true);
+        request.setStatus(RefundRequestStatus.PENDING_APPROVAL);
+        RefundRequest saved = refundRepository.save(request);
             notifyAdmins("Yêu cầu hoàn tiền chờ duyệt", "Yêu cầu " + saved.getTicketCode() + " trị giá " + saved.getAmount() + "đ cần Admin duyệt");
             notifyCustomer(saved, "Yêu cầu đang chờ Admin duyệt", "Staff trưởng đã kiểm tra và chuyển yêu cầu hoàn tiền lên Admin.");
-            return toDto(saved);
-        }
-        request.setRequiresAdmin(false);
-        return completeRefund(request, staffId);
+        return toDto(saved);
     }
 
     @Transactional
@@ -189,10 +237,12 @@ public class RefundRequestService {
         request.setRejectionReason(result.failureReason());
         if (result.status() == PaymentStatus.REFUNDED) {
             request.setStatus(RefundRequestStatus.APPROVED);
-            Booking booking = requireBooking(request.getBookingId());
-            booking.setStatus(BookingStatus.CANCELLED);
-            bookingService.releaseSeats(booking);
-            bookingRepository.save(booking);
+            if (!request.getTicketCode().startsWith("SYS-WATCH-")) {
+                Booking booking = requireBooking(request.getBookingId());
+                booking.setStatus(BookingStatus.CANCELLED);
+                bookingService.releaseSeats(booking);
+                bookingRepository.save(booking);
+            }
             notifyCustomer(request, "Hoàn tiền thành công",
                     "PayOS/Bảo Kim đã hoàn tiền cho vé " + request.getTicketCode() + ".");
         } else {
@@ -297,6 +347,8 @@ public class RefundRequestService {
         if (reason.length() < 10) throw new BadRequestException("Lý do hoàn tiền cần ít nhất 10 ký tự");
         boolean checkedIn = tickets.stream().anyMatch(Ticket::isCheckedIn);
         if (checkedIn) throw new BadRequestException("Vé đã check-in nên không đủ điều kiện hoàn tiền");
+        if (onlineMovieViewRepository.existsByBookingId(booking.getId()))
+            throw new BadRequestException("Vé xem phim online đã được sử dụng nên không thể hoàn tiền");
         Showtime showtime = showtimeRepository.findById(booking.getShowtimeId()).orElse(null);
         if (showtime != null && !showtime.getStartTime().isAfter(LocalDateTime.now()))
             throw new BadRequestException("Suất chiếu đã bắt đầu nên không đủ điều kiện hoàn tiền");
@@ -428,10 +480,17 @@ public class RefundRequestService {
     }
 
     private void validateEligibility(RefundRequest request) {
+        if (request.getTicketCode() != null && request.getTicketCode().startsWith("SYS-WATCH-")) return;
         Booking booking = requireBooking(request.getBookingId());
+        boolean cancelledGroupRefund = request.getTicketCode() != null
+                && request.getTicketCode().startsWith("SYS-GROUP-")
+                && List.of(BookingStatus.EXPIRED, BookingStatus.CANCELLED).contains(booking.getStatus());
+        if (cancelledGroupRefund) return;
         if (booking.getStatus() != BookingStatus.CONFIRMED) throw new BadRequestException("Booking không còn ở trạng thái xác nhận");
         if (ticketRepository.findByBookingId(booking.getId()).stream().anyMatch(Ticket::isCheckedIn))
             throw new BadRequestException("Vé đã check-in nên không thể hoàn tiền");
+        if (onlineMovieViewRepository.existsByBookingId(booking.getId()))
+            throw new BadRequestException("Vé xem phim online đã được sử dụng nên không thể hoàn tiền");
         Showtime showtime = showtimeRepository.findById(booking.getShowtimeId()).orElse(null);
         if (showtime != null && !showtime.getStartTime().isAfter(LocalDateTime.now()))
             throw new BadRequestException("Suất chiếu đã bắt đầu nên không thể hoàn tiền");

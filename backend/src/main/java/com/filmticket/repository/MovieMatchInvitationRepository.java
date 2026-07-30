@@ -5,4 +5,5 @@ import java.util.List;
 import java.util.UUID;
 public interface MovieMatchInvitationRepository extends JpaRepository<MovieMatchInvitation, UUID> {
     List<MovieMatchInvitation> findByMatchIdOrderByCreatedAtDesc(UUID matchId);
+    List<MovieMatchInvitation> findByMatchId(UUID matchId);
 }

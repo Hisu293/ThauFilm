@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Avatar, Box, Button, Chip, CircularProgress, Collapse, Container, IconButton, Paper, Stack, TextField, Typography } from '@mui/material';
+import { Alert, Avatar, Box, Button, Chip, CircularProgress, Collapse, Container, IconButton, MenuItem, Paper, Stack, TextField, Typography } from '@mui/material';
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
 import ContentCopyRoundedIcon from '@mui/icons-material/ContentCopyRounded';
 import FavoriteRoundedIcon from '@mui/icons-material/FavoriteRounded';
@@ -55,6 +55,9 @@ export default function WatchPartyPage() {
   const [inviteCopied, setInviteCopied] = useState(false);
   const [streamUrl, setStreamUrl] = useState('');
   const [membersExpanded, setMembersExpanded] = useState(false);
+  const [refundMethod, setRefundMethod] = useState('MANUAL');
+  const [bankBin, setBankBin] = useState('');
+  const [accountNumber, setAccountNumber] = useState('');
 
   const inviteUrl = room ? `${getPublicAppUrl()}${room.invitePath || `/watch-party/${room.id}`}` : '';
   const me = room?.members?.find((member) => member.currentUser);
@@ -252,6 +255,19 @@ export default function WatchPartyPage() {
     realtime.current?.sendReaction(reaction);
   };
 
+  const requestRefund = async () => {
+    setBusy(true);
+    try {
+      await watchPartyService.refund(roomId, { refundMethod, bankBin, accountNumber });
+      setError('');
+      window.alert('Đã gửi yêu cầu đến Staff Trưởng. Sau khi xác minh, yêu cầu sẽ được chuyển Admin duyệt.');
+    } catch (err) {
+      setError(err.message || 'Không thể gửi yêu cầu hoàn tiền.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (loading) return <Box py={12} textAlign="center"><CircularProgress /></Box>;
   if (!room) return <Container sx={{ py: 6 }}><Alert severity="error">{error || 'Không tìm thấy phòng xem nhóm.'}</Alert></Container>;
 
@@ -319,6 +335,23 @@ export default function WatchPartyPage() {
               <Alert severity="info" sx={{ mb: 2 }}>
                 Mời bạn bè bằng link, mỗi người thanh toán {money(room.pricePerMember)}. Khi tất cả đã thanh toán, cả phòng có thể bấm xem và video sẽ đồng bộ.
               </Alert>
+            )}
+            {me?.paid && !room.readyToWatch && (
+              <Paper sx={{ p: 2, mb: 2 }}>
+                <Typography fontWeight={800} mb={1}>Yêu cầu hoàn tiền Watch Party</Typography>
+                <Stack direction={{ xs: 'column', md: 'row' }} spacing={1}>
+                  <TextField select size="small" label="Phương thức" value={refundMethod}
+                    onChange={(e) => setRefundMethod(e.target.value)}>
+                    <MenuItem value="MANUAL">Thủ công</MenuItem>
+                    <MenuItem value="AUTOMATIC">Tự động PayOS/Bảo Kim</MenuItem>
+                  </TextField>
+                  {refundMethod === 'AUTOMATIC' && <>
+                    <TextField size="small" label="BIN ngân hàng" value={bankBin} onChange={(e) => setBankBin(e.target.value)} />
+                    <TextField size="small" label="Số tài khoản" value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} />
+                  </>}
+                  <Button color="warning" variant="contained" disabled={busy} onClick={requestRefund}>Gửi yêu cầu</Button>
+                </Stack>
+              </Paper>
             )}
             <Box
               sx={{

@@ -120,6 +120,7 @@ public class MovieMatchInteractionService {
         actionRepository.deleteByActorIdAndTargetIdOrActorIdAndTargetId(userId, otherId, otherId, userId);
         match.setStatus(MovieMatch.Status.CANCELLED); match.setEndedAt(LocalDateTime.now()); match.setEndedBy(userId);
         matchRepository.save(match);
+        groupBookingService.cancelForMatch(matchId);
         realtimeEventService.notifyUser(otherId, "MATCH_CANCELLED", "Match đã kết thúc",
                 displayName(requireUser(userId)) + " đã hủy match", "/intelligence");
     }
@@ -134,6 +135,7 @@ public class MovieMatchInteractionService {
         actionRepository.deleteByActorIdAndTargetIdOrActorIdAndTargetId(userId, blockedId, blockedId, userId);
         match.setStatus(MovieMatch.Status.BLOCKED); match.setEndedAt(LocalDateTime.now()); match.setEndedBy(userId);
         matchRepository.save(match);
+        groupBookingService.cancelForMatch(matchId);
     }
 
     @Transactional

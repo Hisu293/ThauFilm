@@ -222,10 +222,17 @@ export const TheatersSection = ({ crud }) => {
   );
 };
 
+const EMPTY_ROOM_FORM = {
+  theaterId: '', name: '', type: 'STANDARD', rowsCount: 8, seatsPerRow: 10,
+  standardSeats: 20, vipSeats: 20, coupleSeats: 40,
+  standardPrice: 90000, vipPrice: 120000, couplePrice: 220000,
+  status: 'ACTIVE',
+};
+
 export const RoomsSection = ({ crud, theaters, getTheaterName }) => {
   const [dialog, setDialog] = useState(null);
   const [expandedRoom, setExpandedRoom] = useState(null);
-  const [form, setForm] = useState({ theaterId: '', name: '', type: 'STANDARD', rowsCount: 8, seatsPerRow: 10, status: 'ACTIVE' });
+  const [form, setForm] = useState(EMPTY_ROOM_FORM);
   const [page, setPage] = useState(1);
 
   // Chỉ hiện rạp đang hoạt động (status === 'ACTIVE')
@@ -242,13 +249,13 @@ export const RoomsSection = ({ crud, theaters, getTheaterName }) => {
   const save = async () => {
     try {
       if (dialog === 'add') {
-        await crud.add({ theaterId: String(form.theaterId), name: form.name, type: form.type ?? 'STANDARD', rowsCount: form.rowsCount, seatsPerRow: form.seatsPerRow, status: form.status ?? 'ACTIVE' });
+        await crud.add({ ...form, theaterId: String(form.theaterId), type: form.type ?? 'STANDARD', status: form.status ?? 'ACTIVE' });
       } else {
         // PUT /api/admin/rooms/{roomId} — gửi name + type + status
         await crud.updateRoom(dialog, { name: form.name, type: form.type, status: form.status });
       }
       setDialog(null);
-      setForm({ theaterId: activeTheaters[0]?.id || '', name: '', type: 'STANDARD', rowsCount: 8, seatsPerRow: 10, status: 'ACTIVE' });
+      setForm({ ...EMPTY_ROOM_FORM, theaterId: activeTheaters[0]?.id || '' });
     } catch (err) {
       console.error('Lỗi khi lưu phòng:', err);
     }
@@ -257,7 +264,7 @@ export const RoomsSection = ({ crud, theaters, getTheaterName }) => {
   if (crud.loading) {
     return (
       <>
-        <SectionHeader title="Phòng chiếu" subtitle="Thêm phòng và cấu hình ghế" onAction={() => { setForm({ theaterId: activeTheaters[0]?.id || '', name: '', type: 'STANDARD', rowsCount: 8, seatsPerRow: 10, status: 'ACTIVE' }); setDialog('add'); }} actionLabel="Thêm phòng" />
+        <SectionHeader title="Phòng chiếu" subtitle="Thêm phòng và cấu hình ghế" onAction={() => { setForm({ ...EMPTY_ROOM_FORM, theaterId: activeTheaters[0]?.id || '' }); setDialog('add'); }} actionLabel="Thêm phòng" />
         <Box sx={{ textAlign: 'center', py: 4, color: 'text.secondary' }}>Đang tải...</Box>
       </>
     );
@@ -266,7 +273,7 @@ export const RoomsSection = ({ crud, theaters, getTheaterName }) => {
   if (crud.error) {
     return (
       <>
-        <SectionHeader title="Phòng chiếu" subtitle="Thêm phòng và cấu hình ghế" onAction={() => { setForm({ theaterId: activeTheaters[0]?.id || '', name: '', type: 'STANDARD', rowsCount: 8, seatsPerRow: 10, status: 'ACTIVE' }); setDialog('add'); }} actionLabel="Thêm phòng" />
+        <SectionHeader title="Phòng chiếu" subtitle="Thêm phòng và cấu hình ghế" onAction={() => { setForm({ ...EMPTY_ROOM_FORM, theaterId: activeTheaters[0]?.id || '' }); setDialog('add'); }} actionLabel="Thêm phòng" />
         <Box sx={{ textAlign: 'center', py: 4, color: 'error.main' }}>
           {crud.error}
           <Button size="small" onClick={crud.reload} sx={{ ml: 2 }}>
@@ -279,7 +286,7 @@ export const RoomsSection = ({ crud, theaters, getTheaterName }) => {
 
   return (
     <>
-      <SectionHeader title="Phòng chiếu" subtitle="Thêm phòng và cấu hình ghế" onAction={() => { setForm({ theaterId: activeTheaters[0]?.id || '', name: '', type: 'STANDARD', rowsCount: 8, seatsPerRow: 10, status: 'ACTIVE' }); setDialog('add'); }} actionLabel="Thêm phòng" />
+      <SectionHeader title="Phòng chiếu" subtitle="Thêm phòng và cấu hình ghế" onAction={() => { setForm({ ...EMPTY_ROOM_FORM, theaterId: activeTheaters[0]?.id || '' }); setDialog('add'); }} actionLabel="Thêm phòng" />
       <Box className="admin-panel admin-animate-in" sx={{ mb: 3 }}>
         <TableContainer>
           <Table size="small">
@@ -341,6 +348,16 @@ export const RoomsSection = ({ crud, theaters, getTheaterName }) => {
             <Stack key="dims" direction="row" spacing={2}>
               <TextField label="Số hàng ghế" type="number" value={form.rowsCount} onChange={(e) => setForm({ ...form, rowsCount: Number(e.target.value) })} sx={{ flex: 1 }} />
               <TextField label="Ghế mỗi hàng" type="number" value={form.seatsPerRow} onChange={(e) => setForm({ ...form, seatsPerRow: Number(e.target.value) })} sx={{ flex: 1 }} />
+            </Stack>
+            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+              <TextField label="Số ghế thường" type="number" value={form.standardSeats} onChange={(e) => setForm({ ...form, standardSeats: Number(e.target.value) })} />
+              <TextField label="Số ghế VIP" type="number" value={form.vipSeats} onChange={(e) => setForm({ ...form, vipSeats: Number(e.target.value) })} />
+              <TextField label="Số ghế đôi" type="number" value={form.coupleSeats} onChange={(e) => setForm({ ...form, coupleSeats: Number(e.target.value) })} />
+            </Stack>
+            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+              <TextField label="Giá ghế thường" type="number" value={form.standardPrice} onChange={(e) => setForm({ ...form, standardPrice: Number(e.target.value) })} />
+              <TextField label="Giá ghế VIP" type="number" value={form.vipPrice} onChange={(e) => setForm({ ...form, vipPrice: Number(e.target.value) })} />
+              <TextField label="Giá ghế đôi" type="number" value={form.couplePrice} onChange={(e) => setForm({ ...form, couplePrice: Number(e.target.value) })} />
             </Stack>
           </>
         ) : (

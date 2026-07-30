@@ -4,6 +4,7 @@ import com.filmticket.dto.CinemaRoomRequest;
 import com.filmticket.dto.CinemaRoomResponse;
 import com.filmticket.dto.CinemaRoomUpdateRequest;
 import com.filmticket.dto.SeatResponse;
+import com.filmticket.dto.SeatTypePriceConfigRequest;
 import com.filmticket.entity.CinemaRoom;
 import com.filmticket.entity.Seat;
 import com.filmticket.exception.BadRequestException;
@@ -30,6 +31,7 @@ public class CinemaRoomService {
     private final SeatRepository seatRepository;
     private final TheaterRepository theaterRepository;
     private final AuditLogService auditLogService;
+    private final SeatTypePriceConfigService seatTypePriceConfigService;
 
     private CinemaRoomResponse convertToResponse(CinemaRoom room) {
         return CinemaRoomResponse.builder()
@@ -82,6 +84,14 @@ public class CinemaRoomService {
         }
 
         int totalCapacity = request.getRowsCount() * request.getSeatsPerRow();
+        boolean customSeatCounts = request.getStandardSeats() != null
+                || request.getVipSeats() != null || request.getCoupleSeats() != null;
+        int standardSeats = request.getStandardSeats() == null ? 0 : request.getStandardSeats();
+        int vipSeats = request.getVipSeats() == null ? 0 : request.getVipSeats();
+        int coupleSeats = request.getCoupleSeats() == null ? 0 : request.getCoupleSeats();
+        if (customSeatCounts && standardSeats + vipSeats + coupleSeats != totalCapacity) {
+            throw new BadRequestException("Tổng số ghế thường, VIP và đôi phải bằng sức chứa phòng");
+        }
 
         CinemaRoom room = CinemaRoom.builder()
                 .name(request.getName())
@@ -100,14 +110,11 @@ public class CinemaRoomService {
             String rowName = String.valueOf((char) (startRow + i));
 
             for (int j = 1; j <= request.getSeatsPerRow(); j++) {
-                String seatType;
-                if (i >= 4) {
-                    seatType = "COUPLE";
-                } else if (i >= 2) {
-                    seatType = "VIP";
-                } else {
-                    seatType = "STANDARD";
-                }
+                int seatIndex = i * request.getSeatsPerRow() + j;
+                String seatType = customSeatCounts
+                        ? seatIndex <= standardSeats ? "STANDARD"
+                        : seatIndex <= standardSeats + vipSeats ? "VIP" : "COUPLE"
+                        : i >= 4 ? "COUPLE" : i >= 2 ? "VIP" : "STANDARD";
 
                 Seat.Type type = Seat.Type.fromStorageValue(seatType);
 
@@ -124,6 +131,9 @@ public class CinemaRoomService {
         }
 
         seatRepository.saveAll(seats);
+        updateSeatPrice("STANDARD", request.getStandardPrice());
+        updateSeatPrice("VIP", request.getVipPrice());
+        updateSeatPrice("COUPLE", request.getCouplePrice());
         auditLogService.success(AuditLogService.AuditCommand.builder()
                 .action(AuditAction.CINEMA_ROOM_CREATED).targetType("CINEMA_ROOM")
                 .targetId(savedRoom.getId().toString())
@@ -133,6 +143,13 @@ public class CinemaRoomService {
                 .metadata(Map.of("sốHàng", request.getRowsCount(), "sốGhếMỗiHàng", request.getSeatsPerRow(),
                         "tổngSốGhế", seats.size())).build());
         return convertToResponse(savedRoom);
+    }
+
+    private void updateSeatPrice(String seatType, java.math.BigDecimal price) {
+        if (price == null) return;
+        if (price.signum() <= 0) throw new BadRequestException("Giá ghế phải lớn hơn 0");
+        seatTypePriceConfigService.upsert(SeatTypePriceConfigRequest.builder()
+                .seatType(seatType).price(price).build());
     }
 
     @Transactional

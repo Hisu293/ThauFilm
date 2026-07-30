@@ -30,6 +30,7 @@ public class GroupBookingService {
     private final SeatRepository seatRepository;
     private final PaymentRepository paymentRepository;
     private final TicketRepository ticketRepository;
+    private final ShowtimeRepository showtimeRepository;
     private final UserRepository userRepository;
     private final RealtimeEventService realtimeEventService;
     private final BookingService bookingService;
@@ -37,6 +38,7 @@ public class GroupBookingService {
     private final GroupBookingRealtimeService groupBookingRealtimeService;
     private final LoyaltyService loyaltyService;
     private final AuditLogService auditLogService;
+    private final RefundRequestService refundRequestService;
 
     @Transactional
     public GroupBooking createForAcceptedInvitation(MovieMatchInvitation invitation) {
@@ -64,6 +66,25 @@ public class GroupBookingService {
     @Transactional(readOnly = true)
     public Optional<GroupBooking> findByInvitationId(UUID invitationId) {
         return groupBookingRepository.findByInvitationId(invitationId);
+    }
+
+    @Transactional
+    public void cancelForMatch(UUID matchId) {
+        invitationRepository.findByMatchId(matchId).stream()
+                .map(MovieMatchInvitation::getId)
+                .map(groupBookingRepository::findByInvitationId)
+                .flatMap(Optional::stream)
+                .filter(group -> !List.of(GroupBookingStatus.EXPIRED, GroupBookingStatus.CANCELLED)
+                        .contains(group.getStatus()))
+                .filter(group -> showtimeRepository.findById(group.getShowtimeId())
+                        .map(showtime -> showtime.getStartTime().isAfter(LocalDateTime.now()))
+                        .orElse(false))
+                .forEach(group -> {
+                    expire(group);
+                    group.setStatus(GroupBookingStatus.CANCELLED);
+                    groupBookingRepository.save(group);
+                    broadcastUpdate(group);
+                });
     }
 
     @Transactional
@@ -338,12 +359,9 @@ public class GroupBookingService {
     private void expire(GroupBooking group) {
         for (GroupBookingMember member : memberRepository.findByGroupBookingIdOrderByCreatedAtAsc(group.getId())) {
             if (member.getPaymentStatus() == GroupMemberPaymentStatus.PAID) {
-                paymentRepository.findByBookingId(member.getBookingId()).ifPresent(payment -> {
-                    payment.setStatus(PaymentStatus.REFUNDED);
-                    paymentRepository.save(payment);
-                });
-                member.setPaymentStatus(GroupMemberPaymentStatus.REFUNDED);
-                memberRepository.save(member);
+                refundRequestService.requestForCancelledGroupBooking(
+                        member.getBookingId(),
+                        "Nhóm xem phim đã hết hạn trước khi tất cả thành viên thanh toán");
             }
             bookingRepository.findById(member.getBookingId()).ifPresent(booking -> {
                 booking.setStatus(BookingStatus.EXPIRED);

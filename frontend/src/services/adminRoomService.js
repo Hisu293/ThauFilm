@@ -13,6 +13,12 @@ export const ROOM_FIELDS = [
   'type',
   'rowsCount',
   'seatsPerRow',
+  'standardSeats',
+  'vipSeats',
+  'coupleSeats',
+  'standardPrice',
+  'vipPrice',
+  'couplePrice',
   'status',
 ];
 
@@ -27,6 +33,9 @@ export const toRoomPayload = (form) => {
   }
   if (form.rowsCount !== undefined) payload.rowsCount = Number(form.rowsCount);
   if (form.seatsPerRow !== undefined) payload.seatsPerRow = Number(form.seatsPerRow);
+  for (const key of ['standardSeats', 'vipSeats', 'coupleSeats', 'standardPrice', 'vipPrice', 'couplePrice']) {
+    if (form[key] !== undefined && form[key] !== '') payload[key] = Number(form[key]);
+  }
   return payload;
 };
 

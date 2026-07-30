@@ -64,6 +64,14 @@ public class WatchPartyController {
         ));
     }
 
+    @PostMapping("/{roomId}/refund")
+    public ResponseEntity<ApiResponse<Void>> refund(@PathVariable UUID roomId,
+                                                     @RequestBody WatchPartyDto.RefundRequest request) {
+        watchPartyService.requestRefund(roomId, userId(), request.getRefundMethod(),
+                request.getBankBin(), request.getAccountNumber());
+        return ResponseEntity.ok(ApiResponse.success("Refund request created", null));
+    }
+
     private UUID userId() {
         UserDetails principal = (UserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         return userRepository.findByEmail(principal.getUsername())

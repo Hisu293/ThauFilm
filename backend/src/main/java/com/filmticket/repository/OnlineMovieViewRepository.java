@@ -11,4 +11,5 @@ import java.util.UUID;
 @Repository
 public interface OnlineMovieViewRepository extends JpaRepository<OnlineMovieView, UUID> {
     List<OnlineMovieView> findByViewedAtBetween(LocalDateTime from, LocalDateTime to);
+    boolean existsByBookingId(UUID bookingId);
 }

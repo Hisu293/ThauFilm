@@ -33,6 +33,13 @@ public final class WatchPartyDto {
     }
 
     @Data
+    public static class RefundRequest {
+        private String refundMethod;
+        private String bankBin;
+        private String accountNumber;
+    }
+
+    @Data
     @Builder
     public static class MemberResponse {
         private UUID userId;
