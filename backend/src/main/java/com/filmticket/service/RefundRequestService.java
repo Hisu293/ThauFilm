@@ -373,7 +373,10 @@ public class RefundRequestService {
     }
 
     private PaymentGatewayService.GatewayRefund executeAutomaticRefund(RefundRequest request, Payment payment) {
-        String referenceId = "REFUND_REQUEST_" + request.getId().toString().replace("-", "");
+        int attempt = request.getAutomaticAttemptCount() + 1;
+        request.setAutomaticAttemptCount(attempt);
+        String referenceId = "REFUND_REQUEST_" + request.getId().toString().replace("-", "")
+                + "_A" + attempt;
         try {
             PayOSRefundClient.PayoutResult payout = payOSRefundClient.refund(
                     referenceId, payment.getAmount(), request.getReason(),

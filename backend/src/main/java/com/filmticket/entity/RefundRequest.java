@@ -80,6 +80,10 @@ public class RefundRequest {
     @Column(name = "reviewed_at")
     private LocalDateTime reviewedAt;
 
+    @Builder.Default
+    @Column(name = "automatic_attempt_count", nullable = false)
+    private int automaticAttemptCount = 0;
+
     @Version
     private long version;
 
