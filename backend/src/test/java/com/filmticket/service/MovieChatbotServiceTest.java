@@ -4,7 +4,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.filmticket.dto.MovieChatRequest;
 import com.filmticket.dto.MovieChatResponse;
 import com.filmticket.entity.Movie;
+import com.filmticket.entity.Theater;
+import com.filmticket.model.TheaterStatus;
 import com.filmticket.repository.MovieRepository;
+import com.filmticket.repository.ShowtimeRepository;
+import com.filmticket.repository.CinemaRoomRepository;
+import com.filmticket.repository.TheaterRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -21,14 +26,41 @@ import static org.mockito.Mockito.when;
 
 class MovieChatbotServiceTest {
     private MovieRepository movieRepository;
+    private TheaterRepository theaterRepository;
     private MovieChatbotService service;
 
     @BeforeEach
     void setUp() {
         movieRepository = mock(MovieRepository.class);
+        theaterRepository = mock(TheaterRepository.class);
         S3PresignedUrlService s3PresignedUrlService = mock(S3PresignedUrlService.class);
         when(s3PresignedUrlService.resolvePosterUrl(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        service = new MovieChatbotService(movieRepository, s3PresignedUrlService, new ObjectMapper());
+        service = new MovieChatbotService(movieRepository, mock(ShowtimeRepository.class),
+                mock(CinemaRoomRepository.class), theaterRepository,
+                s3PresignedUrlService, new ObjectMapper());
+    }
+
+    @Test
+    void refundQuestionUsesControlledPolicyInsteadOfGenericGeminiAnswer() {
+        when(movieRepository.findAllByActiveTrue()).thenReturn(sampleMovies());
+
+        MovieChatResponse response = service.chat("Tôi muốn hoàn tiền vé thì làm sao?");
+
+        assertTrue(response.getAnswer().contains("Staff Trưởng"));
+        assertTrue(response.getAnswer().contains("Admin"));
+        assertTrue(response.getRecommendations().isEmpty());
+    }
+
+    @Test
+    void directionsComeFromActiveTheaterData() {
+        when(movieRepository.findAllByActiveTrue()).thenReturn(sampleMovies());
+        when(theaterRepository.findByStatus(TheaterStatus.ACTIVE)).thenReturn(List.of(
+                Theater.builder().name("ThauFilm Quận 1").address("123 Nguyễn Huệ").city("TP.HCM").build()));
+
+        MovieChatResponse response = service.chat("Địa chỉ các rạp ThauFilm");
+
+        assertTrue(response.getAnswer().contains("123 Nguyễn Huệ"));
+        assertTrue(response.getRecommendations().isEmpty());
     }
 
     @Test

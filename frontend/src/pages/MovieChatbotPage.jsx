@@ -24,16 +24,20 @@ import MovieCreationRoundedIcon from '@mui/icons-material/MovieCreationRounded';
 import { movieChatbotService } from '../services/movieChatbotService';
 
 const quickPrompts = [
-  'Gợi ý phim hành động',
-  'Có phim nào dưới 2 tiếng không?',
-  'Gợi ý phim viễn tưởng đang chiếu',
-  'Bạn làm được gì?',
+  'Gợi ý phim hành động đang chiếu',
+  'Lịch chiếu sắp tới',
+  'Hướng dẫn đặt vé',
+  'Thanh toán bị lỗi phải làm sao?',
+  'Hướng dẫn hoàn tiền',
+  'Địa chỉ các rạp ThauFilm',
+  'Tóm tắt nội dung phim không spoiler',
+  'FAQ ThauFilm',
 ];
 
 const initialMessages = [
   {
     role: 'bot',
-    text: 'Bạn muốn xem phim theo gu nào? Hỏi mình theo tên phim, thể loại, thời lượng hoặc trạng thái đang chiếu/sắp chiếu.',
+    text: 'Mình hỗ trợ tìm phim, lịch chiếu, đặt vé, thanh toán, hoàn tiền, địa chỉ rạp, tóm tắt không spoiler và FAQ ThauFilm.',
     recommendations: [],
   },
 ];
@@ -92,11 +96,11 @@ const MovieChatbotPage = () => {
           <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1 }}>
             <AutoAwesomeRoundedIcon color="primary" />
             <Typography variant="h3" fontWeight={900}>
-              AI Chatbot tư vấn phim
+              AI Chatbot ThauFilm
             </Typography>
           </Stack>
           <Typography color="text.secondary">
-            Trò chuyện tự nhiên hoặc hỏi theo gu phim, thời lượng, thể loại và trạng thái chiếu. AI chỉ gợi ý phim thật đang có trong hệ thống ThauFilm.
+            Trợ lý Gemini được nối với dữ liệu phim, lịch chiếu, rạp và chính sách thật của ThauFilm.
           </Typography>
         </Box>
 
@@ -137,7 +141,7 @@ const MovieChatbotPage = () => {
                   fullWidth
                   value={input}
                   onChange={(event) => setInput(event.target.value)}
-                  placeholder="Ví dụ: Gợi ý phim hành động dưới 2 tiếng"
+                  placeholder="Ví dụ: Zootopia 2 có lịch chiếu nào?"
                   disabled={loading}
                   size="medium"
                 />

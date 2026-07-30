@@ -5,7 +5,14 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.filmticket.dto.MovieChatRequest;
 import com.filmticket.dto.MovieChatResponse;
 import com.filmticket.entity.Movie;
+import com.filmticket.entity.Showtime;
+import com.filmticket.entity.CinemaRoom;
+import com.filmticket.entity.Theater;
+import com.filmticket.model.TheaterStatus;
+import com.filmticket.repository.CinemaRoomRepository;
 import com.filmticket.repository.MovieRepository;
+import com.filmticket.repository.ShowtimeRepository;
+import com.filmticket.repository.TheaterRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,6 +25,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.text.Normalizer;
 import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
@@ -87,6 +95,9 @@ public class MovieChatbotService {
     );
 
     private final MovieRepository movieRepository;
+    private final ShowtimeRepository showtimeRepository;
+    private final CinemaRoomRepository cinemaRoomRepository;
+    private final TheaterRepository theaterRepository;
     private final S3PresignedUrlService s3PresignedUrlService;
     private final ObjectMapper objectMapper;
     private final HttpClient httpClient = HttpClient.newBuilder()
@@ -144,6 +155,20 @@ public class MovieChatbotService {
     private MessageIntent classifyMessage(ConversationContext context, List<Movie> movies) {
         String query = context.currentQuery();
         if (!hasText(query)) return MessageIntent.GIBBERISH;
+        if (containsAny(query, Set.of("lich chieu", "suat chieu", "gio chieu", "chieu luc", "chieu may gio")))
+            return MessageIntent.SHOWTIMES;
+        if (containsAny(query, Set.of("dat ve", "mua ve", "chon ghe", "giu ghe")))
+            return MessageIntent.BOOKING_HELP;
+        if (containsAny(query, Set.of("thanh toan", "payos", "vietqr", "quet qr", "loi giao dich")))
+            return MessageIntent.PAYMENT_HELP;
+        if (containsAny(query, Set.of("hoan tien", "hoan ve", "huy ve", "refund")))
+            return MessageIntent.REFUND_HELP;
+        if (containsAny(query, Set.of("chi duong", "dia chi rap", "dia chi cac rap", "rap o dau", "duong toi rap", "vi tri rap")))
+            return MessageIntent.DIRECTIONS;
+        if (containsAny(query, Set.of("tom tat", "noi dung phim", "spoiler")))
+            return MessageIntent.SUMMARY;
+        if (containsAny(query, Set.of("faq", "cau hoi thuong gap", "quy dinh thaufilm", "ho tro thaufilm")))
+            return MessageIntent.FAQ;
 
         QueryIntent parsedIntent = parseIntent(query, movies);
         if (parsedIntent.hasCriteria() || containsAny(query, MOVIE_SIGNALS)) {
@@ -169,9 +194,16 @@ public class MovieChatbotService {
         String answer = switch (intent) {
             case GREETING -> "Chào bạn! Mình là trợ lý phim của ThauFilm. Bạn có thể hỏi mình phim gì đang chiếu, phim theo thể loại hoặc theo thời lượng nhé.";
             case THANKS -> "Không có gì! Khi cần đổi gu hoặc tìm thêm phim, bạn cứ nói thể loại và thời lượng mong muốn nhé.";
-            case CAPABILITY -> "Mình có thể trò chuyện và tư vấn phim đang có trên ThauFilm theo thể loại, thời lượng, trạng thái chiếu hoặc một phim bạn từng thích.";
+            case CAPABILITY -> "Mình có thể tìm phim theo gu, tra lịch chiếu, hướng dẫn đặt vé, giải thích lỗi thanh toán, hướng dẫn hoàn tiền, cung cấp địa chỉ rạp, tóm tắt phim không spoiler và trả lời FAQ ThauFilm.";
             case GIBBERISH -> "Mình chưa hiểu câu này. Bạn thử viết rõ hơn, ví dụ: “Gợi ý phim hành động dưới 2 tiếng” nhé.";
             case GENERAL_CONVERSATION -> buildGeneralFallback();
+            case SHOWTIMES -> buildShowtimeAnswer(context);
+            case BOOKING_HELP -> buildBookingHelp();
+            case PAYMENT_HELP -> buildPaymentHelp();
+            case REFUND_HELP -> buildRefundHelp();
+            case DIRECTIONS -> buildDirectionsAnswer(context);
+            case SUMMARY -> buildSummaryAnswer(context);
+            case FAQ -> buildFaqAnswer();
             case MOVIE_DISCOVERY -> throw new IllegalStateException("Movie discovery must use the recommendation flow");
         };
 
@@ -193,6 +225,99 @@ public class MovieChatbotService {
 
     private String buildGeneralFallback() {
         return "Mình chuyên hỗ trợ về phim và trải nghiệm tại ThauFilm. Với câu hỏi này mình chưa thể trả lời chắc chắn; bạn có thể hỏi mình gợi ý phim, thể loại, thời lượng hoặc phim đang chiếu nhé.";
+    }
+
+    private String buildShowtimeAnswer(ConversationContext context) {
+        List<Movie> movies = movieRepository.findAllByActiveTrue();
+        Movie requestedMovie = findReferenceMovie(context.currentQuery(), movies);
+        List<Showtime> source = requestedMovie == null
+                ? showtimeRepository.findUpcoming(java.time.LocalDate.now())
+                : showtimeRepository.findByMovieIdOrderByStartTimeAsc(requestedMovie.getId());
+        List<Showtime> upcoming = source.stream()
+                .filter(item -> item.getStartTime() != null && item.getStartTime().isAfter(LocalDateTime.now()))
+                .limit(8).toList();
+        if (upcoming.isEmpty()) return requestedMovie == null
+                ? "Hiện chưa có suất chiếu sắp tới trong hệ thống."
+                : "Hiện chưa có suất chiếu sắp tới cho " + requestedMovie.getTitle() + ".";
+        StringBuilder answer = new StringBuilder(requestedMovie == null
+                ? "Các suất chiếu sắp tới:\n" : "Lịch chiếu của " + requestedMovie.getTitle() + ":\n");
+        for (Showtime showtime : upcoming) {
+            Movie movie = movieRepository.findById(showtime.getMovieId()).orElse(null);
+            CinemaRoom room = showtime.getCinemaRoomId() == null ? null
+                    : cinemaRoomRepository.findById(showtime.getCinemaRoomId()).orElse(null);
+            Theater theater = room == null || room.getTheaterId() == null ? null
+                    : theaterRepository.findById(room.getTheaterId()).orElse(null);
+            answer.append("- ").append(movie == null ? "Phim" : movie.getTitle())
+                    .append(" · ").append(showtime.getStartTime().format(
+                            java.time.format.DateTimeFormatter.ofPattern("dd/MM HH:mm")))
+                    .append(showtime.isOnline() ? " · Xem online"
+                            : " · " + (theater == null ? "Rạp đang cập nhật" : theater.getName()))
+                    .append('\n');
+        }
+        return answer.append("Bạn mở chi tiết phim để chọn ghế và đặt vé.").toString();
+    }
+
+    private String buildBookingHelp() {
+        return "Cách đặt vé:\n1. Chọn phim và suất chiếu.\n2. Chọn ghế còn trống."
+                + "\n3. Kiểm tra giá, mã giảm giá và combo.\n4. Thanh toán trong thời gian giữ ghế."
+                + "\n5. Thành công sẽ mở trang Vé của tôi và gửi vé qua email.";
+    }
+
+    private String buildPaymentHelp() {
+        return "Nếu thanh toán lỗi:\n- Kiểm tra trạng thái trong Vé của tôi trước khi trả lại."
+                + "\n- Không tạo nhiều giao dịch cho cùng một booking."
+                + "\n- Nếu đã trừ tiền nhưng vé chưa xác nhận, chờ PayOS cập nhật rồi dùng cập nhật thanh toán."
+                + "\n- Vẫn chưa khớp: gửi mã booking và mã giao dịch cho Staff.";
+    }
+
+    private String buildRefundHelp() {
+        return "Luồng hoàn tiền:\n1. Vé của tôi → Chi tiết/Hoàn tiền."
+                + "\n2. Chọn thủ công hoặc tự động PayOS/Bảo Kim."
+                + "\n3. Staff Trưởng xác minh.\n4. Admin duyệt rồi hệ thống mới hoàn."
+                + "\nVé đã check-in, phim online đã mở xem hoặc suất chiếu đã bắt đầu không được hoàn.";
+    }
+
+    private String buildDirectionsAnswer(ConversationContext context) {
+        List<Theater> theaters = theaterRepository.findByStatus(TheaterStatus.ACTIVE);
+        List<Theater> matched = theaters.stream()
+                .filter(theater -> matchesKnownText(context.currentQuery(), theater.getName())
+                        || matchesKnownText(context.currentQuery(), theater.getAddress())
+                        || matchesKnownText(context.currentQuery(), theater.getCity()))
+                .toList();
+        List<Theater> result = matched.isEmpty() ? theaters : matched;
+        if (result.isEmpty()) return "Hiện hệ thống chưa có địa chỉ rạp đang hoạt động.";
+        StringBuilder answer = new StringBuilder("Địa chỉ rạp ThauFilm:\n");
+        result.stream().limit(6).forEach(theater -> answer.append("- ").append(theater.getName())
+                .append(": ").append(safe(theater.getAddress()))
+                .append(hasText(theater.getCity()) ? ", " + theater.getCity() : "").append('\n'));
+        return answer.append("Bạn có thể sao chép địa chỉ vào Google Maps để chỉ đường.").toString();
+    }
+
+    private boolean matchesKnownText(String query, String value) {
+        String normalized = normalize(value);
+        return hasText(normalized) && query.contains(normalized);
+    }
+
+    private String buildSummaryAnswer(ConversationContext context) {
+        Movie movie = findReferenceMovie(context.currentQuery(), movieRepository.findAllByActiveTrue());
+        if (movie == null) return "Bạn muốn tóm tắt phim nào? Hãy nhập đúng tên phim trên ThauFilm.";
+        if (!hasText(movie.getDescription())) return movie.getTitle() + " hiện chưa có phần tóm tắt.";
+        boolean allowSpoiler = containsAny(context.currentQuery(),
+                Set.of("co spoiler", "cho phep spoiler", "tiet lo", "ke het"));
+        String description = movie.getDescription().trim();
+        if (!allowSpoiler && description.length() > 320) {
+            int sentenceEnd = description.lastIndexOf('.', 320);
+            description = description.substring(0, sentenceEnd >= 120 ? sentenceEnd + 1 : 320) + "…";
+        }
+        return (allowSpoiler ? "Tóm tắt theo nội dung ThauFilm: " : "Tóm tắt không tiết lộ nút thắt: ")
+                + description;
+    }
+
+    private String buildFaqAnswer() {
+        return "FAQ ThauFilm:\n- Vé ở đâu? Tài khoản → Vé của tôi."
+                + "\n- Vé được gửi thế nào? Hiển thị trong hệ thống và gửi PDF qua email."
+                + "\n- Hoàn tiền thế nào? Gửi trong chi tiết vé, Staff Trưởng xác minh, Admin duyệt."
+                + "\n- Không nhận email? Kiểm tra Spam và email tài khoản.";
     }
 
     private List<ScoredMovie> rankMovies(ConversationContext context, List<Movie> movies) {
@@ -642,6 +767,13 @@ public class MovieChatbotService {
 
     private enum MessageIntent {
         MOVIE_DISCOVERY,
+        SHOWTIMES,
+        BOOKING_HELP,
+        PAYMENT_HELP,
+        REFUND_HELP,
+        DIRECTIONS,
+        SUMMARY,
+        FAQ,
         GREETING,
         THANKS,
         CAPABILITY,
