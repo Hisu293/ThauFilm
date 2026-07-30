@@ -395,22 +395,26 @@ export const PaymentPage = () => {
       paymentMethod,
     });
 
-    navigate('/booking/success', {
-      state: {
-        bookingId: paidBookingId,
-        movieId: confirmedBooking?.movieId || movie?.id || movie?.movieId || showtime?.movieId,
-        movie,
-        showtime,
-      selectedSeats,
-      paymentMethod,
-      selectedDiscount,
-      originalAmount: paidOriginalAmount,
-      discountAmount: paidDiscountAmount,
-      bookingCode: confirmedBooking?.confirmationCode || paymentResult?.confirmationCode || bookingId,
-        tickets: confirmedTickets,
-        totalAmount: Number.isFinite(paidAmount) ? paidAmount : totalAmount,
-      },
-    });
+    if (isOnlineMovieBooking) {
+      navigate('/booking/success', {
+        state: {
+          bookingId: paidBookingId,
+          movieId: confirmedBooking?.movieId || movie?.id || movie?.movieId || showtime?.movieId,
+          movie,
+          showtime,
+          selectedSeats,
+          paymentMethod,
+          selectedDiscount,
+          originalAmount: paidOriginalAmount,
+          discountAmount: paidDiscountAmount,
+          bookingCode: confirmedBooking?.confirmationCode || paymentResult?.confirmationCode || bookingId,
+          tickets: confirmedTickets,
+          totalAmount: Number.isFinite(paidAmount) ? paidAmount : totalAmount,
+        },
+      });
+    } else {
+      navigate('/profile?tab=history', { replace: true });
+    }
 
     updateBookingState({ bookingId: paidBookingId, paymentStatus: 'PAID' });
     sessionStorage.removeItem('tf_booking_id');
