@@ -27,7 +27,7 @@ public class WatchPartyController {
     @PostMapping
     public ResponseEntity<ApiResponse<WatchPartyDto.Response>> create(@Valid @RequestBody WatchPartyDto.CreateRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
-                "Watch party created",
+                "Tạo phòng Watch Party thành công",
                 watchPartyService.create(request.getMovieId(), userId())
         ));
     }
@@ -35,7 +35,7 @@ public class WatchPartyController {
     @GetMapping("/{roomId}")
     public ResponseEntity<ApiResponse<WatchPartyDto.Response>> get(@PathVariable UUID roomId) {
         return ResponseEntity.ok(ApiResponse.success(
-                "Watch party fetched",
+                "Lấy thông tin phòng Watch Party thành công",
                 watchPartyService.get(roomId, userId())
         ));
     }
@@ -43,7 +43,7 @@ public class WatchPartyController {
     @PostMapping("/{roomId}/pay")
     public ResponseEntity<ApiResponse<WatchPartyDto.Response>> pay(@PathVariable UUID roomId) {
         return ResponseEntity.ok(ApiResponse.success(
-                "Watch party payment recorded",
+                "Đã tạo thanh toán phần của bạn",
                 watchPartyService.pay(roomId, userId())
         ));
     }
@@ -51,7 +51,7 @@ public class WatchPartyController {
     @PostMapping("/{roomId}/sync-payment")
     public ResponseEntity<ApiResponse<WatchPartyDto.Response>> syncPayment(@PathVariable UUID roomId) {
         return ResponseEntity.ok(ApiResponse.success(
-                "Watch party payment synced",
+                "Đã cập nhật trạng thái thanh toán Watch Party",
                 watchPartyService.syncCurrentUserPayment(roomId, userId())
         ));
     }
@@ -59,7 +59,7 @@ public class WatchPartyController {
     @GetMapping("/{roomId}/stream")
     public ResponseEntity<ApiResponse<MovieStreamResponse>> stream(@PathVariable UUID roomId) {
         return ResponseEntity.ok(ApiResponse.success(
-                "Watch party stream fetched",
+                "Lấy nội dung xem Watch Party thành công",
                 watchPartyService.getStream(roomId, userId())
         ));
     }
@@ -69,12 +69,12 @@ public class WatchPartyController {
                                                      @RequestBody WatchPartyDto.RefundRequest request) {
         watchPartyService.requestRefund(roomId, userId(), request.getRefundMethod(),
                 request.getBankBin(), request.getAccountNumber());
-        return ResponseEntity.ok(ApiResponse.success("Refund request created", null));
+        return ResponseEntity.ok(ApiResponse.success("Đã tạo yêu cầu hoàn tiền", null));
     }
 
     private UUID userId() {
         UserDetails principal = (UserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         return userRepository.findByEmail(principal.getUsername())
-                .orElseThrow(() -> new BadRequestException("User not found")).getId();
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy người dùng")).getId();
     }
 }

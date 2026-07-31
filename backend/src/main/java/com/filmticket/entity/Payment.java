@@ -75,6 +75,8 @@ public class Payment {
     public void prePersist() {
         if (id == null) {
             id = UUID.randomUUID();
+        }
+        if (createdAt == null) {
             createdAt = java.time.LocalDateTime.now();
         }
     }

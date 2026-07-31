@@ -58,7 +58,7 @@ public class PaymentGatewayService {
         String resolvedCancelUrl = resolveFrontendUrl(cancelUrl);
         return switch (normalizedProvider) {
             case "PAYOS" -> createPayosLink(payment, description, resolvedReturnUrl, resolvedCancelUrl);
-            default -> throw new BadRequestException("Unsupported payment provider: " + provider);
+            default -> throw new BadRequestException("Cổng thanh toán không được hỗ trợ: " + provider);
         };
     }
 
@@ -66,7 +66,7 @@ public class PaymentGatewayService {
         String provider = normalizeProvider(payment.getProvider());
         if ("PAYOS".equals(provider)) {
             return new GatewayRefund(null, PaymentStatus.REFUND_PENDING,
-                    "PayOS/VietQR refund must be processed manually or through your bank/provider dashboard");
+                    "Hoàn tiền PayOS/VietQR cần được xử lý thủ công hoặc qua trang quản trị của ngân hàng/cổng thanh toán");
         }
         return new GatewayRefund("mock-" + UUID.randomUUID(), PaymentStatus.REFUNDED, null);
     }
@@ -74,10 +74,10 @@ public class PaymentGatewayService {
     public PayosPaymentStatus getPayosPaymentStatus(String orderCode) {
         if (payosClientId == null || payosClientId.isBlank()
                 || payosApiKey == null || payosApiKey.isBlank()) {
-            throw new BadRequestException("PayOS credentials are not configured");
+            throw new BadRequestException("Thông tin kết nối PayOS chưa được cấu hình");
         }
         if (orderCode == null || orderCode.isBlank()) {
-            throw new BadRequestException("PayOS order code is required");
+            throw new BadRequestException("Mã đơn hàng PayOS là bắt buộc");
         }
         try {
             HttpHeaders headers = new HttpHeaders();
@@ -107,7 +107,7 @@ public class PaymentGatewayService {
         } catch (BadRequestException ex) {
             throw ex;
         } catch (Exception ex) {
-            throw new BadRequestException("Cannot verify PayOS payment: " + ex.getMessage());
+            throw new BadRequestException("Không thể xác minh giao dịch PayOS: " + ex.getMessage());
         }
     }
 
@@ -145,7 +145,7 @@ public class PaymentGatewayService {
         if (payosClientId == null || payosClientId.isBlank()
                 || payosApiKey == null || payosApiKey.isBlank()
                 || payosChecksumKey == null || payosChecksumKey.isBlank()) {
-            throw new BadRequestException("PayOS credentials are not configured");
+            throw new BadRequestException("Thông tin kết nối PayOS chưa được cấu hình");
         }
         try {
             long orderCode = Math.abs(payment.getId().getMostSignificantBits() % 1_000_000_000_000L);
@@ -178,7 +178,7 @@ public class PaymentGatewayService {
             );
 
             if (response == null || !"00".equals(Objects.toString(response.get("code"), ""))) {
-                throw new BadRequestException("PayOS rejected payment request: " + response);
+                throw new BadRequestException("PayOS từ chối yêu cầu thanh toán: " + response);
             }
 
             @SuppressWarnings("unchecked")
@@ -190,7 +190,7 @@ public class PaymentGatewayService {
         } catch (BadRequestException ex) {
             throw ex;
         } catch (Exception ex) {
-            throw new BadRequestException("Cannot create PayOS payment link: " + ex.getMessage());
+            throw new BadRequestException("Không thể tạo liên kết thanh toán PayOS: " + ex.getMessage());
         }
     }
 
