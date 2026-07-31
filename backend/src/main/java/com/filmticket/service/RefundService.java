@@ -74,13 +74,16 @@ public class RefundService {
         PayOSRefundClient.PayoutResult payout = payOSRefundClient.refund(
                 referenceId, payment.getAmount(), safeReason, bankBin.trim(), accountNumber.trim());
         if (!payout.succeeded() && !payout.processing()) {
+            String failureReason = "PayOS trả về trạng thái: " + payout.state();
+            userRepository.findById(booking.getUserId()).ifPresent(user ->
+                    refundEmailService.sendFailure(user, booking, payment, failureReason));
             auditLogService.failure(AuditLogService.AuditCommand.builder()
                     .action(AuditAction.REFUND_FAILED).targetType("PAYMENT")
                     .targetId(payment.getId().toString()).actorId(requesterId)
                     .description("Hoàn tiền qua PayOS thất bại").reason(safeReason)
                     .correlationId(bookingId.toString()).providerEventId(payout.payoutId())
                     .sensitive(true).metadata(Map.of("trạngTháiPayOS", String.valueOf(payout.state()))).build(),
-                    new IllegalStateException("PayOS trả về trạng thái: " + payout.state()));
+                    new IllegalStateException(failureReason));
             throw new BadRequestException("PayOS hoàn tiền thất bại với trạng thái: " + payout.state());
         }
         RefundHistoryStatus historyStatus = payout.succeeded() ? RefundHistoryStatus.SUCCEEDED

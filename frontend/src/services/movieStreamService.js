@@ -4,7 +4,7 @@ const unwrap = (response) => response?.data?.data ?? response?.data ?? response;
 
 const VIEWING_DEVICE_KEY = 'tf_viewing_device_id';
 
-const getViewingDeviceId = () => {
+export const getViewingDeviceId = () => {
   let deviceId = sessionStorage.getItem(VIEWING_DEVICE_KEY);
   if (!deviceId) {
     deviceId = globalThis.crypto?.randomUUID?.()
@@ -14,7 +14,7 @@ const getViewingDeviceId = () => {
   return deviceId;
 };
 
-const viewingConfig = () => ({
+export const viewingConfig = () => ({
   headers: { 'X-Viewing-Device-Id': getViewingDeviceId() },
 });
 
@@ -28,7 +28,9 @@ export const movieStreamService = {
   release: (movieId) => api
     .post(`/api/member/movies/${movieId}/stream/release`, null, viewingConfig())
     .then(unwrap),
-  getWatchPartyStream: (roomId) => api.get(`/api/member/watch-parties/${roomId}/stream`).then(unwrap),
+  getWatchPartyStream: (roomId) => api
+    .get(`/api/member/watch-parties/${roomId}/stream`, viewingConfig())
+    .then(unwrap),
 };
 
 export default movieStreamService;

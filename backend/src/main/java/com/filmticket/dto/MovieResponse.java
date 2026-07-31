@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Data
@@ -34,6 +35,7 @@ public class MovieResponse {
     private String streamProvider;
     private String streamKey;
     private Movie.Status status;
+    private LocalDateTime createdAt;
 
     public static MovieResponse fromMovie(Movie movie) {
         return fromMovie(movie, false);
@@ -100,6 +102,7 @@ public class MovieResponse {
                 .streamProvider(includeStream ? movie.getStreamProvider() : null)
                 .streamKey(includeStream ? movie.getStreamKey() : null)
                 .status(movie.getStatus())
+                .createdAt(movie.getCreatedAt())
                 .build();
     }
 }

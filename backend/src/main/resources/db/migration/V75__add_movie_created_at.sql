@@ -1,0 +1,4 @@
+ALTER TABLE movies
+    ADD COLUMN IF NOT EXISTS created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP;
+
+CREATE INDEX IF NOT EXISTS idx_movies_created_at ON movies (created_at DESC);

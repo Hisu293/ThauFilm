@@ -13,4 +13,5 @@ public interface MovieRepository extends JpaRepository<Movie, UUID> {
     boolean existsByTitleIgnoreCaseAndIdNot(String title, UUID id);
     List<Movie> findAllByActiveTrue();
     List<Movie> findAllByActiveTrueAndStatus(Movie.Status status);
+    List<Movie> findAllByOrderByCreatedAtDesc();
 }

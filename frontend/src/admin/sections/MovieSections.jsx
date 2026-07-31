@@ -20,6 +20,7 @@ import {
   TableCell,
   TableContainer,
   TableHead,
+  TablePagination,
   TableRow,
   TextField,
   Typography,
@@ -80,6 +81,7 @@ export const MoviesSection = ({ crud, genres = [] }) => {
   const [genreFilter, setGenreFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [activeFilter, setActiveFilter] = useState(''); // '' | 'active' | 'hidden'
+  const [page, setPage] = useState(0);
 
   const genreOptions = useMemo(() => {
     const configured = genres
@@ -102,9 +104,16 @@ export const MoviesSection = ({ crud, genres = [] }) => {
         if (activeFilter === 'active' && m.active === false) return false;
         if (activeFilter === 'hidden' && m.active !== false) return false;
         return true;
+      }).sort((left, right) => {
+        const rightTime = Date.parse(right.createdAt || '') || 0;
+        const leftTime = Date.parse(left.createdAt || '') || 0;
+        return rightTime - leftTime;
       }),
     [crud.list, search, genreFilter, statusFilter, activeFilter]
   );
+  const pageCount = Math.max(1, Math.ceil(filtered.length / 10));
+  const safePage = Math.min(page, pageCount - 1);
+  const pagedMovies = filtered.slice(safePage * 10, safePage * 10 + 10);
 
   const hasFilter = search || genreFilter || statusFilter || activeFilter;
   const clearFilters = () => {
@@ -112,6 +121,7 @@ export const MoviesSection = ({ crud, genres = [] }) => {
     setGenreFilter('');
     setStatusFilter('');
     setActiveFilter('');
+    setPage(0);
   };
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
@@ -173,6 +183,7 @@ export const MoviesSection = ({ crud, genres = [] }) => {
     try {
       if (dialog === 'add') await crud.add(form);
       else await crud.update(dialog, form);
+      setPage(0);
       setDialog(null);
       // Force reload danh sách phim sau khi lưu
       await crud.reload();
@@ -216,7 +227,7 @@ export const MoviesSection = ({ crud, genres = [] }) => {
           size="small"
           placeholder="Tìm theo tên phim…"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => { setSearch(e.target.value); setPage(0); }}
           sx={{ flex: 1, minWidth: 200 }}
           InputProps={{
             startAdornment: (
@@ -226,7 +237,7 @@ export const MoviesSection = ({ crud, genres = [] }) => {
             ),
           }}
         />
-        <TextField select size="small" label="Thể loại" value={genreFilter} onChange={(e) => setGenreFilter(e.target.value)} sx={{ minWidth: 150 }}>
+        <TextField select size="small" label="Thể loại" value={genreFilter} onChange={(e) => { setGenreFilter(e.target.value); setPage(0); }} sx={{ minWidth: 150 }}>
           <MenuItem value="">Tất cả thể loại</MenuItem>
           {genreOptions.map((genre) => (
             <MenuItem key={genre.value} value={genre.value}>
@@ -234,7 +245,7 @@ export const MoviesSection = ({ crud, genres = [] }) => {
             </MenuItem>
           ))}
         </TextField>
-        <TextField select size="small" label="Trạng thái" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} sx={{ minWidth: 150 }}>
+        <TextField select size="small" label="Trạng thái" value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(0); }} sx={{ minWidth: 150 }}>
           <MenuItem value="">Tất cả trạng thái</MenuItem>
           {MOVIE_STATUSES.map((s) => (
             <MenuItem key={s.value} value={s.value}>
@@ -242,7 +253,7 @@ export const MoviesSection = ({ crud, genres = [] }) => {
             </MenuItem>
           ))}
         </TextField>
-        <TextField select size="small" label="Hiển thị" value={activeFilter} onChange={(e) => setActiveFilter(e.target.value)} sx={{ minWidth: 130 }}>
+        <TextField select size="small" label="Hiển thị" value={activeFilter} onChange={(e) => { setActiveFilter(e.target.value); setPage(0); }} sx={{ minWidth: 130 }}>
           <MenuItem value="">Tất cả</MenuItem>
           <MenuItem value="active">Đang hiện</MenuItem>
           <MenuItem value="hidden">Đã ẩn</MenuItem>
@@ -286,7 +297,7 @@ export const MoviesSection = ({ crud, genres = [] }) => {
                 </TableRow>
               )}
               {!crud.loading &&
-                filtered.map((m) => (
+                pagedMovies.map((m) => (
                   <TableRow key={m.id} className="admin-table-row" sx={{ opacity: m.active === false ? 0.5 : 1 }}>
                     <TableCell>
                       <Typography fontWeight={600}>{m.title}</Typography>
@@ -325,6 +336,16 @@ export const MoviesSection = ({ crud, genres = [] }) => {
             </TableBody>
           </Table>
         </TableContainer>
+        {!crud.loading && <TablePagination
+          component="div"
+          count={filtered.length}
+          page={safePage}
+          onPageChange={(_, nextPage) => setPage(nextPage)}
+          rowsPerPage={10}
+          rowsPerPageOptions={[10]}
+          labelRowsPerPage="Số phim mỗi trang"
+          labelDisplayedRows={({ from, to, count }) => `${from}–${to} / ${count}`}
+        />}
       </Box>
       <EntityDialog
         open={!!dialog}

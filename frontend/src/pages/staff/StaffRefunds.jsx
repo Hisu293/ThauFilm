@@ -21,6 +21,7 @@ import {
   TableCell,
   TableContainer,
   TableHead,
+  TablePagination,
   TableRow,
   TextField,
   Typography,
@@ -36,6 +37,7 @@ import PendingActionsRoundedIcon from '@mui/icons-material/PendingActionsRounded
 import AdminPanelSettingsRoundedIcon from '@mui/icons-material/AdminPanelSettingsRounded';
 import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded';
 import QrCode2RoundedIcon from '@mui/icons-material/QrCode2Rounded';
+import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded';
 import { useAuth } from '../../context/AuthContext';
 import refundService from '../../services/refundService';
 import { connectRealtime } from '../../services/realtimeService';
@@ -79,11 +81,13 @@ export default function StaffRefunds() {
   const [error, setError] = useState('');
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [page, setPage] = useState(0);
   const [rejecting, setRejecting] = useState(null);
   const [reason, setReason] = useState('');
   const [chatItem, setChatItem] = useState(null);
   const [messages, setMessages] = useState([]);
   const [messageText, setMessageText] = useState('');
+  const [selected, setSelected] = useState(null);
 
   const load = useCallback(async (silent = false) => {
     if (silent) setRefreshing(true);
@@ -139,6 +143,9 @@ export default function StaffRefunds() {
         .some((value) => String(value || '').toLocaleLowerCase('vi').includes(keyword));
     });
   }, [items, query, statusFilter]);
+  const pageCount = Math.max(1, Math.ceil(filteredItems.length / 10));
+  const safePage = Math.min(page, pageCount - 1);
+  const pagedItems = filteredItems.slice(safePage * 10, safePage * 10 + 10);
 
   const approve = async (item) => {
     setBusy(true);
@@ -146,6 +153,7 @@ export default function StaffRefunds() {
     try {
       const updated = await refundService.staffApprove(item.id);
       setItems((list) => list.map((row) => (row.id === updated.id ? updated : row)));
+      setSelected((current) => (current?.id === updated.id ? updated : current));
     } catch (err) {
       setError(err.message || 'Không thể duyệt yêu cầu.');
     } finally {
@@ -249,12 +257,12 @@ export default function StaffRefunds() {
           <TextField
             size="small"
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => { setQuery(event.target.value); setPage(0); }}
             placeholder="Tìm khách hàng, mã vé, phim..."
             sx={{ width: { xs: '100%', md: 380 } }}
             slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchRoundedIcon fontSize="small" /></InputAdornment> } }}
           />
-          <TextField select size="small" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} sx={{ minWidth: 190 }}>
+          <TextField select size="small" value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(0); }} sx={{ minWidth: 190 }}>
             <MenuItem value="ALL">Tất cả trạng thái</MenuItem>
             {Object.entries(statusMeta).map(([value, item]) => <MenuItem key={value} value={value}>{item.label}</MenuItem>)}
           </TextField>
@@ -262,64 +270,48 @@ export default function StaffRefunds() {
       </CardContent>
       <Divider />
 
-      <TableContainer>
-        <Table sx={{ minWidth: 980 }}>
+      <TableContainer sx={{ overflowX: 'hidden' }}>
+        <Table size="small" sx={{ width: '100%', tableLayout: 'fixed', '& th, & td': { px: { xs: 1, md: 1.5 } } }}>
           <TableHead>
             <TableRow>
-              <TableCell>Khách hàng / mã vé</TableCell>
-              <TableCell>Thông tin suất chiếu</TableCell>
-              <TableCell>Số tiền</TableCell>
-              <TableCell>Lý do</TableCell>
-              <TableCell>Trạng thái</TableCell>
-              <TableCell align="right">Thao tác</TableCell>
+              <TableCell sx={{ width: '27%' }}>Khách hàng / mã vé</TableCell>
+              <TableCell sx={{ width: '28%' }}>Suất chiếu</TableCell>
+              <TableCell sx={{ width: '17%' }}>Số tiền</TableCell>
+              <TableCell sx={{ width: '28%' }}>Xác minh / lý do</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
-            {filteredItems.map((item) => {
+            {pagedItems.map((item) => {
               const status = statusMeta[item.status] || { label: item.status, color: 'default' };
-              const needsQr = item.refundMethod !== 'AUTOMATIC'
-                && Number(item.amount || 0) >= Number(access?.refundApprovalThreshold || 200000);
-              return <TableRow key={item.id} hover sx={{ '& td': { py: 2 } }}>
+              return <TableRow key={item.id} hover sx={{ '& td': { py: 1.5 } }}>
                 <TableCell>
                   <Stack direction="row" spacing={1.25} alignItems="center">
                     <Avatar sx={{ width: 38, height: 38, bgcolor: 'primary.main', fontSize: 14, fontWeight: 800 }}>
                       {(item.customerName || item.customerEmail || '?').slice(0, 2).toUpperCase()}
                     </Avatar>
-                    <Box>
-                      <Typography fontWeight={800}>{item.customerName || item.customerEmail}</Typography>
-                      <Typography variant="caption" color="text.secondary">{item.ticketCode} · {item.ticketCheckedIn ? 'Đã check-in' : 'Chưa check-in'}</Typography>
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography noWrap fontWeight={800}>{item.customerName || item.customerEmail}</Typography>
+                      <Typography noWrap display="block" variant="caption" color="text.secondary">{item.ticketCode}</Typography>
                     </Box>
                   </Stack>
                 </TableCell>
                 <TableCell>
-                  <Typography fontWeight={700}>{item.movieTitle || '—'}</Typography>
-                  <Typography variant="caption" color="text.secondary">Suất: {dateTime(item.showtimeStart)}</Typography>
-                  <Typography variant="caption" display="block" color="text.secondary">Gửi: {dateTime(item.createdAt)}</Typography>
+                  <Typography noWrap fontWeight={700}>{item.movieTitle || '—'}</Typography>
+                  <Typography noWrap display="block" variant="caption" color="text.secondary">{dateTime(item.showtimeStart)}</Typography>
                 </TableCell>
                 <TableCell><Typography fontWeight={900}>{money(item.amount)}</Typography></TableCell>
-                <TableCell sx={{ maxWidth: 280 }}>
-                  <Typography variant="body2" sx={{ whiteSpace: 'normal' }}>{item.reason}</Typography>
-                  {item.refundMethod === 'AUTOMATIC' && (
-                    <Typography variant="caption" display="block" color="success.main">
-                      Tự động · BIN {item.bankBin} · STK {item.bankAccountNumber}
-                    </Typography>
-                  )}
-                  {item.rejectionReason && <Typography variant="caption" color="error">Từ chối: {item.rejectionReason}</Typography>}
-                </TableCell>
-                <TableCell><Chip size="small" label={status.label} color={status.color} sx={{ fontWeight: 700 }} /></TableCell>
-                <TableCell align="right">
-                  <Stack direction="row" justifyContent="flex-end" spacing={0.75}>
-                    <Button size="small" variant="outlined" startIcon={<ChatRoundedIcon />} onClick={() => openChat(item)}>Chat</Button>
-                    {item.refundQrImageUrl && <Button size="small" color="info" startIcon={<QrCode2RoundedIcon />} href={item.refundQrImageUrl} target="_blank" rel="noreferrer">QR khách</Button>}
-                    {item.status === 'REQUESTED' && <>
-                      <Button size="small" variant="contained" color="success" disabled={busy || (needsQr && !item.refundQrImageUrl)} onClick={() => approve(item)}>Duyệt</Button>
-                      <Button size="small" color="error" startIcon={<CancelRoundedIcon />} disabled={busy} onClick={() => setRejecting(item)}>Từ chối</Button>
-                    </>}
+                <TableCell>
+                  <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
+                    <Box sx={{ minWidth: 0 }}>
+                      <Chip size="small" label={status.label} color={status.color} sx={{ maxWidth: '100%', fontWeight: 700 }} />
+                      <Typography noWrap display="block" variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>{item.reason || 'Không có lý do'}</Typography>
+                    </Box>
+                    <Button size="small" variant="outlined" startIcon={<VisibilityRoundedIcon />} onClick={() => setSelected(item)} sx={{ flexShrink: 0 }}>Xem</Button>
                   </Stack>
                 </TableCell>
               </TableRow>;
             })}
-            {filteredItems.length === 0 && <TableRow><TableCell colSpan={6}>
+            {filteredItems.length === 0 && <TableRow><TableCell colSpan={4}>
               <Stack alignItems="center" spacing={1.25} py={7}>
                 <Avatar sx={{ width: 54, height: 54, bgcolor: 'action.hover', color: 'text.secondary' }}><ReceiptLongRoundedIcon /></Avatar>
                 <Typography fontWeight={800}>{items.length ? 'Không tìm thấy yêu cầu phù hợp' : 'Chưa có yêu cầu hoàn tiền'}</Typography>
@@ -329,7 +321,45 @@ export default function StaffRefunds() {
           </TableBody>
         </Table>
       </TableContainer>
+      <TablePagination
+        component="div"
+        count={filteredItems.length}
+        page={safePage}
+        onPageChange={(_, nextPage) => setPage(nextPage)}
+        rowsPerPage={10}
+        rowsPerPageOptions={[10]}
+        labelRowsPerPage="Số dòng mỗi trang"
+        labelDisplayedRows={({ from, to, count }) => `${from}–${to} / ${count}`}
+      />
     </Card>
+
+    <Dialog open={Boolean(selected)} onClose={() => !busy && setSelected(null)} fullWidth maxWidth="md">
+      <DialogTitle fontWeight={900}>Chi tiết yêu cầu hoàn tiền</DialogTitle>
+      <DialogContent dividers>
+        <Stack spacing={2}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} justifyContent="space-between">
+            <Box><Typography variant="caption" color="text.secondary">Khách hàng / mã vé</Typography><Typography fontWeight={900}>{selected?.customerName || selected?.customerEmail || '—'} · {selected?.ticketCode || '—'}</Typography><Typography variant="body2">{selected?.customerEmail || '—'}</Typography></Box>
+            <Chip label={(statusMeta[selected?.status] || {}).label || selected?.status || '—'} color={(statusMeta[selected?.status] || {}).color || 'default'} />
+          </Stack>
+          <Divider />
+          <Box display="grid" gridTemplateColumns={{ xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' }} gap={2}>
+            <Box><Typography variant="caption" color="text.secondary">Phim / suất chiếu</Typography><Typography fontWeight={800}>{selected?.movieTitle || '—'}</Typography><Typography variant="body2">{dateTime(selected?.showtimeStart)} – {dateTime(selected?.showtimeEnd)}</Typography></Box>
+            <Box><Typography variant="caption" color="text.secondary">Số tiền hoàn</Typography><Typography variant="h6" fontWeight={950} color="warning.main">{money(selected?.amount)}</Typography></Box>
+            <Box><Typography variant="caption" color="text.secondary">Trạng thái suất chiếu</Typography><Typography fontWeight={700}>{selected?.showtimeEnded ? 'Suất đã kết thúc' : selected?.showtimeStarted ? 'Suất đang chiếu' : 'Chưa đến giờ chiếu'}</Typography></Box>
+            <Box><Typography variant="caption" color="text.secondary">Xác minh sử dụng</Typography><Typography fontWeight={700} color={selected?.contentAccessed ? 'error.main' : 'success.main'}>{selected?.contentAccessed ? 'Đã mở phim lúc ' + dateTime(selected?.firstViewedAt) : 'Chưa ghi nhận mở phim'}</Typography><Typography variant="caption">{selected?.ticketCheckedIn ? 'Vé đã check-in' : 'Vé chưa check-in'}</Typography></Box>
+          </Box>
+          <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: 'action.hover' }}><Typography variant="caption" color="text.secondary">Lý do khách gửi</Typography><Typography sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{selected?.reason || 'Không có lý do'}</Typography>{selected?.rejectionReason && <Typography color="error.main" sx={{ mt: 1 }}>Phản hồi xử lý: {selected.rejectionReason}</Typography>}</Box>
+          <Box><Typography variant="caption" color="text.secondary">Phương thức hoàn tiền</Typography><Typography fontWeight={750} sx={{ overflowWrap: 'anywhere' }}>{selected?.refundMethod === 'AUTOMATIC' ? 'PayOS/Bảo Kim · BIN ' + (selected?.bankBin || '—') + ' · STK ' + (selected?.bankAccountNumber || '—') : 'Hoàn tiền thủ công bằng QR'}</Typography></Box>
+          {selected?.refundQrImageUrl && <Button variant="outlined" startIcon={<QrCode2RoundedIcon />} href={selected.refundQrImageUrl} target="_blank" rel="noreferrer">Mở QR nhận tiền</Button>}
+        </Stack>
+      </DialogContent>
+      <DialogActions sx={{ p: 2, flexWrap: 'wrap', gap: 1 }}>
+        <Button onClick={() => setSelected(null)}>Đóng</Button>
+        <Button variant="outlined" startIcon={<ChatRoundedIcon />} onClick={() => { openChat(selected); setSelected(null); }}>Chat với khách</Button>
+        {selected?.status === 'REQUESTED' && <Button color="error" startIcon={<CancelRoundedIcon />} disabled={busy} onClick={() => { setRejecting(selected); setSelected(null); }}>Từ chối</Button>}
+        {selected?.status === 'REQUESTED' && <Button variant="contained" color="success" disabled={busy || (selected?.refundMethod !== 'AUTOMATIC' && Number(selected?.amount || 0) >= Number(access?.refundApprovalThreshold || 200000) && !selected?.refundQrImageUrl)} onClick={() => approve(selected)}>Duyệt yêu cầu</Button>}
+      </DialogActions>
+    </Dialog>
 
     <Dialog open={Boolean(rejecting)} onClose={() => !busy && setRejecting(null)} fullWidth maxWidth="sm">
       <DialogTitle fontWeight={850}>Từ chối yêu cầu hoàn tiền</DialogTitle>

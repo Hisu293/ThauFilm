@@ -21,6 +21,7 @@ import {
   TableCell,
   TableContainer,
   TableHead,
+  TablePagination,
   TableRow,
   TextField,
   Typography,
@@ -33,9 +34,9 @@ import RefreshRoundedIcon from '@mui/icons-material/RefreshRounded';
 import SearchRoundedIcon from '@mui/icons-material/SearchRounded';
 import TaskAltRoundedIcon from '@mui/icons-material/TaskAltRounded';
 import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded';
-import PersonRoundedIcon from '@mui/icons-material/PersonRounded';
 import ShieldRoundedIcon from '@mui/icons-material/ShieldRounded';
 import QrCode2RoundedIcon from '@mui/icons-material/QrCode2Rounded';
+import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded';
 import adminService from '../../services/adminService';
 import { connectRealtime } from '../../services/realtimeService';
 
@@ -81,8 +82,10 @@ const RefundSection = () => {
   const [busy, setBusy] = useState(false);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
+  const [page, setPage] = useState(0);
   const [approving, setApproving] = useState(null);
   const [rejecting, setRejecting] = useState(null);
+  const [selected, setSelected] = useState(null);
   const [reason, setReason] = useState('');
 
   const load = useCallback(async (silent = false) => {
@@ -134,6 +137,9 @@ const RefundSection = () => {
         .some((value) => String(value || '').toLocaleLowerCase('vi').includes(keyword));
     });
   }, [items, query, statusFilter]);
+  const pageCount = Math.max(1, Math.ceil(filteredItems.length / 10));
+  const safePage = Math.min(page, pageCount - 1);
+  const pagedItems = filteredItems.slice(safePage * 10, safePage * 10 + 10);
 
   const patchItem = (updated) => setItems((list) => list.map((item) => (item.id === updated.id ? updated : item)));
 
@@ -170,7 +176,9 @@ const RefundSection = () => {
     setBusy(true);
     setError('');
     try {
-      patchItem(await adminService.retryAutomaticRefund(item.id));
+      const updated = await adminService.retryAutomaticRefund(item.id);
+      patchItem(updated);
+      setSelected((current) => (current?.id === updated.id ? updated : current));
     } catch (err) {
       setError(err.message || 'Không thể thử lại lệnh chi PayOS/Bảo Kim.');
     } finally {
@@ -231,12 +239,12 @@ const RefundSection = () => {
           <TextField
             size="small"
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => { setQuery(event.target.value); setPage(0); }}
             placeholder="Tìm mã booking, mã vé, khách hàng, phim..."
             sx={{ width: { xs: '100%', sm: 380 } }}
             slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchRoundedIcon fontSize="small" /></InputAdornment> } }}
           />
-          <TextField select size="small" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)} sx={{ minWidth: 190 }}>
+          <TextField select size="small" value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(0); }} sx={{ minWidth: 190 }}>
             <MenuItem value="ALL">Tất cả trạng thái</MenuItem>
             {Object.entries(statusMeta).map(([value, meta]) => <MenuItem key={value} value={value}>{meta.label}</MenuItem>)}
           </TextField>
@@ -247,16 +255,13 @@ const RefundSection = () => {
       {loading ? <Box minHeight={340} display="grid" sx={{ placeItems: 'center' }}><CircularProgress /></Box> : <TableContainer sx={{ overflowX: 'hidden' }}>
         <Table size="small" sx={{ width: '100%', tableLayout: 'fixed', '& th': { py: 1.25, px: 1.25, fontSize: '0.76rem' }, '& td': { px: 1.25, fontSize: '0.82rem', verticalAlign: 'middle' } }}>
           <TableHead><TableRow>
-            <TableCell sx={{ width: '11%' }}>Yêu cầu</TableCell>
-            <TableCell sx={{ width: '20%' }}>Khách hàng</TableCell>
-            <TableCell sx={{ width: '18%' }}>Vé / phim</TableCell>
-            <TableCell sx={{ width: '15%' }}>Xác minh / lý do</TableCell>
-            <TableCell sx={{ width: '11%' }}>Số tiền</TableCell>
-            <TableCell sx={{ width: '15%' }}>Hoàn tiền</TableCell>
-            <TableCell sx={{ width: '10%' }} align="right">Quyết định</TableCell>
+            <TableCell sx={{ width: '17%' }}>Yêu cầu</TableCell>
+            <TableCell sx={{ width: '25%' }}>Khách hàng</TableCell>
+            <TableCell sx={{ width: '28%' }}>Vé / phim</TableCell>
+            <TableCell sx={{ width: '30%' }}>Xác minh / lý do</TableCell>
           </TableRow></TableHead>
           <TableBody>
-            {filteredItems.map((item) => {
+            {pagedItems.map((item) => {
               const meta = statusMeta[item.status] || { label: item.status, color: 'default' };
               return <TableRow key={item.id} hover sx={{ '& td': { py: 1.25 } }}>
                 <TableCell><Typography fontWeight={850}>{item.bookingCode || '—'}</Typography><Typography variant="caption" color="text.secondary">Gửi: {dateTime(item.createdAt)}</Typography></TableCell>
@@ -266,38 +271,27 @@ const RefundSection = () => {
                     <Box sx={{ minWidth: 0 }}><Typography noWrap fontWeight={750}>{item.customerName || '—'}</Typography><Typography noWrap display="block" variant="caption" color="text.secondary" title={item.customerEmail || ''}>{item.customerEmail || '—'}</Typography></Box>
                   </Stack>
                 </TableCell>
-                <TableCell><Typography fontFamily="monospace" fontWeight={800}>{item.ticketCode || '—'}</Typography><Typography variant="caption" color="text.secondary" sx={{ display: 'block', overflowWrap: 'anywhere' }}>{item.movieTitle || '—'} · {dateTime(item.showtimeStart)}</Typography></TableCell>
+                <TableCell><Typography fontFamily="monospace" fontWeight={800}>{item.ticketCode || '—'}</Typography><Typography noWrap variant="caption" color="text.secondary" display="block">{item.movieTitle || '—'}</Typography></TableCell>
                 <TableCell>
-                  <Stack spacing={0.4}>
-                    <Stack direction="row" spacing={0.5} alignItems="center"><PersonRoundedIcon sx={{ fontSize: 17 }} color="action" /><Typography variant="body2">{item.staffName || 'Chưa chỉ định'}</Typography></Stack>
-                    <Typography variant="caption" color="text.secondary" sx={{ overflowWrap: 'anywhere' }}>{item.reason || 'Không có lý do'}</Typography>
-                    {item.refundMethod === 'AUTOMATIC' && <Typography variant="caption" color="success.main">Tự động · BIN {item.bankBin} · STK {item.bankAccountNumber}</Typography>}
-                    {item.rejectionReason && <Typography variant="caption" color="error">Từ chối: {item.rejectionReason}</Typography>}
-                  </Stack>
-                </TableCell>
-                <TableCell><Typography noWrap fontWeight={950} color={item.status === 'PENDING_APPROVAL' ? 'warning.main' : 'text.primary'}>{money(item.amount)}</Typography></TableCell>
-                <TableCell><Stack spacing={0.75} alignItems="flex-start">
-                  {item.refundMethod === 'AUTOMATIC'
-                    ? <Chip size="small" color="success" variant="outlined" label="PayOS/Bảo Kim" />
-                    : item.refundQrImageUrl
-                    ? <Button size="small" variant="outlined" startIcon={<QrCode2RoundedIcon />} href={item.refundQrImageUrl} target="_blank" rel="noreferrer" sx={{ minWidth: 0, whiteSpace: 'nowrap' }}>Mở QR</Button>
-                    : <Chip size="small" color="error" variant="outlined" label="Thiếu QR" />}
-                  <Chip size="small" label={meta.label} color={meta.color} sx={{ maxWidth: '100%', fontWeight: 750, '& .MuiChip-label': { overflow: 'hidden', textOverflow: 'ellipsis' } }} />
-                </Stack></TableCell>
-                <TableCell align="right">
-                  {item.status === 'PENDING_APPROVAL' ? <Stack alignItems="flex-end" spacing={0.5}>
-                    <Button size="small" variant="contained" color="success" disabled={busy} onClick={() => setApproving(item)} sx={{ minWidth: 72 }}>Duyệt</Button>
-                    <Button size="small" color="error" disabled={busy} onClick={() => setRejecting(item)} sx={{ minWidth: 72 }}>Từ chối</Button>
-                  </Stack> : item.automaticRetryAvailable ? (
-                    <Button size="small" variant="contained" color="warning" startIcon={<RefreshRoundedIcon />}
-                      disabled={busy} onClick={() => retryAutomatic(item)}>
-                      Thử lại
+                  <Stack direction="row" spacing={1} alignItems="center" justifyContent="space-between">
+                    <Box sx={{ minWidth: 0 }}>
+                      <Chip size="small" label={meta.label} color={meta.color} sx={{ maxWidth: '100%' }} />
+                      <Typography noWrap variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>{item.reason || 'Không có lý do'}</Typography>
+                    </Box>
+                    <Button
+                      size="small"
+                      variant="outlined"
+                      startIcon={<VisibilityRoundedIcon />}
+                      onClick={() => setSelected(item)}
+                      sx={{ flexShrink: 0 }}
+                    >
+                      Xem
                     </Button>
-                  ) : <Typography variant="caption" color="text.disabled">Đã xử lý</Typography>}
+                  </Stack>
                 </TableCell>
               </TableRow>;
             })}
-            {!filteredItems.length && <TableRow><TableCell colSpan={7}>
+            {!filteredItems.length && <TableRow><TableCell colSpan={4}>
               <Stack alignItems="center" spacing={1.25} py={8}>
                 <Avatar sx={{ width: 56, height: 56, bgcolor: 'action.hover', color: 'text.secondary' }}><ReceiptLongRoundedIcon /></Avatar>
                 <Typography fontWeight={850}>{items.length ? 'Không tìm thấy yêu cầu phù hợp' : 'Chưa có yêu cầu cần Admin duyệt'}</Typography>
@@ -307,7 +301,47 @@ const RefundSection = () => {
           </TableBody>
         </Table>
       </TableContainer>}
+      {!loading && <TablePagination
+        component="div"
+        count={filteredItems.length}
+        page={safePage}
+        onPageChange={(_, nextPage) => setPage(nextPage)}
+        rowsPerPage={10}
+        rowsPerPageOptions={[10]}
+        labelRowsPerPage="Số dòng mỗi trang"
+        labelDisplayedRows={({ from, to, count }) => `${from}–${to} / ${count}`}
+      />}
     </Card>
+
+    <Dialog open={Boolean(selected)} onClose={() => !busy && setSelected(null)} fullWidth maxWidth="md">
+      <DialogTitle fontWeight={900}>Chi tiết yêu cầu hoàn tiền</DialogTitle>
+      <DialogContent dividers>
+        <Stack spacing={2}>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} justifyContent="space-between">
+            <Box><Typography variant="caption" color="text.secondary">Mã booking / mã vé</Typography><Typography fontWeight={900}>{selected?.bookingCode || '—'} · {selected?.ticketCode || '—'}</Typography></Box>
+            <Chip label={(statusMeta[selected?.status] || {}).label || selected?.status || '—'} color={(statusMeta[selected?.status] || {}).color || 'default'} />
+          </Stack>
+          <Divider />
+          <Box display="grid" gridTemplateColumns={{ xs: '1fr', sm: 'repeat(2, 1fr)' }} gap={2}>
+            <Box><Typography variant="caption" color="text.secondary">Khách hàng</Typography><Typography fontWeight={800}>{selected?.customerName || '—'}</Typography><Typography variant="body2">{selected?.customerEmail || '—'}</Typography></Box>
+            <Box><Typography variant="caption" color="text.secondary">Staff trưởng xác minh</Typography><Typography fontWeight={800}>{selected?.staffName || 'Chưa chỉ định'}</Typography></Box>
+            <Box><Typography variant="caption" color="text.secondary">Phim / suất chiếu</Typography><Typography fontWeight={800}>{selected?.movieTitle || '—'}</Typography><Typography variant="body2">{dateTime(selected?.showtimeStart)} – {dateTime(selected?.showtimeEnd)}</Typography></Box>
+            <Box><Typography variant="caption" color="text.secondary">Số tiền hoàn</Typography><Typography variant="h6" fontWeight={950} color="warning.main">{money(selected?.amount)}</Typography></Box>
+            <Box><Typography variant="caption" color="text.secondary">Trạng thái suất chiếu</Typography><Typography fontWeight={700}>{selected?.showtimeEnded ? 'Suất đã kết thúc' : selected?.showtimeStarted ? 'Suất đang chiếu' : 'Chưa đến giờ chiếu'}</Typography></Box>
+            <Box><Typography variant="caption" color="text.secondary">Dữ liệu xem phim</Typography><Typography fontWeight={700} color={selected?.contentAccessed ? 'error.main' : 'success.main'}>{selected?.contentAccessed ? `Đã mở phim lúc ${dateTime(selected?.firstViewedAt)}` : 'Chưa ghi nhận mở phim'}</Typography></Box>
+          </Box>
+          <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: 'action.hover' }}><Typography variant="caption" color="text.secondary">Lý do khách gửi</Typography><Typography sx={{ whiteSpace: 'pre-wrap' }}>{selected?.reason || 'Không có lý do'}</Typography>{selected?.rejectionReason && <Typography color="error.main" sx={{ mt: 1 }}>Phản hồi xử lý: {selected.rejectionReason}</Typography>}</Box>
+          <Box><Typography variant="caption" color="text.secondary">Phương thức nhận tiền</Typography><Typography fontWeight={750}>{selected?.refundMethod === 'AUTOMATIC' ? `PayOS/Bảo Kim · BIN ${selected?.bankBin || '—'} · STK ${selected?.bankAccountNumber || '—'}` : 'Hoàn tiền thủ công bằng QR'}</Typography></Box>
+          {selected?.refundQrImageUrl && <Button variant="outlined" startIcon={<QrCode2RoundedIcon />} href={selected.refundQrImageUrl} target="_blank" rel="noreferrer">Mở QR nhận tiền</Button>}
+        </Stack>
+      </DialogContent>
+      <DialogActions sx={{ p: 2 }}>
+        <Button onClick={() => setSelected(null)}>Đóng</Button>
+        {selected?.automaticRetryAvailable && <Button variant="contained" color="warning" startIcon={<RefreshRoundedIcon />} disabled={busy} onClick={() => retryAutomatic(selected)}>Thử hoàn lại</Button>}
+        {selected?.status === 'PENDING_APPROVAL' && <Button color="error" disabled={busy} onClick={() => { setRejecting(selected); setSelected(null); }}>Từ chối</Button>}
+        {selected?.status === 'PENDING_APPROVAL' && <Button variant="contained" color="success" disabled={busy} onClick={() => { setApproving(selected); setSelected(null); }}>Duyệt hoàn tiền</Button>}
+      </DialogActions>
+    </Dialog>
 
     <Dialog open={Boolean(approving)} onClose={() => !busy && setApproving(null)} fullWidth maxWidth="sm">
       <DialogTitle fontWeight={900}>Xác nhận duyệt hoàn tiền</DialogTitle>

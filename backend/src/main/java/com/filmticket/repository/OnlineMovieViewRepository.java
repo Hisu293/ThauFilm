@@ -6,10 +6,12 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
 public interface OnlineMovieViewRepository extends JpaRepository<OnlineMovieView, UUID> {
     List<OnlineMovieView> findByViewedAtBetween(LocalDateTime from, LocalDateTime to);
     boolean existsByBookingId(UUID bookingId);
+    Optional<OnlineMovieView> findFirstByBookingIdOrderByViewedAtAsc(UUID bookingId);
 }

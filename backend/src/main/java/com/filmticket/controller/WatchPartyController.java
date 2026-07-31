@@ -58,11 +58,29 @@ public class WatchPartyController {
     }
 
     @GetMapping("/{roomId}/stream")
-    public ResponseEntity<ApiResponse<MovieStreamResponse>> stream(@PathVariable UUID roomId) {
+    public ResponseEntity<ApiResponse<MovieStreamResponse>> stream(
+            @PathVariable UUID roomId,
+            @RequestHeader("X-Viewing-Device-Id") String deviceId) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Lấy nội dung xem Watch Party thành công",
-                watchPartyService.getStream(roomId, userId())
+                watchPartyService.getStream(roomId, userId(), deviceId)
         ));
+    }
+
+    @PostMapping("/{roomId}/stream/heartbeat")
+    public ResponseEntity<ApiResponse<Void>> streamHeartbeat(
+            @PathVariable UUID roomId,
+            @RequestHeader("X-Viewing-Device-Id") String deviceId) {
+        watchPartyService.heartbeatStream(roomId, userId(), deviceId);
+        return ResponseEntity.ok(ApiResponse.success("Đã duy trì phiên xem Watch Party", null));
+    }
+
+    @PostMapping("/{roomId}/stream/release")
+    public ResponseEntity<ApiResponse<Void>> streamRelease(
+            @PathVariable UUID roomId,
+            @RequestHeader("X-Viewing-Device-Id") String deviceId) {
+        watchPartyService.releaseStream(roomId, userId(), deviceId);
+        return ResponseEntity.ok(ApiResponse.success("Đã đóng phiên xem Watch Party", null));
     }
 
     @PostMapping("/{roomId}/refund")

@@ -65,11 +65,17 @@ public class RefundStatusScheduler {
                 log.info("PayOS đã hoàn tiền thành công sau khi chờ: mã đơn đặt vé={}, mã thanh toán={}, mã chi trả={}",
                         booking.getId(), payment.getId(), history.getPayosRefundId());
             } else if (!payout.processing()) {
+                Booking booking = bookingRepository.findById(history.getBookingId()).orElse(null);
                 Payment payment = paymentRepository.findById(history.getPaymentId()).orElse(null);
                 if (payment != null) {
                     payment.setStatus(PaymentStatus.REFUND_FAILED);
                     payment.setRefundFailedReason("PayOS trả về trạng thái: " + payout.state());
                     paymentRepository.save(payment);
+                    if (booking != null) {
+                        userRepository.findById(booking.getUserId()).ifPresent(user ->
+                                refundEmailService.sendFailure(
+                                        user, booking, payment, payment.getRefundFailedReason()));
+                    }
                 }
                 history.setStatus(RefundHistoryStatus.FAILED);
                 historyRepository.save(history);

@@ -220,7 +220,7 @@ public class WatchPartyService {
         }
     }
 
-    public MovieStreamResponse getStream(UUID roomId, UUID userId) {
+    public MovieStreamResponse getStream(UUID roomId, UUID userId, String deviceId) {
         WatchPartyRoom room = requireRoom(roomId);
         synchronized (room) {
             WatchPartyMember member = ensureMember(room, userId);
@@ -230,7 +230,32 @@ public class WatchPartyService {
             if (!isReadyToWatch(room)) {
                 throw new BadRequestException("Phòng đang chờ tất cả thành viên thanh toán");
             }
-            return movieStreamService.buildResponseAndRecord(room.movie, userId);
+            if (member.bookingId == null) {
+                throw new BadRequestException("Không tìm thấy booking của thành viên Watch Party");
+            }
+            return movieStreamService.getWatchPartyStream(
+                    room.movie, userId, member.bookingId, room.showtimeId, deviceId);
+        }
+    }
+
+    public void heartbeatStream(UUID roomId, UUID userId, String deviceId) {
+        WatchPartyRoom room = requireRoom(roomId);
+        synchronized (room) {
+            WatchPartyMember member = ensureMember(room, userId);
+            if (member.bookingId == null || !member.paid) {
+                throw new BadRequestException("Không tìm thấy phiên xem Watch Party đã thanh toán");
+            }
+            movieStreamService.heartbeatBooking(member.bookingId, userId, deviceId);
+        }
+    }
+
+    public void releaseStream(UUID roomId, UUID userId, String deviceId) {
+        WatchPartyRoom room = requireRoom(roomId);
+        synchronized (room) {
+            WatchPartyMember member = ensureMember(room, userId);
+            if (member.bookingId != null) {
+                movieStreamService.releaseBooking(member.bookingId, userId, deviceId);
+            }
         }
     }
 

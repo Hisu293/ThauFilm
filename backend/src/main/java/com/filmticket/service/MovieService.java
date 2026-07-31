@@ -36,7 +36,7 @@ public class MovieService {
 
     @Transactional(readOnly = true)
     public List<MovieResponse> getAllMovies() {
-        return movieRepository.findAll().stream()
+        return movieRepository.findAllByOrderByCreatedAtDesc().stream()
                 .map(movie -> MovieResponse.fromMovieWithStream(
                         movie, resolvePosterUrl(movie), resolveTrailerUrl(movie), resolveHeroBannerUrl(movie)))
                 .toList();

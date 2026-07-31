@@ -50,4 +50,32 @@ public class RefundEmailService {
             log.error("Gửi email hoàn tiền thất bại: mã đơn đặt vé={}, email={}", booking.getId(), customer.getEmail(), ex);
         }
     }
+
+    public void sendFailure(User customer, Booking booking, Payment payment, String failureReason) {
+        if (customer == null || customer.getEmail() == null || customer.getEmail().isBlank()) return;
+        Showtime showtime = showtimeRepository.findById(booking.getShowtimeId()).orElse(null);
+        Movie movie = showtime == null ? null : movieRepository.findById(showtime.getMovieId()).orElse(null);
+        String safeReason = failureReason == null || failureReason.isBlank()
+                ? "Cổng thanh toán chưa thể xử lý yêu cầu."
+                : failureReason;
+        try {
+            String body = "Xin chào " + (customer.getFullName() == null ? "bạn" : customer.getFullName()) + ",\n\n"
+                    + "Yêu cầu hoàn tiền của bạn chưa được xử lý thành công.\n"
+                    + "Phim: " + (movie == null ? "Không xác định" : movie.getTitle()) + "\n"
+                    + "Mã booking: " + booking.getConfirmationCode() + "\n"
+                    + "Số tiền: " + payment.getAmount().toPlainString() + " đ\n"
+                    + "Lý do: " + safeReason + "\n\n"
+                    + "Yêu cầu vẫn được lưu để bộ phận hỗ trợ kiểm tra. Vui lòng theo dõi tại trang Lịch sử hoàn tiền.";
+            outboundEmailService.send(
+                    "REFUND_FAILED_" + payment.getId() + "_" + payment.getStatus(),
+                    customer.getEmail(),
+                    "ThauFilm - Hoàn tiền chưa thành công",
+                    body,
+                    false,
+                    List.of());
+        } catch (Exception ex) {
+            log.error("Gửi email báo hoàn tiền thất bại không thành công: mã booking={}, email={}",
+                    booking.getId(), customer.getEmail(), ex);
+        }
+    }
 }

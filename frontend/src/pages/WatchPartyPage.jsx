@@ -120,6 +120,21 @@ export default function WatchPartyPage() {
   }, [me?.paid, room?.readyToWatch, roomId]);
 
   useEffect(() => {
+    if (!streamUrl || !roomId) return undefined;
+    const heartbeat = () => {
+      watchPartyService.heartbeatStream(roomId).catch((err) => {
+        setError(err.message || 'Phiên xem phim nhóm không còn hiệu lực.');
+        setStreamUrl('');
+      });
+    };
+    const interval = window.setInterval(heartbeat, 25000);
+    return () => {
+      window.clearInterval(interval);
+      watchPartyService.releaseStream(roomId).catch(() => {});
+    };
+  }, [roomId, streamUrl]);
+
+  useEffect(() => {
     if (!roomId || !location.search) return;
     const params = new URLSearchParams(location.search);
     const returnedFromPayos = params.has('orderCode') || params.has('status') || params.has('code') || params.has('id');

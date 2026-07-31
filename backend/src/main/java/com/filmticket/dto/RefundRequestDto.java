@@ -34,6 +34,11 @@ public class RefundRequestDto {
     private boolean requiresAdmin;
     private boolean ticketCheckedIn;
     private LocalDateTime showtimeStart;
+    private LocalDateTime showtimeEnd;
+    private boolean showtimeStarted;
+    private boolean showtimeEnded;
+    private boolean contentAccessed;
+    private LocalDateTime firstViewedAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private LocalDateTime reviewedAt;
