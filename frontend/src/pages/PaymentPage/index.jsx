@@ -413,7 +413,7 @@ export const PaymentPage = () => {
         },
       });
     } else {
-      navigate('/profile?tab=history', { replace: true });
+      navigate(`/my-bookings/${paidBookingId}`, { replace: true });
     }
 
     updateBookingState({ bookingId: paidBookingId, paymentStatus: 'PAID' });

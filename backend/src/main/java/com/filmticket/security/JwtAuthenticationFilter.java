@@ -79,6 +79,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         return HttpMethod.OPTIONS.matches(method)
                 || path.startsWith("/api/auth/register")
+                || path.startsWith("/api/auth/forgot-password/")
                 || path.startsWith("/api/auth/login")
                 || path.startsWith("/api/auth/google")
                 || path.startsWith("/api/auth/refresh")

@@ -19,7 +19,6 @@ import {
   Typography,
 } from '@mui/material';
 import AuthLayout from '../layouts/AuthLayout';
-import ForgotPasswordDialog from '../components/ForgotPasswordDialog';
 import { useAuth } from '../context/AuthContext';
 import { authService, parseAuthResponse } from '../services/authService';
 
@@ -76,7 +75,7 @@ const LoginPage = () => {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [serverError, setServerError] = useState('');
-  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
+  const [showForgotPasswordMessage, setShowForgotPasswordMessage] = useState(false);
 
   const completeLogin = useCallback((body) => {
     const { user, accessToken, refreshToken } = parseAuthResponse(body);
@@ -325,12 +324,24 @@ const LoginPage = () => {
               type="button"
               variant="text"
               color="inherit"
-              onClick={() => setForgotPasswordOpen(true)}
+              onClick={() => {
+                setShowForgotPasswordMessage(false);
+                navigate('/forgot-password');
+              }}
               sx={{ textTransform: 'none', color: 'rgba(255,255,255,0.75)', fontSize: '0.88rem' }}
             >
               Quên mật khẩu?
             </Button>
           </Stack>
+
+          <Collapse in={showForgotPasswordMessage}>
+            <Typography
+              role="status"
+              sx={{ color: '#ffb3b8', textAlign: 'right', fontSize: '0.88rem', fontWeight: 700 }}
+            >
+              Vui lòng liên hệ admin!
+            </Typography>
+          </Collapse>
 
           <Button
             id="login-submit"
@@ -392,7 +403,6 @@ const LoginPage = () => {
           </Typography>
         </Stack>
       </Box>
-      <ForgotPasswordDialog open={forgotPasswordOpen} onClose={() => setForgotPasswordOpen(false)} />
     </AuthLayout>
   );
 };

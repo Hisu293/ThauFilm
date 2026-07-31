@@ -19,7 +19,33 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<ApiResponse<AuthResponse>> register(@Valid @RequestBody RegisterRequest request) {
         AuthResponse response = authService.register(request);
-        return ResponseEntity.ok(ApiResponse.success("Registration successful", response));
+        return ResponseEntity.ok(ApiResponse.success("OTP xác minh đã được gửi đến email", response));
+    }
+
+    @PostMapping("/register/verify-otp")
+    public ResponseEntity<ApiResponse<AuthResponse>> verifyRegistration(
+            @Valid @RequestBody VerifyRegistrationOtpRequest request) {
+        return ResponseEntity.ok(ApiResponse.success(
+                "Xác minh tài khoản thành công", authService.verifyRegistration(request)));
+    }
+
+    @PostMapping("/register/resend-otp")
+    public ResponseEntity<ApiResponse<Void>> resendRegistrationOtp(@Valid @RequestBody EmailRequest request) {
+        authService.resendRegistrationOtp(request);
+        return ResponseEntity.ok(ApiResponse.success("Đã gửi lại OTP xác minh", null));
+    }
+
+    @PostMapping("/forgot-password/request-otp")
+    public ResponseEntity<ApiResponse<Void>> requestPasswordReset(@Valid @RequestBody EmailRequest request) {
+        authService.requestPasswordReset(request);
+        return ResponseEntity.ok(ApiResponse.success(
+                "Nếu email tồn tại, mã OTP đặt lại mật khẩu đã được gửi", null));
+    }
+
+    @PostMapping("/forgot-password/reset")
+    public ResponseEntity<ApiResponse<Void>> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        authService.resetPassword(request);
+        return ResponseEntity.ok(ApiResponse.success("Đặt lại mật khẩu thành công", null));
     }
 
     @PostMapping("/login")
@@ -45,25 +71,5 @@ public class AuthController {
     public ResponseEntity<ApiResponse<Void>> logout(@RequestBody(required = false) RefreshTokenRequest request) {
         authService.logout(request != null ? request.getRefreshToken() : null);
         return ResponseEntity.ok(ApiResponse.success("Logout successful", null));
-    }
-    @PostMapping("/forgot-password")
-    public ResponseEntity<ApiResponse<String>> getSecurityQuestion(@Valid @RequestBody ForgotPasswordRequest request) {
-        try {
-            String question = authService.getSecurityQuestion(request);
-            return ResponseEntity.ok(ApiResponse.success("Get security question successfully", question));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
-            // Hoặc dùng ApiResponse.fail() tùy thuộc vào hàm báo lỗi trong dự án của bạn
-        }
-    }
-
-    @PostMapping("/reset-password")
-    public ResponseEntity<ApiResponse<Void>> resetPassword(@Valid @RequestBody ResetPasswordWithQuestionRequest request) {
-        try {
-            authService.resetPasswordWithQuestion(request);
-            return ResponseEntity.ok(ApiResponse.success("Reset password successfully", null));
-        } catch (Exception e) {
-            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
-        }
     }
 }

@@ -233,6 +233,8 @@ const ProfilePage = () => {
   // Dynamic API state and side effects
   const { loading: apiLoading, getHistory, cancel } = useBooking();
   const [history, setHistory] = useState([]);
+  const [historyError, setHistoryError] = useState('');
+  const [historyReload, setHistoryReload] = useState(0);
   const [subTab, setSubTab] = useState('all');
   const [nowTs, setNowTs] = useState(0);
   const [loyalty, setLoyalty] = useState(null);
@@ -383,15 +385,18 @@ const ProfilePage = () => {
             };
           });
           setHistory(mapped);
+          setHistoryError('');
           mapped
             .filter((ticket) => ticket.isExpired && ['PENDING', 'HOLD'].includes(ticket.rawStatus))
             .forEach((ticket) => {
               cancel(ticket.bookingId).catch(() => {});
             });
         })
-        .catch(() => {});
+        .catch((error) => {
+          setHistoryError(error.message || 'Không thể tải Vé của tôi. Vui lòng thử lại.');
+        });
     }
-  }, [active, cancel, getHistory]);
+  }, [active, cancel, getHistory, historyReload]);
 
   useEffect(() => {
     Promise.resolve().then(() => {
@@ -588,6 +593,15 @@ const ProfilePage = () => {
                   </span>
                 </div>
               </div>
+              {historyError && (
+                <Box sx={{ mb: 2, p: 2, borderRadius: 2, bgcolor: 'rgba(229,9,20,.12)', color: '#ffb3b8' }}>
+                  {historyError}
+                  <button type="button" className="pf-btn pf-btn--outline"
+                    style={{ marginLeft: 12 }} onClick={() => setHistoryReload((value) => value + 1)}>
+                    Tải lại
+                  </button>
+                </Box>
+              )}
               {apiLoading ? (
                 <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
                   <CircularProgress sx={{ color: 'primary.main' }} />

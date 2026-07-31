@@ -51,8 +51,6 @@ const RegisterPage = () => {
     phone:           '',
     password:        '',
     confirmPassword: '',
-    securityQuestion: '',
-    securityAnswer:   '',
   });
   const [showPw,        setShowPw]        = useState(false);
   const [showCpw,       setShowCpw]       = useState(false);
@@ -60,6 +58,8 @@ const RegisterPage = () => {
   const [success,       setSuccess]       = useState(false);
   const [serverError,   setServerError]   = useState('');
   const [loading,        setLoading]        = useState(false);
+  const [otpStep, setOtpStep] = useState(false);
+  const [otp, setOtp] = useState('');
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -89,10 +89,6 @@ const RegisterPage = () => {
       e.confirmPassword = 'Vui lòng xác nhận mật khẩu.';
     else if (form.password !== form.confirmPassword)
       e.confirmPassword = 'Mật khẩu xác nhận không khớp.';
-    if (!form.securityQuestion.trim())
-      e.securityQuestion = 'Vui lòng nhập câu hỏi bảo mật.';
-    if (!form.securityAnswer.trim())
-      e.securityAnswer = 'Vui lòng nhập câu trả lời bảo mật.';
     return e;
   }, [submitted, form]);
 
@@ -107,6 +103,24 @@ const RegisterPage = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (otpStep) {
+      if (!/^[0-9]{6}$/.test(otp)) {
+        setServerError('Vui lòng nhập đúng mã OTP gồm 6 chữ số.');
+        return;
+      }
+      setLoading(true);
+      setServerError('');
+      try {
+        await authService.verifyRegistrationOtp(form.email.trim(), otp);
+        setSuccess(true);
+        setTimeout(() => navigate('/login'), 1500);
+      } catch (err) {
+        setServerError(err.message || 'Xác minh OTP thất bại.');
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
     setSubmitted(true);
     setServerError('');
 
@@ -118,35 +132,19 @@ const RegisterPage = () => {
       !PHONE_RE.test(form.phone.trim()) ||
       !form.password ||
       form.password.length < 6 ||
-      form.password !== form.confirmPassword ||
-      !form.securityQuestion.trim() ||
-      !form.securityAnswer.trim();
+      form.password !== form.confirmPassword;
 
     if (hasErrors) return;
 
     setLoading(true);
     try {
-      const resp = await authService.register({
+      await authService.register({
         fullName: form.fullName,
         email: form.email,
         phone: form.phone,
         password: form.password,
-        securityQuestion: form.securityQuestion.trim(),
-        securityAnswer: form.securityAnswer.trim(),
       });
-      // backend wraps payload in { success, message, data: AuthResponse }
-      const payload = resp?.data?.data || resp?.data;
-      if (payload?.accessToken) {
-        localStorage.setItem('cinema_token', payload.accessToken);
-      }
-      if (payload?.refreshToken) {
-        localStorage.setItem('cinema_refresh_token', payload.refreshToken);
-      }
-      if (payload) {
-        localStorage.setItem('cinema_user', JSON.stringify(payload));
-      }
-      setSuccess(true);
-      setTimeout(() => navigate('/login'), 2000);
+      setOtpStep(true);
     } catch (err) {
       setServerError(err.message || 'Đăng ký thất bại. Vui lòng thử lại.');
     } finally {
@@ -273,32 +271,6 @@ const RegisterPage = () => {
             required
           />
 
-          <TextField
-            label="Câu hỏi bảo mật"
-            name="securityQuestion"
-            id="reg-security-question"
-            value={form.securityQuestion}
-            onChange={handleChange}
-            error={Boolean(errors.securityQuestion)}
-            helperText={errors.securityQuestion || 'Ví dụ: Tên trường tiểu học của bạn là gì?'}
-            autoComplete="off"
-            fullWidth
-            required
-          />
-
-          <TextField
-            label="Câu trả lời bảo mật"
-            name="securityAnswer"
-            id="reg-security-answer"
-            value={form.securityAnswer}
-            onChange={handleChange}
-            error={Boolean(errors.securityAnswer)}
-            helperText={errors.securityAnswer || 'Hãy chọn câu trả lời dễ nhớ nhưng khó đoán.'}
-            autoComplete="off"
-            fullWidth
-            required
-          />
-
           {/* Password + strength bar */}
           <Box>
             <TextField
@@ -386,6 +358,29 @@ const RegisterPage = () => {
           />
 
           {/* Register Button */}
+          {otpStep && (
+            <>
+              <Alert severity="info">
+                Mã OTP đã được gửi đến {form.email}. Mã có hiệu lực trong 10 phút.
+              </Alert>
+              <TextField
+                label="Mã OTP"
+                value={otp}
+                onChange={(event) => setOtp(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                inputProps={{ inputMode: 'numeric', maxLength: 6 }}
+                fullWidth
+                required
+              />
+              <Button
+                type="button"
+                disabled={loading}
+                onClick={() => authService.resendRegistrationOtp(form.email.trim())
+                  .catch((err) => setServerError(err.message || 'Không thể gửi lại OTP.'))}
+              >
+                Gửi lại OTP
+              </Button>
+            </>
+          )}
           <Button
             id="reg-submit"
             type="submit"
@@ -407,7 +402,7 @@ const RegisterPage = () => {
               },
             }}
           >
-            {loading ? <CircularProgress size={22} color="inherit" /> : 'Tạo tài khoản'}
+            {loading ? <CircularProgress size={22} color="inherit" /> : (otpStep ? 'Xác minh OTP' : 'Tạo tài khoản')}
           </Button>
 
           <Typography

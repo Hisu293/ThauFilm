@@ -4,11 +4,12 @@ import com.filmticket.dto.AuthResponse;
 import com.filmticket.dto.GoogleLoginRequest;
 import com.filmticket.dto.LoginRequest;
 import com.filmticket.dto.RegisterRequest;
-import com.filmticket.dto.ForgotPasswordRequest; // Nhớ import DTO mới
-import com.filmticket.dto.ResetPasswordWithQuestionRequest; // Nhớ import DTO mới
+import com.filmticket.dto.EmailRequest;
+import com.filmticket.dto.ResetPasswordRequest;
+import com.filmticket.dto.VerifyRegistrationOtpRequest;
 import com.filmticket.entity.RefreshToken;
 import com.filmticket.entity.User;
-import com.filmticket.exception.BadRequestException; // Dùng exception chuẩn của dự án
+import com.filmticket.exception.BadRequestException;
 import com.filmticket.repository.RefreshTokenRepository;
 import com.filmticket.repository.UserRepository;
 import com.filmticket.security.GoogleIdTokenVerifier;
@@ -34,34 +35,33 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final GoogleIdTokenVerifier googleIdTokenVerifier;
-    private final UserService userService; // BỔ SUNG: Tiêm UserService để gọi các hàm xử lý câu hỏi bảo mật
     private final AuditLogService auditLogService;
+    private final EmailOtpService emailOtpService;
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
-        if (userRepository.existsByEmail(request.getEmail())) {
+        String normalizedEmail = request.getEmail().trim().toLowerCase();
+        User existing = userRepository.findByEmail(normalizedEmail).orElse(null);
+        if (existing != null && existing.isEnabled()) {
             throw new BadRequestException("Email already registered");
         }
 
-        // Chuẩn hóa câu trả lời (xóa dấu, xóa cách, viết thường) trước khi băm
-        String processedAnswer = com.filmticket.util.StringUtil.normalizeAnswer(request.getSecurityAnswer());
-
-        User user = User.builder()
-                .email(request.getEmail())
-                .password(passwordEncoder.encode(request.getPassword()))
-                .fullName(request.getFullName())
-                .phone(request.getPhone())
+        User user = existing != null ? existing : User.builder()
+                .email(normalizedEmail)
                 .provider(User.AuthProvider.EMAIL)
                 .role(User.Role.MEMBER)
-                .enabled(true)
-                .securityQuestion(request.getSecurityQuestion())
-                .securityAnswer(passwordEncoder.encode(processedAnswer)) // Mã hóa câu trả lời đã chuẩn hóa
+                .enabled(false)
                 .build();
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        user.setFullName(request.getFullName());
+        user.setPhone(request.getPhone());
+        user.setEnabled(false);
 
         User saved = userRepository.save(user);
         log.info("Người dùng đã đăng ký: {}", saved.getEmail());
 
-        return issueTokens(saved);
+        emailOtpService.sendRegistrationOtp(saved.getEmail());
+        return null;
     }
 
     @Transactional
@@ -70,7 +70,7 @@ public class AuthService {
         try {
             User user = userRepository.findByEmail(request.getEmail())
                     .orElseThrow(() -> new BadRequestException("Invalid email or password"));
-            if (!user.isEnabled()) throw new BadRequestException("Account is disabled");
+            if (!user.isEnabled()) throw new BadRequestException("Email chưa được xác minh");
             if (user.getProvider() != User.AuthProvider.EMAIL) {
                 throw new BadRequestException("Please use " + user.getProvider().name().toLowerCase() + " login for this account");
             }
@@ -161,32 +161,6 @@ public class AuthService {
                 .build();
     }
 
-    // --- BỔ SUNG: 2 HÀM MỚI VÀO ĐÂY ĐỂ PHỤC VỤ CONTROLLER ---
-
-    @Transactional(readOnly = true)
-    public String getSecurityQuestion(ForgotPasswordRequest request) {
-        try {
-            return userService.getQuestionByEmail(request.getEmail());
-        } catch (RuntimeException e) {
-            throw new BadRequestException(e.getMessage());
-        }
-    }
-
-    @Transactional
-    public void resetPasswordWithQuestion(ResetPasswordWithQuestionRequest request) {
-        try {
-            userService.resetPasswordWithQuestion(
-                    request.getEmail(),
-                    request.getAnswer(),
-                    request.getNewPassword()
-            );
-        } catch (RuntimeException e) {
-            throw new BadRequestException(e.getMessage());
-        }
-    }
-
-    // ----------------------------------------------------
-
     @Transactional
     public void logout(String refreshTokenValue) {
         UUID revokedUserId = null;
@@ -205,6 +179,43 @@ public class AuthService {
                 .targetId(revokedUserId == null ? null : revokedUserId.toString())
                 .description("Người dùng đăng xuất").sensitive(true).build());
         log.info("Người dùng đã đăng xuất");
+    }
+
+    @Transactional
+    public AuthResponse verifyRegistration(VerifyRegistrationOtpRequest request) {
+        User user = userRepository.findByEmail(request.getEmail().trim().toLowerCase())
+                .orElseThrow(() -> new BadRequestException("Registration not found"));
+        if (user.isEnabled()) throw new BadRequestException("Email already verified");
+        emailOtpService.verifyRegistrationOtp(user.getEmail(), request.getOtp());
+        user.setEnabled(true);
+        userRepository.save(user);
+        return issueTokens(user);
+    }
+
+    public void resendRegistrationOtp(EmailRequest request) {
+        User user = userRepository.findByEmail(request.getEmail().trim().toLowerCase())
+                .orElseThrow(() -> new BadRequestException("Registration not found"));
+        if (user.isEnabled()) throw new BadRequestException("Email already verified");
+        emailOtpService.sendRegistrationOtp(user.getEmail());
+    }
+
+    public void requestPasswordReset(EmailRequest request) {
+        User user = userRepository.findByEmail(request.getEmail().trim().toLowerCase()).orElse(null);
+        if (user != null && user.isEnabled() && user.getProvider() == User.AuthProvider.EMAIL) {
+            emailOtpService.sendPasswordResetOtp(user.getEmail());
+        }
+    }
+
+    @Transactional
+    public void resetPassword(ResetPasswordRequest request) {
+        User user = userRepository.findByEmail(request.getEmail().trim().toLowerCase())
+                .filter(User::isEnabled)
+                .filter(item -> item.getProvider() == User.AuthProvider.EMAIL)
+                .orElseThrow(() -> new BadRequestException("OTP is invalid or expired"));
+        emailOtpService.verifyPasswordResetOtp(user.getEmail(), request.getOtp());
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+        refreshTokenRepository.deleteAllByUserId(user.getId());
     }
 
     @Transactional
@@ -235,6 +246,7 @@ public class AuthService {
                 .avatarUrl(user.getAvatarUrl())
                 .build();
     }
+
     private String maskEmail(String email) {
         if (email == null || email.isBlank() || !email.contains("@")) return "***";
         String[] parts = email.trim().split("@", 2);
