@@ -17,6 +17,9 @@ const statusLabel = {
   CANCELLED: 'Đã hủy',
 };
 
+const currentUserBookingId = (group) =>
+  group?.members?.find((member) => member.currentUser)?.bookingId;
+
 export default function GroupBookingPage() {
   const { groupId } = useParams();
   const navigate = useNavigate();
@@ -37,6 +40,11 @@ export default function GroupBookingPage() {
     try {
       const next = unwrap(await bookingApi.fetchGroupBooking(groupId));
       setGroup(next);
+      const bookingId = currentUserBookingId(next);
+      if (next?.status === 'CONFIRMED' && bookingId) {
+        navigate(`/my-bookings/${bookingId}`, { replace: true });
+        return;
+      }
       if (next?.showtimeId && next?.status === 'WAITING_SELECTION') {
         const rawSeats = unwrap(await bookingApi.fetchShowtimeSeats(next.showtimeId));
         setSeats(bookingService.normalizeSeats(rawSeats));
@@ -47,7 +55,7 @@ export default function GroupBookingPage() {
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [groupId]);
+  }, [groupId, navigate]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => load(), 0);
@@ -125,7 +133,12 @@ export default function GroupBookingPage() {
     try {
       const next = unwrap(await bookingApi.syncGroupPayment(groupId));
       setGroup(next);
-      navigate(`/booking/group/${groupId}`, { replace: true });
+      const bookingId = currentUserBookingId(next);
+      if (next?.status === 'CONFIRMED' && bookingId) {
+        navigate(`/my-bookings/${bookingId}`, { replace: true });
+      } else {
+        navigate(`/booking/group/${groupId}`, { replace: true });
+      }
     } catch (err) {
       setError(err.message || 'PayOS chưa xác nhận thanh toán. Vui lòng thử lại sau.');
     } finally {
@@ -151,7 +164,7 @@ export default function GroupBookingPage() {
         <Box>
           <Typography variant="h4" fontWeight={900}>Đặt vé xem phim cùng nhau</Typography>
           <Stack direction="row" spacing={1} alignItems="center" mt={1}>
-            <Chip label={statusLabel[group.status] || group.status} color={group.status === 'CONFIRMED' ? 'success' : terminal ? 'error' : 'warning'} />
+            <Chip label={statusLabel[group.status] || 'Chưa xác định'} color={group.status === 'CONFIRMED' ? 'success' : terminal ? 'error' : 'warning'} />
             {group.expiresAt && <Typography variant="body2" color="text.secondary">Hạn thanh toán: {new Date(group.expiresAt).toLocaleString('vi-VN')}</Typography>}
             <Chip size="small" variant="outlined" color={realtimeStatus === 'connected' ? 'success' : 'warning'} label={realtimeStatus === 'connected' ? 'Realtime' : 'Đang kết nối lại'} />
           </Stack>

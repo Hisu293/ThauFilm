@@ -18,11 +18,12 @@ import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded';
 import { bookingApi } from '../api/bookingApi';
 import EmptyState from '../components/common/EmptyState';
 import LoadingOverlay from '../components/common/LoadingOverlay';
+import { refundStatusLabel } from '../utils/statusLabels';
 
 const STATUS_META = {
   REQUESTED: { label: 'Staff đang kiểm tra', color: 'info' },
   PENDING_APPROVAL: { label: 'Chờ Admin duyệt', color: 'warning' },
-  APPROVED: { label: 'Đã hoàn tiền', color: 'success' },
+  APPROVED: { label: 'Đã hoàn tiền thành công', color: 'success' },
   REJECTED: { label: 'Đã từ chối', color: 'error' },
   REFUND_PENDING: { label: 'Đang hoàn tiền', color: 'warning' },
   REFUND_FAILED: { label: 'Hoàn tiền lỗi', color: 'error' },
@@ -163,7 +164,7 @@ export default function MyRefundsPage() {
         <Stack spacing={1.5}>
           {filteredItems.map((item) => {
             const status = String(item.status || '').toUpperCase();
-            const meta = STATUS_META[status] || { label: status || 'Không xác định', color: 'default' };
+            const meta = STATUS_META[status] || { label: refundStatusLabel(status), color: 'default' };
             return (
               <Card key={item.id} variant="outlined" sx={{ borderRadius: 3, bgcolor: 'rgba(30,41,59,0.52)', overflow: 'visible' }}>
                 <CardContent sx={{ p: { xs: 2, md: 2.5 }, '&:last-child': { pb: { xs: 2, md: 2.5 } } }}>

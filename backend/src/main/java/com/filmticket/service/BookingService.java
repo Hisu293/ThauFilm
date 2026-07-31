@@ -61,7 +61,7 @@ public class BookingService {
     @Transactional
     public List<ShowtimeSeatResponse> getAvailableSeats(UUID showtimeId, UUID currentUserId) {
         Showtime showtime = showtimeRepository.findById(showtimeId)
-                .orElseThrow(() -> new BadRequestException("Showtime not found"));
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy suất chiếu"));
 
         List<SeatAvailability> availabilities = seatAvailabilityRepository.findByShowtimeIdOrderBySeatId(showtimeId);
         if (availabilities.isEmpty() && !showtime.isOnline()) {
@@ -219,14 +219,14 @@ public class BookingService {
     @Transactional
     public BookingResponse createBooking(UUID userId, CreateBookingRequest request) {
         if (!userRepository.existsById(userId)) {
-            throw new BadRequestException("User not found");
+            throw new BadRequestException("Không tìm thấy người dùng");
         }
 
         Showtime showtime = showtimeRepository.findById(request.getShowtimeId())
-                .orElseThrow(() -> new BadRequestException("Showtime not found"));
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy suất chiếu"));
 
         if (showtime.getStartTime().isBefore(now())) {
-            throw new BadRequestException("Cannot book a past showtime");
+            throw new BadRequestException("Không thể đặt vé cho suất chiếu đã qua");
         }
 
         List<UUID> requestedSeatIds = normalizeSeatIds(request.getSeatIds());
@@ -246,7 +246,7 @@ public class BookingService {
 
         BigDecimal total = seatTotal.add(comboTotal);
         if (!"ONLINE".equalsIgnoreCase(request.getChannel()) && !"OFFLINE".equalsIgnoreCase(request.getChannel())) {
-            throw new BadRequestException("Invalid booking channel: " + request.getChannel());
+            throw new BadRequestException("Kênh đặt vé không hợp lệ: " + request.getChannel());
         }
 
         Booking booking = Booking.builder()
@@ -283,26 +283,26 @@ public class BookingService {
     @Transactional
     public BookingResponse createOnlineBooking(UUID userId, CreateOnlineBookingRequest request) {
         if (!userRepository.existsById(userId)) {
-            throw new BadRequestException("User not found");
+            throw new BadRequestException("Không tìm thấy người dùng");
         }
 
         Showtime showtime = showtimeRepository.findById(request.getShowtimeId())
-                .orElseThrow(() -> new BadRequestException("Showtime not found"));
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy suất chiếu"));
 
         if (showtime.getStartTime().isBefore(now())) {
-            throw new BadRequestException("Cannot book a past showtime");
+            throw new BadRequestException("Không thể đặt vé cho suất chiếu đã qua");
         }
         if (!showtime.isOnline()) {
-            throw new BadRequestException("This showtime is not available for online viewing");
+            throw new BadRequestException("Suất chiếu này không hỗ trợ xem phim online");
         }
 
         Movie movie = movieRepository.findById(showtime.getMovieId())
-                .orElseThrow(() -> new BadRequestException("Movie not found"));
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy phim"));
         if (!movie.isActive()) {
-            throw new BadRequestException("Movie is not available");
+            throw new BadRequestException("Phim hiện không khả dụng");
         }
         if (movie.getStreamKey() == null || movie.getStreamKey().trim().isBlank()) {
-            throw new BadRequestException("Online stream is not configured for this movie");
+            throw new BadRequestException("Phim chưa được cấu hình nội dung xem online");
         }
 
         Booking booking = Booking.builder()
@@ -329,22 +329,22 @@ public class BookingService {
     @Transactional
     public BookingResponse updateBookingSeats(UUID bookingId, UUID userId, UpdateBookingSeatsRequest request) {
         Booking booking = bookingRepository.findByIdAndUserId(bookingId, userId)
-                .orElseThrow(() -> new BadRequestException("Booking not found or not owned by you"));
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy đơn đặt vé hoặc đơn không thuộc về bạn"));
 
         if (booking.getStatus() != BookingStatus.HOLD) {
-            throw new BadRequestException("Can only update booking in HOLD status");
+            throw new BadRequestException("Chỉ có thể cập nhật đơn đang giữ chỗ");
         }
 
         if (booking.getHoldExpiresAt().isBefore(now())) {
             releaseSeats(booking);
             booking.setStatus(BookingStatus.EXPIRED);
             bookingRepository.save(booking);
-            throw new BadRequestException("Booking hold has expired. Please create a new booking.");
+            throw new BadRequestException("Thời gian giữ chỗ đã hết. Vui lòng tạo đơn đặt vé mới");
         }
 
         // Nhả ghế cũ
         if (!booking.getShowtimeId().equals(request.getShowtimeId())) {
-            throw new BadRequestException("Cannot change seats to a different showtime");
+            throw new BadRequestException("Không thể đổi ghế sang một suất chiếu khác");
         }
 
         releaseSeats(booking);
@@ -392,7 +392,7 @@ public class BookingService {
     @Transactional
     public BookingPaymentResponse payBooking(UUID bookingId, UUID userId, PayBookingRequest request) {
         Booking booking = bookingRepository.findByIdAndUserId(bookingId, userId)
-                .orElseThrow(() -> new BadRequestException("Booking not found"));
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy đơn đặt vé"));
 
         if (booking.getStatus() == BookingStatus.CONFIRMED) {
             Payment existingPayment = paymentRepository.findByBookingId(bookingId)
@@ -414,7 +414,7 @@ public class BookingService {
                 releaseSeats(booking);
                 booking.setStatus(BookingStatus.EXPIRED);
                 bookingRepository.save(booking);
-                throw new BadRequestException("Booking hold has expired");
+                throw new BadRequestException("Thời gian giữ chỗ của đơn đặt vé đã hết");
             }
             Payment pendingPayment = paymentRepository.findByBookingId(bookingId)
                     .filter(payment -> payment.getStatus() == PaymentStatus.PENDING
@@ -429,7 +429,7 @@ public class BookingService {
         }
 
         if (booking.getStatus() != BookingStatus.HOLD) {
-            throw new BadRequestException("Booking is not in HOLD status");
+            throw new BadRequestException("Đơn đặt vé không ở trạng thái giữ chỗ");
         }
         BigDecimal originalAmount = booking.getTotalAmount();
         BigDecimal discountAmount = BigDecimal.ZERO;
@@ -489,7 +489,7 @@ public class BookingService {
     public void confirmPayosPayment(String orderCode, String paymentId) {
         Payment payment = paymentRepository.findByProviderCheckoutId(orderCode)
                 .orElseGet(() -> paymentRepository.findByProviderPaymentId(paymentId)
-                        .orElseThrow(() -> new BadRequestException("Payment not found for PayOS order")));
+                        .orElseThrow(() -> new BadRequestException("Không tìm thấy thanh toán tương ứng với đơn PayOS")));
         payment.setProviderPaymentId(paymentId);
         payment.setTransactionId(orderCode);
         confirmExternalPayment(payment);
@@ -498,11 +498,11 @@ public class BookingService {
     @Transactional
     public BookingPaymentResponse syncPayosPayment(UUID bookingId, UUID userId) {
         Booking booking = bookingRepository.findByIdAndUserId(bookingId, userId)
-                .orElseThrow(() -> new BadRequestException("Booking not found"));
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy đơn đặt vé"));
         Payment payment = paymentRepository.findByBookingId(bookingId)
                 .filter(item -> "PAYOS".equalsIgnoreCase(String.valueOf(item.getProvider()))
                         || "PAYOS".equalsIgnoreCase(String.valueOf(item.getPaymentMethod())))
-                .orElseThrow(() -> new BadRequestException("PayOS payment not found for this booking"));
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy thanh toán PayOS của đơn đặt vé này"));
 
         if (booking.getStatus() == BookingStatus.CONFIRMED && payment.getStatus() == PaymentStatus.PAID) {
             List<TicketResponse> tickets = ticketRepository.findByBookingId(bookingId).stream()
@@ -516,7 +516,7 @@ public class BookingService {
         PaymentGatewayService.PayosPaymentStatus status =
                 paymentGatewayService.getPayosPaymentStatus(payment.getProviderCheckoutId());
         if (!status.paid()) {
-            throw new BadRequestException("PayOS payment is not paid yet");
+            throw new BadRequestException("Thanh toán PayOS chưa được xác nhận thành công");
         }
 
         payment.setProviderPaymentId(status.paymentId());
@@ -527,7 +527,7 @@ public class BookingService {
     private BookingPaymentResponse confirmExternalPayment(Payment payment) {
         if (payment.getStatus() == PaymentStatus.PAID) {
             Booking booking = bookingRepository.findById(payment.getBookingId())
-                    .orElseThrow(() -> new BadRequestException("Booking not found"));
+                    .orElseThrow(() -> new BadRequestException("Không tìm thấy đơn đặt vé"));
             List<TicketResponse> tickets = ticketRepository.findByBookingId(booking.getId()).stream()
                     .map(TicketResponse::fromTicket)
                     .toList();
@@ -536,9 +536,9 @@ public class BookingService {
             return BookingPaymentResponse.fromPaymentResult(booking, payment, tickets, originalAmount, discountAmount, null);
         }
         Booking booking = bookingRepository.findById(payment.getBookingId())
-                .orElseThrow(() -> new BadRequestException("Booking not found"));
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy đơn đặt vé"));
         if (booking.getStatus() != BookingStatus.HOLD) {
-            throw new BadRequestException("Booking is not in HOLD status");
+            throw new BadRequestException("Đơn đặt vé không ở trạng thái giữ chỗ");
         }
         BigDecimal originalAmount = booking.getTotalAmount();
         BigDecimal discountAmount = originalAmount.subtract(payment.getAmount()).max(BigDecimal.ZERO);
@@ -619,7 +619,7 @@ public class BookingService {
     @Transactional(readOnly = true)
     public BookingResponse getBookingDetail(UUID bookingId, UUID userId) {
         Booking booking = bookingRepository.findByIdAndUserId(bookingId, userId)
-                .orElseThrow(() -> new BadRequestException("Booking not found"));
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy đơn đặt vé"));
         return toBookingResponseWithoutSeats(booking);
     }
 
@@ -635,15 +635,15 @@ public class BookingService {
     @Transactional
     public TicketResponse checkIn(String ticketCode) {
         Ticket ticket = ticketRepository.findByTicketCode(ticketCode)
-                .orElseThrow(() -> new BadRequestException("Ticket not found"));
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy vé"));
 
         if (ticket.isCheckedIn()) {
-            throw new BadRequestException("Ticket already checked in");
+            throw new BadRequestException("Vé đã được check-in trước đó");
         }
 
         Booking booking = bookingRepository.findById(ticket.getBookingId()).orElse(null);
         if (booking == null || booking.getStatus() != BookingStatus.CONFIRMED) {
-            throw new BadRequestException("Booking is not confirmed");
+            throw new BadRequestException("Đơn đặt vé chưa được xác nhận");
         }
 
         ticket.setCheckedIn(true);
@@ -661,7 +661,7 @@ public class BookingService {
     @Transactional(readOnly = true)
     public List<TicketResponse> getBookingTickets(UUID bookingId, UUID userId) {
         bookingRepository.findByIdAndUserId(bookingId, userId)
-                .orElseThrow(() -> new BadRequestException("Booking not found"));
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy đơn đặt vé"));
         return ticketRepository.findByBookingId(bookingId).stream()
                 .map(TicketResponse::fromTicket)
                 .toList();
@@ -670,7 +670,7 @@ public class BookingService {
     @Transactional
     public void expireBooking(UUID bookingId) {
         Booking booking = bookingRepository.findById(bookingId)
-                .orElseThrow(() -> new BadRequestException("Booking not found"));
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy đơn đặt vé"));
 
         if (booking.getStatus() == BookingStatus.HOLD) {
             releaseSeats(booking);
@@ -686,7 +686,7 @@ public class BookingService {
     @Transactional
     public void cancelBooking(UUID bookingId, UUID userId) {
         Booking booking = bookingRepository.findByIdAndUserId(bookingId, userId)
-                .orElseThrow(() -> new BadRequestException("Booking not found"));
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy đơn đặt vé"));
         boolean onlineBooking = isOnlineBooking(booking);
         BookingStatus oldStatus = booking.getStatus();
 
@@ -698,7 +698,7 @@ public class BookingService {
             booking.setStatus(BookingStatus.CANCELLED);
             bookingRepository.save(booking);
         } else {
-            throw new BadRequestException("Cannot cancel booking with status: " + booking.getStatus());
+            throw new BadRequestException("Không thể hủy đơn đặt vé ở trạng thái: " + booking.getStatus());
         }
         auditLogService.success(AuditLogService.AuditCommand.builder()
                 .action(onlineBooking ? AuditAction.ONLINE_BOOKING_CANCELLED : AuditAction.CINEMA_BOOKING_CANCELLED)
@@ -753,11 +753,11 @@ public class BookingService {
 
     private List<UUID> normalizeSeatIds(List<UUID> seatIds) {
         if (seatIds == null || seatIds.isEmpty()) {
-            throw new BadRequestException("Please select at least one seat");
+            throw new BadRequestException("Vui lòng chọn ít nhất một ghế");
         }
         LinkedHashSet<UUID> uniqueSeatIds = new LinkedHashSet<>(seatIds);
         if (uniqueSeatIds.size() != seatIds.size()) {
-            throw new BadRequestException("Duplicate seats are not allowed");
+            throw new BadRequestException("Danh sách ghế không được trùng lặp");
         }
         return new ArrayList<>(uniqueSeatIds);
     }
@@ -771,12 +771,12 @@ public class BookingService {
         for (UUID seatId : seatIds) {
             SeatAvailability availability = availabilityBySeatId.get(seatId);
             if (availability == null) {
-                throw new BadRequestException("Seat not found in this showtime: " + seatId);
+                throw new BadRequestException("Không tìm thấy ghế trong suất chiếu này: " + seatId);
             }
             if (availability.getStatus() != SeatBookingStatus.AVAILABLE) {
                 Seat seat = seatRepository.findById(seatId).orElse(null);
                 String seatInfo = seat != null ? seat.getRowName() + seat.getSeatNumber() : seatId.toString();
-                throw new BadRequestException("Seat is already taken: " + seatInfo);
+                throw new BadRequestException("Ghế đã có người đặt: " + seatInfo);
             }
             availability.setStatus(SeatBookingStatus.HOLDING);
             ordered.add(availability);
@@ -792,7 +792,7 @@ public class BookingService {
         for (UUID seatId : seatIds) {
             Seat seat = seatById.get(seatId);
             if (seat == null) {
-                throw new BadRequestException("Seat not found: " + seatId);
+                throw new BadRequestException("Không tìm thấy ghế: " + seatId);
             }
             seats.add(seat);
         }
@@ -814,18 +814,18 @@ public class BookingService {
         for (BookingSeat bookingSeat : bookingSeats) {
             SeatAvailability availability = availabilityBySeatId.get(bookingSeat.getSeatId());
             if (availability == null) {
-                throw new BadRequestException("Seat not found in this showtime: " + bookingSeat.getSeatId());
+                throw new BadRequestException("Không tìm thấy ghế trong suất chiếu này: " + bookingSeat.getSeatId());
             }
             if (bookingRepository.existsByShowtimeIdAndStatusAndSeatIdAndIdNot(
                     booking.getShowtimeId(), BookingStatus.CONFIRMED, bookingSeat.getSeatId(), booking.getId())) {
                 Seat seat = seatRepository.findById(bookingSeat.getSeatId()).orElse(null);
                 String seatInfo = seat != null ? seat.getRowName() + seat.getSeatNumber() : bookingSeat.getSeatId().toString();
-                throw new BadRequestException("Seat has already been confirmed by another booking: " + seatInfo);
+                throw new BadRequestException("Ghế đã được xác nhận bởi đơn đặt vé khác: " + seatInfo);
             }
             if (availability.getStatus() != SeatBookingStatus.HOLDING) {
                 Seat seat = seatRepository.findById(bookingSeat.getSeatId()).orElse(null);
                 String seatInfo = seat != null ? seat.getRowName() + seat.getSeatNumber() : bookingSeat.getSeatId().toString();
-                throw new BadRequestException("Seat is no longer held by this booking: " + seatInfo);
+                throw new BadRequestException("Ghế không còn được giữ bởi đơn đặt vé này: " + seatInfo);
             }
             availability.setStatus(SeatBookingStatus.SOLD);
         }

@@ -30,6 +30,7 @@ import EmptyState from '../components/common/EmptyState';
 import LoadingOverlay from '../components/common/LoadingOverlay';
 import { bookingApi } from '../api/bookingApi';
 import { bookingService } from '../services/bookingService';
+import { bookingStatusLabel, paymentStatusLabel, refundStatusLabel } from '../utils/statusLabels';
 
 const formatCurrency = (amount) =>
   new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(amount || 0);
@@ -47,8 +48,14 @@ const formatShowDate = (value) =>
 const formatShowTime = (booking) => {
   if (!booking?.startTime) return 'Đang cập nhật';
   const time = new Date(booking.startTime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
-  return `${time} (${booking.showtimeFormat || '2D'})`;
+  const format = String(booking.showtimeFormat || '2D').toUpperCase() === 'ONLINE'
+    ? 'Trực tuyến'
+    : booking.showtimeFormat || '2D';
+  return `${time} (${format})`;
 };
+
+const theaterLabel = (name) =>
+  String(name || '').toUpperCase() === 'ONLINE' ? 'Trực tuyến' : name || 'ThauFilm Cinema';
 
 const enrichBooking = (booking, showtimeMap) => {
   const showtime = showtimeMap.get(String(booking?.showtimeId));
@@ -129,32 +136,10 @@ const MyBookingDetailPage = () => {
           ?? {};
         setAutomaticRefundAvailable(Boolean(automaticRefundData.available));
         if (normalizedTickets[0]?.ticketCode) setRefundTicketCode(normalizedTickets[0].ticketCode);
-        if (payosReturnedPaid && String(enrichedBooking?.status || '').toUpperCase() === 'CONFIRMED') {
-          navigate('/booking/success', {
-            replace: true,
-            state: {
-              bookingId,
-              movie: { title: enrichedBooking.movieTitle },
-              showtime: {
-                room: enrichedBooking.roomName,
-                theaterName: enrichedBooking.theaterName || 'ThauFilm Cinema',
-                startTime: enrichedBooking.startTime,
-                date: enrichedBooking.startTime ? String(enrichedBooking.startTime).slice(0, 10) : '',
-                time: enrichedBooking.startTime ? String(enrichedBooking.startTime).slice(11, 16) : '',
-                format: enrichedBooking.showtimeFormat || '2D',
-              },
-              selectedSeats: enrichedBooking.seats || [],
-              bookingCode: enrichedBooking.confirmationCode,
-              tickets: normalizedTickets,
-              originalAmount: enrichedBooking.originalAmount,
-              discountAmount: enrichedBooking.discountAmount,
-              totalAmount: enrichedBooking.totalAmount,
-              paymentMethod: enrichedBooking.paymentMethod || 'PAYOS',
-            },
-          });
-        }
       })
-      .catch(() => {})
+      .catch((loadError) => {
+        if (active) setSnackbar(loadError?.message || 'Không thể tải chi tiết vé. Vui lòng thử lại.');
+      })
       .finally(() => {
         if (active) setDataLoading(false);
       });
@@ -295,14 +280,14 @@ const MyBookingDetailPage = () => {
               </Typography>
               <Typography color="text.secondary">Mã đặt vé: {booking.confirmationCode}</Typography>
             </Box>
-            <Chip label={booking.status || 'UNKNOWN'} color={booking.status === 'CONFIRMED' ? 'success' : 'warning'} />
+            <Chip label={bookingStatusLabel(booking.status)} color={booking.status === 'CONFIRMED' ? 'success' : 'warning'} />
           </Stack>
 
           <Divider sx={{ my: 3 }} />
 
           <Stack spacing={1.5}>
             <Typography>
-              <b>Rạp chiếu:</b> {booking.theaterName || 'ThauFilm Cinema'}
+              <b>Rạp chiếu:</b> {theaterLabel(booking.theaterName)}
             </Typography>
             <Typography>
               <b>Phòng chiếu:</b> {booking.roomName}
@@ -316,6 +301,11 @@ const MyBookingDetailPage = () => {
             <Typography>
               <b>Ghế:</b> {seatLabels || 'Đang cập nhật'}
             </Typography>
+            {booking.paymentStatus && (
+              <Typography>
+                <b>Trạng thái thanh toán:</b> {paymentStatusLabel(booking.paymentStatus)}
+              </Typography>
+            )}
             <Typography>
               <b>{booking.discountAmount > 0 ? 'Giá gốc:' : 'Tổng tiền:'}</b>{' '}
               {formatCurrency(booking.originalAmount)}
@@ -389,7 +379,7 @@ const MyBookingDetailPage = () => {
           {refundRequest && (
             <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ sm: 'center' }} spacing={1.5} sx={{ mt: 3 }}>
               <Alert severity={refundRequest.status === 'REJECTED' ? 'error' : refundRequest.status === 'APPROVED' ? 'success' : 'info'} sx={{ flex: 1 }}>
-                Yêu cầu hoàn tiền: <b>{refundRequest.status}</b>{refundRequest.rejectionReason ? ` · ${refundRequest.rejectionReason}` : ''}
+                Yêu cầu hoàn tiền: <b>{refundStatusLabel(refundRequest.status)}</b>{refundRequest.rejectionReason ? ` · ${refundRequest.rejectionReason}` : ''}
               </Alert>
               <Button variant="contained" startIcon={<ChatRoundedIcon />} onClick={openRefundChat}>Chat với staff trưởng</Button>
             </Stack>

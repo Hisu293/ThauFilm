@@ -148,7 +148,7 @@ const getDiscountAmount = (discount, subtotal) => {
 export const PaymentPage = () => {
   const location = useLocation();
   const navigate = useBookingNavigate();
-  const { loading: apiLoading, error: apiError, clearError, getDetail, getTickets, create, pay, syncPayment, cancel } = useBooking();
+  const { loading: apiLoading, error: apiError, clearError, getDetail, create, pay, syncPayment, cancel } = useBooking();
   const { updateBookingState, clearBookingState } = useBookingFlow();
 
   const [bookingId, setBookingId] = useState(null);
@@ -380,9 +380,7 @@ export const PaymentPage = () => {
     );
   };
 
-  const goToSuccess = (paymentResult = {}, overrides = {}, paidBookingId = bookingId) => {
-    const confirmedBooking = paymentResult?.booking || overrides.booking || null;
-    const confirmedTickets = paymentResult?.tickets || overrides.tickets || [];
+  const goToSuccess = (paymentResult = {}, paidBookingId = bookingId) => {
     const paidAmount = Number(paymentResult?.finalAmount ?? paymentResult?.payment?.amount ?? totalAmount);
     const paidOriginalAmount = Number(paymentResult?.originalAmount ?? subtotal);
     const paidDiscountAmount = Number(paymentResult?.discountAmount ?? discountAmount);
@@ -395,26 +393,7 @@ export const PaymentPage = () => {
       paymentMethod,
     });
 
-    if (isOnlineMovieBooking) {
-      navigate('/booking/success', {
-        state: {
-          bookingId: paidBookingId,
-          movieId: confirmedBooking?.movieId || movie?.id || movie?.movieId || showtime?.movieId,
-          movie,
-          showtime,
-          selectedSeats,
-          paymentMethod,
-          selectedDiscount,
-          originalAmount: paidOriginalAmount,
-          discountAmount: paidDiscountAmount,
-          bookingCode: confirmedBooking?.confirmationCode || paymentResult?.confirmationCode || bookingId,
-          tickets: confirmedTickets,
-          totalAmount: Number.isFinite(paidAmount) ? paidAmount : totalAmount,
-        },
-      });
-    } else {
-      navigate(`/my-bookings/${paidBookingId}`, { replace: true });
-    }
+    navigate(`/my-bookings/${paidBookingId}`, { replace: true });
 
     updateBookingState({ bookingId: paidBookingId, paymentStatus: 'PAID' });
     sessionStorage.removeItem('tf_booking_id');
@@ -500,7 +479,7 @@ export const PaymentPage = () => {
         });
         return;
       }
-      goToSuccess(result, {}, payableBookingId);
+      goToSuccess(result, payableBookingId);
     } catch (err) {
       const discountRejected = /discount|already used|usage limit|expired|inactive|minimum requirement/i.test(err?.message || '');
       if (selectedDiscount && discountRejected) {
@@ -515,8 +494,7 @@ export const PaymentPage = () => {
         try {
           const confirmedBooking = await getDetail(payableBookingId);
           if (confirmedBooking?.status === 'CONFIRMED') {
-            const confirmedTickets = await getTickets(payableBookingId).catch(() => []);
-            goToSuccess({}, { booking: confirmedBooking, tickets: confirmedTickets }, payableBookingId);
+            goToSuccess({}, payableBookingId);
             return;
           }
         } catch {
@@ -541,8 +519,7 @@ export const PaymentPage = () => {
         setCheckoutNotice('Chưa nhận được xác nhận thanh toán từ PayOS. Vui lòng kiểm tra lại sau vài giây.');
         return;
       }
-      const confirmedTickets = await getTickets(payosCheckout.bookingId).catch(() => []);
-      goToSuccess({}, { booking: confirmedBooking, tickets: confirmedTickets }, payosCheckout.bookingId);
+      goToSuccess({}, payosCheckout.bookingId);
     } catch (err) {
       setCheckoutNotice(err.message || 'Không thể kiểm tra trạng thái thanh toán.');
     } finally {

@@ -34,6 +34,7 @@ import CancelRoundedIcon from '@mui/icons-material/CancelRounded';
 import PaymentRoundedIcon from '@mui/icons-material/PaymentRounded';
 import CheckCircleRoundedIcon from '@mui/icons-material/CheckCircleRounded';
 import { staffTicketService } from '../../services/staffTicketService';
+import { paymentStatusLabel } from '../../utils/statusLabels';
 import QrScannerDialog from '../../components/QrScannerDialog';
 
 // Nhãn + màu cho trạng thái vé
@@ -378,7 +379,7 @@ const StaffTickets = () => {
                 </Typography>
                 <Row label="Phương thức" value={payment?.paymentMethod || payment?.method || detail.paymentMethod || detail.payment?.method} />
                 <Row label="Số tiền" value={formatCurrency(payment?.amount ?? detail.paymentAmount ?? detail.payment?.amount)} />
-                <Row label="Tình trạng" value={payment?.status || detail.paymentStatus || detail.payment?.status} />
+                <Row label="Tình trạng" value={paymentStatusLabel(payment?.status || detail.paymentStatus || detail.payment?.status)} />
                 <Row label="Mã giao dịch" value={payment?.transactionId || detail.transactionId || detail.payment?.transactionId || payment?.id} />
                 <Row label="Thời gian TT" value={formatDateTime(payment?.paidAt || detail.paidAt || detail.payment?.paidAt || payment?.createdAt)} />
               </Stack>

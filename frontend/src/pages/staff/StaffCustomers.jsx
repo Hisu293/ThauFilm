@@ -38,6 +38,7 @@ import LockOpenRoundedIcon from '@mui/icons-material/LockOpenRounded';
 import SupportAgentRoundedIcon from '@mui/icons-material/SupportAgentRounded';
 import { staffCustomerService } from '../../services/staffCustomerService';
 import useStaffList from '../../hooks/useStaffList';
+import { bookingStatusLabel } from '../../utils/statusLabels';
 
 const CUSTOMER_DATE_FIELDS = ['createdAt', 'registeredAt', 'updatedAt', 'lastLoginAt'];
 const matchesCustomerSearch = (customer, query) =>
@@ -326,7 +327,7 @@ const StaffCustomers = () => {
                       <ListItem key={b.bookingId} disableGutters sx={{ py: 0.5 }}>
                         <ListItemText
                           primary={`${b.movieTitle} · ${b.seats || '—'}`}
-                          secondary={`${b.confirmationCode} · ${formatDateTime(b.startTime)} · ${formatCurrency(b.totalAmount)} · ${b.status}`}
+                          secondary={`${b.confirmationCode} · ${formatDateTime(b.startTime)} · ${formatCurrency(b.totalAmount)} · ${bookingStatusLabel(b.status)}`}
                           primaryTypographyProps={{ variant: 'body2', fontWeight: 600 }}
                         />
                       </ListItem>
