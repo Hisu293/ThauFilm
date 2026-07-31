@@ -683,6 +683,7 @@ export const ShowtimesSection = ({ crud, movies, theaters, rooms }) => {
   const [suggestions, setSuggestions] = useState([]);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const [suggestionsError, setSuggestionsError] = useState('');
+  const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({
     movieId: '',
     cinemaRoomId: '',
@@ -706,6 +707,7 @@ export const ShowtimesSection = ({ crud, movies, theaters, rooms }) => {
         setFormError('Giá vé online phải từ 1.000 đồng.');
         return;
       }
+      setSaving(true);
       if (dialog === 'add') {
         if (!form.movieId || (!form.online && !form.cinemaRoomId) || !form.startTime) {
           setFormError(t('admin.showtime', 'errorRequired'));
@@ -739,6 +741,8 @@ export const ShowtimesSection = ({ crud, movies, theaters, rooms }) => {
     } catch (err) {
       setFormError(err.message || 'Không thể lưu suất chiếu.');
       console.error('Lỗi khi lưu suất chiếu:', err);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -794,7 +798,7 @@ export const ShowtimesSection = ({ crud, movies, theaters, rooms }) => {
   const sortedShowtimes = sortByLatest(crud.list);
   const pagedShowtimes = getPagedRows(sortedShowtimes, page);
 
-  if (crud.loading) {
+  if (crud.loading && crud.list.length === 0) {
     return (
       <>
         <SectionHeader title={t('admin.showtime', 'title')} subtitle={t('admin.showtime', 'subtitle')} onAction={() => setDialog('add')} actionLabel={t('admin.showtime', 'add')} />
@@ -895,7 +899,13 @@ export const ShowtimesSection = ({ crud, movies, theaters, rooms }) => {
         </TableContainer>
         <PaginationBar total={sortedShowtimes.length} page={page} onPageChange={setPage} />
       </Box>
-      <CrudDialog open={!!dialog} title={dialog === 'add' ? t('admin.showtime', 'add') : t('admin.showtime', 'edit')} onClose={() => setDialog(null)} onSave={save}>
+      <CrudDialog
+        open={!!dialog}
+        title={dialog === 'add' ? t('admin.showtime', 'add') : t('admin.showtime', 'edit')}
+        onClose={() => !saving && setDialog(null)}
+        onSave={save}
+        saving={saving}
+      >
         {dialog === 'add' ? (
           <>
             {formError && (
@@ -1062,7 +1072,7 @@ export const ShowtimesSection = ({ crud, movies, theaters, rooms }) => {
   );
 };
 
-const CrudDialog = ({ open, title, onClose, onSave, children }) => (
+const CrudDialog = ({ open, title, onClose, onSave, saving = false, children }) => (
   <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
     <DialogTitle sx={{ fontWeight: 700 }}>{title}</DialogTitle>
     <DialogContent>
@@ -1071,9 +1081,9 @@ const CrudDialog = ({ open, title, onClose, onSave, children }) => (
       </Stack>
     </DialogContent>
     <DialogActions sx={{ px: 3, pb: 2 }}>
-      <Button onClick={onClose}>{t('common', 'cancel')}</Button>
-      <Button variant="contained" onClick={onSave}>
-        {t('common', 'save')}
+      <Button onClick={onClose} disabled={saving}>{t('common', 'cancel')}</Button>
+      <Button variant="contained" onClick={onSave} disabled={saving}>
+        {saving ? 'Đang lưu...' : t('common', 'save')}
       </Button>
     </DialogActions>
   </Dialog>

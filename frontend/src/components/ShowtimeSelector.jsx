@@ -3,6 +3,7 @@ import { Alert, Box, Button, Card, Grid, Stack, Tab, Tabs, Typography } from '@m
 import ScheduleRoundedIcon from '@mui/icons-material/ScheduleRounded';
 import LocationOnRoundedIcon from '@mui/icons-material/LocationOnRounded';
 import PlayArrowRoundedIcon from '@mui/icons-material/PlayArrowRounded';
+import GroupRoundedIcon from '@mui/icons-material/GroupRounded';
 import { bookingApi } from '../api/bookingApi';
 import { bookingService } from '../services/bookingService';
 
@@ -23,7 +24,14 @@ const formatDateTab = (dateStr, index) => {
   };
 };
 
-export const ShowtimeSelector = ({ movieId, onSelectShowtime, onSelectOnlineShowtime, onlineLoadingShowtimeId }) => {
+export const ShowtimeSelector = ({
+  movieId,
+  onSelectShowtime,
+  onSelectOnlineShowtime,
+  onCreateWatchParty,
+  onlineLoadingShowtimeId,
+  watchPartyLoading,
+}) => {
   const [selectedDateIdx, setSelectedDateIdx] = useState(0);
   const [showtimes, setShowtimes] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -269,6 +277,19 @@ export const ShowtimeSelector = ({ movieId, onSelectShowtime, onSelectOnlineShow
                           sx={{ borderRadius: 2, fontWeight: 800, minHeight: 36 }}
                         >
                           {onlineLoadingShowtimeId === showtime.id ? 'Đang tạo...' : 'Mua online'}
+                        </Button>
+                      )}
+                      {showtime.online && onCreateWatchParty && (
+                        <Button
+                          fullWidth
+                          size="small"
+                          variant="outlined"
+                          startIcon={<GroupRoundedIcon />}
+                          disabled={watchPartyLoading}
+                          onClick={() => onCreateWatchParty(showtime)}
+                          sx={{ borderRadius: 2, fontWeight: 800, minHeight: 36 }}
+                        >
+                          {watchPartyLoading ? 'Đang tạo phòng...' : `Xem nhóm · ${new Intl.NumberFormat('vi-VN').format(showtime.onlinePrice ?? 79000)}đ`}
                         </Button>
                       )}
                     </Stack>

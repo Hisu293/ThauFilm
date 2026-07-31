@@ -2,6 +2,7 @@ package com.filmticket.dto;
 
 import lombok.Builder;
 import lombok.Data;
+import jakarta.validation.constraints.NotNull;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -14,6 +15,8 @@ public final class WatchPartyDto {
     @Data
     public static class CreateRequest {
         private UUID movieId;
+        @NotNull(message = "Vui lòng chọn suất chiếu online")
+        private UUID showtimeId;
     }
 
     @Data

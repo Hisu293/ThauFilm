@@ -50,16 +50,19 @@ public class WatchPartyService {
     private final Map<UUID, WatchPartyRoom> rooms = new ConcurrentHashMap<>();
     private final Map<String, PendingWatchPartyPayment> pendingPayments = new ConcurrentHashMap<>();
 
-    public WatchPartyDto.Response create(UUID movieId, UUID userId) {
+    public WatchPartyDto.Response create(UUID movieId, UUID showtimeId, UUID userId) {
         Movie movie = requireMovie(movieId);
         User user = requireUser(userId);
-        Showtime onlineShowtime = showtimeRepository.findByMovieIdAndOnlineTrueOrderByStartTimeAsc(movieId).stream()
-                .filter(showtime -> showtime.getEndTime().isAfter(java.time.LocalDateTime.now()))
-                .filter(showtime -> showtime.getStatus() != ShowtimeStatus.CANCELLED
-                        && showtime.getStatus() != ShowtimeStatus.COMPLETED)
-                .findFirst()
-                .orElseThrow(() -> new BadRequestException(
-                        "Phim chưa có suất chiếu online đang hoạt động hoặc sắp diễn ra"));
+        Showtime onlineShowtime = showtimeRepository.findById(showtimeId)
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy suất chiếu online đã chọn"));
+        if (!onlineShowtime.getMovieId().equals(movieId) || !onlineShowtime.isOnline()) {
+            throw new BadRequestException("Suất chiếu online không thuộc phim đã chọn");
+        }
+        if (!onlineShowtime.getEndTime().isAfter(java.time.LocalDateTime.now())
+                || onlineShowtime.getStatus() == ShowtimeStatus.CANCELLED
+                || onlineShowtime.getStatus() == ShowtimeStatus.COMPLETED) {
+            throw new BadRequestException("Suất chiếu online đã kết thúc hoặc không còn hoạt động");
+        }
         BigDecimal price = onlineShowtime.getOnlinePrice() != null
                 ? onlineShowtime.getOnlinePrice()
                 : DEFAULT_MOVIE_PRICE;

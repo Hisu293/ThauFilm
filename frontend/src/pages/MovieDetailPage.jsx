@@ -299,10 +299,10 @@ const MovieDetailPage = () => {
     }
   };
 
-  const handleCreateWatchParty = async () => {
+  const handleCreateWatchParty = async (showtime) => {
     setCreatingWatchParty(true);
     try {
-      const room = await watchPartyService.create(movie.id);
+      const room = await watchPartyService.create(movie.id, showtime.id);
       navigate(`/watch-party/${room.id}`);
     } catch (err) {
       setError(err.message || 'Không thể tạo phòng xem nhóm.');
@@ -499,16 +499,6 @@ const MovieDetailPage = () => {
               >
                 Xem đánh giá cộng đồng
               </Button>
-              <Button
-                variant="contained"
-                size="large"
-                startIcon={<GroupRoundedIcon />}
-                onClick={handleCreateWatchParty}
-                disabled={creatingWatchParty}
-                sx={{ fontWeight: 800, px: 4, py: 1.6, borderRadius: 2 }}
-              >
-                Tạo phòng xem nhóm
-              </Button>
             </Stack>
           </Box>
         </Stack>
@@ -520,6 +510,8 @@ const MovieDetailPage = () => {
           movieId={movie.id}
           onSelectShowtime={handleSelectShowtime}
           onSelectOnlineShowtime={handleSelectOnlineShowtime}
+          onCreateWatchParty={handleCreateWatchParty}
+          watchPartyLoading={creatingWatchParty}
           onlineLoadingShowtimeId={creatingOnlineShowtimeId}
         />
 

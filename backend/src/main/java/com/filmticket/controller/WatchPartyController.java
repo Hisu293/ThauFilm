@@ -29,7 +29,7 @@ public class WatchPartyController {
     public ResponseEntity<ApiResponse<WatchPartyDto.Response>> create(@Valid @RequestBody WatchPartyDto.CreateRequest request) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Tạo phòng Watch Party thành công",
-                watchPartyService.create(request.getMovieId(), userId())
+                watchPartyService.create(request.getMovieId(), request.getShowtimeId(), userId())
         ));
     }
 
