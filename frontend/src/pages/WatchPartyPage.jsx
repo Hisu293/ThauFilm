@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Avatar, Box, Button, Chip, CircularProgress, Collapse, Container, IconButton, MenuItem, Paper, Stack, TextField, Typography } from '@mui/material';
+import { Alert, Avatar, Box, Button, Chip, CircularProgress, Collapse, Container, Dialog, DialogActions, DialogContent, DialogTitle, IconButton, MenuItem, Paper, Stack, TextField, Typography } from '@mui/material';
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
 import ContentCopyRoundedIcon from '@mui/icons-material/ContentCopyRounded';
 import FavoriteRoundedIcon from '@mui/icons-material/FavoriteRounded';
@@ -10,6 +10,7 @@ import KeyboardArrowUpRoundedIcon from '@mui/icons-material/KeyboardArrowUpRound
 import PlayArrowRoundedIcon from '@mui/icons-material/PlayArrowRounded';
 import SendRoundedIcon from '@mui/icons-material/SendRounded';
 import SentimentVerySatisfiedRoundedIcon from '@mui/icons-material/SentimentVerySatisfiedRounded';
+import SupportAgentRoundedIcon from '@mui/icons-material/SupportAgentRounded';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import { connectWatchParty } from '../services/realtimeService';
 import watchPartyService from '../services/watchPartyService';
@@ -56,6 +57,8 @@ export default function WatchPartyPage() {
   const [streamUrl, setStreamUrl] = useState('');
   const [membersExpanded, setMembersExpanded] = useState(false);
   const [refundMethod, setRefundMethod] = useState('MANUAL');
+  const [refundOpen, setRefundOpen] = useState(false);
+  const [incidentReason, setIncidentReason] = useState('');
   const [bankBin, setBankBin] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
 
@@ -256,11 +259,21 @@ export default function WatchPartyPage() {
   };
 
   const requestRefund = async () => {
+    if (incidentReason.trim().length < 10) {
+      setError('Vui lòng mô tả sự cố ít nhất 10 ký tự.');
+      return;
+    }
     setBusy(true);
     try {
-      await watchPartyService.refund(roomId, { refundMethod, bankBin, accountNumber });
+      const created = await watchPartyService.refund(roomId, {
+        reason: incidentReason.trim(),
+        refundMethod,
+        bankBin,
+        accountNumber,
+      });
       setError('');
-      window.alert('Đã gửi yêu cầu đến Staff Trưởng. Sau khi xác minh, yêu cầu sẽ được chuyển Admin duyệt.');
+      setRefundOpen(false);
+      navigate(`/my-bookings/${created.bookingId}?support=refund`);
     } catch (err) {
       setError(err.message || 'Không thể gửi yêu cầu hoàn tiền.');
     } finally {
@@ -314,6 +327,16 @@ export default function WatchPartyPage() {
             {!me?.paid && <Button variant="outlined" disabled={busy} onClick={syncPayment}>Cập nhật thanh toán</Button>}
             {!me?.paid && <Button variant="contained" disabled={busy} onClick={pay}>Thanh toán phần tôi</Button>}
             {room.readyToWatch && <Button variant="contained" startIcon={<PlayArrowRoundedIcon />} onClick={() => videoRef.current?.play()}>Xem</Button>}
+            {me?.paid && (
+              <Button
+                color="warning"
+                variant="outlined"
+                startIcon={<SupportAgentRoundedIcon />}
+                onClick={() => setRefundOpen(true)}
+              >
+                Báo sự cố / Liên hệ Staff trưởng
+              </Button>
+            )}
           </Stack>
         </Stack>
         <TextField
@@ -335,23 +358,6 @@ export default function WatchPartyPage() {
               <Alert severity="info" sx={{ mb: 2 }}>
                 Mời bạn bè bằng link, mỗi người thanh toán {money(room.pricePerMember)}. Khi tất cả đã thanh toán, cả phòng có thể bấm xem và video sẽ đồng bộ.
               </Alert>
-            )}
-            {me?.paid && !room.readyToWatch && (
-              <Paper sx={{ p: 2, mb: 2 }}>
-                <Typography fontWeight={800} mb={1}>Yêu cầu hoàn tiền Watch Party</Typography>
-                <Stack direction={{ xs: 'column', md: 'row' }} spacing={1}>
-                  <TextField select size="small" label="Phương thức" value={refundMethod}
-                    onChange={(e) => setRefundMethod(e.target.value)}>
-                    <MenuItem value="MANUAL">Thủ công</MenuItem>
-                    <MenuItem value="AUTOMATIC">Tự động PayOS/Bảo Kim</MenuItem>
-                  </TextField>
-                  {refundMethod === 'AUTOMATIC' && <>
-                    <TextField size="small" label="BIN ngân hàng" value={bankBin} onChange={(e) => setBankBin(e.target.value)} />
-                    <TextField size="small" label="Số tài khoản" value={accountNumber} onChange={(e) => setAccountNumber(e.target.value)} />
-                  </>}
-                  <Button color="warning" variant="contained" disabled={busy} onClick={requestRefund}>Gửi yêu cầu</Button>
-                </Stack>
-              </Paper>
             )}
             <Box
               sx={{
@@ -637,6 +643,52 @@ export default function WatchPartyPage() {
           </Stack>
         </Stack>
       </Container>
+      <Dialog open={refundOpen} onClose={() => !busy && setRefundOpen(false)} fullWidth maxWidth="sm">
+        <DialogTitle fontWeight={900}>Báo sự cố / Liên hệ Staff trưởng</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <Alert severity="info">
+              Yêu cầu được gắn với Booking riêng của bạn. Staff trưởng sẽ kiểm tra trước khi chuyển Admin duyệt hoàn tiền.
+            </Alert>
+            <TextField
+              label="Mô tả sự cố"
+              multiline
+              minRows={4}
+              required
+              value={incidentReason}
+              onChange={(event) => setIncidentReason(event.target.value)}
+              helperText={`${incidentReason.trim().length}/10 ký tự tối thiểu`}
+            />
+            <TextField
+              select
+              label="Phương thức hoàn tiền"
+              value={refundMethod}
+              onChange={(event) => setRefundMethod(event.target.value)}
+            >
+              <MenuItem value="MANUAL">Thủ công</MenuItem>
+              <MenuItem value="AUTOMATIC">Tự động PayOS/Bảo Kim</MenuItem>
+            </TextField>
+            {refundMethod === 'AUTOMATIC' && (
+              <>
+                <TextField label="BIN ngân hàng" value={bankBin} onChange={(event) => setBankBin(event.target.value)} />
+                <TextField label="Số tài khoản" value={accountNumber} onChange={(event) => setAccountNumber(event.target.value)} />
+              </>
+            )}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRefundOpen(false)} disabled={busy}>Đóng</Button>
+          <Button
+            color="warning"
+            variant="contained"
+            startIcon={<SupportAgentRoundedIcon />}
+            disabled={busy || incidentReason.trim().length < 10}
+            onClick={requestRefund}
+          >
+            Gửi và mở trò chuyện hỗ trợ
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

@@ -2,10 +2,16 @@ package com.filmticket.service;
 
 import com.filmticket.dto.WatchPartyDto;
 import com.filmticket.dto.MovieStreamResponse;
+import com.filmticket.dto.RefundRequestDto;
+import com.filmticket.entity.Booking;
+import com.filmticket.entity.BookingStatus;
 import com.filmticket.entity.Movie;
 import com.filmticket.entity.Payment;
+import com.filmticket.entity.Showtime;
 import com.filmticket.entity.User;
 import com.filmticket.exception.BadRequestException;
+import com.filmticket.model.ShowtimeStatus;
+import com.filmticket.repository.BookingRepository;
 import com.filmticket.repository.MovieRepository;
 import com.filmticket.repository.PaymentRepository;
 import com.filmticket.repository.ShowtimeRepository;
@@ -13,6 +19,7 @@ import com.filmticket.repository.UserRepository;
 import com.filmticket.websocket.RealtimeEventService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -31,6 +38,7 @@ public class WatchPartyService {
     private static final int WATCH_PARTY_GRACE_MINUTES = 5;
 
     private final MovieRepository movieRepository;
+    private final BookingRepository bookingRepository;
     private final UserRepository userRepository;
     private final RealtimeEventService realtimeEventService;
     private final PaymentGatewayService paymentGatewayService;
@@ -45,13 +53,17 @@ public class WatchPartyService {
     public WatchPartyDto.Response create(UUID movieId, UUID userId) {
         Movie movie = requireMovie(movieId);
         User user = requireUser(userId);
-        BigDecimal price = showtimeRepository.findByMovieIdAndOnlineTrueOrderByStartTimeAsc(movieId).stream()
+        Showtime onlineShowtime = showtimeRepository.findByMovieIdAndOnlineTrueOrderByStartTimeAsc(movieId).stream()
                 .filter(showtime -> showtime.getEndTime().isAfter(java.time.LocalDateTime.now()))
-                .map(com.filmticket.entity.Showtime::getOnlinePrice)
-                .filter(java.util.Objects::nonNull)
+                .filter(showtime -> showtime.getStatus() != ShowtimeStatus.CANCELLED
+                        && showtime.getStatus() != ShowtimeStatus.COMPLETED)
                 .findFirst()
-                .orElse(DEFAULT_MOVIE_PRICE);
-        WatchPartyRoom room = new WatchPartyRoom(UUID.randomUUID(), movie, price);
+                .orElseThrow(() -> new BadRequestException(
+                        "Phim chưa có suất chiếu online đang hoạt động hoặc sắp diễn ra"));
+        BigDecimal price = onlineShowtime.getOnlinePrice() != null
+                ? onlineShowtime.getOnlinePrice()
+                : DEFAULT_MOVIE_PRICE;
+        WatchPartyRoom room = new WatchPartyRoom(UUID.randomUUID(), movie, onlineShowtime.getId(), price);
         room.members.put(userId, new WatchPartyMember(user, true));
         rooms.put(room.id, room);
         auditLogService.success(AuditLogService.AuditCommand.builder()
@@ -70,6 +82,7 @@ public class WatchPartyService {
         }
     }
 
+    @Transactional
     public WatchPartyDto.Response pay(UUID roomId, UUID userId) {
         WatchPartyRoom room = requireRoom(roomId);
         synchronized (room) {
@@ -83,9 +96,20 @@ public class WatchPartyService {
                 response.setQrCode(member.qrCode);
                 return response;
             }
+            Booking booking = Booking.builder()
+                    .userId(userId)
+                    .showtimeId(room.showtimeId)
+                    .totalAmount(room.pricePerMember)
+                    .status(BookingStatus.HOLD)
+                    .confirmationCode("WP" + UUID.randomUUID().toString()
+                            .replace("-", "").substring(0, 10).toUpperCase())
+                    .holdExpiresAt(java.time.LocalDateTime.now().plusMinutes(15))
+                    .build();
+            booking = bookingRepository.save(booking);
+            member.bookingId = booking.getId();
+
             Payment payment = Payment.builder()
-                    .id(UUID.randomUUID())
-                    .bookingId(room.id)
+                    .bookingId(booking.getId())
                     .amount(room.pricePerMember)
                     .paymentMethod("PAYOS")
                     .provider("PAYOS")
@@ -121,6 +145,7 @@ public class WatchPartyService {
         }
     }
 
+    @Transactional
     public boolean confirmPayosPayment(String orderCode, String paymentId) {
         PendingWatchPartyPayment pending = orderCode == null ? null : pendingPayments.get(orderCode);
         if (pending == null && paymentId != null) pending = pendingPayments.get(paymentId);
@@ -146,6 +171,7 @@ public class WatchPartyService {
         }
     }
 
+    @Transactional
     public WatchPartyDto.Response syncCurrentUserPayment(UUID roomId, UUID userId) {
         WatchPartyRoom room = requireRoom(roomId);
         synchronized (room) {
@@ -167,16 +193,16 @@ public class WatchPartyService {
         }
     }
 
-    public void requestRefund(UUID roomId, UUID userId, String method, String bankBin, String accountNumber) {
+    public RefundRequestDto requestRefund(UUID roomId, UUID userId, String reason,
+                                          String method, String bankBin, String accountNumber) {
         WatchPartyRoom room = requireRoom(roomId);
         synchronized (room) {
             WatchPartyMember member = ensureMember(room, userId);
-            if (!member.paid || member.paymentRecordId == null)
+            if (!member.paid || member.bookingId == null || member.paymentRecordId == null)
                 throw new BadRequestException("Bạn chưa thanh toán Watch Party");
-            if (room.openedForWatch)
-                throw new BadRequestException("Phòng đã mở phim nên không thể hoàn tiền");
-            refundRequestService.requestForWatchParty(
-                    userId, roomId, member.paymentRecordId, method, bankBin, accountNumber);
+            return refundRequestService.requestForWatchParty(
+                    userId, roomId, member.bookingId, member.paymentRecordId,
+                    reason, method, bankBin, accountNumber);
         }
     }
 
@@ -346,6 +372,15 @@ public class WatchPartyService {
                 paymentRepository.save(payment);
             });
         }
+        if (member.bookingId != null) {
+            bookingRepository.findById(member.bookingId).ifPresent(booking -> {
+                if (booking.getStatus() == BookingStatus.HOLD) {
+                    booking.setStatus(BookingStatus.CONFIRMED);
+                    booking.setConfirmedAt(java.time.LocalDateTime.now());
+                    bookingRepository.save(booking);
+                }
+            });
+        }
     }
 
     private String blankToNull(String value) {
@@ -372,6 +407,7 @@ public class WatchPartyService {
     private static class WatchPartyRoom {
         private final UUID id;
         private final Movie movie;
+        private final UUID showtimeId;
         private final BigDecimal pricePerMember;
         private final Instant expiresAt;
         private final Map<UUID, WatchPartyMember> members = new LinkedHashMap<>();
@@ -379,9 +415,10 @@ public class WatchPartyService {
         private PlaybackState playback = new PlaybackState(0, true, Instant.now(), null);
         private boolean openedForWatch;
 
-        private WatchPartyRoom(UUID id, Movie movie, BigDecimal pricePerMember) {
+        private WatchPartyRoom(UUID id, Movie movie, UUID showtimeId, BigDecimal pricePerMember) {
             this.id = id;
             this.movie = movie;
+            this.showtimeId = showtimeId;
             this.pricePerMember = pricePerMember;
             int durationMinutes = movie.getDurationMinutes() == null ? 0 : movie.getDurationMinutes();
             this.expiresAt = Instant.now().plusSeconds((long) (durationMinutes + WATCH_PARTY_GRACE_MINUTES) * 60);
@@ -396,6 +433,7 @@ public class WatchPartyService {
         private String qrCode;
         private String checkoutId;
         private String paymentId;
+        private UUID bookingId;
         private UUID paymentRecordId;
 
         private WatchPartyMember(User user, boolean creator) {

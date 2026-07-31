@@ -116,7 +116,7 @@ const MyBookingDetailPage = () => {
       bookingApi.fetchMyRefundRequests().catch(() => null),
       bookingApi.fetchAutomaticRefundAvailability().catch(() => null),
     ])
-      .then(([bookingDetail, ticketList, showtimeResponse, refundResponse, automaticRefundResponse]) => {
+      .then(async ([bookingDetail, ticketList, showtimeResponse, refundResponse, automaticRefundResponse]) => {
         if (!active) return;
         const rawShowtimes = showtimeResponse?.data ?? showtimeResponse ?? [];
         const showtimeMap = new Map(
@@ -128,9 +128,17 @@ const MyBookingDetailPage = () => {
         setBooking(enrichedBooking);
         setTickets(normalizedTickets);
         const refundList = refundResponse?.data?.data ?? refundResponse?.data ?? [];
-        setRefundRequest(Array.isArray(refundList)
+        const currentRefund = Array.isArray(refundList)
           ? refundList.find((item) => String(item.bookingId) === String(bookingId)) || null
-          : null);
+          : null;
+        setRefundRequest(currentRefund);
+        if (searchParams.get('support') === 'refund' && currentRefund?.id) {
+          const messagesResponse = await bookingApi.fetchRefundMessages(currentRefund.id).catch(() => null);
+          if (active) {
+            setMessages(messagesResponse?.data?.data ?? messagesResponse?.data ?? []);
+            setChatOpen(true);
+          }
+        }
         const automaticRefundData = automaticRefundResponse?.data?.data
           ?? automaticRefundResponse?.data
           ?? {};

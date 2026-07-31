@@ -113,25 +113,34 @@ public class RefundRequestService {
     }
 
     @Transactional
-    public RefundRequestDto requestForWatchParty(UUID customerId, UUID roomId, UUID paymentId,
-                                                  String refundMethod, String bankBin, String accountNumber) {
+    public RefundRequestDto requestForWatchParty(UUID customerId, UUID roomId, UUID bookingId, UUID paymentId,
+                                                  String rawReason, String refundMethod,
+                                                  String bankBin, String accountNumber) {
+        String reason = clean(rawReason);
+        if (reason.length() < 10) {
+            throw new BadRequestException("Vui lòng mô tả sự cố ít nhất 10 ký tự");
+        }
         RefundMethod method = parseRefundMethod(refundMethod);
         if (method == RefundMethod.AUTOMATIC && !payOSRefundClient.isAvailable())
             throw new BadRequestException("Kênh chi PayOS/Bảo Kim chưa sẵn sàng");
         validateDestination(method, bankBin, accountNumber);
         Payment payment = paymentRepository.findById(paymentId)
                 .orElseThrow(() -> new BadRequestException("Không tìm thấy thanh toán Watch Party"));
+        Booking booking = requireBooking(bookingId);
+        if (!booking.getUserId().equals(customerId) || !bookingId.equals(payment.getBookingId())) {
+            throw new BadRequestException("Booking Watch Party không thuộc về tài khoản của bạn");
+        }
         if (payment.getStatus() != PaymentStatus.PAID)
             throw new BadRequestException("Thanh toán Watch Party không đủ điều kiện hoàn");
-        Optional<RefundRequest> existing = refundRepository.findFirstByBookingIdAndStatusIn(paymentId, ACTIVE);
+        Optional<RefundRequest> existing = refundRepository.findFirstByBookingIdAndStatusIn(bookingId, ACTIVE);
         if (existing.isPresent()) return toDto(existing.get());
         RefundRequest request = refundRepository.save(RefundRequest.builder()
-                .bookingId(paymentId).paymentId(paymentId).customerId(customerId)
+                .bookingId(bookingId).paymentId(paymentId).customerId(customerId)
                 .ticketCode("SYS-WATCH-" + roomId.toString().substring(0, 8).toUpperCase(Locale.ROOT))
                 .amount(payment.getAmount()).refundMethod(method)
                 .bankBin(method == RefundMethod.AUTOMATIC ? bankBin.trim() : null)
                 .bankAccountNumber(method == RefundMethod.AUTOMATIC ? accountNumber.trim() : null)
-                .reason("Khách hàng yêu cầu hoàn tiền phòng xem phim nhóm")
+                .reason(reason)
                 .ticketCheckedIn(false).requiresAdmin(true).status(RefundRequestStatus.REQUESTED).build());
         saveMessage(request, customerId, "MEMBER", request.getReason());
         notifyShiftLeaders("Watch Party cần hoàn tiền", "Yêu cầu đang chờ Staff Trưởng xác minh.");
@@ -237,12 +246,10 @@ public class RefundRequestService {
         request.setRejectionReason(result.failureReason());
         if (result.status() == PaymentStatus.REFUNDED) {
             request.setStatus(RefundRequestStatus.APPROVED);
-            if (!request.getTicketCode().startsWith("SYS-WATCH-")) {
-                Booking booking = requireBooking(request.getBookingId());
-                booking.setStatus(BookingStatus.CANCELLED);
-                bookingService.releaseSeats(booking);
-                bookingRepository.save(booking);
-            }
+            Booking booking = requireBooking(request.getBookingId());
+            booking.setStatus(BookingStatus.CANCELLED);
+            bookingService.releaseSeats(booking);
+            bookingRepository.save(booking);
             notifyCustomer(request, "Hoàn tiền thành công",
                     "PayOS/Bảo Kim đã hoàn tiền cho vé " + request.getTicketCode() + ".");
         } else {

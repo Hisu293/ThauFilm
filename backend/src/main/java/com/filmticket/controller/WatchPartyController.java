@@ -2,6 +2,7 @@ package com.filmticket.controller;
 
 import com.filmticket.dto.ApiResponse;
 import com.filmticket.dto.MovieStreamResponse;
+import com.filmticket.dto.RefundRequestDto;
 import com.filmticket.dto.WatchPartyDto;
 import com.filmticket.exception.BadRequestException;
 import com.filmticket.repository.UserRepository;
@@ -65,11 +66,12 @@ public class WatchPartyController {
     }
 
     @PostMapping("/{roomId}/refund")
-    public ResponseEntity<ApiResponse<Void>> refund(@PathVariable UUID roomId,
-                                                     @RequestBody WatchPartyDto.RefundRequest request) {
-        watchPartyService.requestRefund(roomId, userId(), request.getRefundMethod(),
+    public ResponseEntity<ApiResponse<RefundRequestDto>> refund(
+            @PathVariable UUID roomId, @RequestBody WatchPartyDto.RefundRequest request) {
+        RefundRequestDto created = watchPartyService.requestRefund(
+                roomId, userId(), request.getReason(), request.getRefundMethod(),
                 request.getBankBin(), request.getAccountNumber());
-        return ResponseEntity.ok(ApiResponse.success("Đã tạo yêu cầu hoàn tiền", null));
+        return ResponseEntity.ok(ApiResponse.success("Đã tạo yêu cầu hoàn tiền", created));
     }
 
     private UUID userId() {

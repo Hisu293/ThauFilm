@@ -193,7 +193,7 @@ export default function MyRefundsPage() {
                         size="small"
                         variant="outlined"
                         startIcon={<ChatRoundedIcon />}
-                        onClick={() => navigate(`/my-bookings/${item.bookingId}`)}
+                        onClick={() => navigate(`/my-bookings/${item.bookingId}?support=refund`)}
                       >
                         Chi tiết và hỗ trợ
                       </Button>

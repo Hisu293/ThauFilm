@@ -34,6 +34,7 @@ public final class WatchPartyDto {
 
     @Data
     public static class RefundRequest {
+        private String reason;
         private String refundMethod;
         private String bankBin;
         private String accountNumber;
