@@ -54,6 +54,19 @@ const severityMeta = {
   CRITICAL: { label: 'Nghiêm trọng', color: 'error' },
 };
 
+const auditFailureLabel = (reason) => {
+  const normalized = String(reason || '').trim().toLowerCase();
+  if (!normalized) return 'Thao tác không thành công.';
+  if (normalized.includes('bad credentials') || normalized.includes('invalid credentials')) return 'Thông tin đăng nhập không chính xác.';
+  if (normalized.includes('access denied') || normalized.includes('forbidden')) return 'Người thực hiện không có quyền hoàn tất thao tác này.';
+  if (normalized.includes('not found')) return 'Không tìm thấy dữ liệu cần xử lý.';
+  if (normalized.includes('timeout') || normalized.includes('timed out')) return 'Hệ thống xử lý quá thời gian cho phép.';
+  if (normalized.includes('connection') || normalized.includes('connect')) return 'Không thể kết nối tới dịch vụ liên quan.';
+  if (normalized.includes('duplicate') || normalized.includes('already exists')) return 'Dữ liệu đã tồn tại trong hệ thống.';
+  if (/[À-ỹĐđ]/u.test(reason)) return reason;
+  return 'Không thể hoàn tất thao tác do lỗi hệ thống. Hãy dùng Request ID để kiểm tra nhật ký máy chủ.';
+};
+
 const formatTime = (value) => {
   if (!value) return '—';
   const date = new Date(value);
@@ -122,7 +135,7 @@ const AuditRow = ({ item }) => {
                 <Typography variant="caption">IP: {item.ipAddress || '—'}</Typography>
               </Stack>
               {item.reason && <Alert severity="info">Lý do: {item.reason}</Alert>}
-              {item.failureReason && <Alert severity="error">{item.failureReason}</Alert>}
+              {item.failureReason && <Alert severity="error">Lỗi: {auditFailureLabel(item.failureReason)}</Alert>}
               <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
                 <Box flex={1}><JsonBlock title="Dữ liệu trước thay đổi" value={item.oldValues} /></Box>
                 <Box flex={1}><JsonBlock title="Dữ liệu sau thay đổi" value={item.newValues} /></Box>

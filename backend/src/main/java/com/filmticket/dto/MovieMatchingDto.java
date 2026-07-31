@@ -79,6 +79,7 @@ public final class MovieMatchingDto {
         private UUID showtimeId; private String movieTitle; private String theaterName; private String roomName;
         private LocalDateTime startTime; private String status; private LocalDateTime createdAt;
         private LocalDateTime respondedAt; private String bookingPath;
+        private boolean expired; private boolean canSelectSeats;
     }
 
     @Data

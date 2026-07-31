@@ -174,15 +174,24 @@ public class MovieMatchInteractionService {
         Movie movie = showtime == null ? null : movieRepository.findById(showtime.getMovieId()).orElse(null);
         CinemaRoom room = showtime == null ? null : roomRepository.findById(showtime.getCinemaRoomId()).orElse(null);
         Theater theater = room == null || room.getTheaterId() == null ? null : theaterRepository.findById(room.getTheaterId()).orElse(null);
-        UUID groupBookingId = invitation.getStatus() == MovieMatchInvitation.Status.ACCEPTED
-                ? groupBookingService.findByInvitationId(invitation.getId()).map(GroupBooking::getId).orElse(null)
+        GroupBooking groupBooking = invitation.getStatus() == MovieMatchInvitation.Status.ACCEPTED
+                ? groupBookingService.findByInvitationId(invitation.getId()).orElse(null)
                 : null;
+        boolean showtimeExpired = showtime == null || !showtime.getStartTime().isAfter(LocalDateTime.now());
+        boolean groupBookingExpired = invitation.getStatus() == MovieMatchInvitation.Status.ACCEPTED
+                && (groupBooking == null || List.of(GroupBookingStatus.EXPIRED, GroupBookingStatus.CANCELLED)
+                .contains(groupBooking.getStatus()));
+        boolean expired = showtimeExpired || groupBookingExpired;
+        boolean canSelectSeats = !expired && groupBooking != null
+                && groupBooking.getStatus() == GroupBookingStatus.WAITING_SELECTION;
+        UUID groupBookingId = groupBooking == null ? null : groupBooking.getId();
         return MovieMatchingDto.InvitationResponse.builder().id(invitation.getId()).matchId(invitation.getMatchId())
                 .senderId(invitation.getSenderId()).recipientId(invitation.getRecipientId()).showtimeId(invitation.getShowtimeId())
                 .movieTitle(movie == null ? "Phim" : movie.getTitle()).theaterName(theater == null ? null : theater.getName())
                 .roomName(room == null ? null : room.getName()).startTime(showtime == null ? null : showtime.getStartTime())
                 .status(invitation.getStatus().name()).createdAt(invitation.getCreatedAt()).respondedAt(invitation.getRespondedAt())
                 .groupBookingId(groupBookingId)
-                .bookingPath(groupBookingId == null ? null : "/booking/group/" + groupBookingId).build();
+                .bookingPath(canSelectSeats ? "/booking/group/" + groupBookingId : null)
+                .expired(expired).canSelectSeats(canSelectSeats).build();
     }
 }

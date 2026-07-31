@@ -257,8 +257,26 @@ public class AuditLogService {
 
     private String safeFailure(Throwable throwable) {
         String message = throwable.getMessage();
-        if (message == null || message.isBlank()) return throwable.getClass().getSimpleName();
-        return message.length() > 1000 ? message.substring(0, 1000) : message;
+        if (message == null || message.isBlank()) return "Thao tác không thành công do lỗi hệ thống.";
+        String normalized = message.toLowerCase(Locale.ROOT);
+        if (normalized.contains("bad credentials") || normalized.contains("invalid credentials")) {
+            return "Thông tin đăng nhập không chính xác.";
+        }
+        if (normalized.contains("access denied") || normalized.contains("forbidden")) {
+            return "Người thực hiện không có quyền hoàn tất thao tác này.";
+        }
+        if (normalized.contains("not found")) return "Không tìm thấy dữ liệu cần xử lý.";
+        if (normalized.contains("timeout") || normalized.contains("timed out")) {
+            return "Hệ thống xử lý quá thời gian cho phép.";
+        }
+        if (normalized.contains("connection") || normalized.contains("connect")) {
+            return "Không thể kết nối tới dịch vụ liên quan.";
+        }
+        if (normalized.contains("duplicate") || normalized.contains("already exists")) {
+            return "Dữ liệu đã tồn tại trong hệ thống.";
+        }
+        if (message.matches(".*[À-ỹĐđ].*")) return message.length() > 1000 ? message.substring(0, 1000) : message;
+        return "Không thể hoàn tất thao tác do lỗi hệ thống. Hãy kiểm tra nhật ký máy chủ bằng Request ID.";
     }
 
     private static String stringValue(Object value) {
