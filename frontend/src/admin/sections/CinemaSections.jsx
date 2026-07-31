@@ -689,6 +689,7 @@ export const ShowtimesSection = ({ crud, movies, theaters, rooms }) => {
     startTime: '',
     status: 'SCHEDULED',
     online: false,
+    onlinePrice: '79000',
     mystery: false,
     mysteryUnlockAt: '',
   });
@@ -701,6 +702,10 @@ export const ShowtimesSection = ({ crud, movies, theaters, rooms }) => {
   const save = async () => {
     try {
       setFormError('');
+      if (form.online && (!form.onlinePrice || Number(form.onlinePrice) < 1000)) {
+        setFormError('Giá vé online phải từ 1.000 đồng.');
+        return;
+      }
       if (dialog === 'add') {
         if (!form.movieId || (!form.online && !form.cinemaRoomId) || !form.startTime) {
           setFormError(t('admin.showtime', 'errorRequired'));
@@ -712,15 +717,25 @@ export const ShowtimesSection = ({ crud, movies, theaters, rooms }) => {
           startTime: form.startTime,
           status: 'SCHEDULED',
           online: Boolean(form.online),
+          onlinePrice: form.online ? Number(form.onlinePrice) : null,
           mystery: Boolean(form.mystery),
           mysteryUnlockAt: form.mystery ? form.mysteryUnlockAt || null : null,
         });
       } else {
-        await crud.updateShowtime(dialog, { status: form.status });
+        await crud.update(dialog, {
+          movieId: String(form.movieId),
+          cinemaRoomId: form.online ? '' : String(form.cinemaRoomId),
+          startTime: form.startTime,
+          status: form.status,
+          online: Boolean(form.online),
+          onlinePrice: form.online ? Number(form.onlinePrice) : null,
+          mystery: Boolean(form.mystery),
+          mysteryUnlockAt: form.mystery ? form.mysteryUnlockAt || null : null,
+        });
       }
       setDialog(null);
       setFormError('');
-      setForm({ movieId: '', cinemaRoomId: '', startTime: '', status: 'SCHEDULED', online: false, mystery: false, mysteryUnlockAt: '' });
+      setForm({ movieId: '', cinemaRoomId: '', startTime: '', status: 'SCHEDULED', online: false, onlinePrice: '79000', mystery: false, mysteryUnlockAt: '' });
     } catch (err) {
       setFormError(err.message || 'Không thể lưu suất chiếu.');
       console.error('Lỗi khi lưu suất chiếu:', err);
@@ -972,9 +987,21 @@ export const ShowtimesSection = ({ crud, movies, theaters, rooms }) => {
                 )}
               </>
             ) : (
-              <Alert severity="info">
-                Suất chiếu online sử dụng nguồn phim đã tải lên và không cần chọn rạp hoặc phòng chiếu.
-              </Alert>
+              <>
+                <Alert severity="info">
+                  Suất chiếu online sử dụng nguồn phim đã tải lên và không cần chọn rạp hoặc phòng chiếu.
+                </Alert>
+                <TextField
+                  label="Giá vé online"
+                  type="number"
+                  fullWidth
+                  value={form.onlinePrice || ''}
+                  onChange={(event) => setForm({ ...form, onlinePrice: event.target.value })}
+                  inputProps={{ min: 1000, step: 1000 }}
+                  helperText="Giá áp dụng cho mỗi vé online và mỗi thành viên Watch Party."
+                  InputProps={{ endAdornment: <Typography color="text.secondary">đ</Typography> }}
+                />
+              </>
             )}
             <TextField key="start" label="Giờ bắt đầu" type="datetime-local" fullWidth InputLabelProps={{ shrink: true }} value={form.startTime || ''} onChange={(e) => setForm({ ...form, startTime: e.target.value })} />
             <Typography variant="caption" color="text.secondary">
@@ -1009,11 +1036,26 @@ export const ShowtimesSection = ({ crud, movies, theaters, rooms }) => {
             ) : null}
           </>
         ) : (
-          <TextField select label="Trạng thái" fullWidth value={form.status ?? 'SCHEDULED'} onChange={(e) => setForm({ ...form, status: e.target.value })}>
-            {SHOWTIME_STATUS_OPTIONS.map((opt) => (
-              <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
-            ))}
-          </TextField>
+          <>
+            {formError && <Alert severity="error">{formError}</Alert>}
+            <TextField select label="Trạng thái" fullWidth value={form.status ?? 'SCHEDULED'} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+              {SHOWTIME_STATUS_OPTIONS.map((opt) => (
+                <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+              ))}
+            </TextField>
+            {form.online ? (
+              <TextField
+                label="Giá vé online"
+                type="number"
+                fullWidth
+                value={form.onlinePrice || ''}
+                onChange={(event) => setForm({ ...form, onlinePrice: event.target.value })}
+                inputProps={{ min: 1000, step: 1000 }}
+                helperText="Giá áp dụng cho mỗi vé online và mỗi thành viên Watch Party mới."
+                InputProps={{ endAdornment: <Typography color="text.secondary">đ</Typography> }}
+              />
+            ) : null}
+          </>
         )}
       </CrudDialog>
     </>

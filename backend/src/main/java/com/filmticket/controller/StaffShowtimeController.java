@@ -28,14 +28,14 @@ public class StaffShowtimeController {
     @Operation(summary = "List all showtimes for staff")
     @GetMapping
     public ResponseEntity<ApiResponse<List<ShowtimeResponse>>> listShowtimes() {
-        return ResponseEntity.ok(ApiResponse.success("Showtimes fetched successfully", staffShowtimeService.listShowtimes()));
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách suất chiếu thành công", staffShowtimeService.listShowtimes()));
     }
 
     @Operation(summary = "Create a showtime")
     @PostMapping
     public ResponseEntity<ApiResponse<ShowtimeResponse>> createShowtime(@Valid @RequestBody UpsertShowtimeRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("Showtime created successfully", staffShowtimeService.createShowtime(request)));
+                .body(ApiResponse.success("Tạo suất chiếu thành công", staffShowtimeService.createShowtime(request)));
     }
 
     @Operation(summary = "Update a showtime")
@@ -44,19 +44,19 @@ public class StaffShowtimeController {
             @PathVariable UUID showtimeId,
             @Valid @RequestBody UpsertShowtimeRequest request
     ) {
-        return ResponseEntity.ok(ApiResponse.success("Showtime updated successfully", staffShowtimeService.updateShowtime(showtimeId, request)));
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật suất chiếu thành công", staffShowtimeService.updateShowtime(showtimeId, request)));
     }
 
     @Operation(summary = "Cancel a showtime")
     @DeleteMapping("/{showtimeId}")
     public ResponseEntity<ApiResponse<Void>> cancelShowtime(@PathVariable UUID showtimeId) {
         staffShowtimeService.cancelShowtime(showtimeId);
-        return ResponseEntity.ok(ApiResponse.success("Showtime cancelled successfully", null));
+        return ResponseEntity.ok(ApiResponse.success("Hủy suất chiếu thành công", null));
     }
 
     @Operation(summary = "Get seat tracking for a showtime")
     @GetMapping("/{showtimeId}/seats")
     public ResponseEntity<ApiResponse<?>> getShowtimeSeats(@PathVariable UUID showtimeId) {
-        return ResponseEntity.ok(ApiResponse.success("Showtime seats fetched successfully", staffShowtimeService.getShowtimeSeats(showtimeId)));
+        return ResponseEntity.ok(ApiResponse.success("Lấy trạng thái ghế của suất chiếu thành công", staffShowtimeService.getShowtimeSeats(showtimeId)));
     }
 }

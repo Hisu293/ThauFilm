@@ -35,14 +35,14 @@ public class AdminShowtimeController {
             @RequestParam UUID movieId,
             @RequestParam(required = false) LocalDate fromDate
     ) {
-        return ResponseEntity.ok(ApiResponse.success("Showtime suggestions generated",
+        return ResponseEntity.ok(ApiResponse.success("Đã tạo gợi ý suất chiếu",
                 demandPredictionService.suggest(movieId, fromDate)));
     }
 
     @Operation(summary = "List all showtimes")
     @GetMapping
     public ResponseEntity<ApiResponse<List<ShowtimeResponse>>> getAllShowtimes() {
-        return ResponseEntity.ok(ApiResponse.success("Showtimes fetched successfully", showtimeService.getAllShowtimes()));
+        return ResponseEntity.ok(ApiResponse.success("Lấy danh sách suất chiếu thành công", showtimeService.getAllShowtimes()));
     }
 
     @Operation(summary = "Create a showtime")
@@ -51,7 +51,7 @@ public class AdminShowtimeController {
             @Valid @RequestBody UpsertShowtimeRequest request
     ) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("Showtime created successfully", showtimeService.createShowtime(request)));
+                .body(ApiResponse.success("Tạo suất chiếu thành công", showtimeService.createShowtime(request)));
     }
 
     @Operation(summary = "Update a showtime")
@@ -60,7 +60,7 @@ public class AdminShowtimeController {
             @PathVariable UUID id,
             @Valid @RequestBody UpsertShowtimeRequest request
     ) {
-        return ResponseEntity.ok(ApiResponse.success("Showtime updated successfully", showtimeService.updateShowtime(id, request)));
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật suất chiếu thành công", showtimeService.updateShowtime(id, request)));
     }
 
     @Operation(summary = "Delete a showtime")

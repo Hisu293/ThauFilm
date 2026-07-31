@@ -7,6 +7,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -26,6 +27,7 @@ public class ShowtimeResponse {
     private LocalDateTime endTime;
     private ShowtimeStatus status;
     private boolean online;
+    private BigDecimal onlinePrice;
     private boolean mystery;
     private boolean mysteryUnlocked;
     private LocalDateTime mysteryUnlockAt;
@@ -42,6 +44,7 @@ public class ShowtimeResponse {
                 .endTime(showtime.getEndTime())
                 .status(showtime.getStatus())
                 .online(showtime.isOnline())
+                .onlinePrice(showtime.getOnlinePrice())
                 .mystery(showtime.isMystery())
                 .mysteryUnlocked(unlocked)
                 .mysteryUnlockAt(unlockAt)
@@ -69,6 +72,7 @@ public class ShowtimeResponse {
                 .endTime(showtime.getEndTime())
                 .status(showtime.getStatus())
                 .online(showtime.isOnline())
+                .onlinePrice(showtime.getOnlinePrice())
                 .mystery(mystery)
                 .mysteryUnlocked(unlocked)
                 .mysteryUnlockAt(unlockAt)

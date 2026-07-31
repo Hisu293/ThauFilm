@@ -8,6 +8,7 @@ import com.filmticket.entity.User;
 import com.filmticket.exception.BadRequestException;
 import com.filmticket.repository.MovieRepository;
 import com.filmticket.repository.PaymentRepository;
+import com.filmticket.repository.ShowtimeRepository;
 import com.filmticket.repository.UserRepository;
 import com.filmticket.websocket.RealtimeEventService;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +37,7 @@ public class WatchPartyService {
     private final MovieStreamService movieStreamService;
     private final AuditLogService auditLogService;
     private final PaymentRepository paymentRepository;
+    private final ShowtimeRepository showtimeRepository;
     private final RefundRequestService refundRequestService;
     private final Map<UUID, WatchPartyRoom> rooms = new ConcurrentHashMap<>();
     private final Map<String, PendingWatchPartyPayment> pendingPayments = new ConcurrentHashMap<>();
@@ -43,14 +45,20 @@ public class WatchPartyService {
     public WatchPartyDto.Response create(UUID movieId, UUID userId) {
         Movie movie = requireMovie(movieId);
         User user = requireUser(userId);
-        WatchPartyRoom room = new WatchPartyRoom(UUID.randomUUID(), movie);
+        BigDecimal price = showtimeRepository.findByMovieIdAndOnlineTrueOrderByStartTimeAsc(movieId).stream()
+                .filter(showtime -> showtime.getEndTime().isAfter(java.time.LocalDateTime.now()))
+                .map(com.filmticket.entity.Showtime::getOnlinePrice)
+                .filter(java.util.Objects::nonNull)
+                .findFirst()
+                .orElse(DEFAULT_MOVIE_PRICE);
+        WatchPartyRoom room = new WatchPartyRoom(UUID.randomUUID(), movie, price);
         room.members.put(userId, new WatchPartyMember(user, true));
         rooms.put(room.id, room);
         auditLogService.success(AuditLogService.AuditCommand.builder()
                 .action(AuditAction.WATCH_PARTY_CREATED).targetType("WATCH_PARTY")
                 .targetId(room.id.toString()).actorId(userId)
                 .description("Đã tạo phòng xem chung cho phim \"" + movie.getTitle() + "\"")
-                .metadata(Map.of("mãPhim", movieId, "giáMỗiThànhViên", DEFAULT_MOVIE_PRICE)).build());
+                .metadata(Map.of("mãPhim", movieId, "giáMỗiThànhViên", room.pricePerMember)).build());
         return toResponse(room, userId);
     }
 
@@ -69,10 +77,16 @@ public class WatchPartyService {
             if (member.paid) {
                 return toResponse(room, userId);
             }
+            if (member.checkoutUrl != null && !member.checkoutUrl.isBlank()) {
+                WatchPartyDto.Response response = toResponse(room, userId);
+                response.setCheckoutUrl(member.checkoutUrl);
+                response.setQrCode(member.qrCode);
+                return response;
+            }
             Payment payment = Payment.builder()
                     .id(UUID.randomUUID())
                     .bookingId(room.id)
-                    .amount(DEFAULT_MOVIE_PRICE)
+                    .amount(room.pricePerMember)
                     .paymentMethod("PAYOS")
                     .provider("PAYOS")
                     .status(com.filmticket.entity.PaymentStatus.PENDING)
@@ -123,7 +137,7 @@ public class WatchPartyService {
                     .targetId(room.id.toString()).actorId(pending.userId())
                     .description("Thành viên thanh toán phòng xem chung thành công")
                     .correlationId(room.id.toString()).providerEventId(paymentId)
-                    .newValues(Map.of("sốTiền", DEFAULT_MOVIE_PRICE, "trạngThái", "ĐÃ THANH TOÁN"))
+                    .newValues(Map.of("sốTiền", room.pricePerMember, "trạngThái", "ĐÃ THANH TOÁN"))
                     .sensitive(true).build());
             realtimeEventService.sendWatchPartyEvent(room.id, "WATCH_PARTY_UPDATED", toResponse(room, pending.userId()));
             if (orderCode != null) pendingPayments.remove(orderCode);
@@ -139,12 +153,12 @@ public class WatchPartyService {
             if (!member.paid) {
                 String checkoutId = blankToNull(member.checkoutId);
                 if (checkoutId == null) {
-                    throw new BadRequestException("Create your watch party payment before syncing");
+                    throw new BadRequestException("Vui lòng tạo thanh toán phần của bạn trước khi cập nhật trạng thái");
                 }
                 PaymentGatewayService.PayosPaymentStatus status =
                         paymentGatewayService.getPayosPaymentStatus(checkoutId);
                 if (!status.paid()) {
-                    throw new BadRequestException("PayOS payment is not paid yet");
+                    throw new BadRequestException("Giao dịch PayOS chưa được thanh toán");
                 }
                 markMemberPaid(member, status.orderCode(), status.paymentId());
                 realtimeEventService.sendWatchPartyEvent(room.id, "WATCH_PARTY_UPDATED", toResponse(room, userId));
@@ -182,10 +196,10 @@ public class WatchPartyService {
         synchronized (room) {
             WatchPartyMember member = ensureMember(room, userId);
             if (!member.paid) {
-                throw new BadRequestException("Pay your watch party ticket before watching");
+                throw new BadRequestException("Vui lòng thanh toán vé Watch Party trước khi xem");
             }
             if (!isReadyToWatch(room)) {
-                throw new BadRequestException("Watch party is waiting for all members to pay");
+                throw new BadRequestException("Phòng đang chờ tất cả thành viên thanh toán");
             }
             return movieStreamService.buildResponseAndRecord(room.movie, userId);
         }
@@ -195,7 +209,7 @@ public class WatchPartyService {
         WatchPartyRoom room = requireRoom(roomId);
         String normalized = content == null ? "" : content.trim();
         if (normalized.isBlank()) {
-            throw new BadRequestException("Message cannot be empty");
+            throw new BadRequestException("Tin nhắn không được để trống");
         }
         if (normalized.length() > 500) {
             normalized = normalized.substring(0, 500);
@@ -222,7 +236,7 @@ public class WatchPartyService {
         WatchPartyRoom room = requireRoom(roomId);
         String value = reaction == null ? "" : reaction.trim();
         if (!List.of("❤️", "😂", "😮").contains(value)) {
-            throw new BadRequestException("Unsupported reaction");
+            throw new BadRequestException("Biểu cảm không được hỗ trợ");
         }
         synchronized (room) {
             WatchPartyMember member = ensureMember(room, userId);
@@ -247,7 +261,7 @@ public class WatchPartyService {
 
     private WatchPartyRoom requireRoom(UUID roomId) {
         WatchPartyRoom room = rooms.get(roomId);
-        if (room == null) throw new BadRequestException("Watch party not found");
+        if (room == null) throw new BadRequestException("Không tìm thấy phòng Watch Party");
         if (Instant.now().isAfter(room.expiresAt)) {
             throw new BadRequestException("Watch party đã hết thời gian xem phim");
         }
@@ -256,12 +270,12 @@ public class WatchPartyService {
 
     private Movie requireMovie(UUID movieId) {
         return movieRepository.findById(movieId)
-                .orElseThrow(() -> new BadRequestException("Movie not found"));
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy phim"));
     }
 
     private User requireUser(UUID userId) {
         return userRepository.findById(userId)
-                .orElseThrow(() -> new BadRequestException("User not found"));
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy người dùng"));
     }
 
     private WatchPartyMember ensureMember(WatchPartyRoom room, UUID userId) {
@@ -293,7 +307,7 @@ public class WatchPartyService {
                 .movieTitle(room.movie.getTitle())
                 .posterUrl(room.movie.getPosterUrl())
                 .expiresAt(room.expiresAt)
-                .pricePerMember(DEFAULT_MOVIE_PRICE)
+                .pricePerMember(room.pricePerMember)
                 .readyToWatch(readyToWatch)
                 .currentUserPaid(currentUserPaid)
                 .checkoutUrl(room.members.get(currentUserId) != null ? room.members.get(currentUserId).checkoutUrl : null)
@@ -358,15 +372,17 @@ public class WatchPartyService {
     private static class WatchPartyRoom {
         private final UUID id;
         private final Movie movie;
+        private final BigDecimal pricePerMember;
         private final Instant expiresAt;
         private final Map<UUID, WatchPartyMember> members = new LinkedHashMap<>();
         private final List<WatchPartyDto.ChatMessageResponse> messages = new ArrayList<>();
         private PlaybackState playback = new PlaybackState(0, true, Instant.now(), null);
         private boolean openedForWatch;
 
-        private WatchPartyRoom(UUID id, Movie movie) {
+        private WatchPartyRoom(UUID id, Movie movie, BigDecimal pricePerMember) {
             this.id = id;
             this.movie = movie;
+            this.pricePerMember = pricePerMember;
             int durationMinutes = movie.getDurationMinutes() == null ? 0 : movie.getDurationMinutes();
             this.expiresAt = Instant.now().plusSeconds((long) (durationMinutes + WATCH_PARTY_GRACE_MINUTES) * 60);
         }

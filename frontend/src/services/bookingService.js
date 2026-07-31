@@ -208,6 +208,7 @@ export const bookingService = {
         online: isOnline,
         startTime: raw,
         endTime: showtime.endTime ?? '',
+        onlinePrice: showtime.onlinePrice ?? null,
         date: dateStr,
         _date: dateStr,
       });
@@ -244,6 +245,7 @@ export const bookingService = {
       time,
       startTime: rawStart,
       endTime: rawEnd,
+      onlinePrice: showtime.onlinePrice ?? null,
       room: isOnline ? 'Xem online' : (showtime.cinemaRoomName ?? showtime.roomName ?? showtime.room ?? ''),
       format: isOnline ? 'Online' : (showtime.format ?? '2D'),
       status: showtime.status,

@@ -308,7 +308,7 @@ public class BookingService {
         Booking booking = Booking.builder()
                 .userId(userId)
                 .showtimeId(request.getShowtimeId())
-                .totalAmount(ONLINE_MOVIE_PRICE)
+                .totalAmount(showtime.getOnlinePrice() != null ? showtime.getOnlinePrice() : ONLINE_MOVIE_PRICE)
                 .status(BookingStatus.HOLD)
                 .confirmationCode(generateConfirmationCode())
                 .holdExpiresAt(now().plusMinutes(HOLD_MINUTES))

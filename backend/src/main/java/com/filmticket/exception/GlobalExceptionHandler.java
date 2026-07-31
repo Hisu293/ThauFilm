@@ -65,7 +65,7 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleHttpMessageNotReadable(HttpMessageNotReadableException ex) {
         log.error("Yêu cầu JSON sai định dạng: {}", ex.getMostSpecificCause().getMessage());
         return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                .body(ApiResponse.error("Malformed JSON request body"));
+                .body(ApiResponse.error("Nội dung JSON của yêu cầu không đúng định dạng"));
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
@@ -73,13 +73,13 @@ public class GlobalExceptionHandler {
         log.error("Lỗi vi phạm tính toàn vẹn dữ liệu: {}", ex.getMessage());
 
         String message = ex.getMessage();
-        String returnMessage = "Không thể xóa dữ liệu do có ràng buộc liên quan hệ thống!";
+        String returnMessage = "Không thể lưu dữ liệu do có ràng buộc liên quan hệ thống. Vui lòng thử lại hoặc liên hệ hỗ trợ.";
 
         // Bẫy đúng tên constraint ngoại khóa của bảng bookings khi xóa showtime
         if (message != null && message.contains("bookings_showtime_id_fkey")) {
             returnMessage = "Không thể xóa suất chiếu này vì đã có khách đặt vé!";
         } else if (message != null && message.contains("uk_showtime_room_start_time")) {
-            returnMessage = "Showtime overlaps with an existing showtime in this room and start time.";
+            returnMessage = "Suất chiếu bị trùng giờ với một suất chiếu khác trong cùng phòng.";
         } else if (message != null && message.contains("chk_movie_match_order")) {
             returnMessage = "Không thể tạo match do thứ tự định danh người dùng không hợp lệ.";
         } else if (message != null && message.contains("uk_movie_match_pair")) {

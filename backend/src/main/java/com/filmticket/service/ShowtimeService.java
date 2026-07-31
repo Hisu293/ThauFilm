@@ -39,6 +39,7 @@ import java.util.stream.Collectors;
 public class ShowtimeService {
 
     private static final BigDecimal MYSTERY_PRICE = BigDecimal.valueOf(79000);
+    private static final BigDecimal DEFAULT_ONLINE_PRICE = BigDecimal.valueOf(79000);
 
     private final ShowtimeRepository showtimeRepository;
     private final MovieRepository movieRepository;
@@ -123,33 +124,33 @@ public class ShowtimeService {
         LocalDateTime now = LocalDateTime.now();
 
         if (!request.getStartTime().isAfter(now)) {
-            throw new BadRequestException("Start time must be in the future");
+            throw new BadRequestException("Giờ bắt đầu phải ở trong tương lai");
         }
 
         Movie movie = movieRepository.findById(request.getMovieId())
-                .orElseThrow(() -> new BadRequestException("Movie not found"));
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy phim"));
         if (!movie.isActive() || movie.getStatus() != Movie.Status.NOW_SHOWING) {
-            throw new BadRequestException("Movie is not currently active");
+            throw new BadRequestException("Phim hiện không hoạt động hoặc chưa ở trạng thái đang chiếu");
         }
 
         boolean online = Boolean.TRUE.equals(request.getOnline());
         if (online && (movie.getStreamKey() == null || movie.getStreamKey().trim().isBlank())) {
-            throw new BadRequestException("Online stream is not configured for this movie");
+            throw new BadRequestException("Phim chưa được cấu hình nội dung xem online");
         }
         if (!online) {
             if (request.getCinemaRoomId() == null) {
-                throw new BadRequestException("Cinema room is required for theater showtimes");
+                throw new BadRequestException("Vui lòng chọn phòng cho suất chiếu tại rạp");
             }
             CinemaRoom room = cinemaRoomRepository.findById(request.getCinemaRoomId())
-                    .orElseThrow(() -> new BadRequestException("CinemaRoom not found"));
+                    .orElseThrow(() -> new BadRequestException("Không tìm thấy phòng chiếu"));
             if (room.getStatus() != RoomStatus.ACTIVE) {
-                throw new BadRequestException("Cinema room is not active");
+                throw new BadRequestException("Phòng chiếu hiện không hoạt động");
             }
             if (room.getStatus() == RoomStatus.MAINTENANCE) {
-                throw new BadRequestException("Cannot create showtime in a room that is under maintenance");
+                throw new BadRequestException("Không thể tạo suất chiếu trong phòng đang bảo trì");
             }
             if (!seatRepository.existsByCinemaRoomIdAndStatus(room.getId(), Seat.Status.ACTIVE)) {
-                throw new BadRequestException("Cinema room has no active seats");
+                throw new BadRequestException("Phòng chiếu chưa có ghế đang hoạt động");
             }
         }
 
@@ -168,6 +169,7 @@ public class ShowtimeService {
                 .endTime(endTime)
                 .status(request.getStatus())
                 .online(online)
+                .onlinePrice(resolveOnlinePrice(request, online))
                 .mystery(Boolean.TRUE.equals(request.getMystery()))
                 .mysteryUnlockAt(Boolean.TRUE.equals(request.getMystery())
                         ? (request.getMysteryUnlockAt() != null ? request.getMysteryUnlockAt() : request.getStartTime())
@@ -192,36 +194,36 @@ public class ShowtimeService {
         LocalDateTime now = LocalDateTime.now();
 
         if (!request.getStartTime().isAfter(now)) {
-            throw new BadRequestException("Start time must be in the future");
+            throw new BadRequestException("Giờ bắt đầu phải ở trong tương lai");
         }
 
         Showtime showtime = getShowtimeEntityOrThrow(showtimeId);
         Map<String, Object> oldValues = showtimeAuditValues(showtime);
 
         Movie movie = movieRepository.findById(request.getMovieId())
-                .orElseThrow(() -> new BadRequestException("Movie not found"));
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy phim"));
         if (!movie.isActive() || movie.getStatus() != Movie.Status.NOW_SHOWING) {
-            throw new BadRequestException("Movie is not currently active");
+            throw new BadRequestException("Phim hiện không hoạt động hoặc chưa ở trạng thái đang chiếu");
         }
 
         boolean online = Boolean.TRUE.equals(request.getOnline());
         if (online && (movie.getStreamKey() == null || movie.getStreamKey().trim().isBlank())) {
-            throw new BadRequestException("Online stream is not configured for this movie");
+            throw new BadRequestException("Phim chưa được cấu hình nội dung xem online");
         }
         if (!online) {
             if (request.getCinemaRoomId() == null) {
-                throw new BadRequestException("Cinema room is required for theater showtimes");
+                throw new BadRequestException("Vui lòng chọn phòng cho suất chiếu tại rạp");
             }
             CinemaRoom room = cinemaRoomRepository.findById(request.getCinemaRoomId())
-                    .orElseThrow(() -> new BadRequestException("CinemaRoom not found"));
+                    .orElseThrow(() -> new BadRequestException("Không tìm thấy phòng chiếu"));
             if (room.getStatus() != RoomStatus.ACTIVE) {
-                throw new BadRequestException("Cinema room is not active");
+                throw new BadRequestException("Phòng chiếu hiện không hoạt động");
             }
             if (room.getStatus() == RoomStatus.MAINTENANCE) {
-                throw new BadRequestException("Cannot create showtime in a room that is under maintenance");
+                throw new BadRequestException("Không thể tạo suất chiếu trong phòng đang bảo trì");
             }
             if (!seatRepository.existsByCinemaRoomIdAndStatus(room.getId(), Seat.Status.ACTIVE)) {
-                throw new BadRequestException("Cinema room has no active seats");
+                throw new BadRequestException("Phòng chiếu chưa có ghế đang hoạt động");
             }
         }
 
@@ -239,6 +241,7 @@ public class ShowtimeService {
         showtime.setEndTime(endTime);
         showtime.setStatus(request.getStatus());
         showtime.setOnline(online);
+        showtime.setOnlinePrice(resolveOnlinePrice(request, online));
         showtime.setMystery(Boolean.TRUE.equals(request.getMystery()));
         showtime.setMysteryUnlockAt(showtime.isMystery()
                 ? (request.getMysteryUnlockAt() != null ? request.getMysteryUnlockAt() : request.getStartTime())
@@ -253,6 +256,11 @@ public class ShowtimeService {
                 .oldValues(oldValues).newValues(showtimeAuditValues(savedShowtime))
                 .correlationId(savedShowtime.getId().toString()).build());
         return enrich(List.of(savedShowtime)).get(0);
+    }
+
+    private BigDecimal resolveOnlinePrice(UpsertShowtimeRequest request, boolean online) {
+        if (!online) return null;
+        return request.getOnlinePrice() != null ? request.getOnlinePrice() : DEFAULT_ONLINE_PRICE;
     }
 
     @Transactional
@@ -276,7 +284,7 @@ public class ShowtimeService {
     @Transactional(readOnly = true)
     public Showtime getShowtimeEntityOrThrow(UUID showtimeId) {
         return showtimeRepository.findById(showtimeId)
-                .orElseThrow(() -> new BadRequestException("Showtime not found"));
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy suất chiếu"));
     }
 
     private Map<String, Object> showtimeAuditValues(Showtime showtime) {
@@ -287,6 +295,7 @@ public class ShowtimeService {
         values.put("kếtThúc", showtime.getEndTime());
         values.put("trạngThái", showtime.getStatus());
         values.put("chiếuOnline", showtime.isOnline());
+        values.put("giáOnline", showtime.getOnlinePrice());
         values.put("suấtChiếuBíMật", showtime.isMystery());
         return values;
     }
@@ -294,7 +303,7 @@ public class ShowtimeService {
     @Transactional(readOnly = true)
     public List<ShowtimeResponse> getShowtimesByMovie(UUID movieId) {
         if (!movieRepository.existsById(movieId)) {
-            throw new BadRequestException("Movie not found");
+            throw new BadRequestException("Không tìm thấy phim");
         }
         return enrich(showtimeRepository.findByMovieIdOrderByStartTimeAsc(movieId));
     }
@@ -302,7 +311,7 @@ public class ShowtimeService {
     @Transactional(readOnly = true)
     public List<ShowtimeResponse> getPublicShowtimesByMovie(UUID movieId) {
         if (!movieRepository.existsById(movieId)) {
-            throw new BadRequestException("Movie not found");
+            throw new BadRequestException("Không tìm thấy phim");
         }
         return enrich(showtimeRepository.findByMovieIdOrderByStartTimeAsc(movieId), false);
     }
@@ -320,7 +329,7 @@ public class ShowtimeService {
     @Transactional(readOnly = true)
     public List<ShowtimeResponse> getShowtimesByMovieAndDate(UUID movieId, java.time.LocalDate date) {
         if (!movieRepository.existsById(movieId)) {
-            throw new BadRequestException("Movie not found");
+            throw new BadRequestException("Không tìm thấy phim");
         }
         return enrich(showtimeRepository.findByMovieIdAndDate(movieId, date));
     }
@@ -328,7 +337,7 @@ public class ShowtimeService {
     @Transactional(readOnly = true)
     public List<ShowtimeResponse> getPublicShowtimesByMovieAndDate(UUID movieId, java.time.LocalDate date) {
         if (!movieRepository.existsById(movieId)) {
-            throw new BadRequestException("Movie not found");
+            throw new BadRequestException("Không tìm thấy phim");
         }
         return enrich(showtimeRepository.findByMovieIdAndDate(movieId, date), false);
     }
@@ -346,7 +355,7 @@ public class ShowtimeService {
     @Transactional(readOnly = true)
     public List<ShowtimeResponse> getShowtimesByMovieAndTheater(UUID movieId, UUID theaterId) {
         if (!movieRepository.existsById(movieId)) {
-            throw new BadRequestException("Movie not found");
+            throw new BadRequestException("Không tìm thấy phim");
         }
         return enrich(showtimeRepository.findByTheaterIdAndMovieId(theaterId, movieId));
     }
@@ -354,7 +363,7 @@ public class ShowtimeService {
     @Transactional(readOnly = true)
     public List<ShowtimeResponse> getPublicShowtimesByMovieAndTheater(UUID movieId, UUID theaterId) {
         if (!movieRepository.existsById(movieId)) {
-            throw new BadRequestException("Movie not found");
+            throw new BadRequestException("Không tìm thấy phim");
         }
         return enrich(showtimeRepository.findByTheaterIdAndMovieId(theaterId, movieId), false);
     }
@@ -362,7 +371,7 @@ public class ShowtimeService {
     @Transactional(readOnly = true)
     public List<CinemaRoomResponse> getCinemasByMovie(UUID movieId) {
         if (!movieRepository.existsById(movieId)) {
-            throw new BadRequestException("Movie not found");
+            throw new BadRequestException("Không tìm thấy phim");
         }
         List<UUID> roomIds = showtimeRepository.findDistinctCinemaRoomIdsByMovieId(movieId);
         return roomIds.stream()
@@ -382,7 +391,7 @@ public class ShowtimeService {
     @Transactional(readOnly = true)
     public List<LocalDate> getShowDatesByMovie(UUID movieId) {
         if (!movieRepository.existsById(movieId)) {
-            throw new BadRequestException("Movie not found");
+            throw new BadRequestException("Không tìm thấy phim");
         }
         return showtimeRepository.findByMovieIdOrderByStartTimeAsc(movieId).stream()
                 .map(s -> s.getStartTime().toLocalDate())
@@ -443,7 +452,7 @@ public class ShowtimeService {
         }
 
         if (!overlapping.isEmpty()) {
-            throw new BadRequestException("Showtime overlaps with an existing showtime in this room");
+            throw new BadRequestException("Suất chiếu bị trùng giờ với một suất chiếu khác trong cùng phòng");
         }
     }
 

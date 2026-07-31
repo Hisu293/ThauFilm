@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -48,6 +49,9 @@ public class Showtime {
     @Column(name = "online", nullable = false)
     @Builder.Default
     private boolean online = false;
+
+    @Column(name = "online_price", precision = 10, scale = 2)
+    private BigDecimal onlinePrice;
 
     @Column(name = "mystery", nullable = false)
     @Builder.Default

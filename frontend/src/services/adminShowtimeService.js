@@ -13,6 +13,7 @@ export const SHOWTIME_FIELDS = [
   'startTime',
   'status',
   'online',
+  'onlinePrice',
   'mystery',
   'mysteryUnlockAt',
 ];

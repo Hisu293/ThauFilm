@@ -28,6 +28,7 @@ public interface ShowtimeRepository extends JpaRepository<Showtime, UUID> {
             @Param("excludeId") UUID excludeId);
 
     List<Showtime> findByMovieIdOrderByStartTimeAsc(UUID movieId);
+    List<Showtime> findByMovieIdAndOnlineTrueOrderByStartTimeAsc(UUID movieId);
 
     @Query("SELECT s FROM Showtime s WHERE DATE(s.startTime) = :date ORDER BY s.startTime ASC")
     List<Showtime> findByDate(@Param("date") LocalDate date);
