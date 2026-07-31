@@ -4,6 +4,7 @@ import com.filmticket.entity.EmailOtp;
 import com.filmticket.exception.BadRequestException;
 import com.filmticket.repository.EmailOtpRepository;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -15,6 +16,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class EmailOtpService {
     private static final SecureRandom RANDOM = new SecureRandom();
     private static final int TTL_MINUTES = 10;
@@ -73,6 +75,7 @@ public class EmailOtpService {
             outboundEmailService.send("OTP_" + purpose + "_" + otp.getId() + "_" + now,
                     email, subject, body, true, List.of());
         } catch (Exception exception) {
+            log.error("Gửi OTP thất bại: mục đích={}, email={}", purpose, maskEmail(email), exception);
             throw new BadRequestException("Không thể gửi OTP đến email. Vui lòng kiểm tra email hoặc thử lại sau");
         }
     }
@@ -93,5 +96,12 @@ public class EmailOtpService {
             throw new BadRequestException("OTP không chính xác");
         }
         repository.delete(otp);
+    }
+
+    private String maskEmail(String email) {
+        if (email == null || !email.contains("@")) return "***";
+        String[] parts = email.split("@", 2);
+        String visible = parts[0].isBlank() ? "*" : parts[0].substring(0, 1);
+        return visible + "***@" + parts[1];
     }
 }

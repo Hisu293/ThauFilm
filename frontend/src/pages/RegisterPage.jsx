@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 import VisibilityOffRoundedIcon from '@mui/icons-material/VisibilityOffRounded';
 import VisibilityRoundedIcon from '@mui/icons-material/VisibilityRounded';
@@ -60,6 +60,17 @@ const RegisterPage = () => {
   const [loading,        setLoading]        = useState(false);
   const [otpStep, setOtpStep] = useState(false);
   const [otp, setOtp] = useState('');
+  const [resendSeconds, setResendSeconds] = useState(0);
+  const [resending, setResending] = useState(false);
+  const [otpNotice, setOtpNotice] = useState('');
+
+  useEffect(() => {
+    if (resendSeconds <= 0) return undefined;
+    const timer = window.setInterval(() => {
+      setResendSeconds((current) => Math.max(0, current - 1));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [resendSeconds]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -145,6 +156,8 @@ const RegisterPage = () => {
         password: form.password,
       });
       setOtpStep(true);
+      setResendSeconds(60);
+      setOtpNotice('OTP đã được gửi. Hãy kiểm tra Hộp thư đến và Thư rác.');
     } catch (err) {
       setServerError(err.message || 'Đăng ký thất bại. Vui lòng thử lại.');
     } finally {
@@ -363,6 +376,7 @@ const RegisterPage = () => {
               <Alert severity="info">
                 Mã OTP đã được gửi đến {form.email}. Mã có hiệu lực trong 10 phút.
               </Alert>
+              {otpNotice && <Alert severity="success">{otpNotice}</Alert>}
               <TextField
                 label="Mã OTP"
                 value={otp}
@@ -373,11 +387,27 @@ const RegisterPage = () => {
               />
               <Button
                 type="button"
-                disabled={loading}
-                onClick={() => authService.resendRegistrationOtp(form.email.trim())
-                  .catch((err) => setServerError(err.message || 'Không thể gửi lại OTP.'))}
+                disabled={loading || resending || resendSeconds > 0}
+                onClick={async () => {
+                  setResending(true);
+                  setServerError('');
+                  setOtpNotice('');
+                  try {
+                    await authService.resendRegistrationOtp(form.email.trim());
+                    setResendSeconds(60);
+                    setOtpNotice('Đã gửi OTP mới. Mã OTP cũ không còn hiệu lực.');
+                  } catch (err) {
+                    setServerError(err.message || 'Không thể gửi lại OTP.');
+                  } finally {
+                    setResending(false);
+                  }
+                }}
               >
-                Gửi lại OTP
+                {resending
+                  ? <CircularProgress size={20} color="inherit" />
+                  : resendSeconds > 0
+                    ? `Gửi lại OTP sau ${resendSeconds}s`
+                    : 'Gửi lại OTP'}
               </Button>
             </>
           )}
