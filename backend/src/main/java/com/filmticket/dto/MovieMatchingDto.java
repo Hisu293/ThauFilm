@@ -81,6 +81,7 @@ public final class MovieMatchingDto {
         private LocalDateTime respondedAt; private String bookingPath;
         private String groupBookingStatus;
         private boolean expired; private boolean canSelectSeats;
+        private boolean reused; private String notice;
     }
 
     @Data

@@ -1,6 +1,9 @@
 package com.filmticket.websocket;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.filmticket.dto.UserNotificationDto;
+import com.filmticket.entity.UserNotification;
+import com.filmticket.repository.UserNotificationRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -8,7 +11,6 @@ import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 
 import java.io.IOException;
-import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -19,6 +21,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @RequiredArgsConstructor
 public class RealtimeEventService {
     private final ObjectMapper objectMapper;
+    private final UserNotificationRepository notificationRepository;
     private final Set<WebSocketSession> sessions = ConcurrentHashMap.newKeySet();
 
     public void register(WebSocketSession session) {
@@ -41,19 +44,15 @@ public class RealtimeEventService {
     }
 
     public void notifyUser(UUID userId, String type, String title, String message, String link) {
+        UserNotification notification = notificationRepository.save(UserNotification.builder()
+                .userId(userId).notificationType(type).title(title).message(message)
+                .link(link == null ? "" : link).build());
         sendMatching(session -> {
             UUID sessionUserId = (UUID) session.getAttributes().get("userId");
             return userId.equals(sessionUserId);
         }, Map.of(
                 "type", "NOTIFICATION",
-                "data", Map.of(
-                        "id", UUID.randomUUID(),
-                        "notificationType", type,
-                        "title", title,
-                        "message", message,
-                        "link", link == null ? "" : link,
-                        "createdAt", LocalDateTime.now()
-                )
+                "data", UserNotificationDto.from(notification)
         ), type, userId);
     }
 

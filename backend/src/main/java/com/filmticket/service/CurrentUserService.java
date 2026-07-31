@@ -16,7 +16,7 @@ public class CurrentUserService {
 
     public UUID requireUserId(UserDetails principal) {
         return findUserId(principal)
-                .orElseThrow(() -> new BadRequestException("Authentication is required"));
+                .orElseThrow(() -> new BadRequestException("Bạn cần đăng nhập để thực hiện thao tác này"));
     }
 
     public Optional<UUID> findUserId(UserDetails principal) {
