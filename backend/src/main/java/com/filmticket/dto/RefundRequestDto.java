@@ -18,6 +18,10 @@ public class RefundRequestDto {
     private UUID customerId;
     private String customerName;
     private String customerEmail;
+    private UUID paidByUserId;
+    private String paidByUserName;
+    private String paidByUserEmail;
+    private boolean paidByAnotherUser;
     private UUID staffId;
     private String staffName;
     private String movieTitle;
@@ -29,6 +33,9 @@ public class RefundRequestDto {
     private String bankBin;
     private String bankAccountNumber;
     private String bankAccountMasked;
+    private UUID payoutConfirmedBy;
+    private LocalDateTime payoutConfirmedAt;
+    private boolean payoutDestinationConfirmed;
     private boolean automaticRetryAvailable;
     private RefundRequestStatus status;
     private boolean requiresAdmin;

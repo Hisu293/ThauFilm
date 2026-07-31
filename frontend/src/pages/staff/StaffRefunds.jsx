@@ -139,7 +139,7 @@ export default function StaffRefunds() {
     return items.filter((item) => {
       if (statusFilter !== 'ALL' && item.status !== statusFilter) return false;
       if (!keyword) return true;
-      return [item.customerName, item.customerEmail, item.ticketCode, item.movieTitle, item.reason]
+      return [item.customerName, item.customerEmail, item.paidByUserName, item.paidByUserEmail, item.ticketCode, item.movieTitle, item.reason]
         .some((value) => String(value || '').toLocaleLowerCase('vi').includes(keyword));
     });
   }, [items, query, statusFilter]);
@@ -344,12 +344,14 @@ export default function StaffRefunds() {
           <Divider />
           <Box display="grid" gridTemplateColumns={{ xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' }} gap={2}>
             <Box><Typography variant="caption" color="text.secondary">Phim / suất chiếu</Typography><Typography fontWeight={800}>{selected?.movieTitle || '—'}</Typography><Typography variant="body2">{dateTime(selected?.showtimeStart)} – {dateTime(selected?.showtimeEnd)}</Typography></Box>
+            <Box><Typography variant="caption" color="text.secondary">Người thanh toán</Typography><Typography fontWeight={800}>{selected?.paidByUserName || selected?.customerName || '—'}</Typography><Typography variant="body2">{selected?.paidByUserEmail || selected?.customerEmail || '—'}</Typography></Box>
             <Box><Typography variant="caption" color="text.secondary">Số tiền hoàn</Typography><Typography variant="h6" fontWeight={950} color="warning.main">{money(selected?.amount)}</Typography></Box>
             <Box><Typography variant="caption" color="text.secondary">Trạng thái suất chiếu</Typography><Typography fontWeight={700}>{selected?.showtimeEnded ? 'Suất đã kết thúc' : selected?.showtimeStarted ? 'Suất đang chiếu' : 'Chưa đến giờ chiếu'}</Typography></Box>
             <Box><Typography variant="caption" color="text.secondary">Xác minh sử dụng</Typography><Typography fontWeight={700} color={selected?.contentAccessed ? 'error.main' : 'success.main'}>{selected?.contentAccessed ? 'Đã mở phim lúc ' + dateTime(selected?.firstViewedAt) : 'Chưa ghi nhận mở phim'}</Typography><Typography variant="caption">{selected?.ticketCheckedIn ? 'Vé đã check-in' : 'Vé chưa check-in'}</Typography></Box>
           </Box>
           <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: 'action.hover' }}><Typography variant="caption" color="text.secondary">Lý do khách gửi</Typography><Typography sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{selected?.reason || 'Không có lý do'}</Typography>{selected?.rejectionReason && <Typography color="error.main" sx={{ mt: 1 }}>Phản hồi xử lý: {selected.rejectionReason}</Typography>}</Box>
-          <Box><Typography variant="caption" color="text.secondary">Phương thức hoàn tiền</Typography><Typography fontWeight={750} sx={{ overflowWrap: 'anywhere' }}>{selected?.refundMethod === 'AUTOMATIC' ? 'PayOS/Bảo Kim · BIN ' + (selected?.bankBin || '—') + ' · STK ' + (selected?.bankAccountNumber || '—') : 'Hoàn tiền thủ công bằng QR'}</Typography></Box>
+          <Box><Typography variant="caption" color="text.secondary">Phương thức hoàn tiền</Typography><Typography fontWeight={750} sx={{ overflowWrap: 'anywhere' }}>{selected?.refundMethod === 'AUTOMATIC' ? 'PayOS/Bảo Kim · BIN ' + (selected?.bankBin || '—') + ' · STK ' + (selected?.bankAccountMasked || '—') : 'Hoàn tiền thủ công bằng QR'}</Typography></Box>
+          {selected?.refundMethod === 'AUTOMATIC' && <Alert severity={selected?.payoutDestinationConfirmed ? 'success' : 'warning'}>{selected?.payoutDestinationConfirmed ? `Người thanh toán đã xác nhận tài khoản lúc ${dateTime(selected?.payoutConfirmedAt)}.` : 'Chưa được duyệt: đang chờ người thanh toán nhập BIN và số tài khoản.'}</Alert>}
           {selected?.refundQrImageUrl && <Button variant="outlined" startIcon={<QrCode2RoundedIcon />} href={selected.refundQrImageUrl} target="_blank" rel="noreferrer">Mở QR nhận tiền</Button>}
         </Stack>
       </DialogContent>
@@ -357,7 +359,7 @@ export default function StaffRefunds() {
         <Button onClick={() => setSelected(null)}>Đóng</Button>
         <Button variant="outlined" startIcon={<ChatRoundedIcon />} onClick={() => { openChat(selected); setSelected(null); }}>Chat với khách</Button>
         {selected?.status === 'REQUESTED' && <Button color="error" startIcon={<CancelRoundedIcon />} disabled={busy} onClick={() => { setRejecting(selected); setSelected(null); }}>Từ chối</Button>}
-        {selected?.status === 'REQUESTED' && <Button variant="contained" color="success" disabled={busy || (selected?.refundMethod !== 'AUTOMATIC' && Number(selected?.amount || 0) >= Number(access?.refundApprovalThreshold || 200000) && !selected?.refundQrImageUrl)} onClick={() => approve(selected)}>Duyệt yêu cầu</Button>}
+        {selected?.status === 'REQUESTED' && <Button variant="contained" color="success" disabled={busy || (selected?.refundMethod === 'AUTOMATIC' && !selected?.payoutDestinationConfirmed) || (selected?.refundMethod !== 'AUTOMATIC' && Number(selected?.amount || 0) >= Number(access?.refundApprovalThreshold || 200000) && !selected?.refundQrImageUrl)} onClick={() => approve(selected)}>Duyệt yêu cầu</Button>}
       </DialogActions>
     </Dialog>
 

@@ -68,10 +68,25 @@ public class MovieMatchInteractionService {
 
     @Transactional
     public MovieMatchingDto.InvitationResponse invite(UUID userId, UUID matchId, UUID showtimeId) {
-        MovieMatch match = requireActiveMember(matchId, userId);
+        MovieMatch match = matchRepository.findLockedById(matchId)
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy match"));
+        if (!match.getUserOneId().equals(userId) && !match.getUserTwoId().equals(userId)) {
+            throw new BadRequestException("Bạn không thuộc match này");
+        }
+        if (match.getStatus() != MovieMatch.Status.ACTIVE) throw new BadRequestException("Match này không còn hoạt động");
         Showtime showtime = showtimeRepository.findById(showtimeId)
                 .orElseThrow(() -> new BadRequestException("Không tìm thấy suất chiếu"));
         if (!showtime.getStartTime().isAfter(LocalDateTime.now())) throw new BadRequestException("Suất chiếu đã bắt đầu hoặc đã kết thúc");
+        List<MovieMatchInvitation> existing = invitationRepository
+                .findByMatchIdAndShowtimeIdAndStatusInOrderByCreatedAtDesc(matchId, showtimeId,
+                        List.of(MovieMatchInvitation.Status.PENDING, MovieMatchInvitation.Status.ACCEPTED));
+        if (!existing.isEmpty()) {
+            MovieMatchInvitation reusable = existing.stream()
+                    .filter(item -> item.getStatus() == MovieMatchInvitation.Status.ACCEPTED)
+                    .findFirst()
+                    .orElse(existing.get(0));
+            return toInvitation(reusable);
+        }
         UUID recipient = other(match, userId);
         MovieMatchInvitation saved = invitationRepository.save(MovieMatchInvitation.builder()
                 .matchId(matchId).senderId(userId).recipientId(recipient).showtimeId(showtimeId).build());
@@ -185,13 +200,16 @@ public class MovieMatchInteractionService {
         boolean canSelectSeats = !expired && groupBooking != null
                 && groupBooking.getStatus() == GroupBookingStatus.WAITING_SELECTION;
         UUID groupBookingId = groupBooking == null ? null : groupBooking.getId();
+        boolean canOpenGroupBooking = !expired && groupBooking != null
+                && !List.of(GroupBookingStatus.EXPIRED, GroupBookingStatus.CANCELLED).contains(groupBooking.getStatus());
         return MovieMatchingDto.InvitationResponse.builder().id(invitation.getId()).matchId(invitation.getMatchId())
                 .senderId(invitation.getSenderId()).recipientId(invitation.getRecipientId()).showtimeId(invitation.getShowtimeId())
                 .movieTitle(movie == null ? "Phim" : movie.getTitle()).theaterName(theater == null ? null : theater.getName())
                 .roomName(room == null ? null : room.getName()).startTime(showtime == null ? null : showtime.getStartTime())
                 .status(invitation.getStatus().name()).createdAt(invitation.getCreatedAt()).respondedAt(invitation.getRespondedAt())
                 .groupBookingId(groupBookingId)
-                .bookingPath(canSelectSeats ? "/booking/group/" + groupBookingId : null)
+                .groupBookingStatus(groupBooking == null ? null : groupBooking.getStatus().name())
+                .bookingPath(canOpenGroupBooking ? "/booking/group/" + groupBookingId : null)
                 .expired(expired).canSelectSeats(canSelectSeats).build();
     }
 }

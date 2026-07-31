@@ -135,6 +135,7 @@ export const bookingApi = {
   fetchMyRefundRequests: () => axiosClient.get('/api/member/booking/refund-requests/me'),
   fetchRefundMessages: (requestId) => axiosClient.get(`/api/member/booking/refund-requests/${requestId}/messages`),
   sendRefundMessage: (requestId, content) => axiosClient.post(`/api/member/booking/refund-requests/${requestId}/messages`, { content }),
+  confirmRefundDestination: (requestId, bankBin, accountNumber) => axiosClient.post(`/api/member/booking/refund-requests/${requestId}/confirm-destination`, { bankBin, accountNumber }),
   sendRefundQr: (requestId, image, content = '') => {
     const formData = new FormData();
     formData.append('image', image);
@@ -153,12 +154,14 @@ export const bookingApi = {
     return axiosClient.post(`/api/member/group-bookings/${groupId}/seats`, { seatIds });
   },
 
-  payGroupBooking: (groupId, paymentMethod = 'PAYOS') => {
-    return axiosClient.post(`/api/member/group-bookings/${groupId}/pay`, { paymentMethod });
+  payGroupBooking: (groupId, paymentMethod = 'PAYOS', targetUserId) => {
+    return axiosClient.post(`/api/member/group-bookings/${groupId}/pay`, { paymentMethod, targetUserId });
   },
 
-  syncGroupPayment: (groupId) => {
-    return axiosClient.post(`/api/member/group-bookings/${groupId}/sync-payment`);
+  syncGroupPayment: (groupId, targetUserId) => {
+    return axiosClient.post(`/api/member/group-bookings/${groupId}/sync-payment`, null, {
+      params: targetUserId ? { targetUserId } : undefined,
+    });
   },
 };
 

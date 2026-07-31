@@ -17,6 +17,11 @@ import java.util.UUID;
 public interface RefundRequestRepository extends JpaRepository<RefundRequest, UUID> {
     List<RefundRequest> findAllByOrderByCreatedAtDesc();
     List<RefundRequest> findByCustomerIdOrderByCreatedAtDesc(UUID customerId);
+    @Query("select distinct request from RefundRequest request, Payment payment " +
+            "where request.paymentId = payment.id " +
+            "and (request.customerId = :userId or payment.paidByUserId = :userId) " +
+            "order by request.createdAt desc")
+    List<RefundRequest> findVisibleToUser(@Param("userId") UUID userId);
     Optional<RefundRequest> findFirstByBookingIdAndStatusIn(UUID bookingId, Collection<RefundRequestStatus> statuses);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

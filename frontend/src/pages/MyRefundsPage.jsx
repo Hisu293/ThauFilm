@@ -8,16 +8,24 @@ import {
   CardContent,
   Chip,
   Container,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Stack,
+  TextField,
   Typography,
 } from '@mui/material';
+import AddPhotoAlternateRoundedIcon from '@mui/icons-material/AddPhotoAlternateRounded';
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
 import ChatRoundedIcon from '@mui/icons-material/ChatRounded';
 import CurrencyExchangeRoundedIcon from '@mui/icons-material/CurrencyExchangeRounded';
 import ReceiptLongRoundedIcon from '@mui/icons-material/ReceiptLongRounded';
+import SendRoundedIcon from '@mui/icons-material/SendRounded';
 import { bookingApi } from '../api/bookingApi';
 import EmptyState from '../components/common/EmptyState';
 import LoadingOverlay from '../components/common/LoadingOverlay';
+import { useAuth } from '../context/AuthContext';
 import { refundStatusLabel } from '../utils/statusLabels';
 
 const STATUS_META = {
@@ -59,10 +67,61 @@ const matchesFilter = (item, filter) => {
 
 export default function MyRefundsPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [items, setItems] = useState([]);
   const [filter, setFilter] = useState('ALL');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [support, setSupport] = useState(null);
+  const [messages, setMessages] = useState([]);
+  const [messageText, setMessageText] = useState('');
+  const [supportBusy, setSupportBusy] = useState(false);
+  const [destination, setDestination] = useState({ bankBin: '', accountNumber: '' });
+
+  const openSupport = async (item) => {
+    setSupport(item); setMessages([]); setMessageText(''); setDestination({ bankBin: '', accountNumber: '' });
+    try {
+      const response = await bookingApi.fetchRefundMessages(item.id);
+      setMessages(response?.data?.data ?? response?.data ?? []);
+    } catch (err) { setError(err?.message || 'Không thể tải trao đổi hoàn tiền.'); }
+  };
+
+  const sendMessage = async () => {
+    if (!support || !messageText.trim()) return;
+    setSupportBusy(true);
+    try {
+      const response = await bookingApi.sendRefundMessage(support.id, messageText.trim());
+      setMessages((items) => [...items, response?.data?.data ?? response?.data]);
+      setMessageText('');
+    } catch (err) { setError(err?.message || 'Không thể gửi tin nhắn.'); }
+    finally { setSupportBusy(false); }
+  };
+
+  const sendQr = async (event) => {
+    const image = event.target.files?.[0];
+    event.target.value = '';
+    if (!support || !image) return;
+    setSupportBusy(true);
+    try {
+      const response = await bookingApi.sendRefundQr(support.id, image, messageText.trim());
+      setMessages((items) => [...items, response?.data?.data ?? response?.data]);
+      setMessageText('');
+    } catch (err) { setError(err?.message || 'Không thể gửi QR nhận tiền.'); }
+    finally { setSupportBusy(false); }
+  };
+
+  const confirmDestination = async () => {
+    if (!support) return;
+    setSupportBusy(true);
+    try {
+      const response = await bookingApi.confirmRefundDestination(support.id, destination.bankBin, destination.accountNumber);
+      const updated = response?.data?.data ?? response?.data;
+      setSupport(updated);
+      setItems((items) => items.map((item) => item.id === updated.id ? updated : item));
+      setDestination({ bankBin: '', accountNumber: '' });
+    } catch (err) { setError(err?.message || 'Không thể xác nhận tài khoản nhận tiền.'); }
+    finally { setSupportBusy(false); }
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -193,7 +252,7 @@ export default function MyRefundsPage() {
                         size="small"
                         variant="outlined"
                         startIcon={<ChatRoundedIcon />}
-                        onClick={() => navigate(`/my-bookings/${item.bookingId}?support=refund`)}
+                        onClick={() => openSupport(item)}
                       >
                         Chi tiết và hỗ trợ
                       </Button>
@@ -223,6 +282,22 @@ export default function MyRefundsPage() {
           )}
         </Stack>
       )}
+
+      <Dialog open={Boolean(support)} onClose={() => !supportBusy && setSupport(null)} fullWidth maxWidth="sm">
+        <DialogTitle fontWeight={900}>Trao đổi hoàn tiền</DialogTitle>
+        <DialogContent dividers>
+          {support?.paidByAnotherUser && <Alert severity="warning" sx={{ mb: 2 }}>Vé thuộc {support.customerName || 'người nhận vé'} nhưng do {support.paidByUserName || support.paidByUserEmail} thanh toán. Tiền chỉ được hoàn cho người thực tế thanh toán.</Alert>}
+          {support?.refundMethod === 'AUTOMATIC' && String(support?.paidByUserId) === String(user?.id) && !support?.payoutDestinationConfirmed && <Stack spacing={1.25} sx={{ mb: 2, p: 2, borderRadius: 2, bgcolor: 'action.hover' }}><Typography fontWeight={850}>Xác nhận tài khoản nhận hoàn tiền</Typography><Typography variant="body2" color="text.secondary">Chính bạn là người thanh toán. Hãy nhập tài khoản của bạn để PayOS/Bảo Kim chuyển tiền sau khi Staff/Admin duyệt.</Typography><TextField size="small" label="BIN ngân hàng" value={destination.bankBin} onChange={(event) => setDestination((value) => ({ ...value, bankBin: event.target.value.replace(/\D/g, '').slice(0, 10) }))} inputProps={{ inputMode: 'numeric' }} /><TextField size="small" label="Số tài khoản" value={destination.accountNumber} onChange={(event) => setDestination((value) => ({ ...value, accountNumber: event.target.value.replace(/\D/g, '').slice(0, 20) }))} inputProps={{ inputMode: 'numeric' }} /><Button variant="contained" disabled={supportBusy || destination.bankBin.length < 6 || destination.accountNumber.length < 5} onClick={confirmDestination}>Xác nhận tài khoản của tôi</Button></Stack>}
+          {support?.refundMethod === 'AUTOMATIC' && support?.payoutDestinationConfirmed && <Alert severity="success" sx={{ mb: 2 }}>Người thanh toán đã xác nhận tài khoản nhận tiền lúc {dateTime(support.payoutConfirmedAt)} · STK {support.bankAccountMasked || 'đã được bảo mật'}.</Alert>}
+          <Stack spacing={1.25} sx={{ maxHeight: 360, overflowY: 'auto' }}>
+            {messages.map((message) => { const mine = String(message.senderId) === String(user?.id); return <Box key={message.id} alignSelf={mine ? 'flex-end' : 'flex-start'} sx={{ maxWidth: '82%', p: 1.25, borderRadius: 2, bgcolor: mine ? 'primary.main' : 'action.hover', color: mine ? 'primary.contrastText' : 'text.primary' }}><Typography variant="caption">{mine ? 'Bạn' : message.senderName || 'Staff'}</Typography><Typography variant="body2">{message.content}</Typography>{message.imageUrl && <Box component="img" src={message.imageUrl} alt="QR nhận tiền" sx={{ display: 'block', mt: 1, maxWidth: 240, width: '100%', borderRadius: 1 }} />}</Box>; })}
+            {messages.length === 0 && <Typography color="text.secondary">Chưa có trao đổi.</Typography>}
+          </Stack>
+          <TextField fullWidth size="small" sx={{ mt: 2 }} placeholder="Nhắn cho Staff..." value={messageText} onChange={(event) => setMessageText(event.target.value)} />
+          {String(support?.paidByUserId) === String(user?.id) && ['REQUESTED', 'PENDING_APPROVAL'].includes(support?.status) && <Button component="label" fullWidth variant="outlined" startIcon={<AddPhotoAlternateRoundedIcon />} disabled={supportBusy} sx={{ mt: 1.25 }}>Gửi QR nhận tiền của tôi<input hidden type="file" accept="image/*" onChange={sendQr} /></Button>}
+        </DialogContent>
+        <DialogActions><Button onClick={() => setSupport(null)} disabled={supportBusy}>Đóng</Button><Button variant="contained" startIcon={<SendRoundedIcon />} onClick={sendMessage} disabled={supportBusy || !messageText.trim()}>Gửi</Button></DialogActions>
+      </Dialog>
     </Container>
   );
 }

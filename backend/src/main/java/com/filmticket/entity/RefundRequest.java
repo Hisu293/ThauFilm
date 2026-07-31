@@ -49,6 +49,12 @@ public class RefundRequest {
     @Column(name = "bank_account_number", length = 20)
     private String bankAccountNumber;
 
+    @Column(name = "payout_confirmed_by")
+    private UUID payoutConfirmedBy;
+
+    @Column(name = "payout_confirmed_at")
+    private LocalDateTime payoutConfirmedAt;
+
     @Column(name = "ticket_code", nullable = false, length = 20)
     private String ticketCode;
 

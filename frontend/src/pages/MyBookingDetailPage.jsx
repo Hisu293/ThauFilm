@@ -448,7 +448,8 @@ const MyBookingDetailPage = () => {
               </Box>;
             })}
           </Stack>
-          {['REQUESTED', 'PENDING_APPROVAL'].includes(refundRequest?.status) && <Button component="label" fullWidth variant="outlined" startIcon={<AddPhotoAlternateRoundedIcon />} disabled={qrUploading} sx={{ mt: 1.5 }}>
+          {refundRequest?.paidByAnotherUser && <Alert severity="warning" sx={{ mt: 1.5 }}>Vé này được {refundRequest?.paidByUserName || refundRequest?.paidByUserEmail || 'người khác'} thanh toán giúp. Người thanh toán cần mở mục Lịch sử hoàn tiền và gửi QR của họ.</Alert>}
+          {String(refundRequest?.paidByUserId || user?.id) === String(user?.id) && ['REQUESTED', 'PENDING_APPROVAL'].includes(refundRequest?.status) && <Button component="label" fullWidth variant="outlined" startIcon={<AddPhotoAlternateRoundedIcon />} disabled={qrUploading} sx={{ mt: 1.5 }}>
             {qrUploading ? 'Đang tải ảnh QR...' : refundRequest?.refundQrImageUrl ? 'Đổi ảnh QR nhận tiền' : 'Chọn ảnh QR để gửi'}
             <input hidden type="file" accept="image/jpeg,image/png,image/webp" onChange={uploadRefundQr} />
           </Button>}

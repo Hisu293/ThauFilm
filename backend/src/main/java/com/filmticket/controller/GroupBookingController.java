@@ -40,16 +40,18 @@ public class GroupBookingController {
     }
 
     @PostMapping("/{groupId}/sync-payment")
-    public ResponseEntity<ApiResponse<GroupBookingDto.Response>> syncPayment(@PathVariable UUID groupId) {
+    public ResponseEntity<ApiResponse<GroupBookingDto.Response>> syncPayment(
+            @PathVariable UUID groupId,
+            @RequestParam(required = false) UUID targetUserId) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Đã đồng bộ trạng thái PayOS",
-                groupBookingService.syncPayosPayment(groupId, userId())
+                groupBookingService.syncPayosPayment(groupId, userId(), targetUserId)
         ));
     }
 
     private UUID userId() {
         UserDetails principal = (UserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
         return userRepository.findByEmail(principal.getUsername())
-                .orElseThrow(() -> new BadRequestException("User not found")).getId();
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy người dùng")).getId();
     }
 }

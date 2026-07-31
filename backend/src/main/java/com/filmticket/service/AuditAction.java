@@ -76,6 +76,7 @@ public enum AuditAction {
     PAYMENT_WEBHOOK_SIGNATURE_INVALID(AuditCategory.PAYMENT, AuditSeverity.CRITICAL, "Chữ ký webhook thanh toán không hợp lệ"),
     DUPLICATE_PAYMENT_DETECTED(AuditCategory.PAYMENT, AuditSeverity.WARNING, "Phát hiện thanh toán trùng"),
     REFUND_REQUESTED(AuditCategory.REFUND, AuditSeverity.INFO, "Yêu cầu hoàn tiền"),
+    REFUND_DESTINATION_CONFIRMED(AuditCategory.REFUND, AuditSeverity.WARNING, "Xác nhận tài khoản nhận hoàn tiền"),
     REFUND_APPROVED(AuditCategory.REFUND, AuditSeverity.WARNING, "Phê duyệt hoàn tiền"),
     REFUND_REJECTED(AuditCategory.REFUND, AuditSeverity.WARNING, "Từ chối hoàn tiền"),
     REFUND_SUCCEEDED(AuditCategory.REFUND, AuditSeverity.INFO, "Hoàn tiền thành công"),

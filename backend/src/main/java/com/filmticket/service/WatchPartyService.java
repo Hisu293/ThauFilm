@@ -113,6 +113,7 @@ public class WatchPartyService {
 
             Payment payment = Payment.builder()
                     .bookingId(booking.getId())
+                    .paidByUserId(userId)
                     .amount(room.pricePerMember)
                     .paymentMethod("PAYOS")
                     .provider("PAYOS")

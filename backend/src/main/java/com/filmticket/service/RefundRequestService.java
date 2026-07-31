@@ -52,13 +52,24 @@ public class RefundRequestService {
         Booking booking = requireBooking(bookingId);
         if (!booking.getUserId().equals(customerId)) throw new BadRequestException("Bạn không có quyền yêu cầu hoàn vé này");
         RefundMethod method = parseRefundMethod(refundMethod);
+        Payment payment = paymentRepository.findByBookingId(bookingId)
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy thanh toán"));
+        UUID paidByUserId = payment.getPaidByUserId() == null ? booking.getUserId() : payment.getPaidByUserId();
         if (method == RefundMethod.AUTOMATIC && !payOSRefundClient.isAvailable()) {
             throw new BadRequestException("Kênh chi PayOS/Bảo Kim chưa sẵn sàng, vui lòng chọn hoàn tiền thủ công");
         }
-        validateDestination(method, bankBin, accountNumber);
+        boolean paidByAnotherUser = !paidByUserId.equals(customerId);
+        if (!paidByAnotherUser) validateDestination(method, bankBin, accountNumber);
         RefundRequest request = createRequest(booking, null, ticketCode, reason,
-                method, bankBin, accountNumber);
+                method, paidByAnotherUser ? null : bankBin, paidByAnotherUser ? null : accountNumber);
         saveMessage(request, customerId, "MEMBER", reason);
+        if (!paidByUserId.equals(customerId)) {
+            realtimeEventService.notifyUser(paidByUserId, "REFUND_REQUESTED", "Vé bạn thanh toán giúp đang yêu cầu hoàn",
+                    method == RefundMethod.AUTOMATIC
+                            ? "Vui lòng mở lịch sử hoàn tiền, nhập BIN và số tài khoản của bạn để xác nhận nhận tiền."
+                            : "Vui lòng mở lịch sử hoàn tiền và cung cấp QR nhận tiền của bạn để Staff xác minh.",
+                    "/my-refunds");
+        }
         notifyShiftLeaders("Yêu cầu hoàn tiền mới", "Khách hàng vừa gửi yêu cầu cho vé " + request.getTicketCode());
         auditLogService.success(AuditLogService.AuditCommand.builder()
                 .action(AuditAction.REFUND_REQUESTED).targetType("REFUND_REQUEST")
@@ -150,7 +161,34 @@ public class RefundRequestService {
 
     @Transactional(readOnly = true)
     public List<RefundRequestDto> customerRequests(UUID customerId) {
-        return enrich(refundRepository.findByCustomerIdOrderByCreatedAtDesc(customerId));
+        return enrich(refundRepository.findVisibleToUser(customerId));
+    }
+
+    @Transactional
+    public RefundRequestDto confirmAutomaticDestination(UUID userId, UUID requestId, String bankBin, String accountNumber) {
+        RefundRequest request = requireStatus(requestId, RefundRequestStatus.REQUESTED);
+        if (!isAutomatic(request)) throw new BadRequestException("Yêu cầu này không sử dụng hoàn tiền tự động");
+        UUID paidByUserId = refundRecipientId(request);
+        if (!paidByUserId.equals(userId)) {
+            throw new BadRequestException("Chỉ người thực tế thanh toán mới được xác nhận tài khoản nhận tiền");
+        }
+        validateDestination(RefundMethod.AUTOMATIC, bankBin, accountNumber);
+        request.setBankBin(bankBin.trim());
+        request.setBankAccountNumber(accountNumber.trim());
+        request.setPayoutConfirmedBy(userId);
+        request.setPayoutConfirmedAt(LocalDateTime.now());
+        RefundRequest saved = refundRepository.save(request);
+        saveMessage(saved, userId, "MEMBER", "Tôi đã xác nhận tài khoản nhận hoàn tiền tự động.");
+        auditLogService.success(AuditLogService.AuditCommand.builder()
+                .action(AuditAction.REFUND_DESTINATION_CONFIRMED).targetType("REFUND_REQUEST")
+                .targetId(saved.getId().toString()).actorId(userId)
+                .description("Người thanh toán đã xác nhận tài khoản nhận hoàn tiền tự động")
+                .correlationId(saved.getBookingId().toString())
+                .metadata(Map.of("mãBIN", saved.getBankBin(), "tàiKhoản", maskAccount(saved.getBankAccountNumber())))
+                .sensitive(true).build());
+        notifyShiftLeaders("Người thanh toán đã xác nhận tài khoản hoàn tiền",
+                "Yêu cầu " + saved.getTicketCode() + " đã đủ thông tin để Staff trưởng kiểm tra.");
+        return toDto(saved);
     }
 
     @Transactional(readOnly = true)
@@ -169,6 +207,7 @@ public class RefundRequestService {
         requireShiftLeader(staffId);
         RefundRequest request = requireStatus(requestId, RefundRequestStatus.REQUESTED);
         validateEligibility(request);
+        if (isAutomatic(request)) requireAutomaticDestination(request);
         if (request.getAmount().compareTo(staffApprovalThreshold) >= 0 && !isAutomatic(request)) {
             requireRefundQr(request);
         }
@@ -187,6 +226,7 @@ public class RefundRequestService {
     public RefundRequestDto adminApprove(UUID adminId, UUID requestId) {
         RefundRequest request = requireStatus(requestId, RefundRequestStatus.PENDING_APPROVAL);
         validateEligibility(request);
+        if (isAutomatic(request)) requireAutomaticDestination(request);
         if (!isAutomatic(request)) requireRefundQr(request);
         RefundRequestDto result = completeRefund(request, adminId);
         auditLogService.success(AuditLogService.AuditCommand.builder()
@@ -233,6 +273,7 @@ public class RefundRequestService {
             throw new BadRequestException("Lệnh chi đã có trên PayOS; hệ thống sẽ tiếp tục đối soát thay vì tạo lại");
         }
         validateEligibility(request);
+        requireAutomaticDestination(request);
 
         PaymentGatewayService.GatewayRefund result = executeAutomaticRefund(request, payment);
         payment.setStatus(result.status());
@@ -286,6 +327,10 @@ public class RefundRequestService {
     @Transactional
     public RefundMessageDto customerQrMessage(UUID customerId, UUID requestId, MultipartFile image, String caption) {
         RefundRequest request = requireOwnedRequest(customerId, requestId);
+        UUID refundRecipientId = refundRecipientId(request);
+        if (!refundRecipientId.equals(customerId)) {
+            throw new BadRequestException("Chỉ người thực tế thanh toán mới được cung cấp QR nhận tiền cho yêu cầu này");
+        }
         if (request.getStatus() != RefundRequestStatus.REQUESTED
                 && request.getStatus() != RefundRequestStatus.PENDING_APPROVAL) {
             throw new BadRequestException("Chỉ được cập nhật QR khi yêu cầu đang chờ duyệt");
@@ -365,8 +410,11 @@ public class RefundRequestService {
                 .bookingId(booking.getId()).paymentId(payment.getId()).customerId(booking.getUserId())
                 .staffId(staffId).ticketCode(selected.getTicketCode()).amount(payment.getAmount())
                 .refundMethod(refundMethod)
-                .bankBin(refundMethod == RefundMethod.AUTOMATIC ? bankBin.trim() : null)
-                .bankAccountNumber(refundMethod == RefundMethod.AUTOMATIC ? accountNumber.trim() : null)
+                .bankBin(refundMethod == RefundMethod.AUTOMATIC && bankBin != null ? bankBin.trim() : null)
+                .bankAccountNumber(refundMethod == RefundMethod.AUTOMATIC && accountNumber != null ? accountNumber.trim() : null)
+                .payoutConfirmedBy(refundMethod == RefundMethod.AUTOMATIC && bankBin != null
+                        ? (payment.getPaidByUserId() == null ? booking.getUserId() : payment.getPaidByUserId()) : null)
+                .payoutConfirmedAt(refundMethod == RefundMethod.AUTOMATIC && bankBin != null ? LocalDateTime.now() : null)
                 .reason(reason).ticketCheckedIn(false)
                 .requiresAdmin(onlineIncident || payment.getAmount().compareTo(staffApprovalThreshold) >= 0)
                 .status(RefundRequestStatus.REQUESTED).build());
@@ -374,7 +422,9 @@ public class RefundRequestService {
 
     private RefundRequest requireOwnedRequest(UUID customerId, UUID requestId) {
         RefundRequest request = refundRepository.findById(requestId).orElseThrow(() -> new BadRequestException("Không tìm thấy yêu cầu hoàn tiền"));
-        if (!request.getCustomerId().equals(customerId)) throw new BadRequestException("Bạn không có quyền xem trao đổi này");
+        if (!request.getCustomerId().equals(customerId) && !refundRecipientId(request).equals(customerId)) {
+            throw new BadRequestException("Bạn không có quyền xem trao đổi này");
+        }
         return request;
     }
 
@@ -531,6 +581,10 @@ public class RefundRequestService {
     private void notifyCustomer(RefundRequest request, String title, String message) {
         realtimeEventService.notifyUser(request.getCustomerId(), "REFUND_STATUS", title, message,
                 "/my-bookings/" + request.getBookingId());
+        UUID paidByUserId = refundRecipientId(request);
+        if (!paidByUserId.equals(request.getCustomerId())) {
+            realtimeEventService.notifyUser(paidByUserId, "REFUND_STATUS", title, message, "/my-refunds");
+        }
     }
 
     private void notifyShiftLeaders(String title, String message) {
@@ -556,6 +610,9 @@ public class RefundRequestService {
         String refundQrImageUrl = request.getRefundQrMessageId() == null ? null
                 : messageRepository.findById(request.getRefundQrMessageId()).map(RefundMessage::getImageUrl).orElse(null);
         Payment refundPayment = paymentRepository.findById(request.getPaymentId()).orElse(null);
+        UUID paidByUserId = refundPayment == null || refundPayment.getPaidByUserId() == null
+                ? request.getCustomerId() : refundPayment.getPaidByUserId();
+        User paidByUser = userRepository.findById(paidByUserId).orElse(null);
         OnlineMovieView firstView = onlineMovieViewRepository
                 .findFirstByBookingIdOrderByViewedAtAsc(request.getBookingId()).orElse(null);
         LocalDateTime now = LocalDateTime.now();
@@ -568,14 +625,21 @@ public class RefundRequestService {
         return RefundRequestDto.builder().id(request.getId()).bookingId(request.getBookingId())
                 .bookingCode(booking == null ? null : booking.getConfirmationCode()).ticketCode(request.getTicketCode())
                 .customerId(request.getCustomerId()).customerName(customer == null ? null : customer.getFullName())
-                .customerEmail(customer == null ? null : customer.getEmail()).staffId(request.getStaffId())
+                .customerEmail(customer == null ? null : customer.getEmail())
+                .paidByUserId(paidByUserId).paidByUserName(paidByUser == null ? null : paidByUser.getFullName())
+                .paidByUserEmail(paidByUser == null ? null : paidByUser.getEmail())
+                .paidByAnotherUser(!paidByUserId.equals(request.getCustomerId())).staffId(request.getStaffId())
                 .staffName(staff == null ? null : staff.getFullName()).movieTitle(movie == null ? null : movie.getTitle())
                 .amount(request.getAmount()).reason(request.getReason()).rejectionReason(request.getRejectionReason())
                 .refundQrImageUrl(refundQrImageUrl)
                 .refundMethod(request.getRefundMethod())
                 .bankBin(request.getBankBin())
-                .bankAccountNumber(request.getBankAccountNumber())
+                .bankAccountNumber(null)
                 .bankAccountMasked(maskAccount(request.getBankAccountNumber()))
+                .payoutConfirmedBy(request.getPayoutConfirmedBy()).payoutConfirmedAt(request.getPayoutConfirmedAt())
+                .payoutDestinationConfirmed(request.getPayoutConfirmedBy() != null
+                        && request.getPayoutConfirmedAt() != null
+                        && request.getBankBin() != null && request.getBankAccountNumber() != null)
                 .automaticRetryAvailable(automaticRetryAvailable)
                 .status(request.getStatus()).requiresAdmin(request.isRequiresAdmin())
                 .ticketCheckedIn(ticketRepository.findByBookingId(request.getBookingId()).stream().anyMatch(Ticket::isCheckedIn))
@@ -590,14 +654,32 @@ public class RefundRequestService {
     }
 
     private void requireRefundQr(RefundRequest request) {
+        UUID refundRecipientId = refundRecipientId(request);
         boolean hasQr = request.getRefundQrMessageId() != null
                 && messageRepository.findById(request.getRefundQrMessageId())
+                .filter(message -> refundRecipientId.equals(message.getSenderId()))
                 .map(RefundMessage::getImageUrl)
                 .filter(url -> !url.isBlank())
                 .isPresent();
         if (!hasQr) {
-            throw new BadRequestException("Yêu cầu từ 200.000đ cần ảnh QR nhận tiền của khách trước khi duyệt");
+            throw new BadRequestException("Cần ảnh QR nhận tiền do chính người thanh toán cung cấp trước khi duyệt");
         }
+    }
+
+    private void requireAutomaticDestination(RefundRequest request) {
+        if (request.getPayoutConfirmedBy() == null || request.getPayoutConfirmedAt() == null
+                || request.getBankBin() == null || request.getBankAccountNumber() == null
+                || !refundRecipientId(request).equals(request.getPayoutConfirmedBy())) {
+            throw new BadRequestException("Người thanh toán chưa xác nhận BIN và số tài khoản nhận hoàn tiền");
+        }
+        validateDestination(RefundMethod.AUTOMATIC, request.getBankBin(), request.getBankAccountNumber());
+    }
+
+    private UUID refundRecipientId(RefundRequest request) {
+        Payment payment = paymentRepository.findById(request.getPaymentId()).orElse(null);
+        return payment == null || payment.getPaidByUserId() == null
+                ? request.getCustomerId()
+                : payment.getPaidByUserId();
     }
 
     private RefundMethod parseRefundMethod(String value) {

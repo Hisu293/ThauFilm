@@ -253,6 +253,15 @@ public class MemberBookingController {
                 refundRequestService.customerMessage(getCurrentUserId(), requestId, body.content())));
     }
 
+    @PostMapping("/refund-requests/{requestId}/confirm-destination")
+    public ResponseEntity<ApiResponse<RefundRequestDto>> confirmRefundDestination(
+            @PathVariable UUID requestId,
+            @RequestBody RefundDestinationBody body) {
+        return ResponseEntity.ok(ApiResponse.success("Đã xác nhận tài khoản nhận hoàn tiền",
+                refundRequestService.confirmAutomaticDestination(
+                        getCurrentUserId(), requestId, body.bankBin(), body.accountNumber())));
+    }
+
     @PostMapping(value = "/refund-requests/{requestId}/messages/qr", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<RefundMessageDto>> sendRefundQr(
             @PathVariable UUID requestId,
@@ -265,6 +274,7 @@ public class MemberBookingController {
     public record RefundRequestBody(String ticketCode, String reason, String refundMethod,
                                     String bankBin, String accountNumber) {}
     public record RefundMessageBody(String content) {}
+    public record RefundDestinationBody(String bankBin, String accountNumber) {}
 
     private UUID getCurrentUserId() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();

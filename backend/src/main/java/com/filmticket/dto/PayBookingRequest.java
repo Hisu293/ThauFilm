@@ -6,6 +6,8 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.UUID;
+
 @Data
 @Builder
 @NoArgsConstructor
@@ -15,4 +17,6 @@ public class PayBookingRequest {
     private String paymentMethod;
 
     private String discountCode;
+
+    private UUID targetUserId;
 }

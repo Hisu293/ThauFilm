@@ -27,6 +27,7 @@ export default function GroupBookingPage() {
   const [group, setGroup] = useState(null);
   const [seats, setSeats] = useState([]);
   const [selectedSeatIds, setSelectedSeatIds] = useState([]);
+  const [selectionActorId, setSelectionActorId] = useState(null);
   const [realtimeStatus, setRealtimeStatus] = useState('disconnected');
   const [paymentMethod, setPaymentMethod] = useState('PAYOS');
   const [loading, setLoading] = useState(true);
@@ -74,6 +75,7 @@ export default function GroupBookingPage() {
       onEvent: (event) => {
         if (['GROUP_SUBSCRIBED', 'GROUP_SEAT_PREVIEW'].includes(event.type)) {
           setSelectedSeatIds((event.data?.selectedSeatIds || []).map(String));
+          setSelectionActorId(event.data?.actorId || null);
         } else if (event.type === 'GROUP_BOOKING_UPDATED') {
           window.setTimeout(() => load(true), 120);
         } else if (event.type === 'REALTIME_ERROR') {
@@ -117,10 +119,10 @@ export default function GroupBookingPage() {
     finally { setBusy(false); }
   };
 
-  const pay = async () => {
+  const pay = async (targetUserId) => {
     setBusy(true); setError('');
     try {
-      const next = unwrap(await bookingApi.payGroupBooking(groupId, paymentMethod));
+      const next = unwrap(await bookingApi.payGroupBooking(groupId, paymentMethod, targetUserId));
       setGroup(next);
       if (next?.checkoutUrl) window.location.assign(next.checkoutUrl);
     }
@@ -131,7 +133,7 @@ export default function GroupBookingPage() {
   const syncPayosPayment = useCallback(async () => {
     setBusy(true); setError('');
     try {
-      const next = unwrap(await bookingApi.syncGroupPayment(groupId));
+      const next = unwrap(await bookingApi.syncGroupPayment(groupId, searchParams.get('targetUserId')));
       setGroup(next);
       const bookingId = currentUserBookingId(next);
       if (next?.status === 'CONFIRMED' && bookingId) {
@@ -144,7 +146,7 @@ export default function GroupBookingPage() {
     } finally {
       setBusy(false);
     }
-  }, [groupId, navigate]);
+  }, [groupId, navigate, searchParams]);
 
   useEffect(() => {
     if (!group || paymentSyncStarted.current || searchParams.get('payment') !== 'return') return;
@@ -157,6 +159,8 @@ export default function GroupBookingPage() {
 
   const me = group.members?.find((member) => member.currentUser);
   const terminal = ['EXPIRED', 'CANCELLED'].includes(group.status);
+  const unpaidMembers = (group.members || []).filter((member) => member.paymentStatus === 'PENDING');
+  const selectionActor = (group.members || []).find((member) => String(member.userId) === String(selectionActorId));
 
   return (
     <Container maxWidth="lg" sx={{ py: 5 }}>
@@ -180,6 +184,7 @@ export default function GroupBookingPage() {
             <Typography variant="h6" fontWeight={800} mb={1}>Chọn một ghế đôi hoặc hai ghế liền nhau</Typography>
             <Typography color="text.secondary" mb={3}>Ghế đôi COUPLE dành cho cả hai người nên chỉ cần chọn một ghế. Với ghế thường/VIP, hãy chọn hai ghế liền nhau.</Typography>
             <SeatMap seats={seats} selectedSeats={selectedSeats} onToggleSelectSeat={toggleSeat} />
+            {selectedSeats.length > 0 && <Alert severity="info" sx={{ mt: 2 }}>{selectionActor?.currentUser ? 'Bạn đang chọn' : `${selectionActor?.fullName || 'Người kia'} đang chọn`} ghế {selectedSeats.map((seat) => `${seat.rowName}${seat.seatNumber}`).join(', ')}. Thay đổi được đồng bộ cho cả hai người.</Alert>}
             {selectedSeats.length > 0 && !validSelection && <Alert severity="warning" sx={{ mt: 2 }}>Chọn một ghế đôi, hoặc hai ghế thường/VIP cùng hàng và liền nhau.</Alert>}
             <Box textAlign="right" mt={3}><Button variant="contained" disabled={!validSelection || busy} onClick={selectSeats}>Giữ ghế trong 15 phút</Button></Box>
           </Paper>
@@ -198,12 +203,13 @@ export default function GroupBookingPage() {
           </Stack>
         )}
 
-        {group.canPay && me && (
+        {['WAITING_PAYMENTS', 'PARTIALLY_PAID'].includes(group.status) && unpaidMembers.length > 0 && (
           <Paper sx={{ p: 3 }}>
-            <Typography variant="h6" fontWeight={800}>Thanh toán phần của bạn: {money(me.amount)}</Typography>
-            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} mt={2}>
-              <FormControl fullWidth><InputLabel>Phương thức</InputLabel><Select label="Phương thức" value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)}><MenuItem value="PAYOS">PayOS / VietQR</MenuItem><MenuItem value="VNPAY">VNPay</MenuItem><MenuItem value="MOMO">MoMo</MenuItem><MenuItem value="ZALOPAY">ZaloPay</MenuItem></Select></FormControl>
-              <Button variant="contained" size="large" disabled={busy} onClick={pay}>Thanh toán vé của tôi</Button>
+            <Typography variant="h6" fontWeight={800}>Thanh toán sau khi đã chọn ghế</Typography>
+            <Typography color="text.secondary" mt={0.5}>Mỗi người có thể tự thanh toán phần của mình hoặc thanh toán giúp phần còn thiếu của người kia.</Typography>
+            <FormControl fullWidth sx={{ mt: 2 }}><InputLabel>Phương thức</InputLabel><Select label="Phương thức" value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value)}><MenuItem value="PAYOS">PayOS / VietQR</MenuItem><MenuItem value="VNPAY">VNPay</MenuItem><MenuItem value="MOMO">MoMo</MenuItem><MenuItem value="ZALOPAY">ZaloPay</MenuItem></Select></FormControl>
+            <Stack spacing={1.25} mt={2}>
+              {unpaidMembers.map((member) => <Button key={member.userId} variant={member.currentUser ? 'contained' : 'outlined'} size="large" disabled={busy} onClick={() => pay(member.userId)}>{member.currentUser ? `Thanh toán phần của tôi: ${money(member.amount)}` : `Thanh toán giúp ${member.fullName || 'người kia'}: ${money(member.amount)}`}</Button>)}
             </Stack>
             {group.checkoutUrl && (
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} mt={2}>

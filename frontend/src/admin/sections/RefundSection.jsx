@@ -133,7 +133,7 @@ const RefundSection = () => {
     return items.filter((item) => {
       if (statusFilter !== 'ALL' && item.status !== statusFilter) return false;
       if (!keyword) return true;
-      return [item.bookingCode, item.ticketCode, item.customerName, item.customerEmail, item.movieTitle, item.staffName, item.reason]
+      return [item.bookingCode, item.ticketCode, item.customerName, item.customerEmail, item.paidByUserName, item.paidByUserEmail, item.movieTitle, item.staffName, item.reason]
         .some((value) => String(value || '').toLocaleLowerCase('vi').includes(keyword));
     });
   }, [items, query, statusFilter]);
@@ -324,6 +324,7 @@ const RefundSection = () => {
           <Divider />
           <Box display="grid" gridTemplateColumns={{ xs: '1fr', sm: 'repeat(2, 1fr)' }} gap={2}>
             <Box><Typography variant="caption" color="text.secondary">Khách hàng</Typography><Typography fontWeight={800}>{selected?.customerName || '—'}</Typography><Typography variant="body2">{selected?.customerEmail || '—'}</Typography></Box>
+            <Box><Typography variant="caption" color="text.secondary">Người thanh toán</Typography><Typography fontWeight={800}>{selected?.paidByUserName || selected?.customerName || '—'}</Typography><Typography variant="body2">{selected?.paidByUserEmail || selected?.customerEmail || '—'}</Typography>{selected?.paidByAnotherUser && <Chip size="small" color="warning" label="Thanh toán giúp" sx={{ mt: 0.5 }} />}</Box>
             <Box><Typography variant="caption" color="text.secondary">Staff trưởng xác minh</Typography><Typography fontWeight={800}>{selected?.staffName || 'Chưa chỉ định'}</Typography></Box>
             <Box><Typography variant="caption" color="text.secondary">Phim / suất chiếu</Typography><Typography fontWeight={800}>{selected?.movieTitle || '—'}</Typography><Typography variant="body2">{dateTime(selected?.showtimeStart)} – {dateTime(selected?.showtimeEnd)}</Typography></Box>
             <Box><Typography variant="caption" color="text.secondary">Số tiền hoàn</Typography><Typography variant="h6" fontWeight={950} color="warning.main">{money(selected?.amount)}</Typography></Box>
@@ -331,7 +332,9 @@ const RefundSection = () => {
             <Box><Typography variant="caption" color="text.secondary">Dữ liệu xem phim</Typography><Typography fontWeight={700} color={selected?.contentAccessed ? 'error.main' : 'success.main'}>{selected?.contentAccessed ? `Đã mở phim lúc ${dateTime(selected?.firstViewedAt)}` : 'Chưa ghi nhận mở phim'}</Typography></Box>
           </Box>
           <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: 'action.hover' }}><Typography variant="caption" color="text.secondary">Lý do khách gửi</Typography><Typography sx={{ whiteSpace: 'pre-wrap' }}>{selected?.reason || 'Không có lý do'}</Typography>{selected?.rejectionReason && <Typography color="error.main" sx={{ mt: 1 }}>Phản hồi xử lý: {selected.rejectionReason}</Typography>}</Box>
-          <Box><Typography variant="caption" color="text.secondary">Phương thức nhận tiền</Typography><Typography fontWeight={750}>{selected?.refundMethod === 'AUTOMATIC' ? `PayOS/Bảo Kim · BIN ${selected?.bankBin || '—'} · STK ${selected?.bankAccountNumber || '—'}` : 'Hoàn tiền thủ công bằng QR'}</Typography></Box>
+          <Box><Typography variant="caption" color="text.secondary">Phương thức nhận tiền</Typography><Typography fontWeight={750}>{selected?.refundMethod === 'AUTOMATIC' ? `PayOS/Bảo Kim · BIN ${selected?.bankBin || '—'} · STK ${selected?.bankAccountMasked || '—'}` : 'Hoàn tiền thủ công bằng QR'}</Typography></Box>
+          {selected?.refundMethod === 'AUTOMATIC' && <Alert severity={selected?.payoutDestinationConfirmed ? 'success' : 'warning'}>{selected?.payoutDestinationConfirmed ? `Người thanh toán đã xác nhận tài khoản lúc ${dateTime(selected?.payoutConfirmedAt)}.` : 'Đang chờ người thanh toán xác nhận BIN và số tài khoản.'}</Alert>}
+          {selected?.paidByAnotherUser && <Alert severity="warning">Vé được người khác thanh toán giúp. Chỉ duyệt QR do người thanh toán ({selected?.paidByUserName || selected?.paidByUserEmail}) cung cấp; không hoàn vào tài khoản do chủ vé tự nhập.</Alert>}
           {selected?.refundQrImageUrl && <Button variant="outlined" startIcon={<QrCode2RoundedIcon />} href={selected.refundQrImageUrl} target="_blank" rel="noreferrer">Mở QR nhận tiền</Button>}
         </Stack>
       </DialogContent>
@@ -339,7 +342,7 @@ const RefundSection = () => {
         <Button onClick={() => setSelected(null)}>Đóng</Button>
         {selected?.automaticRetryAvailable && <Button variant="contained" color="warning" startIcon={<RefreshRoundedIcon />} disabled={busy} onClick={() => retryAutomatic(selected)}>Thử hoàn lại</Button>}
         {selected?.status === 'PENDING_APPROVAL' && <Button color="error" disabled={busy} onClick={() => { setRejecting(selected); setSelected(null); }}>Từ chối</Button>}
-        {selected?.status === 'PENDING_APPROVAL' && <Button variant="contained" color="success" disabled={busy} onClick={() => { setApproving(selected); setSelected(null); }}>Duyệt hoàn tiền</Button>}
+        {selected?.status === 'PENDING_APPROVAL' && <Button variant="contained" color="success" disabled={busy || (selected?.refundMethod === 'AUTOMATIC' && !selected?.payoutDestinationConfirmed)} onClick={() => { setApproving(selected); setSelected(null); }}>Duyệt hoàn tiền</Button>}
       </DialogActions>
     </Dialog>
 
@@ -348,9 +351,11 @@ const RefundSection = () => {
       <DialogContent>
         <Stack spacing={2} sx={{ pt: 0.5 }}>
           <Alert severity="warning">Hành động này sẽ gọi quy trình hoàn tiền của cổng thanh toán và không thể hoàn tác trực tiếp.</Alert>
+          {approving?.paidByAnotherUser && <Alert severity="error">Khoản tiền phải được hoàn cho người đã thanh toán giúp: {approving?.paidByUserName || approving?.paidByUserEmail}.</Alert>}
           <Box sx={{ p: 2, borderRadius: 2.5, bgcolor: 'action.hover' }}>
             <Stack spacing={1}>
               <Stack direction="row" justifyContent="space-between"><Typography color="text.secondary">Khách hàng</Typography><Typography fontWeight={800}>{approving?.customerName}</Typography></Stack>
+              <Stack direction="row" justifyContent="space-between"><Typography color="text.secondary">Người thanh toán</Typography><Typography fontWeight={800}>{approving?.paidByUserName || approving?.customerName}</Typography></Stack>
               <Stack direction="row" justifyContent="space-between"><Typography color="text.secondary">Mã vé</Typography><Typography fontFamily="monospace" fontWeight={800}>{approving?.ticketCode}</Typography></Stack>
               <Stack direction="row" justifyContent="space-between"><Typography color="text.secondary">Số tiền hoàn</Typography><Typography fontWeight={950} color="warning.main">{money(approving?.amount)}</Typography></Stack>
             </Stack>

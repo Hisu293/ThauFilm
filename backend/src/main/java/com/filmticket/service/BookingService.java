@@ -452,6 +452,7 @@ public class BookingService {
         String paymentMethod = request.getPaymentMethod().trim().toUpperCase();
         Payment payment = Payment.builder()
                 .bookingId(booking.getId())
+                .paidByUserId(userId)
                 .amount(finalAmount)
                 .paymentMethod(paymentMethod)
                 .provider(resolveProvider(paymentMethod))

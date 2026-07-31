@@ -26,6 +26,9 @@ public class Payment {
     @Column(name = "booking_id", nullable = false)
     private UUID bookingId;
 
+    @Column(name = "paid_by_user_id")
+    private UUID paidByUserId;
+
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal amount;
 
