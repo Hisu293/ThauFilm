@@ -34,6 +34,7 @@ public class RefundRequestService {
     private final ShowtimeRepository showtimeRepository;
     private final MovieRepository movieRepository;
     private final OnlineMovieViewRepository onlineMovieViewRepository;
+    private final GroupBookingMemberRepository groupBookingMemberRepository;
     private final PaymentGatewayService paymentGatewayService;
     private final PayOSRefundClient payOSRefundClient;
     private final RefundHistoryRepository refundHistoryRepository;
@@ -152,6 +153,8 @@ public class RefundRequestService {
                 .amount(payment.getAmount()).refundMethod(method)
                 .bankBin(method == RefundMethod.AUTOMATIC ? bankBin.trim() : null)
                 .bankAccountNumber(method == RefundMethod.AUTOMATIC ? accountNumber.trim() : null)
+                .payoutConfirmedBy(method == RefundMethod.AUTOMATIC ? customerId : null)
+                .payoutConfirmedAt(method == RefundMethod.AUTOMATIC ? LocalDateTime.now() : null)
                 .reason(reason)
                 .ticketCheckedIn(false).requiresAdmin(true).status(RefundRequestStatus.REQUESTED).build());
         saveMessage(request, customerId, "MEMBER", request.getReason());
@@ -390,33 +393,34 @@ public class RefundRequestService {
         refundRepository.findFirstByBookingIdAndStatusIn(booking.getId(), ACTIVE).ifPresent(existing -> {
             throw new BadRequestException("Booking đã có một yêu cầu hoàn tiền đang xử lý");
         });
+        Showtime showtime = showtimeRepository.findById(booking.getShowtimeId()).orElse(null);
+        boolean onlineBooking = showtime != null && showtime.isOnline();
         List<Ticket> tickets = ticketRepository.findByBookingId(booking.getId());
-        if (tickets.isEmpty()) throw new BadRequestException("Booking chưa có vé");
+        if (tickets.isEmpty() && !onlineBooking) throw new BadRequestException("Booking chưa có vé");
         String ticketCode = clean(rawTicketCode);
-        Ticket selected = ticketCode.isEmpty() ? tickets.get(0) : tickets.stream()
-                .filter(ticket -> ticket.getTicketCode().equalsIgnoreCase(ticketCode)).findFirst()
-                .orElseThrow(() -> new BadRequestException("Mã vé không thuộc booking này"));
+        String resolvedTicketCode;
+        if (tickets.isEmpty()) {
+            resolvedTicketCode = "SYS-ONLINE-" + booking.getId().toString().substring(0, 8).toUpperCase(Locale.ROOT);
+        } else {
+            Ticket selected = ticketCode.isEmpty() ? tickets.get(0) : tickets.stream()
+                    .filter(ticket -> ticket.getTicketCode().equalsIgnoreCase(ticketCode)).findFirst()
+                    .orElseThrow(() -> new BadRequestException("Mã vé không thuộc booking này"));
+            resolvedTicketCode = selected.getTicketCode();
+        }
         String reason = clean(rawReason);
         if (reason.length() < 10) throw new BadRequestException("Lý do hoàn tiền cần ít nhất 10 ký tự");
         boolean checkedIn = tickets.stream().anyMatch(Ticket::isCheckedIn);
-        if (checkedIn) throw new BadRequestException("Vé đã check-in nên không đủ điều kiện hoàn tiền");
-        Showtime showtime = showtimeRepository.findById(booking.getShowtimeId()).orElse(null);
-        boolean onlineIncident = showtime != null && showtime.isOnline();
-        if (!onlineIncident && onlineMovieViewRepository.existsByBookingId(booking.getId()))
-            throw new BadRequestException("Vé xem phim online đã được sử dụng nên không thể hoàn tiền");
-        if (!onlineIncident && showtime != null && !showtime.getStartTime().isAfter(LocalDateTime.now()))
-            throw new BadRequestException("Suất chiếu đã bắt đầu nên không đủ điều kiện hoàn tiền");
         return refundRepository.save(RefundRequest.builder()
                 .bookingId(booking.getId()).paymentId(payment.getId()).customerId(booking.getUserId())
-                .staffId(staffId).ticketCode(selected.getTicketCode()).amount(payment.getAmount())
+                .staffId(staffId).ticketCode(resolvedTicketCode).amount(payment.getAmount())
                 .refundMethod(refundMethod)
                 .bankBin(refundMethod == RefundMethod.AUTOMATIC && bankBin != null ? bankBin.trim() : null)
                 .bankAccountNumber(refundMethod == RefundMethod.AUTOMATIC && accountNumber != null ? accountNumber.trim() : null)
                 .payoutConfirmedBy(refundMethod == RefundMethod.AUTOMATIC && bankBin != null
                         ? (payment.getPaidByUserId() == null ? booking.getUserId() : payment.getPaidByUserId()) : null)
                 .payoutConfirmedAt(refundMethod == RefundMethod.AUTOMATIC && bankBin != null ? LocalDateTime.now() : null)
-                .reason(reason).ticketCheckedIn(false)
-                .requiresAdmin(onlineIncident || payment.getAmount().compareTo(staffApprovalThreshold) >= 0)
+                .reason(reason).ticketCheckedIn(checkedIn)
+                .requiresAdmin(onlineBooking || payment.getAmount().compareTo(staffApprovalThreshold) >= 0)
                 .status(RefundRequestStatus.REQUESTED).build());
     }
 
@@ -546,21 +550,12 @@ public class RefundRequestService {
     }
 
     private void validateEligibility(RefundRequest request) {
-        if (request.getTicketCode() != null && request.getTicketCode().startsWith("SYS-WATCH-")) return;
         Booking booking = requireBooking(request.getBookingId());
         boolean cancelledGroupRefund = request.getTicketCode() != null
                 && request.getTicketCode().startsWith("SYS-GROUP-")
                 && List.of(BookingStatus.EXPIRED, BookingStatus.CANCELLED).contains(booking.getStatus());
         if (cancelledGroupRefund) return;
         if (booking.getStatus() != BookingStatus.CONFIRMED) throw new BadRequestException("Booking không còn ở trạng thái xác nhận");
-        if (ticketRepository.findByBookingId(booking.getId()).stream().anyMatch(Ticket::isCheckedIn))
-            throw new BadRequestException("Vé đã check-in nên không thể hoàn tiền");
-        Showtime showtime = showtimeRepository.findById(booking.getShowtimeId()).orElse(null);
-        boolean onlineIncident = showtime != null && showtime.isOnline();
-        if (!onlineIncident && onlineMovieViewRepository.existsByBookingId(booking.getId()))
-            throw new BadRequestException("Vé xem phim online đã được sử dụng nên không thể hoàn tiền");
-        if (!onlineIncident && showtime != null && !showtime.getStartTime().isAfter(LocalDateTime.now()))
-            throw new BadRequestException("Suất chiếu đã bắt đầu nên không thể hoàn tiền");
     }
 
     private RefundRequest requireStatus(UUID id, RefundRequestStatus status) {
@@ -617,6 +612,21 @@ public class RefundRequestService {
         OnlineMovieView firstView = onlineMovieViewRepository
                 .findFirstByBookingIdOrderByViewedAtAsc(request.getBookingId()).orElse(null);
         LocalDateTime now = LocalDateTime.now();
+        boolean ticketCheckedIn = ticketRepository.findByBookingId(request.getBookingId()).stream().anyMatch(Ticket::isCheckedIn);
+        boolean showtimeStarted = showtime != null && !now.isBefore(showtime.getStartTime());
+        boolean showtimeEnded = showtime != null && !now.isBefore(showtime.getEndTime());
+        String showtimePhase = showtime == null ? "UNKNOWN"
+                : showtimeEnded ? "ENDED" : showtimeStarted ? "IN_PROGRESS" : "NOT_STARTED";
+        String ticketCode = request.getTicketCode() == null ? "" : request.getTicketCode();
+        String bookingType = ticketCode.startsWith("SYS-WATCH-") ? "WATCH_PARTY"
+                : ticketCode.startsWith("SYS-GROUP-") || (booking != null && groupBookingMemberRepository.existsByBookingId(booking.getId()))
+                ? "GROUP_BOOKING"
+                : showtime != null && showtime.isOnline() ? "ONLINE" : "CINEMA";
+        List<String> reviewWarnings = new ArrayList<>();
+        if (ticketCheckedIn) reviewWarnings.add("Vé đã được check-in tại rạp.");
+        if (firstView != null) reviewWarnings.add("Nội dung phim đã được mở lúc " + firstView.getViewedAt() + ".");
+        if (showtimeEnded) reviewWarnings.add("Suất chiếu đã kết thúc.");
+        else if (showtimeStarted) reviewWarnings.add("Suất chiếu đã bắt đầu hoặc đang diễn ra.");
         boolean automaticRetryAvailable = isAutomatic(request)
                 && request.getStatus() == RefundRequestStatus.REFUND_PENDING
                 && refundPayment != null
@@ -631,6 +641,7 @@ public class RefundRequestService {
                 .paidByUserEmail(paidByUser == null ? null : paidByUser.getEmail())
                 .paidByAnotherUser(!paidByUserId.equals(request.getCustomerId())).staffId(request.getStaffId())
                 .staffName(staff == null ? null : staff.getFullName()).movieTitle(movie == null ? null : movie.getTitle())
+                .bookingType(bookingType)
                 .amount(request.getAmount()).reason(request.getReason()).rejectionReason(request.getRejectionReason())
                 .refundQrImageUrl(refundQrImageUrl)
                 .refundMethod(request.getRefundMethod())
@@ -643,13 +654,15 @@ public class RefundRequestService {
                         && request.getBankBin() != null && request.getBankAccountNumber() != null)
                 .automaticRetryAvailable(automaticRetryAvailable)
                 .status(request.getStatus()).requiresAdmin(request.isRequiresAdmin())
-                .ticketCheckedIn(ticketRepository.findByBookingId(request.getBookingId()).stream().anyMatch(Ticket::isCheckedIn))
+                .ticketCheckedIn(ticketCheckedIn)
                 .showtimeStart(showtime == null ? null : showtime.getStartTime())
                 .showtimeEnd(showtime == null ? null : showtime.getEndTime())
-                .showtimeStarted(showtime != null && !now.isBefore(showtime.getStartTime()))
-                .showtimeEnded(showtime != null && !now.isBefore(showtime.getEndTime()))
+                .showtimeStarted(showtimeStarted)
+                .showtimeEnded(showtimeEnded)
+                .showtimePhase(showtimePhase)
                 .contentAccessed(firstView != null)
                 .firstViewedAt(firstView == null ? null : firstView.getViewedAt())
+                .reviewWarnings(reviewWarnings)
                 .createdAt(request.getCreatedAt())
                 .updatedAt(request.getUpdatedAt()).reviewedAt(request.getReviewedAt()).build();
     }

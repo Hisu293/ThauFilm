@@ -7,6 +7,7 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Data @Builder
@@ -25,6 +26,7 @@ public class RefundRequestDto {
     private UUID staffId;
     private String staffName;
     private String movieTitle;
+    private String bookingType;
     private BigDecimal amount;
     private String reason;
     private String rejectionReason;
@@ -44,8 +46,10 @@ public class RefundRequestDto {
     private LocalDateTime showtimeEnd;
     private boolean showtimeStarted;
     private boolean showtimeEnded;
+    private String showtimePhase;
     private boolean contentAccessed;
     private LocalDateTime firstViewedAt;
+    private List<String> reviewWarnings;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private LocalDateTime reviewedAt;

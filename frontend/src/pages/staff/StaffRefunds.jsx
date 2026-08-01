@@ -63,6 +63,20 @@ const statusMeta = {
   REFUND_FAILED: { label: 'Hoàn tiền lỗi', color: 'error' },
 };
 
+const bookingTypeMeta = {
+  CINEMA: 'Vé tại rạp',
+  ONLINE: 'Vé xem online',
+  WATCH_PARTY: 'Watch Party',
+  GROUP_BOOKING: 'Tìm bạn xem phim',
+};
+
+const showtimePhaseMeta = {
+  NOT_STARTED: { label: 'Chưa đến giờ chiếu', color: 'success' },
+  IN_PROGRESS: { label: 'Đang chiếu', color: 'warning' },
+  ENDED: { label: 'Đã kết thúc', color: 'error' },
+  UNKNOWN: { label: 'Chưa xác định', color: 'default' },
+};
+
 const summaryCardSx = {
   border: '1px solid',
   borderColor: 'divider',
@@ -298,6 +312,10 @@ export default function StaffRefunds() {
                 <TableCell>
                   <Typography noWrap fontWeight={700}>{item.movieTitle || '—'}</Typography>
                   <Typography noWrap display="block" variant="caption" color="text.secondary">{dateTime(item.showtimeStart)}</Typography>
+                  <Stack direction="row" spacing={0.5} sx={{ mt: 0.5 }}>
+                    <Chip size="small" variant="outlined" label={bookingTypeMeta[item.bookingType] || 'Không xác định'} />
+                    <Chip size="small" color={(showtimePhaseMeta[item.showtimePhase] || showtimePhaseMeta.UNKNOWN).color} label={(showtimePhaseMeta[item.showtimePhase] || showtimePhaseMeta.UNKNOWN).label} />
+                  </Stack>
                 </TableCell>
                 <TableCell><Typography fontWeight={900}>{money(item.amount)}</Typography></TableCell>
                 <TableCell>
@@ -343,12 +361,15 @@ export default function StaffRefunds() {
           </Stack>
           <Divider />
           <Box display="grid" gridTemplateColumns={{ xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))' }} gap={2}>
-            <Box><Typography variant="caption" color="text.secondary">Phim / suất chiếu</Typography><Typography fontWeight={800}>{selected?.movieTitle || '—'}</Typography><Typography variant="body2">{dateTime(selected?.showtimeStart)} – {dateTime(selected?.showtimeEnd)}</Typography></Box>
+            <Box><Typography variant="caption" color="text.secondary">Loại vé / suất chiếu</Typography><Typography fontWeight={800}>{bookingTypeMeta[selected?.bookingType] || 'Không xác định'} · {selected?.movieTitle || '—'}</Typography><Typography variant="body2">{dateTime(selected?.showtimeStart)} – {dateTime(selected?.showtimeEnd)}</Typography></Box>
             <Box><Typography variant="caption" color="text.secondary">Người thanh toán</Typography><Typography fontWeight={800}>{selected?.paidByUserName || selected?.customerName || '—'}</Typography><Typography variant="body2">{selected?.paidByUserEmail || selected?.customerEmail || '—'}</Typography></Box>
             <Box><Typography variant="caption" color="text.secondary">Số tiền hoàn</Typography><Typography variant="h6" fontWeight={950} color="warning.main">{money(selected?.amount)}</Typography></Box>
-            <Box><Typography variant="caption" color="text.secondary">Trạng thái suất chiếu</Typography><Typography fontWeight={700}>{selected?.showtimeEnded ? 'Suất đã kết thúc' : selected?.showtimeStarted ? 'Suất đang chiếu' : 'Chưa đến giờ chiếu'}</Typography></Box>
+            <Box><Typography variant="caption" color="text.secondary">Trạng thái suất chiếu</Typography><Chip size="small" color={(showtimePhaseMeta[selected?.showtimePhase] || showtimePhaseMeta.UNKNOWN).color} label={(showtimePhaseMeta[selected?.showtimePhase] || showtimePhaseMeta.UNKNOWN).label} /></Box>
             <Box><Typography variant="caption" color="text.secondary">Xác minh sử dụng</Typography><Typography fontWeight={700} color={selected?.contentAccessed ? 'error.main' : 'success.main'}>{selected?.contentAccessed ? 'Đã mở phim lúc ' + dateTime(selected?.firstViewedAt) : 'Chưa ghi nhận mở phim'}</Typography><Typography variant="caption">{selected?.ticketCheckedIn ? 'Vé đã check-in' : 'Vé chưa check-in'}</Typography></Box>
           </Box>
+          {(selected?.reviewWarnings || []).length > 0
+            ? <Alert severity="warning"><Typography fontWeight={800}>Cần cân nhắc trước khi duyệt</Typography>{selected.reviewWarnings.map((warning) => <Typography key={warning} variant="body2">• {warning}</Typography>)}</Alert>
+            : <Alert severity="success">Chưa ghi nhận vé đã sử dụng hoặc suất chiếu đã bắt đầu.</Alert>}
           <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: 'action.hover' }}><Typography variant="caption" color="text.secondary">Lý do khách gửi</Typography><Typography sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{selected?.reason || 'Không có lý do'}</Typography>{selected?.rejectionReason && <Typography color="error.main" sx={{ mt: 1 }}>Phản hồi xử lý: {selected.rejectionReason}</Typography>}</Box>
           <Box><Typography variant="caption" color="text.secondary">Phương thức hoàn tiền</Typography><Typography fontWeight={750} sx={{ overflowWrap: 'anywhere' }}>{selected?.refundMethod === 'AUTOMATIC' ? 'PayOS/Bảo Kim · BIN ' + (selected?.bankBin || '—') + ' · STK ' + (selected?.bankAccountMasked || '—') : 'Hoàn tiền thủ công bằng QR'}</Typography></Box>
           {selected?.refundMethod === 'AUTOMATIC' && <Alert severity={selected?.payoutDestinationConfirmed ? 'success' : 'warning'}>{selected?.payoutDestinationConfirmed ? `Người thanh toán đã xác nhận tài khoản lúc ${dateTime(selected?.payoutConfirmedAt)}.` : 'Chưa được duyệt: đang chờ người thanh toán nhập BIN và số tài khoản.'}</Alert>}

@@ -400,15 +400,15 @@ const MyBookingDetailPage = () => {
         <DialogContent>
           <Stack spacing={2} sx={{ pt: 1 }}>
             <Alert severity="info">Staff trưởng sẽ kiểm tra mã vé, trạng thái check-in và điều kiện hoàn. Yêu cầu từ 200.000đ trở lên cần Admin duyệt.</Alert>
-            <TextField select label="Mã vé" value={refundTicketCode} onChange={(event) => setRefundTicketCode(event.target.value)}>
+            {tickets.length > 0 ? <TextField select label="Mã vé" value={refundTicketCode} onChange={(event) => setRefundTicketCode(event.target.value)}>
               {tickets.map((ticket) => <MenuItem key={ticket.ticketCode || ticket.id} value={ticket.ticketCode}>{ticket.ticketCode}</MenuItem>)}
-            </TextField>
+            </TextField> : <Alert severity="info">Đây là vé xem online nên yêu cầu sẽ được đối chiếu theo booking và lịch sử mở phim.</Alert>}
             <TextField multiline minRows={4} label="Lý do hoàn tiền" value={refundReason} onChange={(event) => setRefundReason(event.target.value)} helperText="Nhập ít nhất 10 ký tự để staff trưởng có đủ thông tin kiểm tra." />
           </Stack>
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setRefundOpen(false)}>Hủy</Button>
-          <Button variant="contained" onClick={handleRefundRequest} disabled={actionLoading || refundReason.trim().length < 10 || !refundTicketCode}>Gửi yêu cầu</Button>
+          <Button variant="contained" onClick={handleRefundRequest} disabled={actionLoading || refundReason.trim().length < 10 || (tickets.length > 0 && !refundTicketCode)}>Gửi yêu cầu</Button>
         </DialogActions>
       </Dialog>
 
@@ -424,7 +424,7 @@ const MyBookingDetailPage = () => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setAutoRefundOpen(false)}>Hủy</Button>
-          <Button variant="contained" color="success" onClick={handleAutomaticRefund} disabled={actionLoading || !refundTicketCode || !/^\d{6,10}$/.test(refundBankBin) || !/^\d{5,20}$/.test(refundAccountNumber)}>
+          <Button variant="contained" color="success" onClick={handleAutomaticRefund} disabled={actionLoading || (tickets.length > 0 && !refundTicketCode) || !/^\d{6,10}$/.test(refundBankBin) || !/^\d{5,20}$/.test(refundAccountNumber) || autoRefundReason.trim().length < 10}>
             Gửi yêu cầu duyệt
           </Button>
         </DialogActions>
