@@ -14,6 +14,7 @@ const MovieConveyor = ({ movies }) => {
   const dragRef = useRef(null);
   const pausedRef = useRef(false);
   const draggedRef = useRef(false);
+  const scrollPositionRef = useRef(0);
 
   useEffect(() => {
     const rail = railRef.current;
@@ -26,9 +27,10 @@ const MovieConveyor = ({ movies }) => {
       const elapsed = Math.min(time - previousTime, 40);
       previousTime = time;
       if (!pausedRef.current && !dragRef.current && rail.scrollWidth > rail.clientWidth) {
-        rail.scrollLeft += elapsed * 0.025;
         const loopWidth = rail.scrollWidth / 2;
-        if (rail.scrollLeft >= loopWidth) rail.scrollLeft -= loopWidth;
+        scrollPositionRef.current += elapsed * 0.025;
+        if (scrollPositionRef.current >= loopWidth) scrollPositionRef.current -= loopWidth;
+        rail.scrollLeft = scrollPositionRef.current;
       }
       frameId = requestAnimationFrame(tick);
     };
@@ -42,6 +44,7 @@ const MovieConveyor = ({ movies }) => {
       || event.target.closest('button, a, input, select, textarea, [role="button"]')
     ) return;
     draggedRef.current = false;
+    scrollPositionRef.current = railRef.current.scrollLeft;
     dragRef.current = {
       pointerId: event.pointerId,
       startX: event.clientX,
@@ -64,6 +67,7 @@ const MovieConveyor = ({ movies }) => {
       while (nextScrollLeft < 0) nextScrollLeft += loopWidth;
       while (nextScrollLeft >= loopWidth) nextScrollLeft -= loopWidth;
     }
+    scrollPositionRef.current = nextScrollLeft;
     rail.scrollLeft = nextScrollLeft;
     if (draggedRef.current) event.preventDefault();
   };
@@ -91,10 +95,12 @@ const MovieConveyor = ({ movies }) => {
       onPointerMove={handlePointerMove}
       onPointerUp={finishDrag}
       onPointerCancel={finishDrag}
-      onPointerEnter={() => { pausedRef.current = true; }}
+      onPointerEnter={(event) => {
+        if (event.pointerType === 'mouse') pausedRef.current = true;
+      }}
       onPointerLeave={(event) => {
         if (dragRef.current) finishDrag(event);
-        pausedRef.current = false;
+        if (event.pointerType === 'mouse') pausedRef.current = false;
       }}
       onClickCapture={blockClickAfterDrag}
       aria-label="Danh sách phim tự chạy. Kéo ngang để xem thêm."

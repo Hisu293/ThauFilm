@@ -2,8 +2,19 @@ import api from './api';
 
 const unwrap = (res) => (res?.data?.data !== undefined ? res.data.data : res?.data);
 
+let staffAccessRequest = null;
+const getStaffAccess = () => {
+  if (!staffAccessRequest) {
+    staffAccessRequest = api.get('/api/staff/refunds/access').then(unwrap).catch((error) => {
+      staffAccessRequest = null;
+      throw error;
+    });
+  }
+  return staffAccessRequest;
+};
+
 export const refundService = {
-  staffAccess: () => api.get('/api/staff/refunds/access').then(unwrap),
+  staffAccess: getStaffAccess,
   staffList: () => api.get('/api/staff/refunds').then(unwrap),
   staffCreate: (payload) => api.post('/api/staff/refunds', payload).then(unwrap),
   staffApprove: (id) => api.post(`/api/staff/refunds/${id}/approve`).then(unwrap),

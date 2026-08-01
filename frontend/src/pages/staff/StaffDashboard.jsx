@@ -119,13 +119,17 @@ const StaffDashboard = () => {
     else setLoading(true);
     setError('');
     try {
-      const [stats, today, shift, access] = await Promise.all([
-        staffReportService.dashboard(),
+      const statsRequest = staffReportService.dashboard();
+      const supportingRequests = Promise.all([
         staffAttendanceService.today().catch(() => null),
         staffAttendanceService.todayShift().catch(() => null),
         refundService.staffAccess().catch(() => null),
       ]);
+      const stats = await statsRequest;
       setDashboardStats(stats);
+      setLoading(false);
+      setRefreshing(false);
+      const [today, shift, access] = await supportingRequests;
       setAttendance(today);
       setTodayShift(shift);
       const leader = Boolean(access?.shiftLeader);

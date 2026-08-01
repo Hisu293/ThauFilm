@@ -413,17 +413,32 @@ public class StaffReportService {
     public Map<String, Object> dashboard() {
         LocalDate today = LocalDate.now();
         LocalDate yesterday = today.minusDays(1);
-        BigDecimal todayRevenue = paidRevenue(today);
-        BigDecimal yesterdayRevenue = paidRevenue(yesterday);
-        long todayTickets = confirmedTickets(today);
-        long yesterdayTickets = confirmedTickets(yesterday);
+        ReportContext context = context();
+        Map<LocalDate, BigDecimal> revenueByDate = context.payments.stream()
+                .filter(payment -> payment.getStatus() == PaymentStatus.PAID)
+                .filter(payment -> paymentDate(payment) != null)
+                .filter(payment -> today.equals(paymentDate(payment)) || yesterday.equals(paymentDate(payment)))
+                .collect(Collectors.groupingBy(this::paymentDate,
+                        Collectors.reducing(BigDecimal.ZERO, Payment::getAmount, BigDecimal::add)));
+        BigDecimal todayRevenue = revenueByDate.getOrDefault(today, BigDecimal.ZERO);
+        BigDecimal yesterdayRevenue = revenueByDate.getOrDefault(yesterday, BigDecimal.ZERO);
+        Set<UUID> confirmedBookingIds = context.bookings.values().stream()
+                .filter(booking -> booking.getStatus() == BookingStatus.CONFIRMED)
+                .map(Booking::getId)
+                .collect(Collectors.toSet());
+        Map<LocalDate, Long> ticketsByDate = context.tickets.stream()
+                .filter(ticket -> confirmedBookingIds.contains(ticket.getBookingId()))
+                .filter(ticket -> ticket.getCreatedAt() != null)
+                .filter(ticket -> today.equals(ticket.getCreatedAt().toLocalDate()) || yesterday.equals(ticket.getCreatedAt().toLocalDate()))
+                .collect(Collectors.groupingBy(ticket -> ticket.getCreatedAt().toLocalDate(), Collectors.counting()));
+        long todayTickets = ticketsByDate.getOrDefault(today, 0L);
+        long yesterdayTickets = ticketsByDate.getOrDefault(yesterday, 0L);
         LocalDateTime now = LocalDateTime.now();
-        long activeScreenings = showtimeRepository.findAll().stream()
+        long activeScreenings = context.showtimes.values().stream()
                 .filter(showtime -> showtime.getStatus() != ShowtimeStatus.CANCELLED)
                 .filter(showtime -> !showtime.getStartTime().isAfter(now) && showtime.getEndTime().isAfter(now))
                 .count();
 
-        ReportContext context = context();
         List<Map<String, Object>> recentCheckIns = context.tickets.stream().filter(Ticket::isCheckedIn)
                 .sorted(Comparator.comparing(this::checkInTime).reversed()).limit(5)
                 .map(ticket -> checkInRow(ticket, context)).toList();
@@ -467,19 +482,6 @@ public class StaffReportService {
 
     private LocalDateTime checkInTime(Ticket ticket) {
         return ticket.getCheckedInAt() == null ? ticket.getCreatedAt() : ticket.getCheckedInAt();
-    }
-
-    private BigDecimal paidRevenue(LocalDate date) {
-        return paymentRepository.findAll().stream().filter(payment -> payment.getStatus() == PaymentStatus.PAID)
-                .filter(payment -> date.equals(paymentDate(payment)))
-                .map(Payment::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
-    }
-
-    private long confirmedTickets(LocalDate date) {
-        Set<UUID> confirmed = bookingRepository.findAll().stream().filter(booking -> booking.getStatus() == BookingStatus.CONFIRMED)
-                .map(Booking::getId).collect(Collectors.toSet());
-        return ticketRepository.findAll().stream().filter(ticket -> confirmed.contains(ticket.getBookingId()))
-                .filter(ticket -> ticket.getCreatedAt().toLocalDate().equals(date)).count();
     }
 
     private LocalDate paymentDate(Payment payment) {

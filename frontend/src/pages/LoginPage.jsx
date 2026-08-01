@@ -94,7 +94,7 @@ const LoginPage = () => {
     if (isAdmin) redirectUrl = '/admin';
     else if (isStaff) redirectUrl = '/staff/dashboard';
 
-    setTimeout(() => navigate(redirectUrl), 1000);
+    navigate(redirectUrl, { replace: true });
   }, [login, navigate]);
 
   useEffect(() => {
