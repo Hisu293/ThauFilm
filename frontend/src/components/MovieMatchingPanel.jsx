@@ -92,7 +92,7 @@ const DiscoveryCard = ({ person, nextPerson, busy, onDecision }) => {
     }
   };
 
-  return <Box sx={{ width: '100%', maxWidth: 600, height: { xs: 625, sm: 700 }, position: 'relative' }}>
+  return <Box sx={{ width: '100%', maxWidth: 560, height: { xs: 590, sm: 640 }, position: 'relative' }}>
     {nextPerson && <Paper sx={{ position: 'absolute', inset: '16px 14px -4px', borderRadius: 5, bgcolor: '#202b3d', transform: 'scale(.97)', border: '1px solid rgba(255,255,255,.07)' }} />}
     <Card onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); gestureRef.current = { active: true, startX: event.clientX, x: 0, pointerId: event.pointerId }; setDrag({ active: true, x: 0, leaving: false }); }}
       onPointerMove={moveDrag}
@@ -101,21 +101,21 @@ const DiscoveryCard = ({ person, nextPerson, busy, onDecision }) => {
         transform: `translate3d(${offset}px,0,0) rotate(${rotation}deg)`, transition: drag.active ? 'none' : `transform ${drag.leaving ? 180 : 320}ms cubic-bezier(.22,.8,.3,1)`, willChange: 'transform', backfaceVisibility: 'hidden', opacity: busy ? .65 : 1,
         border: '1px solid rgba(255,255,255,.09)', boxShadow: '0 24px 70px rgba(0,0,0,.38)' }}>
       <Box sx={{ position: 'relative' }}>
-        <Photo person={person} height={{ xs: 400, sm: 475 }} radius="20px 20px 0 0" />
+        <Photo person={person} height={{ xs: 365, sm: 410 }} radius="20px 20px 0 0" />
         <Box sx={{ position: 'absolute', inset: '55% 0 0', background: 'linear-gradient(transparent,rgba(8,12,20,.9))', pointerEvents: 'none' }} />
         <Chip icon={<AutoAwesomeRoundedIcon />} label={`${person.compatibilityPercent || 0}% hợp gu`} sx={{ position: 'absolute', top: 16, left: 16, bgcolor: 'rgba(8,12,20,.78)', color: '#ffd052', fontWeight: 900, border: '1px solid rgba(245,181,27,.38)', backdropFilter: 'blur(10px)' }} />
         {Math.abs(offset) > 25 && <Box sx={{ position: 'absolute', top: 74, [offset > 0 ? 'left' : 'right']: 24, px: 1.7, py: .45, border: '4px solid', borderColor: offset > 0 ? ACCENT : '#6f5a63', color: offset > 0 ? ACCENT : '#6f5a63', borderRadius: 2, fontWeight: 1000, fontSize: 22, transform: `rotate(${offset > 0 ? -9 : 9}deg)`, bgcolor: 'rgba(255,250,251,.84)' }}>{offset > 0 ? 'THÍCH' : 'BỎ QUA'}</Box>}
       </Box>
-      <CardContent sx={{ px: { xs: 2.5, sm: 3.5 }, pt: 2.5, pb: 2 }}>
-        <Stack direction="row" alignItems="center" spacing={1}><Typography variant="h4" fontWeight={950}>{person.fullName || 'Thành viên'}</Typography><Box sx={{ width: 9, height: 9, borderRadius: '50%', bgcolor: '#35b86b' }} /></Stack>
+      <CardContent sx={{ px: { xs: 2.5, sm: 3 }, pt: 2.2, pb: 1.8 }}>
+        <Stack direction="row" alignItems="center" spacing={1}><Typography sx={{ fontSize: { xs: 27, sm: 31 }, lineHeight: 1.1, fontWeight: 950 }} noWrap>{person.fullName || 'Thành viên'}</Typography><Box sx={{ width: 9, height: 9, flex: '0 0 auto', borderRadius: '50%', bgcolor: '#35b86b' }} /></Stack>
         <Typography color="rgba(226,232,240,.68)" sx={{ mt: .5, lineHeight: 1.55, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{person.bio || 'Cùng mình tìm một bộ phim hay và một cuộc trò chuyện thú vị nhé.'}</Typography>
-        <Stack direction="row" gap={.7} flexWrap="wrap" mt={1.5}>{(person.favoriteGenres || []).slice(0, 4).map((genre) => <Chip key={genre} size="small" label={genre} sx={{ bgcolor: ACCENT_SOFT, color: ACCENT_DARK, fontWeight: 700 }} />)}</Stack>
-        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: .5, sm: 2 }} mt={1.5} color="#716e78">
+        <Stack direction="row" gap={.7} flexWrap="wrap" mt={1.1}>{(person.favoriteGenres || []).slice(0, 4).map((genre) => <Chip key={genre} size="small" label={genre} sx={{ bgcolor: ACCENT_SOFT, color: ACCENT_DARK, fontWeight: 700 }} />)}</Stack>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={{ xs: .35, sm: 2 }} mt={1.1} color="#716e78">
           {person.preferredTheater && <Typography variant="body2" display="flex" alignItems="center" gap={.5}><PlaceRoundedIcon sx={{ fontSize: 17 }} />{person.preferredTheater}</Typography>}
           {person.availableTimes && <Typography variant="body2" display="flex" alignItems="center" gap={.5}><LocalMoviesRoundedIcon sx={{ fontSize: 17 }} />{person.availableTimes}</Typography>}
         </Stack>
       </CardContent>
-      <Stack direction="row" justifyContent="flex-end" alignItems="center" spacing={2.4} sx={{ position: 'absolute', right: 24, top: { xs: 363, sm: 436 } }}>
+      <Stack direction="row" justifyContent="flex-end" alignItems="center" spacing={2} sx={{ position: 'absolute', right: 22, top: { xs: 328, sm: 372 } }}>
         <FloatingAction kind="pass" disabled={busy} onClick={() => onDecision('PASS')} />
         <FloatingAction kind="like" disabled={busy} onClick={() => onDecision('LIKE')} />
       </Stack>
@@ -208,8 +208,8 @@ const MatchesCarousel = ({ matches, onOpen }) => {
   </Box>;
 };
 
-const ConversationRow = ({ match, onOpen }) => <Button fullWidth onClick={onOpen} sx={{ minHeight: 70, justifyContent: 'flex-start', textAlign: 'left', color: '#f8fafc', textTransform: 'none', px: 1.5, py: 1, borderRadius: 3, border: '1px solid transparent', '&:hover': { bgcolor: 'rgba(255,255,255,.05)', borderColor: 'rgba(255,255,255,.07)' } }}>
-  <Avatar src={match.person?.avatarUrl} sx={{ width: 52, height: 52, mr: 1.6, flex: '0 0 auto' }}>{firstLetter(match.person?.fullName)}</Avatar>
+const ConversationRow = ({ match, onOpen }) => <Button fullWidth onClick={onOpen} sx={{ minHeight: 62, justifyContent: 'flex-start', textAlign: 'left', color: '#f8fafc', textTransform: 'none', px: 1.4, py: .75, borderRadius: 3, border: '1px solid transparent', '&:hover': { bgcolor: 'rgba(255,255,255,.05)', borderColor: 'rgba(255,255,255,.07)' } }}>
+  <Avatar src={match.person?.avatarUrl} sx={{ width: 46, height: 46, mr: 1.5, flex: '0 0 auto' }}>{firstLetter(match.person?.fullName)}</Avatar>
   <Box flex={1} minWidth={0}><Typography fontWeight={900} fontSize="1.05rem" noWrap>{match.person?.fullName}</Typography><Typography color="#77737e" noWrap>Bắt đầu cuộc trò chuyện về bộ phim yêu thích</Typography></Box>
   <Box sx={{ width: 28, height: 28, borderRadius: '50%', border: '2px solid #aaa6b0', display: 'grid', placeItems: 'center', color: '#77737e' }}><ChatBubbleRoundedIcon sx={{ fontSize: 15 }} /></Box>
 </Button>;
@@ -343,7 +343,7 @@ export default function MovieMatchingPanel() {
   const clearDiscoveryFilters = () => { setSpotlightOnly(false); setGenreFilter(''); };
   const activePerson = visibleCandidates[0];
   const discoveryFiltered = spotlightOnly || Boolean(genreFilter);
-  const conversationsPerPage = 8;
+  const conversationsPerPage = 6;
   const conversationPageCount = Math.max(1, Math.ceil(matches.length / conversationsPerPage));
   const effectiveConversationPage = Math.min(conversationPage, conversationPageCount);
   const visibleConversations = matches.slice(
@@ -379,8 +379,8 @@ export default function MovieMatchingPanel() {
         {matches.length === 0 ? <Alert severity="info">Chưa có kết nối nào. Hãy khám phá thêm hồ sơ mới.</Alert> : <><MatchesCarousel matches={matches} onOpen={setSelectedMatch} /><Divider sx={{ my: 3 }} /><Stack direction="row" justifyContent="space-between" alignItems="center" mb={1}><Typography variant="h5" fontWeight={950}>Cuộc trò chuyện</Typography><Typography variant="caption" color="rgba(226,232,240,.48)">{matches.length} kết nối</Typography></Stack><Stack spacing={.5}>{visibleConversations.map((match) => <ConversationRow key={match.matchId} match={match} onOpen={() => setSelectedMatch(match)} />)}</Stack>{conversationPageCount > 1 && <Stack alignItems="center" mt={2.5}><Pagination count={conversationPageCount} page={effectiveConversationPage} onChange={(_, page) => setConversationPage(page)} siblingCount={1} boundaryCount={1} sx={{ '& .MuiPaginationItem-root': { color: 'rgba(226,232,240,.7)', borderColor: 'rgba(255,255,255,.1)' }, '& .Mui-selected': { bgcolor: `${ACCENT_SOFT} !important`, color: '#ffd052', borderColor: 'rgba(245,181,27,.28)' } }} /></Stack>}</>}
       </Paper>}
 
-      {tab === 2 && <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'minmax(270px,.8fr) 1.2fr' }, gap: 2.5 }}>
-        <Card sx={{ alignSelf: 'start', borderRadius: 4, overflow: 'hidden', bgcolor: SURFACE, border: '1px solid rgba(255,255,255,.08)' }}><Box sx={{ position: 'relative' }}><Photo person={profile || {}} height={430} /><Stack direction="row" spacing={1} sx={{ position: 'absolute', left: 18, bottom: 18 }}><Button variant="contained" startIcon={<PhotoCameraRoundedIcon />} onClick={() => photoInput.current?.click()} sx={{ bgcolor: ACCENT, '&:hover': { bgcolor: ACCENT_DARK } }}>Chọn ảnh</Button>{profile?.customDatingPhoto && <IconButton onClick={removePhoto} sx={{ bgcolor: SURFACE, color: ACCENT_DARK, '&:hover': { bgcolor: '#fff0f4' } }}><DeleteOutlineRoundedIcon /></IconButton>}</Stack><input ref={photoInput} hidden type="file" accept="image/jpeg,image/png,image/webp" onChange={uploadPhoto} /></Box></Card>
+      {tab === 2 && <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: 'minmax(270px,.8fr) 1.2fr' }, alignItems: 'start', gap: 2.5 }}>
+        <Card sx={{ alignSelf: 'start', height: 'fit-content', minHeight: 0, borderRadius: 4, overflow: 'hidden', bgcolor: SURFACE, border: '1px solid rgba(255,255,255,.08)' }}><Box sx={{ position: 'relative', height: 430 }}><Photo person={profile || {}} height="100%" /><Stack direction="row" spacing={1} sx={{ position: 'absolute', left: 18, bottom: 18 }}><Button variant="contained" startIcon={<PhotoCameraRoundedIcon />} onClick={() => photoInput.current?.click()} sx={{ bgcolor: ACCENT, '&:hover': { bgcolor: ACCENT_DARK } }}>Chọn ảnh</Button>{profile?.customDatingPhoto && <IconButton onClick={removePhoto} sx={{ bgcolor: SURFACE, color: ACCENT_DARK, '&:hover': { bgcolor: '#fff0f4' } }}><DeleteOutlineRoundedIcon /></IconButton>}</Stack><input ref={photoInput} hidden type="file" accept="image/jpeg,image/png,image/webp" onChange={uploadPhoto} /></Box></Card>
         <Card sx={{ borderRadius: 4, bgcolor: SURFACE, border: '1px solid #efdee4' }}><CardContent sx={{ p: { xs: 2.5, md: 3.5 } }}><Typography variant="h5" fontWeight={950}>Chỉnh sửa hồ sơ</Typography><Typography color="#77737e" mb={3}>Giúp người cùng gu hiểu thêm về bạn.</Typography><Stack spacing={2}><TextField label="Giới thiệu bản thân" multiline minRows={4} value={form.bio} onChange={(event) => setForm({ ...form, bio: event.target.value })} inputProps={{ maxLength: 500 }} /><TextField label="Thể loại yêu thích" helperText="Ví dụ: Marvel, Anime, Tâm lý" value={form.favoriteGenres} onChange={(event) => setForm({ ...form, favoriteGenres: event.target.value })} /><TextField label="Rạp yêu thích" value={form.preferredTheater} onChange={(event) => setForm({ ...form, preferredTheater: event.target.value })} /><TextField label="Thời gian thường rảnh" value={form.availableTimes} onChange={(event) => setForm({ ...form, availableTimes: event.target.value })} /><Divider /><FormControlLabel control={<Switch checked={form.active} onChange={(event) => setForm({ ...form, active: event.target.checked })} sx={{ '& .MuiSwitch-switchBase.Mui-checked': { color: ACCENT }, '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: ACCENT } }} />} label="Cho phép hiển thị hồ sơ trong gợi ý" /><Button variant="contained" startIcon={<SaveRoundedIcon />} onClick={save} sx={{ bgcolor: ACCENT, '&:hover': { bgcolor: ACCENT_DARK } }}>Lưu hồ sơ</Button></Stack></CardContent></Card>
       </Box>}
 
