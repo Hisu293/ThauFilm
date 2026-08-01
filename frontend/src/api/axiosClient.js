@@ -28,8 +28,11 @@ axiosClient.interceptors.response.use(
   (response) => response.data,
   async (error) => {
     if (!error.response) {
+      const message = error.code === 'ECONNABORTED'
+        ? 'Server xử lý quá lâu và chưa trả về dữ liệu. Vui lòng thử tải lại.'
+        : `Không thể kết nối đến server tại ${API_BASE_URL}. Vui lòng kiểm tra kết nối mạng hoặc server backend.`;
       return Promise.reject(
-        new Error(`Không thể kết nối đến server tại ${API_BASE_URL}. Vui lòng kiểm tra kết nối mạng hoặc server backend.`)
+        new Error(message)
       );
     }
 

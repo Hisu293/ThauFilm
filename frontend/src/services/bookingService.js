@@ -90,6 +90,8 @@ export const bookingService = {
       movieId: backendBooking.movieId ?? null,
       movieTitle: backendBooking.movieTitle || 'Vé xem phim',
       roomName: backendBooking.cinemaRoomName || 'Phòng chiếu',
+      online: Boolean(backendBooking.online),
+      bookingType: backendBooking.bookingType || (backendBooking.online ? 'ONLINE' : 'CINEMA'),
       startTime: backendBooking.startTime,
       originalAmount,
       discountAmount: Number(savedPayment?.discountAmount) || Math.max(originalAmount - paidAmount, 0),

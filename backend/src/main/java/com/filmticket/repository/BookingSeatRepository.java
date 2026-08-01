@@ -14,6 +14,7 @@ import java.util.UUID;
 @Repository
 public interface BookingSeatRepository extends JpaRepository<BookingSeat, UUID> {
     List<BookingSeat> findByBookingId(UUID bookingId);
+    List<BookingSeat> findByBookingIdIn(List<UUID> bookingIds);
 
     @Query("SELECT bs.seatId FROM BookingSeat bs, Booking b " +
             "WHERE bs.bookingId = b.id AND b.userId = :userId " +

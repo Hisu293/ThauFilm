@@ -128,7 +128,9 @@ const TicketCard = ({ ticket, onResume, onWatch, onDetails }) => (
         <div className="pf-ticket__detail">
           <span className="pf-ticket__detail-label">Ghế ngồi</span>
           <span className="pf-ticket__detail-value">
-            {ticket.seats.map((s) => <span key={s} className="pf-seat">{s}</span>)}
+            {ticket.seats.length > 0
+              ? ticket.seats.map((s) => <span key={s} className="pf-seat">{s}</span>)
+              : <span>{ticket.bookingType === 'WATCH_PARTY' ? 'Phòng xem chung' : 'Không áp dụng'}</span>}
           </span>
         </div>
         <div className="pf-ticket__detail">
@@ -164,7 +166,7 @@ const TicketCard = ({ ticket, onResume, onWatch, onDetails }) => (
               <ConfirmationNumberRoundedIcon sx={{ fontSize: 16 }} />
               {ticket.canRequestRefund ? 'Chi tiết / Hoàn tiền' : 'Chi tiết vé'}
             </button>
-            {ticket.movieId && (
+            {ticket.movieId && ticket.online && (
               <button
                 type="button"
                 className="pf-btn pf-btn--sm pf-btn--pay"
@@ -365,6 +367,8 @@ const ProfilePage = () => {
               isExpired,
               canResume: isPending && !isExpired,
               canRequestRefund: normStatus === 'CONFIRMED' && !isPast,
+              online: Boolean(b.online),
+              bookingType: b.bookingType || (b.online ? 'ONLINE' : 'CINEMA'),
               moviePayload: {
                 ...mergedMovie,
                 id: b.movieId || showtimeInfo?.movieId || mergedShowtime?.movieId,

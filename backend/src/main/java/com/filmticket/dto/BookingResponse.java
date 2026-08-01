@@ -26,6 +26,8 @@ public class BookingResponse {
     private String movieTitle;
     private UUID cinemaRoomId;
     private String cinemaRoomName;
+    private Boolean online;
+    private String bookingType;
     private UUID theaterId;
     private String theaterName;
     private LocalDateTime startTime;

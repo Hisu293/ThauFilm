@@ -612,8 +612,30 @@ public class BookingService {
     @Transactional(readOnly = true)
     public List<BookingResponse> getMyBookings(UUID userId) {
         List<Booking> bookings = bookingRepository.findByUserIdOrderByCreatedAtDesc(userId);
+        if (bookings.isEmpty()) return List.of();
+
+        List<UUID> bookingIds = bookings.stream().map(Booking::getId).toList();
+        List<BookingSeat> bookingSeats = bookingSeatRepository.findByBookingIdIn(bookingIds);
+        Map<UUID, List<BookingSeat>> bookingSeatsByBookingId = bookingSeats.stream()
+                .collect(Collectors.groupingBy(BookingSeat::getBookingId));
+        Map<UUID, Seat> seatsById = seatRepository.findAllById(
+                        bookingSeats.stream().map(BookingSeat::getSeatId).distinct().toList())
+                .stream().collect(Collectors.toMap(Seat::getId, seat -> seat));
+
+        Map<UUID, Showtime> showtimesById = showtimeRepository.findAllById(
+                        bookings.stream().map(Booking::getShowtimeId).filter(Objects::nonNull).distinct().toList())
+                .stream().collect(Collectors.toMap(Showtime::getId, showtime -> showtime));
+        Map<UUID, Movie> moviesById = movieRepository.findAllById(
+                        showtimesById.values().stream().map(Showtime::getMovieId).filter(Objects::nonNull).distinct().toList())
+                .stream().collect(Collectors.toMap(Movie::getId, movie -> movie));
+        Map<UUID, CinemaRoom> roomsById = cinemaRoomRepository.findAllById(
+                        showtimesById.values().stream().filter(showtime -> !showtime.isOnline())
+                                .map(Showtime::getCinemaRoomId).filter(Objects::nonNull).distinct().toList())
+                .stream().collect(Collectors.toMap(CinemaRoom::getId, room -> room));
+
         return bookings.stream()
-                .map(this::toBookingResponseWithoutSeats)
+                .map(booking -> toBookingHistoryResponse(booking, bookingSeatsByBookingId, seatsById,
+                        showtimesById, moviesById, roomsById))
                 .toList();
     }
 
@@ -994,13 +1016,14 @@ public class BookingService {
         String movieTitle = null;
         String cinemaRoomName = null;
         UUID movieId = null;
+        Showtime showtime = null;
         if (booking.getShowtimeId() != null) {
             var optShowtime = showtimeRepository.findById(booking.getShowtimeId());
             if (optShowtime.isPresent()) {
-                Showtime showtime = optShowtime.get();
+                showtime = optShowtime.get();
                 movieId = showtime.getMovieId();
-                movieTitle = movieRepository.findById(showtime.getMovieId())
-                        .map(movie -> displayMovieTitle(showtime, movie.getTitle())).orElse(null);
+                Movie movie = movieRepository.findById(showtime.getMovieId()).orElse(null);
+                movieTitle = movie == null ? null : displayMovieTitle(showtime, movie.getTitle());
                 cinemaRoomName = showtime.isOnline()
                         ? "Xem online"
                         : (showtime.getCinemaRoomId() != null
@@ -1009,7 +1032,9 @@ public class BookingService {
             }
         }
 
-        return BookingResponse.fromBooking(booking, seatResponses, movieId, movieTitle, cinemaRoomName);
+        BookingResponse response = BookingResponse.fromBooking(booking, seatResponses, movieId, movieTitle, cinemaRoomName);
+        applyBookingType(response, booking, showtime);
+        return response;
     }
 
     private BookingResponse toBookingResponseWithoutSeats(Booking booking) {
@@ -1033,13 +1058,14 @@ public class BookingService {
         String movieTitle = null;
         String cinemaRoomName = null;
         UUID movieId = null;
+        Showtime showtime = null;
         if (booking.getShowtimeId() != null) {
             var optShowtime = showtimeRepository.findById(booking.getShowtimeId());
             if (optShowtime.isPresent()) {
-                Showtime showtime = optShowtime.get();
+                showtime = optShowtime.get();
                 movieId = showtime.getMovieId();
-                movieTitle = movieRepository.findById(showtime.getMovieId())
-                        .map(movie -> displayMovieTitle(showtime, movie.getTitle())).orElse(null);
+                Movie movie = movieRepository.findById(showtime.getMovieId()).orElse(null);
+                movieTitle = movie == null ? null : displayMovieTitle(showtime, movie.getTitle());
                 cinemaRoomName = showtime.isOnline()
                         ? "Xem online"
                         : (showtime.getCinemaRoomId() != null
@@ -1048,7 +1074,50 @@ public class BookingService {
             }
         }
 
-        return BookingResponse.fromBooking(booking, seatResponses, movieId, movieTitle, cinemaRoomName);
+        BookingResponse response = BookingResponse.fromBooking(booking, seatResponses, movieId, movieTitle, cinemaRoomName);
+        applyBookingType(response, booking, showtime);
+        return response;
+    }
+
+    private BookingResponse toBookingHistoryResponse(
+            Booking booking,
+            Map<UUID, List<BookingSeat>> bookingSeatsByBookingId,
+            Map<UUID, Seat> seatsById,
+            Map<UUID, Showtime> showtimesById,
+            Map<UUID, Movie> moviesById,
+            Map<UUID, CinemaRoom> roomsById) {
+        List<ShowtimeSeatResponse> seatResponses = bookingSeatsByBookingId
+                .getOrDefault(booking.getId(), List.of()).stream()
+                .map(bookingSeat -> {
+                    Seat seat = seatsById.get(bookingSeat.getSeatId());
+                    if (seat == null) return null;
+                    return ShowtimeSeatResponse.builder()
+                            .seatId(seat.getId()).rowName(seat.getRowName()).seatNumber(seat.getSeatNumber())
+                            .type(seat.getType().toStorageValue()).status(SeatBookingStatus.SOLD)
+                            .price(bookingSeat.getPriceAtBooking()).build();
+                })
+                .filter(Objects::nonNull)
+                .toList();
+
+        Showtime showtime = showtimesById.get(booking.getShowtimeId());
+        UUID movieId = showtime == null ? null : showtime.getMovieId();
+        Movie movie = movieId == null ? null : moviesById.get(movieId);
+        String movieTitle = movie == null ? null : displayMovieTitle(showtime, movie.getTitle());
+        String cinemaRoomName = showtime == null ? null
+                : showtime.isOnline() ? "Xem online"
+                : Optional.ofNullable(roomsById.get(showtime.getCinemaRoomId())).map(CinemaRoom::getName).orElse(null);
+        BookingResponse response = BookingResponse.fromBooking(booking, seatResponses, movieId, movieTitle, cinemaRoomName);
+        applyBookingType(response, booking, showtime);
+        return response;
+    }
+
+    private void applyBookingType(BookingResponse response, Booking booking, Showtime showtime) {
+        boolean online = showtime != null && showtime.isOnline();
+        boolean watchParty = online && booking.getConfirmationCode() != null
+                && booking.getConfirmationCode().startsWith("WP");
+        response.setOnline(online);
+        response.setBookingType(watchParty ? "WATCH_PARTY" : online ? "ONLINE" : "CINEMA");
+        if (watchParty) response.setCinemaRoomName("Watch Party");
     }
 
     private String formatMoney(BigDecimal value) {
