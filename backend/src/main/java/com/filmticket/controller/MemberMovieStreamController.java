@@ -45,11 +45,29 @@ public class MemberMovieStreamController {
         return ResponseEntity.ok(ApiResponse.success("Viewing session refreshed", null));
     }
 
+    @PostMapping("/{movieId}/stream/{bookingId}/heartbeat")
+    public ResponseEntity<ApiResponse<Void>> heartbeatBooking(
+            @PathVariable UUID movieId,
+            @PathVariable UUID bookingId,
+            @RequestHeader("X-Viewing-Device-Id") String deviceId) {
+        movieStreamService.heartbeatBooking(movieId, bookingId, userId(), deviceId);
+        return ResponseEntity.ok(ApiResponse.success("Viewing session refreshed", null));
+    }
+
     @PostMapping("/{movieId}/stream/release")
     public ResponseEntity<ApiResponse<Void>> release(
             @PathVariable UUID movieId,
             @RequestHeader("X-Viewing-Device-Id") String deviceId) {
         movieStreamService.release(movieId, userId(), deviceId);
+        return ResponseEntity.ok(ApiResponse.success("Viewing session released", null));
+    }
+
+    @PostMapping("/{movieId}/stream/{bookingId}/release")
+    public ResponseEntity<ApiResponse<Void>> releaseBooking(
+            @PathVariable UUID movieId,
+            @PathVariable UUID bookingId,
+            @RequestHeader("X-Viewing-Device-Id") String deviceId) {
+        movieStreamService.releaseBooking(movieId, bookingId, userId(), deviceId);
         return ResponseEntity.ok(ApiResponse.success("Viewing session released", null));
     }
 

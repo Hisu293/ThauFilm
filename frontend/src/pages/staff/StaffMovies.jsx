@@ -113,7 +113,8 @@ const StaffMovies = () => {
   };
 
   const openEdit = (movie) => {
-    setForm({ ...emptyForm, ...movie, trailerUrl: movie?.trailerKey || movie?.trailerUrl || '' });
+    setForm({ ...emptyForm, ...movie, originalDurationMinutes: movie.durationMinutes,
+      trailerUrl: movie?.trailerKey || movie?.trailerUrl || '' });
     setDialog({ mode: 'edit', movie });
   };
 
@@ -123,9 +124,16 @@ const StaffMovies = () => {
   };
 
   const handleSave = async () => {
+    const durationChanged = Number(form.durationMinutes) !== Number(form.originalDurationMinutes);
+    if (durationChanged && !window.confirm(
+      'Thời lượng phim đã thay đổi. Cập nhật lại endTime của tất cả suất chiếu tương lai theo thời lượng mới + 1 phút?'
+    )) return;
     setSaving(true);
     try {
-      const updated = await staffMovieService.update(dialog.movie.id, form);
+      const updated = await staffMovieService.update(dialog.movie.id, {
+        ...form,
+        updateFutureShowtimes: durationChanged,
+      });
       setMovies((list) => list.map((m) => (m.id === updated.id ? updated : m)));
       setToast({ severity: 'success', message: 'Cập nhật phim thành công.' });
       setDialog(null);

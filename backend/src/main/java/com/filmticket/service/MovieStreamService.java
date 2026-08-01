@@ -13,9 +13,11 @@ import com.filmticket.repository.MovieRepository;
 import com.filmticket.repository.OnlineMovieViewRepository;
 import com.filmticket.repository.OnlineViewingSessionRepository;
 import com.filmticket.repository.ShowtimeRepository;
+import com.filmticket.model.ShowtimeStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.transaction.annotation.Transactional;
 
 import javax.crypto.Mac;
@@ -100,10 +102,14 @@ public class MovieStreamService {
                     .orElseThrow(() -> new BadRequestException("Booking not found"));
             streamingShowtime = showtimeRepository.findById(streamingBooking.getShowtimeId())
                     .orElseThrow(() -> new BadRequestException("Showtime not found"));
+            validateStreamingAccess(streamingBooking, streamingShowtime, movieId, userId,
+                    LocalDateTime.now(VIETNAM_ZONE));
             accessExpiresAt = streamingShowtime.getEndTime().atZone(VIETNAM_ZONE).toInstant();
             acquireViewingSession(streamingBooking, movieId, userId, normalizedDeviceId);
         }
-        MovieStreamResponse response = buildResponse(movie, accessExpiresAt);
+        MovieStreamResponse response = buildResponse(movie, accessExpiresAt,
+                streamingBooking == null ? null : streamingBooking.getId(),
+                streamingShowtime == null ? null : streamingShowtime.getId());
         if (streamingBooking != null && streamingShowtime != null) {
             recordView(userId, movieId, streamingBooking.getId(), streamingShowtime.getId());
         }
@@ -131,20 +137,21 @@ public class MovieStreamService {
         if (now.isBefore(showtime.getStartTime()) || !now.isBefore(showtime.getEndTime())) {
             throw new BadRequestException("Chỉ có thể xem phim trong thời gian của suất chiếu đã thanh toán");
         }
+        validateStreamingAccess(booking, showtime, movie.getId(), userId, LocalDateTime.now(VIETNAM_ZONE));
         acquireViewingSession(booking, movie.getId(), userId, normalizedDeviceId);
         MovieStreamResponse response = buildResponse(
-                movie, showtime.getEndTime().atZone(VIETNAM_ZONE).toInstant());
+                movie, showtime.getEndTime().atZone(VIETNAM_ZONE).toInstant(), bookingId, showtimeId);
         recordView(userId, movie.getId(), bookingId, showtimeId);
         return response;
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = BadRequestException.class)
     public void heartbeat(UUID movieId, UUID userId, String deviceId) {
         OnlineViewingSession session = onlineViewingSessionRepository
                 .findByUserIdAndMovieIdAndDeviceId(userId, movieId, requireDeviceId(deviceId))
                 .orElseThrow(() -> new BadRequestException(
                         "Phiên xem không còn hiệu lực. Vui lòng mở lại phim."));
-        session.setLastHeartbeatAt(LocalDateTime.now(VIETNAM_ZONE));
+        heartbeatSession(session, movieId, userId);
     }
 
     @Transactional
@@ -154,10 +161,19 @@ public class MovieStreamService {
                 .ifPresent(onlineViewingSessionRepository::delete);
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = BadRequestException.class)
     public void heartbeatBooking(UUID bookingId, UUID userId, String deviceId) {
         OnlineViewingSession session = requireOwnedBookingSession(bookingId, userId, deviceId);
-        session.setLastHeartbeatAt(LocalDateTime.now(VIETNAM_ZONE));
+        heartbeatSession(session, session.getMovieId(), userId);
+    }
+
+    @Transactional(noRollbackFor = BadRequestException.class)
+    public void heartbeatBooking(UUID movieId, UUID bookingId, UUID userId, String deviceId) {
+        OnlineViewingSession session = requireOwnedBookingSession(bookingId, userId, deviceId);
+        if (!session.getMovieId().equals(movieId)) {
+            revokeSession(session, "Phiên xem không thuộc phim này");
+        }
+        heartbeatSession(session, movieId, userId);
     }
 
     @Transactional
@@ -168,6 +184,73 @@ public class MovieStreamService {
                 && session.getDeviceId().equals(requireDeviceId(deviceId))) {
             onlineViewingSessionRepository.delete(session);
         }
+    }
+
+    @Transactional
+    public void releaseBooking(UUID movieId, UUID bookingId, UUID userId, String deviceId) {
+        OnlineViewingSession session = onlineViewingSessionRepository.findByBookingId(bookingId).orElse(null);
+        if (session != null && session.getMovieId().equals(movieId)
+                && session.getUserId().equals(userId)
+                && session.getDeviceId().equals(requireDeviceId(deviceId))) {
+            onlineViewingSessionRepository.delete(session);
+        }
+    }
+
+    private void heartbeatSession(OnlineViewingSession session, UUID movieId, UUID userId) {
+        Booking booking = bookingRepository.findById(session.getBookingId()).orElse(null);
+        Showtime showtime = booking == null ? null : showtimeRepository.findById(booking.getShowtimeId()).orElse(null);
+        try {
+            if (booking == null || showtime == null) {
+                throw new BadRequestException("Booking hoặc suất chiếu không còn tồn tại");
+            }
+            validateStreamingAccess(booking, showtime, movieId, userId, LocalDateTime.now(VIETNAM_ZONE));
+            session.setLastHeartbeatAt(LocalDateTime.now(VIETNAM_ZONE));
+        } catch (BadRequestException ex) {
+            revokeSession(session, ex.getMessage());
+        }
+    }
+
+    private void revokeSession(OnlineViewingSession session, String reason) {
+        onlineViewingSessionRepository.delete(session);
+        onlineViewingSessionRepository.flush();
+        throw new BadRequestException(reason + ". Phiên xem đã được thu hồi.");
+    }
+
+    private void validateStreamingAccess(Booking booking, Showtime showtime, UUID movieId,
+                                         UUID userId, LocalDateTime now) {
+        if (!booking.getUserId().equals(userId) || booking.getStatus() != BookingStatus.CONFIRMED) {
+            throw new BadRequestException("Booking không hợp lệ hoặc chưa thanh toán");
+        }
+        if (!booking.getShowtimeId().equals(showtime.getId()) || !showtime.getMovieId().equals(movieId)) {
+            throw new BadRequestException("Booking không thuộc phim hoặc suất chiếu này");
+        }
+        if (!showtime.isOnline() || showtime.getStatus() == ShowtimeStatus.CANCELLED) {
+            throw new BadRequestException("Suất chiếu online đã bị hủy hoặc không còn khả dụng");
+        }
+        if (now.isBefore(showtime.getStartTime())) {
+            throw new BadRequestException("Chưa đến giờ xem của suất chiếu đã đặt");
+        }
+        if (!now.isBefore(showtime.getEndTime())) {
+            throw new BadRequestException("Suất chiếu đã kết thúc");
+        }
+    }
+
+    @Scheduled(fixedDelayString = "${app.streaming.session-cleanup-ms:30000}")
+    @Transactional
+    public void revokeExpiredSessions() {
+        LocalDateTime now = LocalDateTime.now(VIETNAM_ZONE);
+        List<OnlineViewingSession> expired = onlineViewingSessionRepository.findAll().stream()
+                .filter(session -> {
+                    Booking booking = bookingRepository.findById(session.getBookingId()).orElse(null);
+                    if (booking == null || booking.getStatus() != BookingStatus.CONFIRMED) return true;
+                    Showtime showtime = showtimeRepository.findById(booking.getShowtimeId()).orElse(null);
+                    return showtime == null || !showtime.isOnline()
+                            || showtime.getStatus() == ShowtimeStatus.CANCELLED
+                            || !showtime.getMovieId().equals(session.getMovieId())
+                            || !now.isBefore(showtime.getEndTime());
+                })
+                .toList();
+        if (!expired.isEmpty()) onlineViewingSessionRepository.deleteAll(expired);
     }
 
     private OnlineViewingSession requireOwnedBookingSession(UUID bookingId, UUID userId, String deviceId) {
@@ -251,6 +334,11 @@ public class MovieStreamService {
     }
 
     public MovieStreamResponse buildResponse(Movie movie, Instant accessExpiresAt) {
+        return buildResponse(movie, accessExpiresAt, null, null);
+    }
+
+    public MovieStreamResponse buildResponse(Movie movie, Instant accessExpiresAt,
+                                             UUID bookingId, UUID showtimeId) {
         String streamKey = blankToNull(movie.getStreamKey());
         if (streamKey == null) {
             throw new BadRequestException("Online stream is not configured for this movie");
@@ -266,9 +354,11 @@ public class MovieStreamService {
                 : publicStream ? buildPublicS3Url(streamKey) : presignS3Url(streamKey, expiresAt);
         return MovieStreamResponse.builder()
                 .movieId(movie.getId())
+                .bookingId(bookingId)
+                .showtimeId(showtimeId)
                 .title(movie.getTitle())
                 .streamUrl(streamUrl)
-                .expiresAt(isAbsoluteUrl(streamKey) || publicStream ? null : expiresAt)
+                .expiresAt(accessExpiresAt == null ? expiresAt : accessExpiresAt)
                 .provider(provider)
                 .build();
     }

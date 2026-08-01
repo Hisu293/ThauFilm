@@ -55,6 +55,7 @@ export default function WatchPartyPage() {
   const [error, setError] = useState('');
   const [inviteCopied, setInviteCopied] = useState(false);
   const [streamUrl, setStreamUrl] = useState('');
+  const [streamExpiresAt, setStreamExpiresAt] = useState('');
   const [membersExpanded, setMembersExpanded] = useState(false);
   const [refundMethod, setRefundMethod] = useState('MANUAL');
   const [refundOpen, setRefundOpen] = useState(false);
@@ -102,6 +103,7 @@ export default function WatchPartyPage() {
   useEffect(() => {
     if (!room?.readyToWatch || !me?.paid) {
       setStreamUrl('');
+      setStreamExpiresAt('');
       playbackReady.current = false;
       return;
     }
@@ -110,6 +112,7 @@ export default function WatchPartyPage() {
       .then((stream) => {
         if (!cancelled) {
           setStreamUrl(stream?.streamUrl || '');
+          setStreamExpiresAt(stream?.expiresAt || '');
           setError('');
         }
       })
@@ -120,11 +123,24 @@ export default function WatchPartyPage() {
   }, [me?.paid, room?.readyToWatch, roomId]);
 
   useEffect(() => {
+    if (!streamUrl || !streamExpiresAt) return undefined;
+    const expiresAt = new Date(streamExpiresAt).getTime();
+    const timeout = window.setTimeout(() => {
+      setStreamUrl('');
+      setStreamExpiresAt('');
+      setError('Suất chiếu đã kết thúc. Phiên xem phim nhóm đã được thu hồi.');
+      watchPartyService.releaseStream(roomId).catch(() => {});
+    }, Number.isFinite(expiresAt) ? Math.max(0, expiresAt - Date.now()) : 0);
+    return () => window.clearTimeout(timeout);
+  }, [roomId, streamExpiresAt, streamUrl]);
+
+  useEffect(() => {
     if (!streamUrl || !roomId) return undefined;
     const heartbeat = () => {
       watchPartyService.heartbeatStream(roomId).catch((err) => {
         setError(err.message || 'Phiên xem phim nhóm không còn hiệu lực.');
         setStreamUrl('');
+        setStreamExpiresAt('');
       });
     };
     const interval = window.setInterval(heartbeat, 25000);

@@ -22,11 +22,11 @@ export const movieStreamService = {
   getMovieStream: (movieId) => api
     .get(`/api/member/movies/${movieId}/stream`, viewingConfig())
     .then(unwrap),
-  heartbeat: (movieId) => api
-    .post(`/api/member/movies/${movieId}/stream/heartbeat`, null, viewingConfig())
+  heartbeat: (movieId, bookingId) => api
+    .post(`/api/member/movies/${movieId}/stream/${bookingId}/heartbeat`, null, viewingConfig())
     .then(unwrap),
-  release: (movieId) => api
-    .post(`/api/member/movies/${movieId}/stream/release`, null, viewingConfig())
+  release: (movieId, bookingId) => api
+    .post(`/api/member/movies/${movieId}/stream/${bookingId}/release`, null, viewingConfig())
     .then(unwrap),
   getWatchPartyStream: (roomId) => api
     .get(`/api/member/watch-parties/${roomId}/stream`, viewingConfig())

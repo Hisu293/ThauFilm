@@ -11,6 +11,7 @@ export const MOVIE_FIELDS = [
   'title',
   'description',
   'durationMinutes',
+  'updateFutureShowtimes',
   'rating',
   'active',
   'posterUrl',

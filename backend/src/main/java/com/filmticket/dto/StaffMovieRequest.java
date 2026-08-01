@@ -42,6 +42,8 @@ public class StaffMovieRequest {
     @Min(value = 1, message = "Duration must be greater than 0")
     private Integer durationMinutes;
 
+    private Boolean updateFutureShowtimes;
+
     @DecimalMin(value = "0.0", inclusive = true, message = "Rating must be at least 0")
     @DecimalMax(value = "10.0", inclusive = true, message = "Rating must be at most 10")
     private BigDecimal rating;

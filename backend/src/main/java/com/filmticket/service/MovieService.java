@@ -33,6 +33,7 @@ public class MovieService {
     private final MovieEventService movieEventService;
     private final S3PresignedUrlService s3PresignedUrlService;
     private final AuditLogService auditLogService;
+    private final ShowtimeDurationSyncService showtimeDurationSyncService;
 
     @Transactional(readOnly = true)
     public List<MovieResponse> getAllMovies() {
@@ -123,7 +124,10 @@ public class MovieService {
         Movie movie = getMovieEntityOrThrow(movieId);
         Map<String, Object> oldValues = movieAuditValues(movie);
         String oldStreamKey = movie.getStreamKey();
+        Integer oldDurationMinutes = movie.getDurationMinutes();
         validateTitleUniqueness(request.getTitle(), movieId);
+        showtimeDurationSyncService.syncFutureShowtimes(movieId, oldDurationMinutes,
+                request.getDurationMinutes(), Boolean.TRUE.equals(request.getUpdateFutureShowtimes()));
 
         movie.setTitle(normalize(request.getTitle()));
         movie.setDescription(normalizeNullable(request.getDescription()));
@@ -241,6 +245,8 @@ public class MovieService {
         @NotNull(message = "Duration is required")
         @Min(value = 1, message = "Duration must be greater than 0")
         private Integer durationMinutes;
+
+        private Boolean updateFutureShowtimes;
 
         @NotNull(message = "Rating is required")
         @DecimalMin(value = "0.0", inclusive = true, message = "Rating must be at least 0")

@@ -210,7 +210,7 @@ public class AdminIntelligenceService {
                 if (movie == null || movie.getDurationMinutes() == null) {
                     continue;
                 }
-                endTime = item.startTime().plusMinutes(movie.getDurationMinutes()).plusMinutes(5);
+                endTime = item.startTime().plusMinutes(movie.getDurationMinutes()).plusMinutes(1);
             }
 
             if (!online) {

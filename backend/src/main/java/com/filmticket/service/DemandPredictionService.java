@@ -36,7 +36,7 @@ import java.util.function.Predicate;
 @Service
 @RequiredArgsConstructor
 public class DemandPredictionService {
-    private static final int CLEANUP_MINUTES = 15;
+    private static final int CLEANUP_MINUTES = 1;
     private static final LocalTime OPENING_TIME = LocalTime.of(9, 0);
     private static final LocalTime LAST_START_TIME = LocalTime.of(22, 30);
     private static final int SLOT_STEP_MINUTES = 30;

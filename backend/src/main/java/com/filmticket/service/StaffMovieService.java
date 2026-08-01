@@ -18,6 +18,7 @@ public class StaffMovieService {
 
     private final MovieRepository movieRepository;
     private final S3PresignedUrlService s3PresignedUrlService;
+    private final ShowtimeDurationSyncService showtimeDurationSyncService;
 
     public List<MovieResponse> listMovies() {
         return movieRepository.findAll().stream()
@@ -28,6 +29,11 @@ public class StaffMovieService {
     public MovieResponse getMovie(UUID movieId) {
         Movie movie = movieRepository.findById(movieId)
                 .orElseThrow(() -> new BadRequestException("Movie not found"));
+
+        if (request.getDurationMinutes() != null) {
+            showtimeDurationSyncService.syncFutureShowtimes(movieId, movie.getDurationMinutes(),
+                    request.getDurationMinutes(), Boolean.TRUE.equals(request.getUpdateFutureShowtimes()));
+        }
         return MovieResponse.fromMovieWithStream(movie, resolvePosterUrl(movie), resolveTrailerUrl(movie));
     }
 

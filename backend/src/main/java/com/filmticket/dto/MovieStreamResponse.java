@@ -10,6 +10,8 @@ import java.util.UUID;
 @Builder
 public class MovieStreamResponse {
     UUID movieId;
+    UUID bookingId;
+    UUID showtimeId;
     String title;
     String streamUrl;
     Instant expiresAt;

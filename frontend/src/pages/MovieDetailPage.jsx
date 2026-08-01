@@ -105,6 +105,7 @@ const MovieDetailPage = () => {
   const [openOnlineMovie, setOpenOnlineMovie] = useState(false);
   const [onlineStreamUrl, setOnlineStreamUrl] = useState('');
   const [streamExpiresAt, setStreamExpiresAt] = useState('');
+  const [streamBookingId, setStreamBookingId] = useState('');
   const [streamLoading, setStreamLoading] = useState(false);
   const [streamError, setStreamError] = useState('');
   const [creatingWatchParty, setCreatingWatchParty] = useState(false);
@@ -167,9 +168,11 @@ const MovieDetailPage = () => {
       const stream = await movieStreamService.getMovieStream(movie.id);
       setOnlineStreamUrl(stream?.streamUrl || '');
       setStreamExpiresAt(stream?.expiresAt || '');
+      setStreamBookingId(stream?.bookingId || '');
     } catch (err) {
       setOnlineStreamUrl('');
       setStreamExpiresAt('');
+      setStreamBookingId('');
       setStreamError(err.message || 'Không thể lấy link xem phim online.');
     } finally {
       setStreamLoading(false);
@@ -180,6 +183,7 @@ const MovieDetailPage = () => {
     setOpenOnlineMovie(false);
     setOnlineStreamUrl('');
     setStreamExpiresAt('');
+    setStreamBookingId('');
   }, []);
 
   useEffect(() => {
@@ -189,20 +193,22 @@ const MovieDetailPage = () => {
     const timeout = window.setTimeout(() => {
       setOnlineStreamUrl('');
       setStreamExpiresAt('');
+      setStreamBookingId('');
       setStreamError('Đã hết thời gian xem phim của suất chiếu này.');
     }, Number.isFinite(expiresMs) ? Math.max(0, remainingMs) : 0);
     return () => window.clearTimeout(timeout);
   }, [openOnlineMovie, streamExpiresAt]);
 
   useEffect(() => {
-    if (!openOnlineMovie || !onlineStreamUrl || !movie?.id) return undefined;
+    if (!openOnlineMovie || !onlineStreamUrl || !movie?.id || !streamBookingId) return undefined;
 
     let active = true;
     const heartbeat = () => {
-      movieStreamService.heartbeat(movie.id).catch((err) => {
+      movieStreamService.heartbeat(movie.id, streamBookingId).catch((err) => {
         if (!active) return;
         setOnlineStreamUrl('');
         setStreamExpiresAt('');
+        setStreamBookingId('');
         setStreamError(err.message || 'Phiên xem đã kết thúc. Vui lòng mở lại phim.');
       });
     };
@@ -211,9 +217,9 @@ const MovieDetailPage = () => {
     return () => {
       active = false;
       window.clearInterval(interval);
-      movieStreamService.release(movie.id).catch(() => {});
+      movieStreamService.release(movie.id, streamBookingId).catch(() => {});
     };
-  }, [movie?.id, onlineStreamUrl, openOnlineMovie]);
+  }, [movie?.id, onlineStreamUrl, openOnlineMovie, streamBookingId]);
 
   useEffect(() => {
     if (!movie || autoWatchStarted || searchParams.get('watch') !== '1') return;

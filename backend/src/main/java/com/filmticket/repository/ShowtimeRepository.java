@@ -21,13 +21,16 @@ public interface ShowtimeRepository extends JpaRepository<Showtime, UUID> {
             @Param("newStartTime") LocalDateTime newStartTime,
             @Param("newEndTime") LocalDateTime newEndTime);
 
-    @Query("SELECT s FROM Showtime s WHERE s.cinemaRoomId = :cinemaRoomId AND s.startTime < :newEndTime AND s.endTime > :newStartTime AND s.id != :excludeId")
+    @Query("SELECT s FROM Showtime s WHERE s.cinemaRoomId = :cinemaRoomId " +
+            "AND s.status <> com.filmticket.model.ShowtimeStatus.CANCELLED " +
+            "AND s.startTime < :newEndTime AND s.endTime > :newStartTime AND s.id != :excludeId")
     List<Showtime> findOverlappingShowtimesExcluding(@Param("cinemaRoomId") UUID cinemaRoomId,
             @Param("newStartTime") LocalDateTime newStartTime,
             @Param("newEndTime") LocalDateTime newEndTime,
             @Param("excludeId") UUID excludeId);
 
     List<Showtime> findByMovieIdOrderByStartTimeAsc(UUID movieId);
+    List<Showtime> findByMovieIdAndStartTimeAfterOrderByStartTimeAsc(UUID movieId, LocalDateTime startTime);
     List<Showtime> findByMovieIdAndOnlineTrueOrderByStartTimeAsc(UUID movieId);
 
     @Query("SELECT s FROM Showtime s WHERE DATE(s.startTime) = :date ORDER BY s.startTime ASC")
@@ -51,7 +54,8 @@ public interface ShowtimeRepository extends JpaRepository<Showtime, UUID> {
     @Query("SELECT s FROM Showtime s, Booking b WHERE b.showtimeId = s.id " +
             "AND b.userId = :userId AND b.status = com.filmticket.entity.BookingStatus.CONFIRMED " +
             "AND s.movieId = :movieId AND s.online = true " +
-            "AND s.startTime <= :now AND s.endTime >= :now " +
+            "AND s.status <> com.filmticket.model.ShowtimeStatus.CANCELLED " +
+            "AND s.startTime <= :now AND s.endTime > :now " +
             "ORDER BY s.endTime ASC")
     List<Showtime> findEligibleStreamingShowtimes(@Param("userId") UUID userId,
                                                   @Param("movieId") UUID movieId,

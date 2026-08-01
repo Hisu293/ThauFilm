@@ -126,7 +126,28 @@ export const MoviesSection = ({ crud, genres = [] }) => {
 
   const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
 
-  const selectStreamFile = (event) => {
+  const readVideoDurationMinutes = (file) => new Promise((resolve, reject) => {
+    const video = document.createElement('video');
+    const objectUrl = URL.createObjectURL(file);
+    const cleanup = () => {
+      URL.revokeObjectURL(objectUrl);
+      video.removeAttribute('src');
+    };
+    video.preload = 'metadata';
+    video.onloadedmetadata = () => {
+      const seconds = Number(video.duration);
+      cleanup();
+      if (!Number.isFinite(seconds) || seconds <= 0) reject(new Error('Không đọc được thời lượng video.'));
+      else resolve({ seconds, minutes: Math.max(1, Math.ceil(seconds / 60)) });
+    };
+    video.onerror = () => {
+      cleanup();
+      reject(new Error('Trình duyệt không đọc được metadata của định dạng video này.'));
+    };
+    video.src = objectUrl;
+  });
+
+  const selectStreamFile = async (event) => {
     const file = event.target.files?.[0] || null;
     if (file && (!file.type.startsWith('video/') || file.size > 500 * 1024 * 1024)) {
       setFormError('Chỉ nhận file video tối đa 500MB.');
@@ -137,6 +158,19 @@ export const MoviesSection = ({ crud, genres = [] }) => {
     if (!file) return;
     setStreamUploading(true);
     setStreamUploadProgress(0);
+    try {
+      const metadata = await readVideoDurationMinutes(file);
+      setForm((current) => ({
+        ...current,
+        durationMinutes: metadata.minutes,
+        videoDurationNotice: `Video dài ${Math.floor(metadata.seconds / 60)} phút ${Math.round(metadata.seconds % 60)} giây; làm tròn lên ${metadata.minutes} phút.`,
+      }));
+    } catch (err) {
+      setStreamUploading(false);
+      setFormError(`${err.message} Không upload để tránh tạo suất chiếu sai thời lượng.`);
+      event.target.value = '';
+      return;
+    }
     crud.uploadStreamFile(file, setStreamUploadProgress)
       .then((streamKey) => {
         setForm((current) => ({
@@ -164,7 +198,8 @@ export const MoviesSection = ({ crud, genres = [] }) => {
     try {
       const detail = await crud.getById(row.id);
       const movie = detail || row;
-      setForm({ ...emptyMovie, ...movie, trailerUrl: movie?.trailerKey || movie?.trailerUrl || '' });
+      setForm({ ...emptyMovie, ...movie, originalDurationMinutes: movie.durationMinutes,
+        trailerUrl: movie?.trailerKey || movie?.trailerUrl || '' });
       setFormError(null);
       setDialog(row.id);
     } catch (err) {
@@ -182,7 +217,13 @@ export const MoviesSection = ({ crud, genres = [] }) => {
     setFormError(null);
     try {
       if (dialog === 'add') await crud.add(form);
-      else await crud.update(dialog, form);
+      else {
+        const durationChanged = Number(form.durationMinutes) !== Number(form.originalDurationMinutes);
+        if (durationChanged && !window.confirm(
+          'Thời lượng phim đã thay đổi. Cập nhật lại endTime của tất cả suất chiếu tương lai theo thời lượng mới + 1 phút?'
+        )) return;
+        await crud.update(dialog, { ...form, updateFutureShowtimes: durationChanged });
+      }
       setPage(0);
       setDialog(null);
       // Force reload danh sách phim sau khi lưu
@@ -440,6 +481,7 @@ export const MoviesSection = ({ crud, genres = [] }) => {
         <Typography variant="caption" color="text.secondary">
           File sẽ được upload trực tiếp lên S3 ngay khi chọn. Khuyến nghị MP4/WebM, tối đa 500MB.
         </Typography>
+        {form.videoDurationNotice && <Alert severity="info">{form.videoDurationNotice}</Alert>}
           </Stack>
         </Box>
         <FormControlLabel
