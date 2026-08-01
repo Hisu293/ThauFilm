@@ -1025,11 +1025,11 @@ export const PaymentPage = () => {
                   </Typography>
                 </Box>
 
-                <Typography variant="caption" color="text.secondary">
-                  {isOnlineMovieBooking
-                    ? 'Vé online không giữ ghế và không áp dụng combo/mã giảm giá. Quyền xem được mở trong đúng khung giờ suất chiếu sau khi thanh toán.'
-                    : 'Combo được ghi vào booking qua API tạo đơn; mã giảm giá được backend kiểm tra lại khi xác nhận thanh toán. Số tiền cuối cùng lấy theo kết quả API thanh toán.'}
-                </Typography>
+                {isOnlineMovieBooking && (
+                  <Typography variant="caption" color="text.secondary">
+                    Vé online không giữ ghế và không áp dụng combo/mã giảm giá. Quyền xem được mở trong đúng khung giờ suất chiếu sau khi thanh toán.
+                  </Typography>
+                )}
 
                 <CustomButton fullWidth variant="primary" size="large" onClick={handlePay} disabled={apiLoading} sx={{ py: 1.8, mt: 2 }}>
                   Xác nhận thanh toán
