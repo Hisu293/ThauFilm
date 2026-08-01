@@ -35,6 +35,7 @@ import FilterAltOffRoundedIcon from '@mui/icons-material/FilterAltOffRounded';
 import SectionHeader from '../components/SectionHeader';
 import StatusChip from '../components/StatusChip';
 import UploadFile from '../../components/UploadFile';
+import ConfirmationDialog from '../../components/common/ConfirmationDialog';
 
 const emptyMovie = {
   title: '',
@@ -82,6 +83,7 @@ export const MoviesSection = ({ crud, genres = [] }) => {
   const [statusFilter, setStatusFilter] = useState('');
   const [activeFilter, setActiveFilter] = useState(''); // '' | 'active' | 'hidden'
   const [page, setPage] = useState(0);
+  const [durationConfirmOpen, setDurationConfirmOpen] = useState(false);
 
   const genreOptions = useMemo(() => {
     const configured = genres
@@ -208,7 +210,7 @@ export const MoviesSection = ({ crud, genres = [] }) => {
       setEditLoadingId(null);
     }
   };
-  const save = async () => {
+  const performSave = async (updateFutureShowtimes = false) => {
     if (streamUploading || hasMediaUpload) {
       setFormError('Vui lòng chờ tất cả ảnh và video upload lên S3 hoàn tất trước khi lưu.');
       return;
@@ -217,13 +219,7 @@ export const MoviesSection = ({ crud, genres = [] }) => {
     setFormError(null);
     try {
       if (dialog === 'add') await crud.add(form);
-      else {
-        const durationChanged = Number(form.durationMinutes) !== Number(form.originalDurationMinutes);
-        if (durationChanged && !window.confirm(
-          'Thời lượng phim đã thay đổi. Cập nhật lại endTime của tất cả suất chiếu tương lai theo thời lượng mới + 1 phút?'
-        )) return;
-        await crud.update(dialog, { ...form, updateFutureShowtimes: durationChanged });
-      }
+      else await crud.update(dialog, { ...form, updateFutureShowtimes });
       setPage(0);
       setDialog(null);
       // Force reload danh sách phim sau khi lưu
@@ -233,6 +229,15 @@ export const MoviesSection = ({ crud, genres = [] }) => {
     } finally {
       setSaving(false);
     }
+  };
+  const save = () => {
+    const durationChanged = dialog !== 'add'
+      && Number(form.durationMinutes) !== Number(form.originalDurationMinutes);
+    if (durationChanged) {
+      setDurationConfirmOpen(true);
+      return;
+    }
+    performSave(false);
   };
   const handleDelete = async (id) => {
     if (!window.confirm('Ẩn phim này? (xóa mềm — chỉ chuyển trạng thái, không xóa khỏi hệ thống)')) return;
@@ -490,6 +495,19 @@ export const MoviesSection = ({ crud, genres = [] }) => {
           sx={{ mt: 1 }}
         />
       </EntityDialog>
+      <ConfirmationDialog
+        open={durationConfirmOpen}
+        title="Xác nhận cập nhật thời lượng"
+        description="Thời lượng phim đã thay đổi. Hệ thống sẽ cập nhật endTime của tất cả suất chiếu tương lai theo thời lượng mới cộng thêm 1 phút. Bạn muốn tiếp tục?"
+        confirmText="Cập nhật"
+        cancelText="Hủy"
+        loading={saving}
+        onCancel={() => setDurationConfirmOpen(false)}
+        onConfirm={() => {
+          setDurationConfirmOpen(false);
+          performSave(true);
+        }}
+      />
     </>
   );
 };

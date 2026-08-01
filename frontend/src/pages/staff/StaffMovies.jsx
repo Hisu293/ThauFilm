@@ -37,6 +37,7 @@ import MovieFilterRoundedIcon from '@mui/icons-material/MovieFilterRounded';
 import OpenInNewRoundedIcon from '@mui/icons-material/OpenInNewRounded';
 import { staffMovieService } from '../../services/staffMovieService';
 import useStaffList from '../../hooks/useStaffList';
+import ConfirmationDialog from '../../components/common/ConfirmationDialog';
 
 // Nhãn tiếng Việt + màu cho trạng thái phát hành
 const STATUS_META = {
@@ -76,6 +77,7 @@ const StaffMovies = () => {
   const [movies, setMovies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [durationConfirmOpen, setDurationConfirmOpen] = useState(false);
 
   // dialog: { mode: 'view' | 'edit', movie }
   const [dialog, setDialog] = useState(null);
@@ -123,16 +125,12 @@ const StaffMovies = () => {
     setDialog(null);
   };
 
-  const handleSave = async () => {
-    const durationChanged = Number(form.durationMinutes) !== Number(form.originalDurationMinutes);
-    if (durationChanged && !window.confirm(
-      'Thời lượng phim đã thay đổi. Cập nhật lại endTime của tất cả suất chiếu tương lai theo thời lượng mới + 1 phút?'
-    )) return;
+  const performSave = async (updateFutureShowtimes = false) => {
     setSaving(true);
     try {
       const updated = await staffMovieService.update(dialog.movie.id, {
         ...form,
-        updateFutureShowtimes: durationChanged,
+        updateFutureShowtimes,
       });
       setMovies((list) => list.map((m) => (m.id === updated.id ? updated : m)));
       setToast({ severity: 'success', message: 'Cập nhật phim thành công.' });
@@ -142,6 +140,14 @@ const StaffMovies = () => {
     } finally {
       setSaving(false);
     }
+  };
+  const handleSave = () => {
+    const durationChanged = Number(form.durationMinutes) !== Number(form.originalDurationMinutes);
+    if (durationChanged) {
+      setDurationConfirmOpen(true);
+      return;
+    }
+    performSave(false);
   };
 
   const {
@@ -406,6 +412,20 @@ const StaffMovies = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <ConfirmationDialog
+        open={durationConfirmOpen}
+        title="Xác nhận cập nhật thời lượng"
+        description="Thời lượng phim đã thay đổi. Hệ thống sẽ cập nhật endTime của tất cả suất chiếu tương lai theo thời lượng mới cộng thêm 1 phút. Bạn muốn tiếp tục?"
+        confirmText="Cập nhật"
+        cancelText="Hủy"
+        loading={saving}
+        onCancel={() => setDurationConfirmOpen(false)}
+        onConfirm={() => {
+          setDurationConfirmOpen(false);
+          performSave(true);
+        }}
+      />
 
       <Snackbar
         open={!!toast}
