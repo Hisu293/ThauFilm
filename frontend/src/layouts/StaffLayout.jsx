@@ -31,7 +31,6 @@ import AssessmentRoundedIcon from '@mui/icons-material/AssessmentRounded';
 import LogoutRoundedIcon from '@mui/icons-material/LogoutRounded';
 import LightModeRoundedIcon from '@mui/icons-material/LightModeRounded';
 import DarkModeRoundedIcon from '@mui/icons-material/DarkModeRounded';
-import NotificationsNoneRoundedIcon from '@mui/icons-material/NotificationsNoneRounded';
 import ArrowBackRoundedIcon from '@mui/icons-material/ArrowBackRounded';
 import DashboardRoundedIcon from '@mui/icons-material/DashboardRounded';
 import PunchClockRoundedIcon from '@mui/icons-material/PunchClockRounded';
@@ -41,6 +40,7 @@ import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import { useAuth } from '../context/AuthContext';
 import cinemaTheme from '../theme/cinemaTheme';
 import refundService from '../services/refundService';
+import NotificationBell from '../components/NotificationBell';
 
 const drawerWidth = 280;
 
@@ -325,9 +325,7 @@ const StaffLayout = () => {
                 {mode === 'dark' ? <LightModeRoundedIcon /> : <DarkModeRoundedIcon />}
               </IconButton>
               
-              <IconButton sx={{ color: 'text.secondary' }}>
-                <NotificationsNoneRoundedIcon />
-              </IconButton>
+              <NotificationBell />
               
             </Toolbar>
           </AppBar>

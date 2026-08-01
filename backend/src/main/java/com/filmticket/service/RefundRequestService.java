@@ -594,7 +594,8 @@ public class RefundRequestService {
 
     private void notifyAdmins(String title, String message) {
         userRepository.findAll().stream().filter(user -> user.getRole() == User.Role.ADMIN)
-                .forEach(user -> realtimeEventService.notifyUser(user.getId(), "REFUND_APPROVAL", title, message, "/admin"));
+                .forEach(user -> realtimeEventService.notifyUser(user.getId(), "REFUND_APPROVAL", title, message,
+                        "/admin?view=refunds"));
     }
 
     private List<RefundRequestDto> enrich(List<RefundRequest> requests) {

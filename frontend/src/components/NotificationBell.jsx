@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { connectRealtime } from '../services/realtimeService';
 import notificationService from '../services/notificationService';
 
-export default function NotificationBell() {
+export default function NotificationBell({ onNavigate }) {
   const navigate = useNavigate();
   const [anchor, setAnchor] = useState(null);
   const [notifications, setNotifications] = useState([]);
@@ -44,7 +44,10 @@ export default function NotificationBell() {
   const select = (item) => {
     setAnchor(null);
     if (!item.readAt) notificationService.markRead(item.id).catch(() => undefined);
-    if (item.link) navigate(item.link);
+    if (item.link) {
+      if (onNavigate) onNavigate(item.link, item);
+      else navigate(item.link);
+    }
   };
 
   return <>

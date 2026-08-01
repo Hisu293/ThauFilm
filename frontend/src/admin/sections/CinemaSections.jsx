@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Box,
@@ -45,6 +45,7 @@ import {
 
 const thSx = { color: 'rgba(255,255,255,0.45)', fontWeight: 600 };
 const PAGE_SIZE = 10;
+const MAX_ROOM_CAPACITY = 500;
 const sortByLatest = (items = []) =>
   [...items].sort((a, b) => {
     const aTime = new Date(a.createdAt || a.updatedAt || a.startTime || 0).getTime();
@@ -234,6 +235,9 @@ export const RoomsSection = ({ crud, theaters, getTheaterName }) => {
   const [expandedRoom, setExpandedRoom] = useState(null);
   const [form, setForm] = useState(EMPTY_ROOM_FORM);
   const [page, setPage] = useState(1);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const savingRef = useRef(false);
 
   // Chỉ hiện rạp đang hoạt động (status === 'ACTIVE')
   const activeTheaters = theaters.filter((t) => t.status === 'ACTIVE');
@@ -247,6 +251,19 @@ export const RoomsSection = ({ crud, theaters, getTheaterName }) => {
   }, [crud.list.length, theaters.length]);
 
   const save = async () => {
+    if (savingRef.current) return;
+    const totalCapacity = Number(form.rowsCount) * Number(form.seatsPerRow);
+    if (dialog === 'add' && totalCapacity > MAX_ROOM_CAPACITY) {
+      setSaveError('Mỗi phòng chỉ được tạo tối đa 500 ghế.');
+      return;
+    }
+    if (dialog === 'add' && Number(form.standardSeats) + Number(form.vipSeats) + Number(form.coupleSeats) !== totalCapacity) {
+      setSaveError('Tổng số ghế thường, VIP và đôi phải bằng tổng số ghế của phòng.');
+      return;
+    }
+    savingRef.current = true;
+    setSaving(true);
+    setSaveError('');
     try {
       if (dialog === 'add') {
         await crud.add({ ...form, theaterId: String(form.theaterId), type: form.type ?? 'STANDARD', status: form.status ?? 'ACTIVE' });
@@ -258,6 +275,10 @@ export const RoomsSection = ({ crud, theaters, getTheaterName }) => {
       setForm({ ...EMPTY_ROOM_FORM, theaterId: activeTheaters[0]?.id || '' });
     } catch (err) {
       console.error('Lỗi khi lưu phòng:', err);
+      setSaveError(err?.response?.data?.message || 'Không thể lưu phòng. Vui lòng thử lại.');
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
     }
   };
 
@@ -286,7 +307,7 @@ export const RoomsSection = ({ crud, theaters, getTheaterName }) => {
 
   return (
     <>
-      <SectionHeader title="Phòng chiếu" subtitle="Thêm phòng và cấu hình ghế" onAction={() => { setForm({ ...EMPTY_ROOM_FORM, theaterId: activeTheaters[0]?.id || '' }); setDialog('add'); }} actionLabel="Thêm phòng" />
+      <SectionHeader title="Phòng chiếu" subtitle="Thêm phòng và cấu hình ghế" onAction={() => { setSaveError(''); setForm({ ...EMPTY_ROOM_FORM, theaterId: activeTheaters[0]?.id || '' }); setDialog('add'); }} actionLabel="Thêm phòng" />
       <Box className="admin-panel admin-animate-in" sx={{ mb: 3 }}>
         <TableContainer>
           <Table size="small">
@@ -319,7 +340,7 @@ export const RoomsSection = ({ crud, theaters, getTheaterName }) => {
                     theaterName={getTheaterName(room.theaterId)}
                     expanded={expandedRoom === room.id}
                     onToggle={() => setExpandedRoom(expandedRoom === room.id ? null : room.id)}
-                    onEdit={() => { setForm({ ...room, type: room.type ?? 'STANDARD', status: room.status ?? 'ACTIVE' }); setDialog(room.id); }}
+                    onEdit={() => { setSaveError(''); setForm({ ...room, type: room.type ?? 'STANDARD', status: room.status ?? 'ACTIVE' }); setDialog(room.id); }}
                     onDelete={() => crud.remove(room.id)}
                   />
                 ))
@@ -329,7 +350,8 @@ export const RoomsSection = ({ crud, theaters, getTheaterName }) => {
         </TableContainer>
         <PaginationBar total={visibleRooms.length} page={page} onPageChange={setPage} />
       </Box>
-      <CrudDialog open={!!dialog} title={dialog === 'add' ? t('admin.room', 'add') : t('admin.room', 'edit')} onClose={() => setDialog(null)} onSave={save}>
+      <CrudDialog open={!!dialog} title={dialog === 'add' ? t('admin.room', 'add') : t('admin.room', 'edit')} onClose={() => !saving && setDialog(null)} onSave={save} saving={saving}>
+        {saveError ? <Alert severity="error">{saveError}</Alert> : null}
         {dialog === 'add' ? (
           <>
             <TextField select label={t('admin.room', 'theater')} fullWidth value={String(form.theaterId || '')} onChange={(event) => setForm({ ...form, theaterId: String(event.target.value) })}>
@@ -346,9 +368,12 @@ export const RoomsSection = ({ crud, theaters, getTheaterName }) => {
               ))}
             </TextField>
             <Stack key="dims" direction="row" spacing={2}>
-              <TextField label="Số hàng ghế" type="number" value={form.rowsCount} onChange={(e) => setForm({ ...form, rowsCount: Number(e.target.value) })} sx={{ flex: 1 }} />
-              <TextField label="Ghế mỗi hàng" type="number" value={form.seatsPerRow} onChange={(e) => setForm({ ...form, seatsPerRow: Number(e.target.value) })} sx={{ flex: 1 }} />
+              <TextField label="Số hàng ghế" type="number" value={form.rowsCount} onChange={(e) => { setSaveError(''); setForm({ ...form, rowsCount: Number(e.target.value) }); }} inputProps={{ min: 1, max: MAX_ROOM_CAPACITY }} sx={{ flex: 1 }} />
+              <TextField label="Ghế mỗi hàng" type="number" value={form.seatsPerRow} onChange={(e) => { setSaveError(''); setForm({ ...form, seatsPerRow: Number(e.target.value) }); }} inputProps={{ min: 1, max: MAX_ROOM_CAPACITY }} sx={{ flex: 1 }} />
             </Stack>
+            <Typography variant="caption" color={form.rowsCount * form.seatsPerRow > MAX_ROOM_CAPACITY ? 'error' : 'text.secondary'}>
+              Tổng số ghế: {form.rowsCount * form.seatsPerRow} / {MAX_ROOM_CAPACITY}
+            </Typography>
             <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
               <TextField label="Số ghế thường" type="number" value={form.standardSeats} onChange={(e) => setForm({ ...form, standardSeats: Number(e.target.value) })} />
               <TextField label="Số ghế VIP" type="number" value={form.vipSeats} onChange={(e) => setForm({ ...form, vipSeats: Number(e.target.value) })} />

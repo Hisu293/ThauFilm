@@ -19,6 +19,7 @@ const statusLabel = {
 
 const currentUserBookingId = (group) =>
   group?.members?.find((member) => member.currentUser)?.bookingId;
+const paymentTargetStorageKey = (groupId) => `group_booking_payment_target_${groupId}`;
 
 export default function GroupBookingPage() {
   const { groupId } = useParams();
@@ -64,7 +65,7 @@ export default function GroupBookingPage() {
   }, [load]);
   useEffect(() => {
     if (!group || ['CONFIRMED', 'EXPIRED', 'CANCELLED'].includes(group.status)) return undefined;
-    const timer = window.setInterval(() => load(true), 30000);
+    const timer = window.setInterval(() => load(true), 5000);
     return () => window.clearInterval(timer);
   }, [group, load]);
 
@@ -124,7 +125,10 @@ export default function GroupBookingPage() {
     try {
       const next = unwrap(await bookingApi.payGroupBooking(groupId, paymentMethod, targetUserId));
       setGroup(next);
-      if (next?.checkoutUrl) window.location.assign(next.checkoutUrl);
+      if (next?.checkoutUrl) {
+        sessionStorage.setItem(paymentTargetStorageKey(groupId), String(targetUserId));
+        window.location.assign(next.checkoutUrl);
+      }
     }
     catch (err) { setError(err.message || 'Thanh toán thất bại.'); }
     finally { setBusy(false); }
@@ -133,7 +137,10 @@ export default function GroupBookingPage() {
   const syncPayosPayment = useCallback(async () => {
     setBusy(true); setError('');
     try {
-      const next = unwrap(await bookingApi.syncGroupPayment(groupId, searchParams.get('targetUserId')));
+      const storedTargetUserId = sessionStorage.getItem(paymentTargetStorageKey(groupId));
+      const targetUserId = searchParams.get('targetUserId') || storedTargetUserId;
+      const next = unwrap(await bookingApi.syncGroupPayment(groupId, targetUserId));
+      sessionStorage.removeItem(paymentTargetStorageKey(groupId));
       setGroup(next);
       const bookingId = currentUserBookingId(next);
       if (next?.status === 'CONFIRMED' && bookingId) {
@@ -149,10 +156,16 @@ export default function GroupBookingPage() {
   }, [groupId, navigate, searchParams]);
 
   useEffect(() => {
-    if (!group || paymentSyncStarted.current || searchParams.get('payment') !== 'return') return;
+    const hasStoredPayment = Boolean(sessionStorage.getItem(paymentTargetStorageKey(groupId)));
+    const returnedFromPayment = searchParams.get('payment') === 'return';
+    if (searchParams.get('payment') === 'cancel') {
+      sessionStorage.removeItem(paymentTargetStorageKey(groupId));
+      return;
+    }
+    if (!group || paymentSyncStarted.current || (!returnedFromPayment && !hasStoredPayment)) return;
     paymentSyncStarted.current = true;
     syncPayosPayment();
-  }, [group, searchParams, syncPayosPayment]);
+  }, [group, groupId, searchParams, syncPayosPayment]);
 
   if (loading) return <Box py={12} textAlign="center"><CircularProgress /></Box>;
   if (!group) return <Container sx={{ py: 6 }}><Alert severity="error">{error || 'Không tìm thấy booking nhóm.'}</Alert></Container>;

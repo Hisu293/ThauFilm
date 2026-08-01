@@ -14,7 +14,6 @@ import {
   createTheme,
 } from '@mui/material';
 import MenuRoundedIcon from '@mui/icons-material/MenuRounded';
-import NotificationsNoneRoundedIcon from '@mui/icons-material/NotificationsNoneRounded';
 import LightModeRoundedIcon from '@mui/icons-material/LightModeRounded';
 import DarkModeRoundedIcon from '@mui/icons-material/DarkModeRounded';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
@@ -25,6 +24,7 @@ import AdminContent from '../admin/AdminContent';
 import { useAdminStore } from '../admin/useAdminStore';
 import { useAuth } from '../context/AuthContext';
 import './AdminPage.css';
+import NotificationBell from '../components/NotificationBell';
 
 const AdminPage = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -70,6 +70,14 @@ const AdminPage = () => {
     setMobileOpen(false);
     await logout();
     navigate('/login', { replace: true });
+  };
+
+  const handleNotificationNavigate = (link) => {
+    if (link.startsWith('/admin')) {
+      const view = new URL(link, window.location.origin).searchParams.get('view');
+      if (view && Object.values(ADMIN_VIEWS).includes(view)) setActiveView(view);
+    }
+    navigate(link);
   };
 
   const sidebar = (
@@ -158,9 +166,7 @@ const AdminPage = () => {
               <IconButton onClick={toggleTheme} sx={{ color: 'text.secondary' }} aria-label="Đổi giao diện sáng/tối">
                 {isDark ? <LightModeRoundedIcon /> : <DarkModeRoundedIcon />}
               </IconButton>
-              <IconButton sx={{ color: 'text.secondary' }}>
-                <NotificationsNoneRoundedIcon />
-              </IconButton>
+              <NotificationBell onNavigate={handleNotificationNavigate} />
             </Toolbar>
           </AppBar>
 

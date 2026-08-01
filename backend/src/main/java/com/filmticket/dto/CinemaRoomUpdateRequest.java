@@ -11,7 +11,7 @@ import lombok.*;
 @AllArgsConstructor
 @Builder
 public class CinemaRoomUpdateRequest {
-    @NotBlank(message = "Room name is required")
+    @NotBlank(message = "Tên phòng là bắt buộc")
     private String name;
 
     private RoomType type;

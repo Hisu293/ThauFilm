@@ -14,10 +14,10 @@ import { invitationStatusLabel } from '../utils/statusLabels';
 
 const dateTime = (value) => value ? new Date(value).toLocaleString('vi-VN') : '';
 
-export default function MatchRoomDialog({ match, open, onClose, onMatchEnded }) {
+export default function MatchRoomDialog({ match, open, initialTab = 0, onClose, onMatchEnded }) {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [tab, setTab] = useState(0);
+  const [tab, setTab] = useState(initialTab);
   const [messages, setMessages] = useState([]);
   const [invitations, setInvitations] = useState([]);
   const [showtimes, setShowtimes] = useState([]);

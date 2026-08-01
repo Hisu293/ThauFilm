@@ -17,6 +17,7 @@ import PlaceRoundedIcon from '@mui/icons-material/PlaceRounded';
 import { memberIntelligenceService } from '../services/intelligenceService';
 import MatchRoomDialog from './MatchRoomDialog';
 import { connectRealtime } from '../services/realtimeService';
+import { useSearchParams } from 'react-router-dom';
 
 const ACCENT = '#FBBF24';
 const ACCENT_DARK = '#D97706';
@@ -105,6 +106,7 @@ const ConversationRow = ({ match, onOpen }) => <Button fullWidth onClick={onOpen
 </Button>;
 
 export default function MovieMatchingPanel() {
+  const [searchParams] = useSearchParams();
   const [tab, setTab] = useState(0);
   const [profile, setProfile] = useState(null);
   const [form, setForm] = useState(emptyForm);
@@ -146,6 +148,22 @@ export default function MovieMatchingPanel() {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadProfile();
   }, [loadProfile]);
+
+  useEffect(() => {
+    const requestedMatchId = searchParams.get('matchId');
+    if (!requestedMatchId) return;
+    let active = true;
+    const timer = window.setTimeout(() => {
+      loadMatches().then((items) => {
+        if (!active) return;
+        setTab(1);
+        const requestedMatch = items.find((item) => String(item.matchId) === requestedMatchId);
+        if (requestedMatch) setSelectedMatch(requestedMatch);
+        else setError('Match trong thông báo không còn hoạt động.');
+      });
+    }, 0);
+    return () => { active = false; window.clearTimeout(timer); };
+  }, [loadMatches, searchParams]);
 
   useEffect(() => connectRealtime({ onEvent: async (event) => {
     const isMatchEvent = event.type === 'MOVIE_MATCH' || (event.type === 'NOTIFICATION' && event.data?.notificationType === 'MOVIE_MATCH');
@@ -231,6 +249,6 @@ export default function MovieMatchingPanel() {
 
       {tab === 3 && (passed.length === 0 ? <Paper sx={{ p: 6, textAlign: 'center', borderRadius: 4, bgcolor: SURFACE, border: `1px solid ${BORDER}` }}><ReplayRoundedIcon sx={{ fontSize: 52, color: ACCENT }} /><Typography variant="h6" fontWeight={900}>Chưa có hồ sơ cần xem lại</Typography></Paper> : <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2,minmax(0,1fr))', md: 'repeat(3,minmax(0,1fr))' }, gap: 2 }}>{passed.map((person) => <Card key={person.userId} sx={{ borderRadius: 4, overflow: 'hidden', bgcolor: SURFACE, border: `1px solid ${BORDER}` }}><Photo person={person} height={260} /><CardContent><Typography variant="h6" fontWeight={950}>{person.fullName}</Typography><Typography color={MUTED} noWrap mb={1.5}>{person.bio || 'Hồ sơ cùng gu phim'}</Typography><Button fullWidth variant="outlined" startIcon={<ReplayRoundedIcon />} disabled={busyId === person.userId} onClick={() => restore(person)}>Đưa lại vào gợi ý</Button></CardContent></Card>)}</Box>)}
     </>}
-    <MatchRoomDialog match={selectedMatch} open={Boolean(selectedMatch)} onClose={() => setSelectedMatch(null)} onMatchEnded={handleMatchEnded} />
+    <MatchRoomDialog key={`${selectedMatch?.matchId || 'closed'}-${searchParams.get('section') || 'chat'}`} match={selectedMatch} open={Boolean(selectedMatch)} initialTab={searchParams.get('section') === 'invitations' ? 1 : 0} onClose={() => setSelectedMatch(null)} onMatchEnded={handleMatchEnded} />
   </Box>;
 }

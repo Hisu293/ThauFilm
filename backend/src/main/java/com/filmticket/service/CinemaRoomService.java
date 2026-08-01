@@ -27,6 +27,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class CinemaRoomService {
 
+    private static final int MAX_ROOM_CAPACITY = 500;
+
     private final CinemaRoomRepository cinemaRoomRepository;
     private final SeatRepository seatRepository;
     private final TheaterRepository theaterRepository;
@@ -79,11 +81,19 @@ public class CinemaRoomService {
 
     @Transactional
     public CinemaRoomResponse createRoomAndGenerateSeats(CinemaRoomRequest request) {
-        if (!theaterRepository.existsById(request.getTheaterId())) {
-            throw new BadRequestException("Theater not found");
+        theaterRepository.findByIdForUpdate(request.getTheaterId())
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy rạp chiếu"));
+
+        String roomName = request.getName().trim();
+        if (cinemaRoomRepository.existsByTheaterIdAndNameIgnoreCase(request.getTheaterId(), roomName)) {
+            throw new BadRequestException("Tên phòng đã tồn tại trong rạp này");
         }
 
-        int totalCapacity = request.getRowsCount() * request.getSeatsPerRow();
+        long requestedCapacity = (long) request.getRowsCount() * request.getSeatsPerRow();
+        if (requestedCapacity > MAX_ROOM_CAPACITY) {
+            throw new BadRequestException("Mỗi phòng chỉ được tạo tối đa 500 ghế");
+        }
+        int totalCapacity = (int) requestedCapacity;
         boolean customSeatCounts = request.getStandardSeats() != null
                 || request.getVipSeats() != null || request.getCoupleSeats() != null;
         int standardSeats = request.getStandardSeats() == null ? 0 : request.getStandardSeats();
@@ -94,7 +104,7 @@ public class CinemaRoomService {
         }
 
         CinemaRoom room = CinemaRoom.builder()
-                .name(request.getName())
+                .name(roomName)
                 .type(request.getType())
                 .capacity(totalCapacity)
                 .status(RoomStatus.ACTIVE)
@@ -155,9 +165,23 @@ public class CinemaRoomService {
     @Transactional
     public CinemaRoomResponse updateRoom(UUID roomId, CinemaRoomUpdateRequest request) {
         CinemaRoom room = getRoomEntityOrThrow(roomId);
+        theaterRepository.findByIdForUpdate(room.getTheaterId())
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy rạp chiếu"));
+        String roomName = request.getName().trim();
+        boolean roomNameChanged = !room.getName().trim().equalsIgnoreCase(roomName);
+        boolean roomIsBeingReactivated = room.getStatus() != RoomStatus.ACTIVE
+                && request.getStatus() == RoomStatus.ACTIVE;
+        if ((roomNameChanged || roomIsBeingReactivated)
+                && cinemaRoomRepository.existsByTheaterIdAndNameIgnoreCaseAndIdNot(
+                room.getTheaterId(), roomName, roomId)) {
+            throw new BadRequestException("Tên phòng đã tồn tại trong rạp này");
+        }
         Map<String, Object> oldValues = roomAuditValues(room);
 
-        room.setName(request.getName());
+        room.setName(roomName);
+        if (request.getType() != null) {
+            room.setType(request.getType());
+        }
         if (request.getStatus() != null) {
             room.setStatus(request.getStatus());
         }

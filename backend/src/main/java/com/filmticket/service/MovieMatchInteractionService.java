@@ -56,7 +56,8 @@ public class MovieMatchInteractionService {
         UUID recipient = other(match, userId);
         MovieMatchingDto.MessageResponse response = toMessage(saved, sender);
         realtimeEventService.sendMatchEvent(matchId, "MATCH_MESSAGE", Map.of("matchId", matchId, "message", response));
-        realtimeEventService.notifyUser(recipient, "MATCH_MESSAGE", displayName(sender), content, "/intelligence");
+        realtimeEventService.notifyUser(recipient, "MATCH_MESSAGE", displayName(sender), content,
+                "/dating?matchId=" + matchId + "&section=chat");
         return response;
     }
 
@@ -103,7 +104,8 @@ public class MovieMatchInteractionService {
                         "matchId", matchId, "invitation", response));
                 realtimeEventService.notifyUser(reusable.getRecipientId(), "MATCH_INVITATION",
                         "Nhắc lại lời mời xem phim",
-                        displayName(requireUser(userId)) + " đang chờ bạn phản hồi lời mời xem phim.", "/intelligence");
+                        displayName(requireUser(userId)) + " đang chờ bạn phản hồi lời mời xem phim.",
+                        "/dating?matchId=" + matchId + "&section=invitations");
             } else {
                 response.setNotice("Người kia đã mời bạn xem suất này. Hãy chấp nhận hoặc từ chối lời mời hiện có.");
             }
@@ -117,7 +119,8 @@ public class MovieMatchInteractionService {
         realtimeEventService.sendMatchEvent(matchId, "MATCH_INVITATION", Map.of(
                 "matchId", matchId, "invitation", toInvitation(saved)));
         realtimeEventService.notifyUser(recipient, "MATCH_INVITATION", "Lời mời xem phim",
-                displayName(requireUser(userId)) + " mời bạn xem " + movieTitle, "/intelligence");
+                displayName(requireUser(userId)) + " mời bạn xem " + movieTitle,
+                "/dating?matchId=" + matchId + "&section=invitations");
         MovieMatchingDto.InvitationResponse response = toInvitation(saved);
         response.setNotice("Đã gửi lời mời xem phim.");
         return response;
@@ -147,9 +150,15 @@ public class MovieMatchInteractionService {
         realtimeEventService.sendUserEvent(sender, "MATCH_INVITATION_UPDATED", Map.of("matchId", match.getId(), "invitationId", saved.getId()));
         realtimeEventService.sendMatchEvent(match.getId(), "MATCH_INVITATION_UPDATED", Map.of(
                 "matchId", match.getId(), "invitation", toInvitation(saved)));
+        MovieMatchingDto.InvitationResponse response = toInvitation(saved);
+        String notificationLink = saved.getStatus() == MovieMatchInvitation.Status.ACCEPTED
+                && response.getBookingPath() != null
+                ? response.getBookingPath()
+                : "/dating?matchId=" + match.getId() + "&section=invitations";
         realtimeEventService.notifyUser(sender, "MATCH_INVITATION_UPDATED", "Phản hồi lời mời",
-                displayName(requireUser(userId)) + (saved.getStatus() == MovieMatchInvitation.Status.ACCEPTED ? " đã chấp nhận lời mời" : " đã từ chối lời mời"), "/intelligence");
-        return toInvitation(saved);
+                displayName(requireUser(userId)) + (saved.getStatus() == MovieMatchInvitation.Status.ACCEPTED ? " đã chấp nhận lời mời" : " đã từ chối lời mời"),
+                notificationLink);
+        return response;
     }
 
     @Transactional
@@ -161,7 +170,7 @@ public class MovieMatchInteractionService {
         matchRepository.save(match);
         groupBookingService.cancelForMatch(matchId);
         realtimeEventService.notifyUser(otherId, "MATCH_CANCELLED", "Match đã kết thúc",
-                displayName(requireUser(userId)) + " đã hủy match", "/intelligence");
+                displayName(requireUser(userId)) + " đã hủy match", "/dating");
     }
 
     @Transactional

@@ -13,20 +13,20 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 @Builder
 public class CinemaRoomRequest {
-    @NotBlank(message = "Room name is required")
+    @NotBlank(message = "Tên phòng là bắt buộc")
     private String name;
 
     private RoomType type;
 
-    @NotNull(message = "Theater ID is required")
+    @NotNull(message = "Rạp chiếu là bắt buộc")
     private java.util.UUID theaterId;
 
-    @NotNull(message = "Rows count is required")
-    @Min(value = 1, message = "Rows count must be greater than 0")
+    @NotNull(message = "Số hàng ghế là bắt buộc")
+    @Min(value = 1, message = "Số hàng ghế phải lớn hơn 0")
     private Integer rowsCount;
 
-    @NotNull(message = "Seats per row is required")
-    @Min(value = 1, message = "Seats per row must be greater than 0")
+    @NotNull(message = "Số ghế mỗi hàng là bắt buộc")
+    @Min(value = 1, message = "Số ghế mỗi hàng phải lớn hơn 0")
     private Integer seatsPerRow;
 
     @Min(0)

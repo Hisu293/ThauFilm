@@ -10,6 +10,8 @@ import com.filmticket.websocket.RealtimeEventService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -445,8 +447,20 @@ public class GroupBookingService {
     }
 
     private void broadcastUpdate(GroupBooking group) {
-        realtimeEventService.sendGroupEvent(group.getId(), "GROUP_BOOKING_UPDATED", Map.of(
-                "groupId", group.getId(), "status", group.getStatus().name()));
+        UUID groupId = group.getId();
+        String status = group.getStatus().name();
+        Runnable broadcast = () -> realtimeEventService.sendGroupEvent(groupId, "GROUP_BOOKING_UPDATED", Map.of(
+                "groupId", groupId, "status", status));
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    broadcast.run();
+                }
+            });
+        } else {
+            broadcast.run();
+        }
     }
 
     private String generateCode(String prefix) {
