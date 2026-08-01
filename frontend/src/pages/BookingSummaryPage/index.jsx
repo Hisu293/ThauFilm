@@ -375,7 +375,7 @@ export const BookingSummaryPage = () => {
                                 : seat.type === 'COUPLE'
                                   ? '#F472B6'
                                   : 'text.primary',
-                            bgcolor: 'rgba(30, 41, 59, 0.3)',
+                            bgcolor: 'action.hover',
                           }}
                         >
                           {seat.rowName}{seat.seatNumber} ({enumLabel(SEAT_TYPE, seat.type)})

@@ -36,7 +36,9 @@ export const PageHeader = ({ title, subtitle, onBack, backText = t('common', 'ba
           component="h1"
           sx={{
             fontWeight: 900,
-            background: 'linear-gradient(45deg, #FFFFFF 20%, #FBBF24 92%)',
+            background: (theme) => theme.palette.mode === 'dark'
+              ? 'linear-gradient(45deg, #FFFFFF 20%, #FBBF24 92%)'
+              : 'linear-gradient(45deg, #172033 20%, #D89400 92%)',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
             letterSpacing: 0,

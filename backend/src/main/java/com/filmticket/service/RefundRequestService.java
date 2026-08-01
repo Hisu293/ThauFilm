@@ -166,7 +166,7 @@ public class RefundRequestService {
 
     @Transactional(readOnly = true)
     public List<RefundRequestDto> customerRequests(UUID customerId) {
-        return enrich(refundRepository.findVisibleToUser(customerId));
+        return refundRepository.findVisibleToUser(customerId).stream().map(this::toListDto).toList();
     }
 
     @Transactional

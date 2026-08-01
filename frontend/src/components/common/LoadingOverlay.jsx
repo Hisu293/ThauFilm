@@ -13,7 +13,9 @@ export const LoadingOverlay = ({
         sx={{
           position: fullScreen ? 'fixed' : 'absolute',
           inset: 0,
-          bgcolor: 'rgba(11, 16, 32, 0.84)',
+          bgcolor: (theme) => theme.palette.mode === 'dark'
+            ? 'rgba(11, 16, 32, 0.84)'
+            : 'rgba(244, 246, 250, 0.88)',
           backdropFilter: blur ? 'blur(10px)' : 'none',
           display: 'flex',
           flexDirection: 'column',

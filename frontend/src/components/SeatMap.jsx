@@ -99,27 +99,27 @@ export const SeatMap = ({ seats = [], selectedSeats = [], suggestedSeats = [], o
         sx={{
           mt: 4,
           p: 2,
-          bgcolor: 'rgba(30, 41, 59, 0.4)',
+          bgcolor: 'action.hover',
           borderRadius: 3,
           border: '1px solid rgba(148, 163, 184, 0.08)',
         }}
       >
         <Stack direction="row" alignItems="center" spacing={1}>
-          <Box sx={{ width: 16, height: 16, border: '1.5px solid #94A3B8', bgcolor: 'rgba(15,23,42,0.35)', borderRadius: '6px 6px 3px 3px' }} />
+          <Box sx={{ width: 16, height: 16, border: '1.5px solid #94A3B8', bgcolor: 'action.hover', borderRadius: '6px 6px 3px 3px' }} />
           <Typography variant="caption" color="text.secondary" fontWeight={600}>
             Thường
           </Typography>
         </Stack>
 
         <Stack direction="row" alignItems="center" spacing={1}>
-          <Box sx={{ width: 16, height: 16, border: '1.5px solid #8B5CF6', bgcolor: 'rgba(15,23,42,0.35)', borderRadius: '6px 6px 3px 3px' }} />
+          <Box sx={{ width: 16, height: 16, border: '1.5px solid #8B5CF6', bgcolor: 'action.hover', borderRadius: '6px 6px 3px 3px' }} />
           <Typography variant="caption" color="text.secondary" fontWeight={600}>
             VIP
           </Typography>
         </Stack>
 
         <Stack direction="row" alignItems="center" spacing={1}>
-          <Box sx={{ width: 26, height: 16, border: '1.5px solid #EC4899', bgcolor: 'rgba(15,23,42,0.35)', borderRadius: '6px 6px 3px 3px' }} />
+          <Box sx={{ width: 26, height: 16, border: '1.5px solid #EC4899', bgcolor: 'action.hover', borderRadius: '6px 6px 3px 3px' }} />
           <Typography variant="caption" color="text.secondary" fontWeight={600}>
             Đôi
           </Typography>

@@ -42,13 +42,13 @@ export const SeatItem = ({ seat, isSelected, isSuggested = false, onToggleSelect
       return {
         bgcolor: 'rgba(34, 211, 238, 0.20)',
         border: '1.5px solid #22D3EE',
-        color: '#CFFAFE',
+        color: 'info.main',
         cursor: 'pointer',
         boxShadow: '0 5px 14px rgba(34, 211, 238, 0.35)',
       };
     }
     return {
-      bgcolor: 'rgba(15, 23, 42, 0.35)',
+      bgcolor: 'action.hover',
       border: `1.5px solid ${accent}`,
       color: 'text.primary',
       cursor: 'pointer',

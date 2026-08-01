@@ -321,7 +321,7 @@ const MovieDetailPage = () => {
     <Box className="mdp-root" sx={{ bgcolor: 'background.default', pb: 10 }}>
       {/* Blurred backdrop */}
       <div className="mdp-backdrop" style={{ backgroundImage: `url(${posterSrc})` }} />
-      <div className="mdp-backdrop-overlay" style={{ background: 'linear-gradient(to bottom, rgba(15,23,42,0.6) 0%, #0F172A 100%)' }} />
+      <div className="mdp-backdrop-overlay" />
 
       <Container maxWidth="xl" sx={{ position: 'relative', zIndex: 1, pt: { xs: 2, md: 4 } }}>
         

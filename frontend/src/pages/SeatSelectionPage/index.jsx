@@ -838,7 +838,7 @@ export const SeatSelectionPage = () => {
                   p: { xs: 1.5, md: 2 },
                   borderRadius: 3,
                   border: '1px solid rgba(148, 163, 184, 0.14)',
-                  background: 'linear-gradient(145deg, rgba(15, 23, 42, 0.52), rgba(15, 23, 42, 0.25))',
+                  bgcolor: 'action.hover',
                 }}
               >
                 <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5} alignItems={{ md: 'center' }} justifyContent="space-between">
@@ -873,7 +873,7 @@ export const SeatSelectionPage = () => {
                         displayEmpty
                         aria-label="Số người trong nhóm"
                         sx={{
-                          bgcolor: 'rgba(15, 23, 42, 0.58)',
+                          bgcolor: 'background.paper',
                           fontWeight: 800,
                           '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(148, 163, 184, 0.25)' },
                         }}
@@ -941,7 +941,7 @@ export const SeatSelectionPage = () => {
                               minWidth: 0,
                               textAlign: 'left',
                               color: 'text.primary',
-                              bgcolor: selected ? 'rgba(34, 211, 238, 0.13)' : 'rgba(15, 23, 42, 0.38)',
+                              bgcolor: selected ? 'rgba(34, 211, 238, 0.13)' : 'background.paper',
                               border: '1px solid',
                               borderColor: selected ? '#22D3EE' : 'rgba(148, 163, 184, 0.18)',
                               borderRadius: 2,
@@ -949,7 +949,7 @@ export const SeatSelectionPage = () => {
                               transition: 'border-color 0.18s ease, background-color 0.18s ease, transform 0.18s ease',
                               '&:hover': {
                                 borderColor: selected ? '#22D3EE' : 'rgba(251, 191, 36, 0.55)',
-                                bgcolor: selected ? 'rgba(34, 211, 238, 0.16)' : 'rgba(30, 41, 59, 0.70)',
+                                bgcolor: selected ? 'rgba(34, 211, 238, 0.16)' : 'action.hover',
                                 transform: 'translateY(-1px)',
                               },
                               '&:disabled': { cursor: 'not-allowed', opacity: 0.55 },
