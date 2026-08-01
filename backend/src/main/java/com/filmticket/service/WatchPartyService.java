@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.net.URI;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -86,7 +87,7 @@ public class WatchPartyService {
     }
 
     @Transactional
-    public WatchPartyDto.Response pay(UUID roomId, UUID userId) {
+    public WatchPartyDto.Response pay(UUID roomId, UUID userId, String frontendOrigin) {
         WatchPartyRoom room = requireRoom(roomId);
         synchronized (room) {
             WatchPartyMember member = ensureMember(room, userId);
@@ -122,12 +123,13 @@ public class WatchPartyService {
                     .build();
             payment = paymentRepository.save(payment);
             String partyPath = "/watch-party/" + room.id;
+            String partyReturnUrl = resolvePartyReturnUrl(frontendOrigin, partyPath);
             PaymentGatewayService.GatewayPayment gatewayPayment = paymentGatewayService.createGatewayPayment(
                     "PAYOS",
                     payment,
                     "ThauFilm Watch Party",
-                    partyPath,
-                    partyPath
+                    partyReturnUrl,
+                    partyReturnUrl
             );
             payment.setProviderCheckoutId(gatewayPayment.checkoutId());
             payment.setProviderPaymentId(gatewayPayment.paymentId());
@@ -312,6 +314,27 @@ public class WatchPartyService {
         synchronized (room) {
             ensureMember(room, userId);
         }
+    }
+
+    private String resolvePartyReturnUrl(String frontendOrigin, String partyPath) {
+        try {
+            URI origin = URI.create(String.valueOf(frontendOrigin == null ? "" : frontendOrigin).trim());
+            String scheme = origin.getScheme();
+            String host = origin.getHost();
+            boolean localHttp = "http".equalsIgnoreCase(scheme)
+                    && ("localhost".equalsIgnoreCase(host) || "127.0.0.1".equals(host));
+            boolean secure = "https".equalsIgnoreCase(scheme);
+            boolean originOnly = (origin.getPath() == null || origin.getPath().isBlank() || "/".equals(origin.getPath()))
+                    && origin.getQuery() == null
+                    && origin.getFragment() == null
+                    && origin.getUserInfo() == null;
+            if (host != null && originOnly && (secure || localHttp)) {
+                return scheme.toLowerCase() + "://" + origin.getAuthority() + partyPath;
+            }
+        } catch (IllegalArgumentException ignored) {
+            // Missing/invalid Origin falls back to app.frontend-url in PaymentGatewayService.
+        }
+        return partyPath;
     }
 
     private WatchPartyRoom requireRoom(UUID roomId) {

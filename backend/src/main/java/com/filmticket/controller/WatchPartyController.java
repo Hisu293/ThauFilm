@@ -42,10 +42,12 @@ public class WatchPartyController {
     }
 
     @PostMapping("/{roomId}/pay")
-    public ResponseEntity<ApiResponse<WatchPartyDto.Response>> pay(@PathVariable UUID roomId) {
+    public ResponseEntity<ApiResponse<WatchPartyDto.Response>> pay(
+            @PathVariable UUID roomId,
+            @RequestHeader(value = "Origin", required = false) String frontendOrigin) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Đã tạo thanh toán phần của bạn",
-                watchPartyService.pay(roomId, userId())
+                watchPartyService.pay(roomId, userId(), frontendOrigin)
         ));
     }
 
