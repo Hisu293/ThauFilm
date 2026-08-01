@@ -41,7 +41,7 @@ const MovieConveyor = ({ movies }) => {
   const handlePointerDown = (event) => {
     if (
       event.button !== 0
-      || event.target.closest('button, a, input, select, textarea, [role="button"]')
+      || event.target.closest('input, select, textarea')
     ) return;
     draggedRef.current = false;
     scrollPositionRef.current = railRef.current.scrollLeft;
@@ -99,9 +99,13 @@ const MovieConveyor = ({ movies }) => {
         if (event.pointerType === 'mouse') pausedRef.current = true;
       }}
       onPointerLeave={(event) => {
-        if (dragRef.current) finishDrag(event);
-        if (event.pointerType === 'mouse') pausedRef.current = false;
+        // Pointer capture keeps touch/pen dragging active outside the rail.
+        if (event.pointerType === 'mouse') {
+          if (dragRef.current) finishDrag(event);
+          pausedRef.current = false;
+        }
       }}
+      onDragStart={(event) => event.preventDefault()}
       onClickCapture={blockClickAfterDrag}
       aria-label="Danh sách phim tự chạy. Kéo ngang để xem thêm."
     >

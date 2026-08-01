@@ -1,76 +1,124 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Box, CircularProgress, Typography } from '@mui/material';
-import MoviePosterCard from '../components/movies/MoviePosterCard';
+import { useNavigate } from 'react-router-dom';
 import { fetchMovies } from '../services/movieService';
+import { useAuth } from '../context/AuthContext';
 import './MoviesPage.css';
 
-const MovieGlobe = ({
-  movies,
-  title,
-  tone = 'now',
-}) => {
-  const [rotation, setRotation] = useState({ x: -0.08, y: 0 });
+const SEGMENTS = 35;
+const AUTO_SPEED = 5.5;
+const DRAG_SENSITIVITY = 20;
+const MAX_TILT = 12;
+
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+const wrapAngle = (value) => ((value + 180) % 360 + 360) % 360 - 180;
+
+const buildDomeItems = (movies) => {
+  if (!movies.length) return [];
+  const xColumns = Array.from({ length: SEGMENTS }, (_, index) => -37 + index * 2);
+  const evenRows = [-4, -2, 0, 2, 4];
+  const oddRows = [-3, -1, 1, 3, 5];
+  let movieIndex = 0;
+
+  return xColumns.flatMap((offsetX, columnIndex) =>
+    (columnIndex % 2 === 0 ? evenRows : oddRows).map((offsetY) => {
+      const movie = movies[movieIndex % movies.length];
+      movieIndex += 1;
+      return { movie, offsetX, offsetY, key: `${columnIndex}-${offsetY}-${movie.id}` };
+    }),
+  );
+};
+
+const MoviesPage = () => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const [movies, setMovies] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const rootRef = useRef(null);
+  const sphereRef = useRef(null);
+  const rotationRef = useRef({ x: -9, y: 0 });
   const dragRef = useRef(null);
+  const inertiaRef = useRef({ x: 0, y: 0 });
   const draggedRef = useRef(false);
-  const pausedRef = useRef(false);
+  const suppressClickRef = useRef(false);
 
-  const points = useMemo(() => {
-    const columns = 12;
-    const rows = 4;
-    const tileCount = columns * rows;
-    return Array.from({ length: tileCount }, (_, index) => {
-      const row = Math.floor(index / columns);
-      const column = index % columns;
-      const longitude = (column / columns) * Math.PI * 2
-        + (row % 2 ? Math.PI / columns : 0)
-        + ((row - 1.5) * 0.025);
-      return {
-        movie: movies[index % movies.length],
-        tileIndex: index,
-        row,
-        rows,
-        longitude,
-      };
-    });
-  }, [movies]);
-
-  useEffect(() => {
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return undefined;
-    let frameId;
-    let previousTime = performance.now();
-    const animate = (time) => {
-      const elapsed = Math.min(time - previousTime, 40);
-      previousTime = time;
-      if (!pausedRef.current && !dragRef.current) {
-        setRotation((current) => ({ ...current, y: current.y + elapsed * 0.0001 }));
-      }
-      frameId = requestAnimationFrame(animate);
-    };
-    frameId = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(frameId);
+  const loadMovies = useCallback(async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const result = await fetchMovies();
+      setMovies(result.movies || []);
+    } catch (loadError) {
+      setError(loadError.message || 'Không tải được danh sách phim.');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
-  const projected = points.map((point) => {
-    const longitude = point.longitude + rotation.y;
-    const rowProgress = point.row / (point.rows - 1);
-    const screenX = Math.sin(longitude);
-    const depth = Math.cos(longitude);
-    return {
-      ...point,
-      screenX,
-      screenY: (rowProgress - 0.5) + rotation.x,
-      depth,
+  useEffect(() => {
+    // Tải dữ liệu lần đầu; trạng thái loading/error được quản lý trong cùng request.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadMovies();
+  }, [loadMovies]);
+
+  const domeItems = useMemo(() => buildDomeItems(movies), [movies]);
+
+  useEffect(() => {
+    const root = rootRef.current;
+    if (!root) return undefined;
+    const updateRadius = () => {
+      const { width, height } = root.getBoundingClientRect();
+      const minimum = width < 700 ? 410 : 560;
+      root.style.setProperty('--radius', `${Math.max(minimum, Math.min(width * 0.72, height * 1.35))}px`);
     };
-  });
+    updateRadius();
+    const observer = new ResizeObserver(updateRadius);
+    observer.observe(root);
+    return () => observer.disconnect();
+  }, [loading]);
+
+  useEffect(() => {
+    const sphere = sphereRef.current;
+    if (!sphere || !domeItems.length) return undefined;
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let frameId;
+    let previous = performance.now();
+
+    const render = (time) => {
+      const elapsed = Math.min(time - previous, 50);
+      previous = time;
+      const rotation = rotationRef.current;
+
+      if (!dragRef.current) {
+        if (!reduceMotion) rotation.y = wrapAngle(rotation.y + (AUTO_SPEED * elapsed) / 1000);
+        rotation.x = clamp(rotation.x + inertiaRef.current.x * elapsed, -MAX_TILT, MAX_TILT);
+        rotation.y = wrapAngle(rotation.y + inertiaRef.current.y * elapsed);
+        inertiaRef.current.x *= Math.pow(0.91, elapsed / 16);
+        inertiaRef.current.y *= Math.pow(0.91, elapsed / 16);
+      }
+
+      sphere.style.transform = `translateZ(calc(var(--radius) * -1)) rotateX(${rotation.x}deg) rotateY(${rotation.y}deg)`;
+      frameId = requestAnimationFrame(render);
+    };
+    frameId = requestAnimationFrame(render);
+    return () => cancelAnimationFrame(frameId);
+  }, [domeItems.length]);
 
   const handlePointerDown = (event) => {
-    if (event.button !== 0 || event.target.closest('button, a, input, [role="dialog"]')) return;
+    if (event.button !== 0 || event.target.closest('.movie-dome-member-bar')) return;
     draggedRef.current = false;
+    suppressClickRef.current = false;
+    inertiaRef.current = { x: 0, y: 0 };
     dragRef.current = {
       pointerId: event.pointerId,
-      x: event.clientX,
-      y: event.clientY,
-      rotation,
+      startX: event.clientX,
+      startY: event.clientY,
+      lastX: event.clientX,
+      lastY: event.clientY,
+      lastTime: performance.now(),
+      rotationX: rotationRef.current.x,
+      rotationY: rotationRef.current.y,
     };
     event.currentTarget.setPointerCapture(event.pointerId);
   };
@@ -78,172 +126,103 @@ const MovieGlobe = ({
   const handlePointerMove = (event) => {
     const drag = dragRef.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
-    if (Math.hypot(event.clientX - drag.x, event.clientY - drag.y) > 6) draggedRef.current = true;
-    setRotation({
-      x: Math.max(-0.62, Math.min(0.62, drag.rotation.x - (event.clientY - drag.y) * 0.004)),
-      y: drag.rotation.y + (event.clientX - drag.x) * 0.004,
-    });
+    const deltaX = event.clientX - drag.startX;
+    const deltaY = event.clientY - drag.startY;
+    if (Math.hypot(deltaX, deltaY) > 6) draggedRef.current = true;
+
+    const now = performance.now();
+    const elapsed = Math.max(8, now - drag.lastTime);
+    rotationRef.current.x = clamp(drag.rotationX - deltaY / DRAG_SENSITIVITY, -MAX_TILT, MAX_TILT);
+    rotationRef.current.y = wrapAngle(drag.rotationY + deltaX / DRAG_SENSITIVITY);
+    inertiaRef.current = {
+      x: -((event.clientY - drag.lastY) / DRAG_SENSITIVITY) / elapsed,
+      y: ((event.clientX - drag.lastX) / DRAG_SENSITIVITY) / elapsed,
+    };
+    drag.lastX = event.clientX;
+    drag.lastY = event.clientY;
+    drag.lastTime = now;
   };
 
-  const finishDrag = (event) => {
-    if (!dragRef.current || dragRef.current.pointerId !== event.pointerId) return;
+  const finishPointer = (event) => {
+    const drag = dragRef.current;
+    if (!drag || drag.pointerId !== event.pointerId) return;
     dragRef.current = null;
+    suppressClickRef.current = draggedRef.current;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
+    window.setTimeout(() => { suppressClickRef.current = false; }, 120);
   };
-
-  return (
-    <section className={`cinema-planet cinema-planet--${tone}`}>
-      <div
-        className="cinema-globe"
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={finishDrag}
-        onPointerCancel={finishDrag}
-        onPointerLeave={(event) => {
-          finishDrag(event);
-          pausedRef.current = false;
-        }}
-        onClickCapture={(event) => {
-          if (!draggedRef.current) return;
-          event.preventDefault();
-          event.stopPropagation();
-          draggedRef.current = false;
-        }}
-        aria-label={`${title} gồm ${movies.length} phim`}
-      >
-        <div className="cinema-globe__mosaic-glow" />
-
-        {projected.map(({ movie, tileIndex, screenX, screenY, depth }) => {
-          const scale = 0.68 + ((depth + 1) / 2) * 0.42;
-          const opacity = Math.max(0, Math.min(1, (depth + 0.42) / 1.08));
-          const isFront = depth > 0.08;
-          return (
-            <div
-              key={`${movie.id}-${tileIndex}`}
-              className={`cinema-globe__movie ${isFront ? 'is-front' : ''}`}
-              style={{
-                left: `${50 + screenX * 52}%`,
-                top: `${50 + screenY * 70}%`,
-                transform: `translate3d(-50%, -50%, 0) scale(${scale}) rotateY(${-screenX * 32}deg)`,
-                opacity,
-                zIndex: Math.round((depth + 1) * 100),
-              }}
-              onPointerEnter={() => { pausedRef.current = true; }}
-              onPointerLeave={() => { pausedRef.current = false; }}
-            >
-              <MoviePosterCard movie={movie} />
-            </div>
-          );
-        })}
-      </div>
-
-      <div className="cinema-planet__caption">
-        <div>
-          <span>{tone === 'soon' ? 'SẮP RA MẮT' : 'ĐANG PHÁT HÀNH'}</span>
-          <strong>{title}</strong>
-        </div>
-        <p>Kéo để xoay thế giới điện ảnh · Chạm vào poster để xem chi tiết</p>
-      </div>
-    </section>
-  );
-};
-
-const MoviesPage = () => {
-  const [allMovies, setAllMovies] = useState([]);
-  const [activePlanet, setActivePlanet] = useState('now');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  const loadMovies = useCallback(async () => {
-    setLoading(true);
-    setError('');
-    try {
-      const result = await fetchMovies();
-      setAllMovies(result.movies || []);
-    } catch (loadError) {
-      setError(loadError.message || 'Không tải được danh sách phim đang chiếu.');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    // Tải dữ liệu khi trang được mở; các cập nhật state thực tế diễn ra sau khi request hoàn tất.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadMovies();
-  }, [loadMovies]);
 
   if (loading) {
     return (
-      <Box className="cinema-planet-state">
+      <Box className="movie-dome-state">
         <CircularProgress sx={{ color: '#e50914' }} />
-        <Typography>Đang tạo hành tinh phim…</Typography>
+        <Typography>Đang dựng thế giới điện ảnh…</Typography>
       </Box>
     );
   }
 
-  if (error) {
+  if (error || !movies.length) {
     return (
-      <Box className="cinema-planet-state">
-        <Typography sx={{ color: '#f87171' }}>{error}</Typography>
-        <button type="button" onClick={loadMovies}>Thử lại</button>
-      </Box>
-    );
-  }
-
-  const nowShowing = allMovies.filter((movie) => movie.isNowShowing);
-  const comingSoon = allMovies.filter((movie) => movie.isComingSoon && !movie.isNowShowing);
-  const showingComingSoon = (activePlanet === 'soon' || !nowShowing.length) && comingSoon.length > 0;
-  const displayedPlanet = showingComingSoon ? 'soon' : 'now';
-  const activeMovies = showingComingSoon ? comingSoon : nowShowing;
-
-  if (!nowShowing.length && !comingSoon.length) {
-    return (
-      <Box className="cinema-planet-state">
-        <Typography>Hiện chưa có phim đang chiếu hoặc sắp chiếu.</Typography>
+      <Box className="movie-dome-state">
+        <Typography sx={{ color: error ? '#f87171' : 'inherit' }}>
+          {error || 'Hiện chưa có phim để hiển thị.'}
+        </Typography>
+        {error && <button type="button" onClick={loadMovies}>Thử lại</button>}
       </Box>
     );
   }
 
   return (
-    <main className="movies-planet-page">
-      <nav className="planet-switcher" aria-label="Chuyển loại hành tinh phim">
-        <button
-          type="button"
-          className={displayedPlanet === 'now' ? 'is-active' : ''}
-          onClick={() => setActivePlanet('now')}
-          disabled={!nowShowing.length}
-        >
-          <span className="planet-switcher__dot planet-switcher__dot--now" />
-          <span>
-            <small>Đang phát hành</small>
-            ThauFilm đang chiếu
-          </span>
-          <strong>{nowShowing.length}</strong>
-        </button>
-        <button
-          type="button"
-          className={displayedPlanet === 'soon' ? 'is-active' : ''}
-          onClick={() => setActivePlanet('soon')}
-          disabled={!comingSoon.length}
-        >
-          <span className="planet-switcher__dot planet-switcher__dot--soon" />
-          <span>
-            <small>Sắp ra mắt</small>
-            ThauFilm sắp chiếu
-          </span>
-          <strong>{comingSoon.length}</strong>
-        </button>
-      </nav>
+    <main
+      ref={rootRef}
+      className="movie-dome-page"
+      onPointerDown={handlePointerDown}
+      onPointerMove={handlePointerMove}
+      onPointerUp={finishPointer}
+      onPointerCancel={finishPointer}
+      onDragStart={(event) => event.preventDefault()}
+    >
+      <div className="movie-dome-page__ambient" aria-hidden="true" />
+      <div className="movie-dome-stage">
+        <div ref={sphereRef} className="movie-dome-sphere">
+          {domeItems.map(({ movie, offsetX, offsetY, key }, index) => (
+            <button
+              type="button"
+              className="movie-dome-item"
+              key={key}
+              style={{ '--offset-x': offsetX, '--offset-y': offsetY }}
+              onClick={() => {
+                if (!suppressClickRef.current) navigate(`/movies/${movie.id}`);
+              }}
+              aria-label={`Xem chi tiết ${movie.title}`}
+            >
+              <span className="movie-dome-item__image">
+                <img
+                  src={movie.posterUrl || movie.poster || '/placeholder.svg'}
+                  alt={movie.title}
+                  loading={index < 30 ? 'eager' : 'lazy'}
+                  decoding="async"
+                  draggable="false"
+                  onError={(event) => { event.currentTarget.src = '/placeholder.svg'; }}
+                />
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="movie-dome-page__vignette" aria-hidden="true" />
 
-      <MovieGlobe
-        key={showingComingSoon ? 'soon' : 'now'}
-        movies={activeMovies}
-        title={showingComingSoon ? 'Hành tinh phim sắp chiếu' : 'Hành tinh phim đang chiếu'}
-        tone={showingComingSoon ? 'soon' : 'now'}
-      />
+      {!user && (
+        <aside className="movie-dome-member-bar">
+          <p>Tham gia ThauFilm để lưu phim, đặt vé và nhận ưu đãi thành viên.</p>
+          <div>
+            <button type="button" onClick={() => navigate('/login')}>Đăng nhập</button>
+            <button type="button" onClick={() => navigate('/register')}>Đăng ký ngay</button>
+          </div>
+        </aside>
+      )}
     </main>
   );
 };
