@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Box, CircularProgress, Typography } from '@mui/material';
+import { Box, CircularProgress, Dialog, IconButton, Typography } from '@mui/material';
+import CloseRoundedIcon from '@mui/icons-material/CloseRounded';
+import ConfirmationNumberRoundedIcon from '@mui/icons-material/ConfirmationNumberRounded';
+import PlayArrowRoundedIcon from '@mui/icons-material/PlayArrowRounded';
 import { useNavigate } from 'react-router-dom';
+import HlsVideoPlayer from '../components/HlsVideoPlayer';
+import { getMovieTrailerUrl } from '../data/movieTrailers';
 import { fetchMovies } from '../services/movieService';
 import { useAuth } from '../context/AuthContext';
 import './MoviesPage.css';
@@ -35,6 +40,8 @@ const MoviesPage = () => {
   const [movies, setMovies] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [trailerMovie, setTrailerMovie] = useState(null);
+  const [activeActionKey, setActiveActionKey] = useState('');
   const rootRef = useRef(null);
   const sphereRef = useRef(null);
   const rotationRef = useRef({ x: -9, y: 0 });
@@ -63,6 +70,7 @@ const MoviesPage = () => {
   }, [loadMovies]);
 
   const domeItems = useMemo(() => buildDomeItems(movies), [movies]);
+  const trailerSrc = useMemo(() => getMovieTrailerUrl(trailerMovie || {}), [trailerMovie]);
 
   useEffect(() => {
     const root = rootRef.current;
@@ -188,13 +196,22 @@ const MoviesPage = () => {
       <div className="movie-dome-stage">
         <div ref={sphereRef} className="movie-dome-sphere">
           {domeItems.map(({ movie, offsetX, offsetY, key }, index) => (
-            <button
-              type="button"
-              className="movie-dome-item"
+            <div
+              className={`movie-dome-item ${activeActionKey === key ? 'is-actions-open' : ''}`}
               key={key}
               style={{ '--offset-x': offsetX, '--offset-y': offsetY }}
+              role="button"
+              tabIndex="0"
               onClick={() => {
-                if (!suppressClickRef.current) navigate(`/movies/${movie.id}`);
+                if (suppressClickRef.current) return;
+                if (window.matchMedia('(hover: none)').matches && activeActionKey !== key) {
+                  setActiveActionKey(key);
+                  return;
+                }
+                navigate(`/movies/${movie.id}`);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') navigate(`/movies/${movie.id}`);
               }}
               aria-label={`Xem chi tiết ${movie.title}`}
             >
@@ -207,8 +224,34 @@ const MoviesPage = () => {
                   draggable="false"
                   onError={(event) => { event.currentTarget.src = '/placeholder.svg'; }}
                 />
+                <span className="movie-dome-item__actions">
+                  {movie.isNowShowing && (
+                    <button
+                      type="button"
+                      aria-label={`Đặt vé ${movie.title}`}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        if (!suppressClickRef.current) navigate(`/movies/${movie.id}?book=1`);
+                      }}
+                    >
+                      <ConfirmationNumberRoundedIcon />
+                      <span>Đặt vé</span>
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    aria-label={`Xem trailer ${movie.title}`}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      if (!suppressClickRef.current) setTrailerMovie(movie);
+                    }}
+                  >
+                    <PlayArrowRoundedIcon />
+                    <span>Trailer</span>
+                  </button>
+                </span>
               </span>
-            </button>
+            </div>
           ))}
         </div>
       </div>
@@ -223,6 +266,45 @@ const MoviesPage = () => {
           </div>
         </aside>
       )}
+
+      <Dialog
+        open={Boolean(trailerMovie)}
+        onClose={() => setTrailerMovie(null)}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{ className: 'movie-dome-trailer-dialog' }}
+      >
+        <div className="movie-dome-trailer">
+          <IconButton
+            className="movie-dome-trailer__close"
+            onClick={() => setTrailerMovie(null)}
+            aria-label="Đóng trailer"
+          >
+            <CloseRoundedIcon />
+          </IconButton>
+          {trailerSrc ? (
+            trailerSrc.includes('youtube.com/embed/') ? (
+              <iframe
+                src={trailerSrc}
+                title={`${trailerMovie?.title || 'Phim'} Trailer`}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+              />
+            ) : (
+              <HlsVideoPlayer
+                src={trailerSrc}
+                title={`${trailerMovie?.title || 'Phim'} Trailer`}
+                poster={trailerMovie?.posterUrl || trailerMovie?.poster}
+              />
+            )
+          ) : (
+            <div className="movie-dome-trailer__empty">
+              <PlayArrowRoundedIcon />
+              <strong>Phim này chưa có trailer</strong>
+            </div>
+          )}
+        </div>
+      </Dialog>
     </main>
   );
 };
