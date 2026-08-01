@@ -30,10 +30,6 @@ public class StaffMovieService {
         Movie movie = movieRepository.findById(movieId)
                 .orElseThrow(() -> new BadRequestException("Movie not found"));
 
-        if (request.getDurationMinutes() != null) {
-            showtimeDurationSyncService.syncFutureShowtimes(movieId, movie.getDurationMinutes(),
-                    request.getDurationMinutes(), Boolean.TRUE.equals(request.getUpdateFutureShowtimes()));
-        }
         return MovieResponse.fromMovieWithStream(movie, resolvePosterUrl(movie), resolveTrailerUrl(movie));
     }
 
@@ -41,6 +37,11 @@ public class StaffMovieService {
     public MovieResponse updateMovie(UUID movieId, StaffMovieRequest request) {
         Movie movie = movieRepository.findById(movieId)
                 .orElseThrow(() -> new BadRequestException("Movie not found"));
+
+        if (request.getDurationMinutes() != null) {
+            showtimeDurationSyncService.syncFutureShowtimes(movieId, movie.getDurationMinutes(),
+                    request.getDurationMinutes(), Boolean.TRUE.equals(request.getUpdateFutureShowtimes()));
+        }
 
         if (request.getPosterUrl() != null) {
             movie.setPosterUrl(request.getPosterUrl());
