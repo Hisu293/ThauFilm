@@ -23,6 +23,7 @@ import { memberIntelligenceService } from '../services/intelligenceService';
 import MatchRoomDialog from './MatchRoomDialog';
 import { connectRealtime } from '../services/realtimeService';
 import { useSearchParams } from 'react-router-dom';
+import { useColorMode } from '../context/ColorModeContext';
 
 const ACCENT = '#f5b51b';
 const ACCENT_DARK = '#d89400';
@@ -208,13 +209,14 @@ const MatchesCarousel = ({ matches, onOpen }) => {
   </Box>;
 };
 
-const ConversationRow = ({ match, onOpen }) => <Button fullWidth onClick={onOpen} sx={{ minHeight: 62, justifyContent: 'flex-start', textAlign: 'left', color: '#f8fafc', textTransform: 'none', px: 1.4, py: .75, borderRadius: 3, border: '1px solid transparent', '&:hover': { bgcolor: 'rgba(255,255,255,.05)', borderColor: 'rgba(255,255,255,.07)' } }}>
+const ConversationRow = ({ match, onOpen }) => <Button fullWidth onClick={onOpen} sx={{ minHeight: 62, justifyContent: 'flex-start', textAlign: 'left', color: 'text.primary', textTransform: 'none', px: 1.4, py: .75, borderRadius: 3, border: '1px solid transparent', '&:hover': { bgcolor: 'action.hover', borderColor: 'divider' } }}>
   <Avatar src={match.person?.avatarUrl} sx={{ width: 46, height: 46, mr: 1.5, flex: '0 0 auto' }}>{firstLetter(match.person?.fullName)}</Avatar>
   <Box flex={1} minWidth={0}><Typography fontWeight={900} fontSize="1.05rem" noWrap>{match.person?.fullName}</Typography><Typography color="#77737e" noWrap>Bắt đầu cuộc trò chuyện về bộ phim yêu thích</Typography></Box>
   <Box sx={{ width: 28, height: 28, borderRadius: '50%', border: '2px solid #aaa6b0', display: 'grid', placeItems: 'center', color: '#77737e' }}><ChatBubbleRoundedIcon sx={{ fontSize: 15 }} /></Box>
 </Button>;
 
 export default function MovieMatchingPanel() {
+  const { isDark } = useColorMode();
   const [searchParams] = useSearchParams();
   const [tab, setTab] = useState(0);
   const [profile, setProfile] = useState(null);
@@ -350,16 +352,20 @@ export default function MovieMatchingPanel() {
     (effectiveConversationPage - 1) * conversationsPerPage,
     effectiveConversationPage * conversationsPerPage,
   );
+  const surface = isDark ? SURFACE : '#ffffff';
+  const textPrimary = isDark ? '#f8fafc' : '#172033';
+  const textSecondary = isDark ? 'rgba(226,232,240,.58)' : '#667085';
+  const divider = isDark ? 'rgba(255,255,255,.08)' : 'rgba(15,23,42,.12)';
 
-  return <Box sx={{ color: '#f8fafc',
-    '& .MuiPaper-root, & .MuiCard-root': { color: '#f8fafc' },
-    '& .MuiDivider-root': { borderColor: 'rgba(255,255,255,.08)' },
-    '& .MuiTextField-root': { '& .MuiOutlinedInput-root': { color: '#f8fafc', bgcolor: 'rgba(255,255,255,.035)', '& fieldset': { borderColor: 'rgba(255,255,255,.12)' }, '&:hover fieldset': { borderColor: 'rgba(245,181,27,.45)' }, '&.Mui-focused fieldset': { borderColor: ACCENT } }, '& .MuiInputLabel-root': { color: 'rgba(226,232,240,.58)' }, '& .MuiFormHelperText-root': { color: 'rgba(226,232,240,.45)' } },
+  return <Box sx={{ color: textPrimary,
+    '& .MuiPaper-root, & .MuiCard-root': { color: textPrimary, backgroundColor: `${surface} !important`, borderColor: `${divider} !important` },
+    '& .MuiDivider-root': { borderColor: divider },
+    '& .MuiTextField-root': { '& .MuiOutlinedInput-root': { color: textPrimary, bgcolor: isDark ? 'rgba(255,255,255,.035)' : 'rgba(15,23,42,.025)', '& fieldset': { borderColor: divider }, '&:hover fieldset': { borderColor: 'rgba(245,181,27,.45)' }, '&.Mui-focused fieldset': { borderColor: ACCENT } }, '& .MuiInputLabel-root': { color: textSecondary }, '& .MuiFormHelperText-root': { color: textSecondary } },
   }}>
-    <Tabs value={tab} onChange={changeTab} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile sx={{ mb: 3.5, minHeight: 58, p: .65, borderRadius: 4, bgcolor: 'rgba(21,29,44,.88)', border: '1px solid rgba(255,255,255,.08)', backdropFilter: 'blur(12px)',
+    <Tabs value={tab} onChange={changeTab} variant="scrollable" scrollButtons="auto" allowScrollButtonsMobile sx={{ mb: 3.5, minHeight: 58, p: .65, borderRadius: 4, bgcolor: isDark ? 'rgba(21,29,44,.88)' : 'rgba(255,255,255,.88)', border: `1px solid ${divider}`, backdropFilter: 'blur(12px)',
       '& .MuiTabs-indicator': { display: 'none' }, '& .MuiTabs-flexContainer': { gap: .7 },
-      '& .MuiTab-root': { minHeight: 46, flex: { md: 1 }, borderRadius: 3, color: 'rgba(226,232,240,.58)', textTransform: 'none', fontWeight: 850, px: 2.4, border: '1px solid transparent', transition: 'all .2s ease' },
-      '& .Mui-selected': { bgcolor: ACCENT_SOFT, color: '#ffd052 !important', borderColor: 'rgba(245,181,27,.28)', boxShadow: 'inset 0 0 24px rgba(245,181,27,.06)' } }}>
+      '& .MuiTab-root': { minHeight: 46, flex: { md: 1 }, borderRadius: 3, color: textSecondary, textTransform: 'none', fontWeight: 850, px: 2.4, border: '1px solid transparent', transition: 'all .2s ease' },
+      '& .Mui-selected': { bgcolor: ACCENT_SOFT, color: `${isDark ? '#ffd052' : ACCENT_DARK} !important`, borderColor: 'rgba(245,181,27,.28)', boxShadow: 'inset 0 0 24px rgba(245,181,27,.06)' } }}>
       <Tab label="Gợi ý ghép đôi" /><Tab label={`Ghép đôi${matches.length ? ` (${matches.length})` : ''}`} /><Tab label="Hồ sơ hẹn hò" /><Tab label={`Xem lại${passed.length ? ` (${passed.length})` : ''}`} />
     </Tabs>
     {error && <Alert severity="error" onClose={() => setError('')} sx={{ mb: 2 }}>{error}</Alert>}
@@ -386,7 +392,7 @@ export default function MovieMatchingPanel() {
 
       {tab === 3 && (passed.length === 0 ? <Paper sx={{ p: 6, textAlign: 'center', borderRadius: 4, bgcolor: SURFACE, border: '1px solid #efdee4' }}><ReplayRoundedIcon sx={{ fontSize: 52, color: ACCENT }} /><Typography variant="h6" fontWeight={900}>Chưa có hồ sơ cần xem lại</Typography></Paper> : <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: 'repeat(2,minmax(0,1fr))', md: 'repeat(3,minmax(0,1fr))' }, gap: 2 }}>{passed.map((person) => <Card key={person.userId} sx={{ borderRadius: 4, overflow: 'hidden', bgcolor: SURFACE, border: '1px solid #efdee4' }}><Photo person={person} height={260} /><CardContent><Typography variant="h6" fontWeight={950}>{person.fullName}</Typography><Typography color="#77737e" noWrap mb={1.5}>{person.bio || 'Hồ sơ cùng gu phim'}</Typography><Button fullWidth variant="outlined" startIcon={<ReplayRoundedIcon />} disabled={busyId === person.userId} onClick={() => restore(person)} sx={{ color: ACCENT_DARK, borderColor: '#edc4d0', '&:hover': { borderColor: ACCENT, bgcolor: ACCENT_SOFT } }}>Đưa lại vào gợi ý</Button></CardContent></Card>)}</Box>)}
     </>}
-    <Dialog open={genreDialogOpen} onClose={() => setGenreDialogOpen(false)} fullWidth maxWidth="sm" PaperProps={{ sx: { borderRadius: 4, bgcolor: SURFACE } }}>
+    <Dialog open={genreDialogOpen} onClose={() => setGenreDialogOpen(false)} fullWidth maxWidth="sm" PaperProps={{ sx: { borderRadius: 4, bgcolor: 'background.paper', color: 'text.primary' } }}>
       <DialogTitle fontWeight={950}>Chọn gu phim muốn khám phá</DialogTitle>
       <DialogContent><Typography color="#716e78" mb={2}>Chỉ hiển thị những người có thể loại phim này trong sở thích.</Typography>{availableGenres.length === 0 ? <Alert severity="info">Chưa có thể loại phim nào trong các hồ sơ hiện tại.</Alert> : <Stack direction="row" gap={1} flexWrap="wrap">{availableGenres.map((genre) => <Chip key={genre} clickable label={genre} onClick={() => { setGenreFilter(genre); setGenreDialogOpen(false); }} sx={{ bgcolor: genreFilter === genre ? ACCENT : '#f4eaed', color: genreFilter === genre ? '#fff' : '#4e3a42', fontWeight: 800, '&:hover': { bgcolor: genreFilter === genre ? ACCENT_DARK : '#f0dce2' } }} />)}</Stack>}</DialogContent>
       <DialogActions sx={{ px: 3, pb: 2.5 }}><Button onClick={() => { setGenreFilter(''); setGenreDialogOpen(false); }} sx={{ color: ACCENT_DARK }}>Bỏ lọc gu phim</Button><Button onClick={() => setGenreDialogOpen(false)}>Đóng</Button></DialogActions>

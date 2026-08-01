@@ -187,7 +187,7 @@ export default function MyRefundsPage() {
               { label: 'Đã hoàn tiền', value: stats.approved, color: 'success.main' },
               { label: 'Đã từ chối', value: stats.rejected, color: 'error.main' },
             ].map((stat) => (
-              <Card key={stat.label} variant="outlined" sx={{ borderRadius: 3, bgcolor: 'rgba(30,41,59,0.48)' }}>
+              <Card key={stat.label} variant="outlined" sx={{ borderRadius: 3, bgcolor: 'background.paper' }}>
                 <CardContent sx={{ '&:last-child': { pb: 2 }, py: 2 }}>
                   <Typography variant="h4" fontWeight={950} color={stat.color}>{stat.value}</Typography>
                   <Typography variant="body2" color="text.secondary">{stat.label}</Typography>
@@ -225,7 +225,7 @@ export default function MyRefundsPage() {
             const status = String(item.status || '').toUpperCase();
             const meta = STATUS_META[status] || { label: refundStatusLabel(status), color: 'default' };
             return (
-              <Card key={item.id} variant="outlined" sx={{ borderRadius: 3, bgcolor: 'rgba(30,41,59,0.52)', overflow: 'visible' }}>
+              <Card key={item.id} variant="outlined" sx={{ borderRadius: 3, bgcolor: 'background.paper', overflow: 'visible' }}>
                 <CardContent sx={{ p: { xs: 2, md: 2.5 }, '&:last-child': { pb: { xs: 2, md: 2.5 } } }}>
                   <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" spacing={2}>
                     <Stack direction="row" spacing={1.5} minWidth={0}>

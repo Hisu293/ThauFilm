@@ -375,3 +375,52 @@ html[data-color-mode='light'] .pf-select {
   .pf-ticket__actions .pf-btn { justify-content: center; }
   .pf-ticket__barcode { justify-content: flex-end; }
 }
+
+/* Light mode: keep every profile surface and secondary label readable. */
+html[data-color-mode='light'] .pf-info,
+html[data-color-mode='light'] .pf-ticket,
+html[data-color-mode='light'] .pf-fav {
+  background: #fff;
+  border-color: rgba(15, 23, 42, 0.10);
+}
+html[data-color-mode='light'] .pf-info__k,
+html[data-color-mode='light'] .pf-ticket__row,
+html[data-color-mode='light'] .pf-ticket__detail-label,
+html[data-color-mode='light'] .pf-ticket__detail-value svg,
+html[data-color-mode='light'] .pf-ticket__code,
+html[data-color-mode='light'] .pf-fav__genre,
+html[data-color-mode='light'] .pf-settings-section__title,
+html[data-color-mode='light'] .pf-settings-row__desc {
+  color: #667085;
+}
+html[data-color-mode='light'] .pf-ticket__left,
+html[data-color-mode='light'] .pf-ticket__footer,
+html[data-color-mode='light'] .pf-settings-section:not(:last-child),
+html[data-color-mode='light'] .pf-settings-row {
+  border-color: rgba(15, 23, 42, 0.10);
+}
+html[data-color-mode='light'] .pf-membership {
+  background: linear-gradient(135deg, rgba(229, 9, 20, 0.08), #fff);
+}
+html[data-color-mode='light'] .pf-membership__label,
+html[data-color-mode='light'] .pf-membership__points small,
+html[data-color-mode='light'] .pf-membership__hint {
+  color: #667085;
+}
+html[data-color-mode='light'] .pf-membership__hint b,
+html[data-color-mode='light'] .pf-settings-row__label,
+html[data-color-mode='light'] .pf-fav__title {
+  color: #172033;
+}
+html[data-color-mode='light'] .pf-progress { background: rgba(15, 23, 42, 0.10); }
+html[data-color-mode='light'] .pf-fav__genre { background: rgba(15, 23, 42, 0.05); }
+html[data-color-mode='light'] .pf-form input,
+html[data-color-mode='light'] .pf-select {
+  background: #fff;
+  color: #172033;
+  border-color: rgba(15, 23, 42, 0.14);
+}
+html[data-color-mode='light'] .pf-select option { background: #fff; }
+html[data-color-mode='light'] .pf-toggle { background: rgba(15, 23, 42, 0.18); }
+html[data-color-mode='light'] .pf-toggle.is-on { background: #e50914; }
+html[data-color-mode='light'] .pf-empty-state svg { color: rgba(15, 23, 42, 0.20); }

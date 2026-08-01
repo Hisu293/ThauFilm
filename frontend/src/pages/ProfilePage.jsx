@@ -600,7 +600,7 @@ const ProfilePage = () => {
                 </div>
               </div>
               {historyError && (
-                <Box sx={{ mb: 2, p: 2, borderRadius: 2, bgcolor: 'rgba(229,9,20,.12)', color: '#ffb3b8' }}>
+                <Box sx={{ mb: 2, p: 2, borderRadius: 2, bgcolor: 'rgba(229,9,20,.12)', color: 'error.main' }}>
                   {historyError}
                   <button type="button" className="pf-btn pf-btn--outline"
                     style={{ marginLeft: 12 }} onClick={() => setHistoryReload((value) => value + 1)}>
@@ -626,7 +626,7 @@ const ProfilePage = () => {
                 </div>
               ) : (
                 <div className="pf-empty-state" style={{ minHeight: 200 }}>
-                  <EventSeatRoundedIcon sx={{ fontSize: 48, color: 'rgba(255,255,255,0.15)' }} />
+                  <EventSeatRoundedIcon sx={{ fontSize: 48, color: 'text.disabled' }} />
                   <p>Không tìm thấy lịch sử đặt vé nào phù hợp.</p>
                 </div>
               )}
@@ -677,7 +677,7 @@ const ProfilePage = () => {
                 </div>
               ) : (
                 <div className="pf-empty-state">
-                  <FavoriteRoundedIcon sx={{ fontSize: 56, color: 'rgba(255,255,255,0.15)' }} />
+                  <FavoriteRoundedIcon sx={{ fontSize: 56, color: 'text.disabled' }} />
                   <p>Chưa có phim yêu thích nào.</p>
                   <button type="button" className="pf-btn" onClick={() => navigate('/movies')}>Khám phá phim</button>
                 </div>

@@ -24,6 +24,7 @@ import DashboardRoundedIcon from '@mui/icons-material/DashboardRounded';
 import DynamicFeedRoundedIcon from '@mui/icons-material/DynamicFeedRounded';
 import ChatRoundedIcon from '@mui/icons-material/ChatRounded';
 import { useAuth } from '../context/AuthContext';
+import { useColorMode } from '../context/ColorModeContext';
 
 const getInitials = (name = '') =>
   name
@@ -46,6 +47,7 @@ const getAvatarColor = (name = '') => {
 
 const UserMenu = () => {
   const { user } = useAuth();
+  const { isDark } = useColorMode();
   const navigate = useNavigate();
   const [anchor, setAnchor] = useState(null);
 
@@ -115,11 +117,17 @@ const UserMenu = () => {
               mt: 1.5,
               minWidth: 240,
               borderRadius: '14px',
-              background: 'rgba(20,20,20,0.97)',
-              border: '1px solid rgba(255,255,255,0.10)',
+              background: isDark ? 'rgba(20,20,20,0.97)' : 'rgba(255,255,255,0.98)',
+              border: '1px solid',
+              borderColor: 'divider',
               backdropFilter: 'blur(16px)',
-              color: '#fff',
+              color: 'text.primary',
               overflow: 'visible',
+              '& .MuiTypography-root': { color: 'text.primary' },
+              '& .MuiListItemIcon-root': { color: 'text.secondary' },
+              '& .MuiMenuItem-root:hover': { backgroundColor: 'action.hover' },
+              '& .MuiDivider-root': { borderColor: 'divider' },
+              '& #menu-workspace .MuiTypography-root, & #menu-workspace .MuiListItemIcon-root': { color: 'primary.main' },
               '&::before': {
                 content: '""',
                 display: 'block',
@@ -128,8 +136,9 @@ const UserMenu = () => {
                 right: 16,
                 width: 10,
                 height: 10,
-                bgcolor: 'rgba(20,20,20,0.97)',
-                border: '1px solid rgba(255,255,255,0.10)',
+                bgcolor: isDark ? 'rgba(20,20,20,0.97)' : 'rgba(255,255,255,0.98)',
+                border: '1px solid',
+                borderColor: 'divider',
                 borderBottom: 'none',
                 borderRight: 'none',
                 transform: 'translateY(-50%) rotate(45deg)',

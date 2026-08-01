@@ -28,7 +28,14 @@ export default function TopMovieFansWidget() {
     load();
   }, [load]);
 
-  return <Card sx={{ borderRadius: 4, overflow: 'hidden', background: 'linear-gradient(160deg, rgba(255,193,7,.12), rgba(229,9,20,.055) 46%, rgba(15,23,42,.4))' }}>
+  return <Card sx={(theme) => ({
+    borderRadius: 4,
+    overflow: 'hidden',
+    border: `1px solid ${theme.palette.divider}`,
+    background: theme.palette.mode === 'dark'
+      ? 'linear-gradient(160deg, rgba(255,193,7,.12), rgba(229,9,20,.055) 46%, rgba(15,23,42,.4))'
+      : 'linear-gradient(160deg, rgba(255,193,7,.12), rgba(229,9,20,.035) 46%, #fff 100%)',
+  })}>
     <CardContent sx={{ p: 2.25 }}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1.5}>
         <Stack direction="row" spacing={1.1} alignItems="center"><Box sx={{ width: 38, height: 38, display: 'grid', placeItems: 'center', borderRadius: 2.5, bgcolor: 'rgba(255,193,7,.16)', color: '#ffc83d' }}><EmojiEventsRoundedIcon /></Box><Box><Typography fontWeight={950}>Top Movie Fans</Typography><Typography variant="caption" color="text.secondary">Nổi bật trong tháng</Typography></Box></Stack>
