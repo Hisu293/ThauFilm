@@ -19,6 +19,7 @@ import DarkModeRoundedIcon from '@mui/icons-material/DarkModeRounded';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import { ADMIN_VIEWS, VIEW_META } from '../admin/adminNav';
 import { adminTheme, SIDEBAR_WIDTH } from '../admin/adminTheme';
+import { useColorMode } from '../context/ColorModeContext';
 import AdminSidebar from '../admin/components/AdminSidebar';
 import AdminContent from '../admin/AdminContent';
 import { useAdminStore } from '../admin/useAdminStore';
@@ -29,14 +30,11 @@ import NotificationBell from '../components/NotificationBell';
 const AdminPage = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activeView, setActiveView] = useState(ADMIN_VIEWS.DASHBOARD);
-  const [mode, setMode] = useState('dark');
+  const { mode, toggleMode } = useColorMode();
   const navigate = useNavigate();
   const { logout } = useAuth();
   const store = useAdminStore();
 
-  const toggleTheme = () => setMode((prev) => (prev === 'light' ? 'dark' : 'light'));
-
-  // Dựng theme động sáng/tối trên nền adminTheme (cinemaTheme), giống StaffLayout.
   const theme = useMemo(
     () =>
       createTheme(adminTheme, {
@@ -54,6 +52,43 @@ const AdminPage = () => {
                 text: { primary: '#111827', secondary: '#6b7280' },
                 divider: 'rgba(0,0,0,0.08)',
               }),
+        },
+        components: {
+          MuiCssBaseline: {
+            styleOverrides: {
+              body: {
+                backgroundColor: mode === 'dark' ? '#08080c' : '#f4f4f5',
+                color: mode === 'dark' ? '#fafafa' : '#111827',
+              },
+            },
+          },
+          MuiCard: {
+            styleOverrides: {
+              root: {
+                background: mode === 'dark'
+                  ? 'linear-gradient(145deg, rgba(24, 24, 30, 0.95), rgba(16, 16, 20, 0.98))'
+                  : '#ffffff',
+                borderColor: mode === 'dark' ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+                boxShadow: mode === 'dark'
+                  ? '0 18px 45px rgba(0,0,0,0.28)'
+                  : '0 12px 34px rgba(15,23,42,0.07)',
+              },
+            },
+          },
+          MuiDialog: {
+            styleOverrides: {
+              paper: {
+                backgroundColor: mode === 'dark' ? '#121218' : '#ffffff',
+              },
+            },
+          },
+          MuiOutlinedInput: {
+            styleOverrides: {
+              root: {
+                backgroundColor: mode === 'dark' ? 'rgba(255,255,255,0.035)' : 'rgba(15,23,42,0.025)',
+              },
+            },
+          },
         },
       }),
     [mode],
@@ -163,7 +198,7 @@ const AdminPage = () => {
                   </Typography>
                 </Breadcrumbs>
               </Box>
-              <IconButton onClick={toggleTheme} sx={{ color: 'text.secondary' }} aria-label="Đổi giao diện sáng/tối">
+              <IconButton onClick={toggleMode} sx={{ color: 'text.secondary' }} aria-label="Đổi giao diện sáng/tối">
                 {isDark ? <LightModeRoundedIcon /> : <DarkModeRoundedIcon />}
               </IconButton>
               <NotificationBell onNavigate={handleNotificationNavigate} />

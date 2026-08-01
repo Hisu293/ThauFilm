@@ -3,9 +3,12 @@ package com.filmticket.controller;
 import com.filmticket.dto.ApiResponse;
 import com.filmticket.dto.RefundRequestDto;
 import com.filmticket.dto.RefundMessageDto;
+import com.filmticket.entity.RefundRequestStatus;
 import com.filmticket.service.CurrentUserService;
 import com.filmticket.service.RefundRequestService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -30,8 +33,18 @@ public class StaffRefundController {
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<List<RefundRequestDto>>> list(@AuthenticationPrincipal UserDetails principal) {
-        return ok("Refund requests fetched", refundService.staffRequests(userId(principal)));
+    public ResponseEntity<ApiResponse<Page<RefundRequestDto>>> list(
+            @AuthenticationPrincipal UserDetails principal,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(required = false) RefundRequestStatus status) {
+        return ok("Refund requests fetched", refundService.staffRequests(
+                userId(principal), status, PageRequest.of(Math.max(0, page), 10)));
+    }
+
+    @GetMapping("/{requestId}")
+    public ResponseEntity<ApiResponse<RefundRequestDto>> detail(
+            @AuthenticationPrincipal UserDetails principal, @PathVariable UUID requestId) {
+        return ok("Refund request fetched", refundService.staffRequest(userId(principal), requestId));
     }
 
     @PostMapping

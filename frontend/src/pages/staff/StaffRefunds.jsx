@@ -96,6 +96,7 @@ export default function StaffRefunds() {
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [page, setPage] = useState(0);
+  const [totalElements, setTotalElements] = useState(0);
   const [rejecting, setRejecting] = useState(null);
   const [reason, setReason] = useState('');
   const [chatItem, setChatItem] = useState(null);
@@ -110,15 +111,24 @@ export default function StaffRefunds() {
     try {
       const permission = await refundService.staffAccess();
       setAccess(permission);
-      if (permission?.shiftLeader) setItems(await refundService.staffList());
-      else setItems([]);
+      if (permission?.shiftLeader) {
+        const result = await refundService.staffList({
+          page,
+          ...(statusFilter === 'ALL' ? {} : { status: statusFilter }),
+        });
+        setItems(Array.isArray(result?.content) ? result.content : []);
+        setTotalElements(Number(result?.totalElements) || 0);
+      } else {
+        setItems([]);
+        setTotalElements(0);
+      }
     } catch (err) {
       setError(err.message || 'Không thể tải yêu cầu hoàn tiền.');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [page, statusFilter]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -157,9 +167,19 @@ export default function StaffRefunds() {
         .some((value) => String(value || '').toLocaleLowerCase('vi').includes(keyword));
     });
   }, [items, query, statusFilter]);
-  const pageCount = Math.max(1, Math.ceil(filteredItems.length / 10));
-  const safePage = Math.min(page, pageCount - 1);
-  const pagedItems = filteredItems.slice(safePage * 10, safePage * 10 + 10);
+  const pagedItems = filteredItems;
+
+  const openDetail = async (item) => {
+    setBusy(true);
+    setError('');
+    try {
+      setSelected(await refundService.staffDetail(item.id));
+    } catch (err) {
+      setError(err.message || 'Không thể tải chi tiết yêu cầu hoàn tiền.');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const approve = async (item) => {
     setBusy(true);
@@ -168,6 +188,7 @@ export default function StaffRefunds() {
       const updated = await refundService.staffApprove(item.id);
       setItems((list) => list.map((row) => (row.id === updated.id ? updated : row)));
       setSelected((current) => (current?.id === updated.id ? updated : current));
+      await load(true);
     } catch (err) {
       setError(err.message || 'Không thể duyệt yêu cầu.');
     } finally {
@@ -183,6 +204,7 @@ export default function StaffRefunds() {
       setItems((list) => list.map((row) => (row.id === updated.id ? updated : row)));
       setRejecting(null);
       setReason('');
+      await load(true);
     } catch (err) {
       setError(err.message || 'Không thể từ chối yêu cầu.');
     } finally {
@@ -220,10 +242,10 @@ export default function StaffRefunds() {
   }
 
   const summary = [
-    { label: 'Tổng yêu cầu', value: items.length, icon: ReceiptLongRoundedIcon, color: 'primary.main' },
-    { label: 'Cần xử lý', value: counts.requested, icon: PendingActionsRoundedIcon, color: 'warning.main' },
-    { label: 'Chờ Admin', value: counts.awaitingAdmin, icon: AdminPanelSettingsRoundedIcon, color: 'info.main' },
-    { label: 'Đã xử lý', value: counts.completed, icon: CheckCircleRoundedIcon, color: 'success.main' },
+    { label: 'Tổng yêu cầu', value: totalElements, icon: ReceiptLongRoundedIcon, color: 'primary.main' },
+    { label: 'Cần xử lý trên trang', value: counts.requested, icon: PendingActionsRoundedIcon, color: 'warning.main' },
+    { label: 'Chờ Admin trên trang', value: counts.awaitingAdmin, icon: AdminPanelSettingsRoundedIcon, color: 'info.main' },
+    { label: 'Đã xử lý trên trang', value: counts.completed, icon: CheckCircleRoundedIcon, color: 'success.main' },
   ];
 
   return <Box>
@@ -272,7 +294,7 @@ export default function StaffRefunds() {
             size="small"
             value={query}
             onChange={(event) => { setQuery(event.target.value); setPage(0); }}
-            placeholder="Tìm khách hàng, mã vé, phim..."
+            placeholder="Tìm trong 10 yêu cầu trên trang..."
             sx={{ width: { xs: '100%', md: 380 } }}
             slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchRoundedIcon fontSize="small" /></InputAdornment> } }}
           />
@@ -324,7 +346,7 @@ export default function StaffRefunds() {
                       <Chip size="small" label={status.label} color={status.color} sx={{ maxWidth: '100%', fontWeight: 700 }} />
                       <Typography noWrap display="block" variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>{item.reason || 'Không có lý do'}</Typography>
                     </Box>
-                    <Button size="small" variant="outlined" startIcon={<VisibilityRoundedIcon />} onClick={() => setSelected(item)} sx={{ flexShrink: 0 }}>Xem</Button>
+                    <Button size="small" variant="outlined" startIcon={<VisibilityRoundedIcon />} onClick={() => openDetail(item)} disabled={busy} sx={{ flexShrink: 0 }}>Xem</Button>
                   </Stack>
                 </TableCell>
               </TableRow>;
@@ -341,8 +363,8 @@ export default function StaffRefunds() {
       </TableContainer>
       <TablePagination
         component="div"
-        count={filteredItems.length}
-        page={safePage}
+        count={totalElements}
+        page={page}
         onPageChange={(_, nextPage) => setPage(nextPage)}
         rowsPerPage={10}
         rowsPerPageOptions={[10]}

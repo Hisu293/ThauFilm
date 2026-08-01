@@ -341,6 +341,28 @@
   color: #0b1020;
 }
 
+html[data-color-mode='light'] .cinema-hero {
+  background: radial-gradient(circle at 20% 20%, rgba(229, 9, 20, 0.10), transparent 45%), linear-gradient(180deg, #fff 0%, #f4f6fa 100%);
+  border-bottom-color: rgba(15, 23, 42, 0.08);
+}
+html[data-color-mode='light'] .cinema-hero__sub,
+html[data-color-mode='light'] .cinema-card__row,
+html[data-color-mode='light'] .cinema-card__stats { color: #667085; }
+html[data-color-mode='light'] .cinema-search,
+html[data-color-mode='light'] .cinema-filters select,
+html[data-color-mode='light'] .cinema-card {
+  background: #fff;
+  border-color: rgba(15, 23, 42, 0.10);
+}
+html[data-color-mode='light'] .cinema-search input,
+html[data-color-mode='light'] .cinema-filters select,
+html[data-color-mode='light'] .cinema-card__name { color: #172033; }
+html[data-color-mode='light'] .cinema-filters option { background: #fff; }
+html[data-color-mode='light'] .cinema-chip {
+  background: rgba(15, 23, 42, 0.05);
+  border-color: rgba(15, 23, 42, 0.10);
+  color: #475467;
+}
 .cinema-card__btn:focus-visible {
   outline: 3px solid rgba(251, 191, 36, 0.34);
   outline-offset: 2px;

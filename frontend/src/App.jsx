@@ -4,11 +4,15 @@ import AppRoutes from './routes/AppRoutes';
 import { AuthProvider } from './context/AuthContext';
 import { BookingProvider } from './context/BookingContext';
 import { BookingNavigationProvider } from './context/BookingNavigationContext';
-import cinemaTheme from './theme/cinemaTheme';
+import { createCinemaModeTheme } from './theme/cinemaTheme';
+import { ColorModeProvider, useColorMode } from './context/ColorModeContext';
+import { useMemo } from 'react';
 
-function App() {
+const AppContent = () => {
+  const { mode } = useColorMode();
+  const theme = useMemo(() => createCinemaModeTheme(mode), [mode]);
   return (
-    <ThemeProvider theme={cinemaTheme}>
+    <ThemeProvider theme={theme}>
       <CssBaseline />
       <AuthProvider>
         <BookingProvider>
@@ -21,6 +25,10 @@ function App() {
       </AuthProvider>
     </ThemeProvider>
   );
+};
+
+function App() {
+  return <ColorModeProvider><AppContent /></ColorModeProvider>;
 }
 
 export default App;

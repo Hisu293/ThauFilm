@@ -194,7 +194,7 @@ const Heatmap = ({ rooms }) => {
       <Box display="grid" gridTemplateColumns={{ xs: '1fr', xl: 'minmax(0, 1fr) 280px' }} gap={2}>
         <Card sx={panelSx}>
           <CardContent sx={{ p: { xs: 2, md: 3 }, overflowX: 'auto' }}>
-            <Box sx={{ width: '70%', minWidth: 420, height: 7, mx: 'auto', mb: 3, bgcolor: 'rgba(255,255,255,.15)', borderRadius: '50% 50% 4px 4px', boxShadow: '0 8px 24px rgba(56,189,248,.18)' }} />
+            <Box sx={{ width: '70%', minWidth: 420, height: 7, mx: 'auto', mb: 3, bgcolor: 'divider', borderRadius: '50% 50% 4px 4px', boxShadow: '0 8px 24px rgba(56,189,248,.18)' }} />
             <Typography variant="caption" color="text.secondary" display="block" textAlign="center" mb={2}>MÀN HÌNH</Typography>
             <Stack spacing={1.1} sx={{ minWidth: 520 }}>
               {Object.entries(rows).map(([row, seats]) => <Stack key={row} direction="row" spacing={0.8} alignItems="center" justifyContent="center">
@@ -400,7 +400,7 @@ const WeeklyManager = ({ movies, onApplied }) => {
   const removeItem = (target) => setPlan((current) => current.filter((item) => !(item.movieId === target.movieId && item.cinemaRoomId === target.cinemaRoomId && item.startTime === target.startTime)));
 
   return <Stack spacing={2.5}>
-    <Alert severity="info">Chỉ cần chọn phim. AI tự tìm rạp đang hoạt động, phòng đang hoạt động thuộc đúng rạp và khung giờ còn trống; mỗi suất gồm thời lượng phim và 15 phút dọn phòng.</Alert>
+    <Alert severity="info">Chỉ cần chọn phim. AI tự tìm rạp đang hoạt động, phòng đang hoạt động thuộc đúng rạp và khung giờ còn trống; mỗi suất gồm thời lượng phim và 1 phút chuyển tiếp.</Alert>
     <Box display="grid" gridTemplateColumns={{ xs: '1fr', md: 'repeat(2, minmax(0, 1fr))' }} gap={1.5}>
       <TextField select size="small" label="Phim" value={movieId} onChange={(event) => { setMovieId(event.target.value); setPlan([]); }} disabled={loading}>
         {availableMovies.map((movie) => <MenuItem key={movie.id} value={movie.id}>{movie.title}</MenuItem>)}

@@ -43,7 +43,7 @@ import {
   enumLabel,
 } from '../../constants/enums';
 
-const thSx = { color: 'rgba(255,255,255,0.45)', fontWeight: 600 };
+const thSx = { color: 'text.secondary', fontWeight: 600 };
 const PAGE_SIZE = 10;
 const MAX_ROOM_CAPACITY = 500;
 const sortByLatest = (items = []) =>
@@ -57,8 +57,8 @@ const emptyTheater = { name: '', address: '', city: '', phoneNumber: '', imageUr
 const PaginationBar = ({ total, page, onPageChange }) => {
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   return (
-    <Stack direction="row" justifyContent="flex-end" alignItems="center" spacing={1.5} sx={{ px: 2, py: 1.5, borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-      <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.55)' }}>
+    <Stack direction="row" justifyContent="flex-end" alignItems="center" spacing={1.5} sx={{ px: 2, py: 1.5, borderTop: '1px solid', borderColor: 'divider' }}>
+      <Typography variant="caption" sx={{ color: 'text.secondary' }}>
         {total === 0 ? '0' : `${(page - 1) * PAGE_SIZE + 1}-${Math.min(page * PAGE_SIZE, total)}`} / {total}
       </Typography>
       <Button size="small" disabled={page <= 1} onClick={() => onPageChange(page - 1)}>Trước</Button>
@@ -136,12 +136,12 @@ export const TheatersSection = ({ crud }) => {
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
-                <SearchRoundedIcon fontSize="small" sx={{ color: 'rgba(255,255,255,0.4)' }} />
+                <SearchRoundedIcon fontSize="small" sx={{ color: 'text.secondary' }} />
               </InputAdornment>
             ),
           }}
         />
-        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', ml: 'auto' }}>
+        <Typography variant="caption" sx={{ color: 'text.secondary', ml: 'auto' }}>
           {t('admin.theater', 'count', 'vi', { filtered: sortedTheaters.length, total: crud.list.length })}
         </Typography>
       </Box>
@@ -179,9 +179,9 @@ export const TheatersSection = ({ crud }) => {
                         <Typography fontWeight={600}>{theater.name}</Typography>
                       </Stack>
                     </TableCell>
-                    <TableCell sx={{ color: 'rgba(255,255,255,0.7)' }}>{theater.address || '—'}</TableCell>
-                    <TableCell sx={{ color: 'rgba(255,255,255,0.7)' }}>{theater.city || '—'}</TableCell>
-                    <TableCell sx={{ color: 'rgba(255,255,255,0.7)' }}>{theater.phoneNumber || '—'}</TableCell>
+                    <TableCell sx={{ color: 'text.secondary' }}>{theater.address || '—'}</TableCell>
+                    <TableCell sx={{ color: 'text.secondary' }}>{theater.city || '—'}</TableCell>
+                    <TableCell sx={{ color: 'text.secondary' }}>{theater.phoneNumber || '—'}</TableCell>
                     <TableCell>
                       <StatusChip status={theater.status} />
                     </TableCell>

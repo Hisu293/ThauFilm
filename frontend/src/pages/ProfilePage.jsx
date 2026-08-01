@@ -21,6 +21,7 @@ import SecurityRoundedIcon from '@mui/icons-material/SecurityRounded';
 import DeleteOutlineRoundedIcon from '@mui/icons-material/DeleteOutlineRounded';
 import MilitaryTechRoundedIcon from '@mui/icons-material/MilitaryTechRounded';
 import { useAuth } from '../context/AuthContext';
+import { useColorMode } from '../context/ColorModeContext';
 import { profileUser, favoriteMovies } from '../data/profileMock';
 import { useBooking } from '../hooks/useBooking';
 import { bookingApi } from '../api/bookingApi';
@@ -226,6 +227,7 @@ const SettingsRow = ({ label, desc, action }) => (
 /* ════════════════ PAGE ════════════════ */
 const ProfilePage = () => {
   const navigate = useNavigate();
+  const { mode, toggleMode } = useColorMode();
   const { user, logout } = useAuth();
   const [searchParams] = useSearchParams();
   const initialTab = MENU.some((m) => m.key === searchParams.get('tab')) ? searchParams.get('tab') : 'info';
@@ -734,6 +736,11 @@ const ProfilePage = () => {
                 </SettingsSection>
 
                 <SettingsSection icon={PaletteRoundedIcon} title="Giao diện & Ngôn ngữ">
+                  <SettingsRow
+                    label="Chế độ sáng"
+                    desc="Đồng bộ giao diện Member, Staff và Admin trên thiết bị này"
+                    action={<Toggle checked={mode === 'light'} onChange={toggleMode} />}
+                  />
                   <SettingsRow
                     label="Ngôn ngữ"
                     desc="Chọn ngôn ngữ hiển thị của ứng dụng"

@@ -13,7 +13,6 @@ import {
   ListItemText,
   useMediaQuery,
   ThemeProvider,
-  createTheme,
   CssBaseline,
   Breadcrumbs,
   Link,
@@ -38,7 +37,8 @@ import QrCode2RoundedIcon from '@mui/icons-material/QrCode2Rounded';
 import CurrencyExchangeRoundedIcon from '@mui/icons-material/CurrencyExchangeRounded';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import { useAuth } from '../context/AuthContext';
-import cinemaTheme from '../theme/cinemaTheme';
+import { createCinemaModeTheme } from '../theme/cinemaTheme';
+import { useColorMode } from '../context/ColorModeContext';
 import refundService from '../services/refundService';
 import NotificationBell from '../components/NotificationBell';
 
@@ -60,7 +60,7 @@ const menuItems = [
 
 const StaffLayout = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [mode, setMode] = useState('dark');
+  const { mode, toggleMode } = useColorMode();
   const [isShiftLeader, setIsShiftLeader] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
@@ -79,47 +79,8 @@ const StaffLayout = () => {
     [isShiftLeader],
   );
 
-  const toggleTheme = () => {
-    setMode((prevMode) => (prevMode === 'light' ? 'dark' : 'light'));
-  };
-
   const theme = useMemo(
-    () =>
-      createTheme(cinemaTheme, {
-        palette: {
-          mode,
-          primary: { main: '#e50914' },
-          ...(mode === 'dark'
-            ? {
-                background: { default: '#08080c', paper: '#121218' },
-                text: { primary: '#fafafa', secondary: 'rgba(255,255,255,0.58)' },
-                divider: 'rgba(255,255,255,0.08)'
-              }
-            : {
-                background: { default: '#f4f4f5', paper: '#ffffff' },
-                text: { primary: '#111827', secondary: '#6b7280' },
-                divider: 'rgba(0,0,0,0.08)'
-              }),
-        },
-        shape: { borderRadius: 12 },
-        typography: {
-          fontFamily: '"Be Vietnam Pro", "Inter", system-ui, sans-serif',
-          h4: { fontWeight: 700, letterSpacing: '-0.02em' },
-          h6: { fontWeight: 600 },
-        },
-        components: {
-          MuiCard: {
-            styleOverrides: {
-              root: ({ theme }) => ({
-                background: theme.palette.mode === 'dark' 
-                  ? 'linear-gradient(145deg, rgba(24, 24, 30, 0.95), rgba(16, 16, 20, 0.98))'
-                  : '#ffffff',
-                border: `1px solid ${theme.palette.divider}`,
-              }),
-            },
-          },
-        }
-      }),
+    () => createCinemaModeTheme(mode, '#e50914'),
     [mode],
   );
 
@@ -141,9 +102,14 @@ const StaffLayout = () => {
   const drawer = (
     <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', bgcolor: 'background.paper' }}>
       <Stack direction="row" alignItems="center" spacing={1.5} sx={{ px: 2, py: 2.5, flexShrink: 0 }}>
-        <Box component="img" src="/logo-removebg-preview.png" alt="ThauFilm" sx={{ height: 36, width: 'auto', objectFit: 'contain' }} />
+        <Box
+          component="img"
+          src="/logo-removebg-preview.png"
+          alt="ThauFilm"
+          sx={{ height: 36, width: 'auto', objectFit: 'contain', opacity: 1 }}
+        />
         <Box sx={{ minWidth: 0 }}>
-          <Typography sx={{ fontWeight: 800, fontSize: '0.95rem', lineHeight: 1.2 }} noWrap>
+          <Typography color="text.primary" sx={{ fontWeight: 800, fontSize: '0.95rem', lineHeight: 1.2 }} noWrap>
             ThauFilm Staff
           </Typography>
           <Typography variant="caption" sx={{ color: 'text.secondary' }}>
@@ -238,7 +204,7 @@ const StaffLayout = () => {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default' }}>
+      <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'background.default', color: 'text.primary' }}>
         
         {/* Mobile Drawer */}
         <Drawer
@@ -321,7 +287,7 @@ const StaffLayout = () => {
                 </Breadcrumbs>
               </Box>
 
-              <IconButton onClick={toggleTheme} sx={{ color: 'text.secondary' }}>
+              <IconButton onClick={toggleMode} sx={{ color: 'text.secondary' }}>
                 {mode === 'dark' ? <LightModeRoundedIcon /> : <DarkModeRoundedIcon />}
               </IconButton>
               

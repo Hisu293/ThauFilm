@@ -9,6 +9,8 @@ import com.filmticket.repository.*;
 import com.filmticket.websocket.RealtimeEventService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -195,14 +197,32 @@ public class RefundRequestService {
     }
 
     @Transactional(readOnly = true)
-    public List<RefundRequestDto> staffRequests(UUID staffId) {
+    public Page<RefundRequestDto> staffRequests(UUID staffId, RefundRequestStatus status, Pageable pageable) {
         requireShiftLeader(staffId);
-        return enrich(refundRepository.findAllByOrderByCreatedAtDesc());
+        return refundPage(status, pageable);
     }
 
     @Transactional(readOnly = true)
-    public List<RefundRequestDto> adminRequests() {
-        return enrich(refundRepository.findAllByOrderByCreatedAtDesc());
+    public Page<RefundRequestDto> adminRequests(RefundRequestStatus status, Pageable pageable) {
+        return refundPage(status, pageable);
+    }
+
+    private Page<RefundRequestDto> refundPage(RefundRequestStatus status, Pageable pageable) {
+        Page<RefundRequest> requests = status == null
+                ? refundRepository.findAllByOrderByCreatedAtDesc(pageable)
+                : refundRepository.findByStatusOrderByCreatedAtDesc(status, pageable);
+        return requests.map(this::toListDto);
+    }
+
+    @Transactional(readOnly = true)
+    public RefundRequestDto staffRequest(UUID staffId, UUID requestId) {
+        requireShiftLeader(staffId);
+        return toDto(requireRequest(requestId));
+    }
+
+    @Transactional(readOnly = true)
+    public RefundRequestDto adminRequest(UUID requestId) {
+        return toDto(requireRequest(requestId));
     }
 
     @Transactional
@@ -564,6 +584,11 @@ public class RefundRequestService {
         return request;
     }
 
+    private RefundRequest requireRequest(UUID id) {
+        return refundRepository.findById(id)
+                .orElseThrow(() -> new BadRequestException("Không tìm thấy yêu cầu hoàn tiền"));
+    }
+
     private Booking requireBooking(UUID id) {
         return bookingRepository.findById(id).orElseThrow(() -> new BadRequestException("Không tìm thấy booking"));
     }
@@ -598,6 +623,14 @@ public class RefundRequestService {
     }
 
     private RefundRequestDto toDto(RefundRequest request) {
+        return toDto(request, true);
+    }
+
+    private RefundRequestDto toListDto(RefundRequest request) {
+        return toDto(request, false);
+    }
+
+    private RefundRequestDto toDto(RefundRequest request, boolean includeEvidence) {
         Booking booking = bookingRepository.findById(request.getBookingId()).orElse(null);
         User customer = userRepository.findById(request.getCustomerId()).orElse(null);
         User staff = request.getStaffId() == null ? null : userRepository.findById(request.getStaffId()).orElse(null);
@@ -609,17 +642,18 @@ public class RefundRequestService {
         UUID paidByUserId = refundPayment == null || refundPayment.getPaidByUserId() == null
                 ? request.getCustomerId() : refundPayment.getPaidByUserId();
         User paidByUser = userRepository.findById(paidByUserId).orElse(null);
-        OnlineMovieView firstView = onlineMovieViewRepository
-                .findFirstByBookingIdOrderByViewedAtAsc(request.getBookingId()).orElse(null);
+        OnlineMovieView firstView = includeEvidence ? onlineMovieViewRepository
+                .findFirstByBookingIdOrderByViewedAtAsc(request.getBookingId()).orElse(null) : null;
         LocalDateTime now = LocalDateTime.now();
-        boolean ticketCheckedIn = ticketRepository.findByBookingId(request.getBookingId()).stream().anyMatch(Ticket::isCheckedIn);
+        boolean ticketCheckedIn = includeEvidence
+                && ticketRepository.findByBookingId(request.getBookingId()).stream().anyMatch(Ticket::isCheckedIn);
         boolean showtimeStarted = showtime != null && !now.isBefore(showtime.getStartTime());
         boolean showtimeEnded = showtime != null && !now.isBefore(showtime.getEndTime());
         String showtimePhase = showtime == null ? "UNKNOWN"
                 : showtimeEnded ? "ENDED" : showtimeStarted ? "IN_PROGRESS" : "NOT_STARTED";
         String ticketCode = request.getTicketCode() == null ? "" : request.getTicketCode();
         String bookingType = ticketCode.startsWith("SYS-WATCH-") ? "WATCH_PARTY"
-                : ticketCode.startsWith("SYS-GROUP-") || (booking != null && groupBookingMemberRepository.existsByBookingId(booking.getId()))
+                : ticketCode.startsWith("SYS-GROUP-") || (includeEvidence && booking != null && groupBookingMemberRepository.existsByBookingId(booking.getId()))
                 ? "GROUP_BOOKING"
                 : showtime != null && showtime.isOnline() ? "ONLINE" : "CINEMA";
         List<String> reviewWarnings = new ArrayList<>();

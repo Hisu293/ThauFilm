@@ -97,6 +97,7 @@ const RefundSection = () => {
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
   const [page, setPage] = useState(0);
+  const [totalElements, setTotalElements] = useState(0);
   const [approving, setApproving] = useState(null);
   const [rejecting, setRejecting] = useState(null);
   const [selected, setSelected] = useState(null);
@@ -107,14 +108,19 @@ const RefundSection = () => {
     else setLoading(true);
     setError('');
     try {
-      setItems(await adminService.getRefundRequests());
+      const result = await adminService.getRefundRequests({
+        page,
+        ...(statusFilter === 'ALL' ? {} : { status: statusFilter }),
+      });
+      setItems(Array.isArray(result?.content) ? result.content : []);
+      setTotalElements(Number(result?.totalElements) || 0);
     } catch (err) {
       setError(err.message || 'Không thể tải yêu cầu hoàn tiền.');
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [page, statusFilter]);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -151,11 +157,21 @@ const RefundSection = () => {
         .some((value) => String(value || '').toLocaleLowerCase('vi').includes(keyword));
     });
   }, [items, query, statusFilter]);
-  const pageCount = Math.max(1, Math.ceil(filteredItems.length / 10));
-  const safePage = Math.min(page, pageCount - 1);
-  const pagedItems = filteredItems.slice(safePage * 10, safePage * 10 + 10);
+  const pagedItems = filteredItems;
 
   const patchItem = (updated) => setItems((list) => list.map((item) => (item.id === updated.id ? updated : item)));
+
+  const openDetail = async (item) => {
+    setBusy(true);
+    setError('');
+    try {
+      setSelected(await adminService.getRefundRequest(item.id));
+    } catch (err) {
+      setError(err.message || 'Không thể tải chi tiết yêu cầu hoàn tiền.');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const approve = async () => {
     if (!approving) return;
@@ -164,6 +180,7 @@ const RefundSection = () => {
     try {
       patchItem(await adminService.approveRefund(approving.id));
       setApproving(null);
+      await load(true);
     } catch (err) {
       setError(err.message || 'Không thể duyệt yêu cầu.');
     } finally {
@@ -179,6 +196,7 @@ const RefundSection = () => {
       patchItem(await adminService.rejectRefund(rejecting.id, reason));
       setRejecting(null);
       setReason('');
+      await load(true);
     } catch (err) {
       setError(err.message || 'Không thể từ chối yêu cầu.');
     } finally {
@@ -201,10 +219,10 @@ const RefundSection = () => {
   };
 
   const metrics = [
-    { label: 'Chờ Admin duyệt', value: stats.pending, icon: PendingActionsRoundedIcon, color: '#f59e0b' },
-    { label: 'Tổng tiền đang chờ', value: money(stats.amount), icon: CurrencyExchangeRoundedIcon, color: '#ef4444' },
-    { label: 'Đã hoàn thành', value: stats.approved, icon: TaskAltRoundedIcon, color: '#22c55e' },
-    { label: 'Đã từ chối', value: stats.rejected, icon: CancelRoundedIcon, color: '#94a3b8' },
+    { label: 'Chờ duyệt trên trang', value: stats.pending, icon: PendingActionsRoundedIcon, color: '#f59e0b' },
+    { label: 'Tiền chờ trên trang', value: money(stats.amount), icon: CurrencyExchangeRoundedIcon, color: '#ef4444' },
+    { label: 'Hoàn thành trên trang', value: stats.approved, icon: TaskAltRoundedIcon, color: '#22c55e' },
+    { label: 'Từ chối trên trang', value: stats.rejected, icon: CancelRoundedIcon, color: '#94a3b8' },
   ];
 
   return <Stack spacing={1.5}>
@@ -254,7 +272,7 @@ const RefundSection = () => {
             size="small"
             value={query}
             onChange={(event) => { setQuery(event.target.value); setPage(0); }}
-            placeholder="Tìm mã booking, mã vé, khách hàng, phim..."
+      placeholder="Tìm trong 10 yêu cầu trên trang..."
             sx={{ width: { xs: '100%', sm: 380 } }}
             slotProps={{ input: { startAdornment: <InputAdornment position="start"><SearchRoundedIcon fontSize="small" /></InputAdornment> } }}
           />
@@ -296,7 +314,8 @@ const RefundSection = () => {
                       size="small"
                       variant="outlined"
                       startIcon={<VisibilityRoundedIcon />}
-                      onClick={() => setSelected(item)}
+                      onClick={() => openDetail(item)}
+                      disabled={busy}
                       sx={{ flexShrink: 0 }}
                     >
                       Xem
@@ -317,8 +336,8 @@ const RefundSection = () => {
       </TableContainer>}
       {!loading && <TablePagination
         component="div"
-        count={filteredItems.length}
-        page={safePage}
+        count={totalElements}
+        page={page}
         onPageChange={(_, nextPage) => setPage(nextPage)}
         rowsPerPage={10}
         rowsPerPageOptions={[10]}

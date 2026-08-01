@@ -33,7 +33,7 @@ const SectionState = ({ loading, error, empty, emptyText = 'Không có dữ li�
 
   if (empty) {
     return (
-      <Box sx={{ textAlign: 'center', py: 6, color: 'rgba(255,255,255,0.4)' }}>
+      <Box sx={{ textAlign: 'center', py: 6, color: 'text.secondary' }}>
         <Typography>{emptyText}</Typography>
       </Box>
     );

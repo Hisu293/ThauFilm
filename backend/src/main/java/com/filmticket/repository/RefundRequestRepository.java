@@ -6,6 +6,8 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 
 import jakarta.persistence.LockModeType;
 
@@ -16,6 +18,8 @@ import java.util.UUID;
 
 public interface RefundRequestRepository extends JpaRepository<RefundRequest, UUID> {
     List<RefundRequest> findAllByOrderByCreatedAtDesc();
+    Page<RefundRequest> findAllByOrderByCreatedAtDesc(Pageable pageable);
+    Page<RefundRequest> findByStatusOrderByCreatedAtDesc(RefundRequestStatus status, Pageable pageable);
     List<RefundRequest> findByCustomerIdOrderByCreatedAtDesc(UUID customerId);
     @Query("select distinct request from RefundRequest request, Payment payment " +
             "where request.paymentId = payment.id " +

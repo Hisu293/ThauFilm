@@ -2,16 +2,18 @@ package com.filmticket.controller;
 
 import com.filmticket.dto.ApiResponse;
 import com.filmticket.dto.RefundRequestDto;
+import com.filmticket.entity.RefundRequestStatus;
 import com.filmticket.service.CurrentUserService;
 import com.filmticket.service.RefundRequestService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -23,8 +25,17 @@ public class AdminRefundController {
     private final CurrentUserService currentUserService;
 
     @GetMapping
-    public ResponseEntity<ApiResponse<List<RefundRequestDto>>> list() {
-        return ResponseEntity.ok(ApiResponse.success("Refund requests fetched", refundService.adminRequests()));
+    public ResponseEntity<ApiResponse<Page<RefundRequestDto>>> list(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(required = false) RefundRequestStatus status) {
+        return ResponseEntity.ok(ApiResponse.success("Refund requests fetched",
+                refundService.adminRequests(status, PageRequest.of(Math.max(0, page), 10))));
+    }
+
+    @GetMapping("/{requestId}")
+    public ResponseEntity<ApiResponse<RefundRequestDto>> detail(@PathVariable UUID requestId) {
+        return ResponseEntity.ok(ApiResponse.success("Refund request fetched",
+                refundService.adminRequest(requestId)));
     }
 
     @PostMapping("/{requestId}/approve")

@@ -94,7 +94,7 @@ const CinemaPage = () => {
   }, [cinemas, query, city, brand]);
 
   return (
-    <Box sx={{ color: '#fff', pb: 8 }}>
+    <Box sx={{ color: 'text.primary', pb: 8 }}>
       <div className="cinema-hero">
         <div className="cinema-hero__inner">
           <Typography variant="overline" sx={{ color: '#e50914', fontWeight: 800, letterSpacing: '0.12em' }}>
@@ -108,7 +108,7 @@ const CinemaPage = () => {
       <Container maxWidth="xl" sx={{ mt: 3 }}>
         <div className="cinema-toolbar">
           <div className="cinema-search">
-            <SearchRoundedIcon sx={{ color: 'rgba(255,255,255,0.5)' }} />
+            <SearchRoundedIcon sx={{ color: 'text.secondary' }} />
             <input placeholder="Tìm rạp theo tên hoặc địa chỉ…" value={query} onChange={(e) => setQuery(e.target.value)} />
           </div>
           <div className="cinema-filters">
@@ -124,7 +124,7 @@ const CinemaPage = () => {
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}><CircularProgress color="error" /></Box>
         ) : filtered.length === 0 ? (
-          <Typography sx={{ textAlign: 'center', py: 8, color: 'rgba(255,255,255,0.6)' }}>
+          <Typography sx={{ textAlign: 'center', py: 8, color: 'text.secondary' }}>
             Không tìm thấy rạp phù hợp.
           </Typography>
         ) : (

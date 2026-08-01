@@ -35,7 +35,7 @@ import SectionState from '../components/SectionState';
 import StatusChip from '../components/StatusChip';
 import { USER_ROLES } from '../../services/adminService';
 
-const thSx = { color: 'rgba(255,255,255,0.45)', fontWeight: 600 };
+const thSx = { color: 'text.secondary', fontWeight: 600 };
 
 /** Tài khoản đang bật hay không (DTO có thể không trả `enabled` → mặc định bật). */
 const isEnabled = (u) => u.enabled !== false;

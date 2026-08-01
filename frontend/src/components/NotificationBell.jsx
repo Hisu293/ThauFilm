@@ -59,10 +59,14 @@ export default function NotificationBell({ onNavigate }) {
         width: 42,
         height: 42,
         flex: '0 0 42px',
-        color: '#fff',
-        bgcolor: 'rgba(255,255,255,.07)',
-        border: '1px solid rgba(255,255,255,.12)',
-        '&:hover': { bgcolor: 'rgba(255,255,255,.14)' },
+        color: 'text.secondary',
+        bgcolor: 'action.hover',
+        border: '1px solid',
+        borderColor: 'divider',
+        '&:hover': {
+          color: 'text.primary',
+          bgcolor: 'action.selected',
+        },
       }}
     >
       <Badge badgeContent={unread} color="error"><NotificationsNoneRoundedIcon /></Badge>

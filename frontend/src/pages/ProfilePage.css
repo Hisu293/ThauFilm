@@ -9,6 +9,34 @@
   align-items: start;
 }
 
+html[data-color-mode='light'] .pf-page { color: #172033; }
+html[data-color-mode='light'] .pf-card {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(15, 23, 42, 0.10);
+  box-shadow: 0 16px 44px rgba(15, 23, 42, 0.08);
+}
+html[data-color-mode='light'] .pf-menu__item { color: #667085; }
+html[data-color-mode='light'] .pf-menu__item:hover { background: rgba(15, 23, 42, 0.05); color: #172033; }
+html[data-color-mode='light'] .pf-menu__item.is-active { color: #fff; }
+html[data-color-mode='light'] .pf-count,
+html[data-color-mode='light'] .pf-tab,
+html[data-color-mode='light'] .pf-btn--ghost {
+  color: #667085;
+  background: rgba(15, 23, 42, 0.05);
+  border-color: rgba(15, 23, 42, 0.10);
+}
+html[data-color-mode='light'] .pf-tab.is-active { color: #fff; background: #e50914; }
+html[data-color-mode='light'] .pf-form label,
+html[data-color-mode='light'] .pf-settings-row__desc,
+html[data-color-mode='light'] .pf-empty,
+html[data-color-mode='light'] .pf-empty-state p { color: #667085; }
+html[data-color-mode='light'] .pf-form input,
+html[data-color-mode='light'] .pf-select {
+  background: #fff;
+  color: #172033;
+  border-color: rgba(15, 23, 42, 0.14);
+}
+
 .pf-card {
   background: rgba(20, 20, 24, 0.72);
   backdrop-filter: blur(16px);

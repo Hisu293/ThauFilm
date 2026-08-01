@@ -278,7 +278,7 @@ export const MoviesSection = ({ crud, genres = [] }) => {
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
-                <SearchRoundedIcon fontSize="small" sx={{ color: 'rgba(255,255,255,0.4)' }} />
+                <SearchRoundedIcon fontSize="small" sx={{ color: 'text.secondary' }} />
               </InputAdornment>
             ),
           }}
@@ -309,7 +309,7 @@ export const MoviesSection = ({ crud, genres = [] }) => {
             Xóa lọc
           </Button>
         )}
-        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', ml: 'auto' }}>
+        <Typography variant="caption" sx={{ color: 'text.secondary', ml: 'auto' }}>
           {filtered.length}/{crud.list.length} phim
         </Typography>
       </Box>
@@ -337,7 +337,7 @@ export const MoviesSection = ({ crud, genres = [] }) => {
               )}
               {!crud.loading && filtered.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 4, color: 'rgba(255,255,255,0.4)' }}>
+                  <TableCell colSpan={6} align="center" sx={{ py: 4, color: 'text.secondary' }}>
                     {crud.list.length === 0 ? 'Chưa có phim nào' : 'Không có phim khớp bộ lọc'}
                   </TableCell>
                 </TableRow>
@@ -362,7 +362,7 @@ export const MoviesSection = ({ crud, genres = [] }) => {
                         size="small"
                         onClick={() => openEdit(m)}
                         disabled={editLoadingId === m.id}
-                        sx={{ color: 'rgba(255,255,255,0.5)' }}
+                        sx={{ color: 'text.secondary' }}
                         title="Sửa"
                       >
                         {editLoadingId === m.id ? <CircularProgress size={16} /> : <EditRoundedIcon fontSize="small" />}
@@ -401,7 +401,7 @@ export const MoviesSection = ({ crud, genres = [] }) => {
         saving={saving || streamUploading || hasMediaUpload}
       >
         {formError && <Alert severity="error" sx={{ mb: 1 }}>{formError}</Alert>}
-        <Box sx={{ p: 2, borderRadius: 2.5, bgcolor: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.08)' }}>
+        <Box sx={{ p: 2, borderRadius: 2.5, bgcolor: 'action.hover', border: '1px solid', borderColor: 'divider' }}>
           <Typography variant="subtitle1" fontWeight={800} sx={{ mb: 1.5 }}>Thông tin cơ bản</Typography>
           <Stack spacing={2}>
             <TextField label="Tên phim" fullWidth value={form.title} onChange={set('title')} />
@@ -461,7 +461,7 @@ export const MoviesSection = ({ crud, genres = [] }) => {
           </Stack>
         </Box>
         <Divider />
-        <Box sx={{ p: 2, borderRadius: 2.5, bgcolor: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.08)' }}>
+        <Box sx={{ p: 2, borderRadius: 2.5, bgcolor: 'action.hover', border: '1px solid', borderColor: 'divider' }}>
           <Typography variant="subtitle1" fontWeight={800} sx={{ mb: 1.5 }}>Phim online</Typography>
           <Stack spacing={2}>
         <Stack direction="row" spacing={2}>
@@ -678,7 +678,7 @@ const EntityDialog = ({ open, title, onClose, onSave, saving, children }) => (
 
 const ActionBtns = ({ onEdit, onDelete }) => (
   <>
-    <IconButton size="small" onClick={onEdit} sx={{ color: 'rgba(255,255,255,0.5)' }}>
+    <IconButton size="small" onClick={onEdit} sx={{ color: 'text.secondary' }}>
       <EditRoundedIcon fontSize="small" />
     </IconButton>
     <IconButton size="small" onClick={onDelete} sx={{ color: '#f87171' }}>
@@ -687,4 +687,4 @@ const ActionBtns = ({ onEdit, onDelete }) => (
   </>
 );
 
-const thSx = { color: 'rgba(255,255,255,0.45)', fontWeight: 600 };
+const thSx = { color: 'text.secondary', fontWeight: 600 };

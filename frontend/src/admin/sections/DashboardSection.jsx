@@ -27,7 +27,7 @@ const StatCard = ({ icon: Icon, label, value, accent }) => (
     <Box sx={{ width: 40, height: 40, borderRadius: 2, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: `${accent}22`, color: accent }}>
       <Icon fontSize="small" />
     </Box>
-    <Typography variant="caption" sx={{ mt: 2, display: 'block', color: 'rgba(255,255,255,0.5)' }}>
+    <Typography variant="caption" sx={{ mt: 2, display: 'block', color: 'text.secondary' }}>
       {label}
     </Typography>
     <Typography variant="h5" sx={{ fontWeight: 800 }}>
@@ -172,7 +172,7 @@ const DashboardSection = ({ dashboard, users }) => {
   );
 };
 
-const thSx = { color: 'rgba(255,255,255,0.45)', fontWeight: 600 };
+const thSx = { color: 'text.secondary', fontWeight: 600 };
 
 const Row = ({ label, value }) => (
   <Stack direction="row" justifyContent="space-between" alignItems="center">

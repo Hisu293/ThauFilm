@@ -18,15 +18,19 @@ import {
   Typography,
 } from '@mui/material';
 import MenuRoundedIcon from '@mui/icons-material/MenuRounded';
+import LightModeRoundedIcon from '@mui/icons-material/LightModeRounded';
+import DarkModeRoundedIcon from '@mui/icons-material/DarkModeRounded';
 import KeyboardArrowDownRoundedIcon from '@mui/icons-material/KeyboardArrowDownRounded';
 import UserMenu, { AuthButtons } from '../UserMenu';
 import { useAuth } from '../../context/AuthContext';
 import { NAV_LINKS } from '../../theme/theme';
 import NotificationBell from '../NotificationBell';
 import MovieSearch from './MovieSearch';
+import { useColorMode } from '../../context/ColorModeContext';
 
 const SiteNavbar = () => {
   const { isLoggedIn } = useAuth();
+  const { mode, isDark, toggleMode } = useColorMode();
   const { pathname } = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [communityAnchor, setCommunityAnchor] = useState(null);
@@ -37,6 +41,9 @@ const SiteNavbar = () => {
   const primaryLinks = NAV_LINKS.slice(0, 4);
   const communityLinks = NAV_LINKS.slice(4);
   const communityActive = communityLinks.some((link) => isActive(link.to));
+  const lightSolid = !isDark && solidHeader;
+  const navText = lightSolid ? '#172033' : '#fff';
+  const navMuted = lightSolid ? 'rgba(23,32,51,.72)' : 'rgba(255,255,255,.8)';
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 24);
@@ -53,8 +60,8 @@ const SiteNavbar = () => {
         sx={{
           zIndex: (theme) => theme.zIndex.drawer + 1,
           backdropFilter: solidHeader ? 'blur(16px)' : 'none',
-          borderBottom: solidHeader ? '1px solid rgba(255,255,255,0.08)' : '1px solid transparent',
-          backgroundColor: solidHeader ? 'rgba(7,7,9,0.94)' : 'transparent',
+          borderBottom: solidHeader ? (lightSolid ? '1px solid rgba(15,23,42,.1)' : '1px solid rgba(255,255,255,0.08)') : '1px solid transparent',
+          backgroundColor: solidHeader ? (lightSolid ? 'rgba(255,255,255,.94)' : 'rgba(7,7,9,0.94)') : 'transparent',
           boxShadow: solidHeader ? '0 8px 28px rgba(0,0,0,.24)' : 'none',
           transition: 'background-color .28s ease, border-color .28s ease, box-shadow .28s ease, backdrop-filter .28s ease',
         }}
@@ -70,7 +77,7 @@ const SiteNavbar = () => {
               sx={{ mr: { md: 2, xl: 3 }, textDecoration: 'none', flexShrink: 0 }}
             >
               <Box component="img" src="/logo-removebg-preview.png" alt="ThauFilm" sx={{ height: 36, width: 'auto', objectFit: 'contain' }} />
-              <Typography variant="h6" noWrap sx={{ fontWeight: 800, color: '#fff', letterSpacing: '0.01em' }}>
+              <Typography variant="h6" noWrap sx={{ fontWeight: 800, color: navText, letterSpacing: '0.01em' }}>
                 ThauFilm
               </Typography>
             </Stack>
@@ -99,7 +106,7 @@ const SiteNavbar = () => {
                     flexShrink: 0,
                     minWidth: 0,
                     px: { md: 0.75, xl: 1.15 },
-                    color: isActive(link.to) ? '#fff' : 'rgba(255,255,255,0.8)',
+                    color: isActive(link.to) ? navText : navMuted,
                     borderRadius: '8px',
                     position: 'relative',
                     '&::after': isActive(link.to)
@@ -114,7 +121,7 @@ const SiteNavbar = () => {
                           backgroundColor: 'primary.main',
                         }
                       : {},
-                    '&:hover': { color: '#fff', backgroundColor: 'rgba(255,255,255,0.07)' },
+                    '&:hover': { color: navText, backgroundColor: lightSolid ? 'rgba(15,23,42,.055)' : 'rgba(255,255,255,0.07)' },
                   }}
                 >
                   {link.label}
@@ -131,7 +138,7 @@ const SiteNavbar = () => {
                   whiteSpace: 'nowrap',
                   minWidth: 0,
                   px: { md: 0.75, xl: 1.15 },
-                  color: communityActive ? '#fff' : 'rgba(255,255,255,0.8)',
+                  color: communityActive ? navText : navMuted,
                   borderRadius: '8px',
                   position: 'relative',
                   '&::after': communityActive
@@ -146,7 +153,7 @@ const SiteNavbar = () => {
                         backgroundColor: 'primary.main',
                       }
                     : {},
-                  '&:hover': { color: '#fff', backgroundColor: 'rgba(255,255,255,0.07)' },
+                  '&:hover': { color: navText, backgroundColor: lightSolid ? 'rgba(15,23,42,.055)' : 'rgba(255,255,255,0.07)' },
                 }}
               >
                 Cộng đồng
@@ -163,9 +170,12 @@ const SiteNavbar = () => {
                 whiteSpace: 'nowrap',
                 pl: { md: 1, xl: 2 },
                 ml: { md: 0.5, xl: 1 },
-                borderLeft: { md: '1px solid rgba(255,255,255,.1)' },
+                borderLeft: { md: lightSolid ? '1px solid rgba(15,23,42,.1)' : '1px solid rgba(255,255,255,.1)' },
               }}
             >
+              <IconButton onClick={toggleMode} aria-label="Đổi giao diện sáng tối" sx={{ color: navMuted }}>
+                {mode === 'dark' ? <LightModeRoundedIcon /> : <DarkModeRoundedIcon />}
+              </IconButton>
               {isLoggedIn && <NotificationBell />}
               {isLoggedIn && <UserMenu />}
               <AuthButtons />
@@ -194,9 +204,10 @@ const SiteNavbar = () => {
               mt: 1,
               minWidth: 220,
               borderRadius: 2,
-              bgcolor: 'rgba(15,15,18,.98)',
-              color: '#fff',
-              border: '1px solid rgba(255,255,255,.1)',
+              bgcolor: isDark ? 'rgba(15,15,18,.98)' : '#fff',
+              color: 'text.primary',
+              border: '1px solid',
+              borderColor: 'divider',
               boxShadow: '0 18px 50px rgba(0,0,0,.45)',
             },
           },
@@ -223,10 +234,10 @@ const SiteNavbar = () => {
         ModalProps={{ keepMounted: true }}
         sx={{ display: { md: 'none' }, '& .MuiDrawer-paper': { width: 240 } }}
       >
-        <Box onClick={() => setMobileOpen(false)} sx={{ backgroundColor: '#0f0f0f', height: '100%', pt: 2 }}>
+        <Box onClick={() => setMobileOpen(false)} sx={{ backgroundColor: 'background.paper', color: 'text.primary', height: '100%', pt: 2 }}>
           <Stack direction="row" alignItems="center" spacing={1} sx={{ px: 2, mb: 2 }}>
             <Box component="img" src="/logo-removebg-preview.png" alt="ThauFilm" sx={{ height: 28, width: 'auto' }} />
-            <Typography variant="h6" sx={{ fontWeight: 800, color: '#fff' }}>
+            <Typography variant="h6" sx={{ fontWeight: 800, color: 'text.primary' }}>
               ThauFilm
             </Typography>
           </Stack>
@@ -239,7 +250,7 @@ const SiteNavbar = () => {
                 <ListItemButton component={RouterLink} to={link.to} sx={{ '&:hover': { backgroundColor: 'rgba(229,9,20,0.1)' } }}>
                   <ListItemText
                     primary={link.label}
-                    primaryTypographyProps={{ color: 'rgba(255,255,255,0.85)', fontWeight: 600 }}
+                    primaryTypographyProps={{ color: 'text.primary', fontWeight: 600 }}
                   />
                 </ListItemButton>
               </ListItem>

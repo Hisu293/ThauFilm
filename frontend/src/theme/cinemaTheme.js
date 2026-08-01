@@ -309,6 +309,80 @@ export const cinemaTheme = createTheme({
   },
 });
 
+export const createCinemaModeTheme = (mode = 'dark', primaryMain = cinemaTokens.palette.gold) => {
+  const dark = mode === 'dark';
+  const goldPrimary = primaryMain.toLowerCase() === cinemaTokens.palette.gold.toLowerCase();
+  const background = dark
+    ? { default: cinemaTokens.palette.ink, paper: cinemaTokens.palette.surfaceSoft }
+    : { default: '#F4F6FA', paper: '#FFFFFF' };
+  const text = dark
+    ? { primary: cinemaTokens.palette.text, secondary: cinemaTokens.palette.muted }
+    : { primary: '#172033', secondary: '#667085' };
+  const divider = dark ? cinemaTokens.palette.line : 'rgba(15, 23, 42, 0.10)';
+
+  return createTheme(cinemaTheme, {
+    palette: {
+      mode,
+      primary: { main: primaryMain, contrastText: goldPrimary ? '#0B1020' : '#FFFFFF' },
+      background,
+      text,
+      divider,
+      action: {
+        hover: dark ? 'rgba(255,255,255,0.055)' : 'rgba(15,23,42,0.055)',
+        selected: dark ? 'rgba(251,191,36,0.16)' : 'rgba(229,9,20,0.09)',
+      },
+    },
+    components: {
+      MuiCssBaseline: {
+        styleOverrides: {
+          body: { backgroundColor: background.default, color: text.primary },
+        },
+      },
+      MuiCard: {
+        styleOverrides: {
+          root: {
+            backgroundColor: background.paper,
+            borderColor: divider,
+            boxShadow: dark ? cinemaTokens.shadow.card : '0 12px 34px rgba(15, 23, 42, 0.07)',
+          },
+        },
+      },
+      MuiButton: {
+        styleOverrides: {
+          containedPrimary: {
+            background: goldPrimary
+              ? `linear-gradient(135deg, ${cinemaTokens.palette.gold} 0%, #D97706 100%)`
+              : `linear-gradient(135deg, #EF4444 0%, ${primaryMain} 100%)`,
+            color: goldPrimary ? '#0B1020' : '#FFFFFF',
+          },
+        },
+      },
+      MuiDialog: {
+        styleOverrides: {
+          paper: { backgroundColor: background.paper, borderColor: divider },
+        },
+      },
+      MuiOutlinedInput: {
+        styleOverrides: {
+          root: { backgroundColor: dark ? 'rgba(255,255,255,0.035)' : 'rgba(15,23,42,0.025)' },
+          notchedOutline: { borderColor: dark ? 'rgba(148,163,184,0.18)' : 'rgba(15,23,42,0.16)' },
+        },
+      },
+      MuiTableCell: {
+        styleOverrides: {
+          root: { borderColor: divider },
+          head: { color: text.secondary },
+        },
+      },
+      MuiTab: {
+        styleOverrides: {
+          root: { color: text.secondary },
+        },
+      },
+    },
+  });
+};
+
 export const NAV_LINKS = [
   { label: t('common', 'home'), to: '/' },
   { label: 'Phim', to: '/movies' },

@@ -84,7 +84,7 @@ const JsonBlock = ({ title, value }) => {
         p: 1.25,
         borderRadius: 1.5,
         overflow: 'auto',
-        bgcolor: 'rgba(255,255,255,.04)',
+        bgcolor: 'action.hover',
         fontSize: 12,
         whiteSpace: 'pre-wrap',
       }}>
@@ -127,7 +127,7 @@ const AuditRow = ({ item }) => {
       <TableRow>
         <TableCell colSpan={7} sx={{ p: 0, borderBottom: open ? undefined : 0 }}>
           <Collapse in={open} timeout="auto" unmountOnExit>
-            <Stack spacing={1.5} sx={{ p: 2, bgcolor: 'rgba(255,255,255,.015)' }}>
+            <Stack spacing={1.5} sx={{ p: 2, bgcolor: 'action.hover' }}>
               <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
                 <Typography variant="caption">Đối tượng: {item.targetType || '—'} / {item.targetId || '—'}</Typography>
                 <Typography variant="caption">Request ID: {item.requestId || '—'}</Typography>

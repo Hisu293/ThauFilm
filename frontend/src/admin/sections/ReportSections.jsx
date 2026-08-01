@@ -15,7 +15,7 @@ import WorkspacePremiumRoundedIcon from '@mui/icons-material/WorkspacePremiumRou
 import SectionHeader from '../components/SectionHeader';
 import { adminService } from '../../services/adminService';
 
-const thSx = { color: 'rgba(255,255,255,0.45)', fontWeight: 600 };
+const thSx = { color: 'text.secondary', fontWeight: 600 };
 const money = (value) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND', maximumFractionDigits: 0 }).format(Number(value || 0));
 const shortDate = (date) => new Date(`${date}T00:00:00`).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
 

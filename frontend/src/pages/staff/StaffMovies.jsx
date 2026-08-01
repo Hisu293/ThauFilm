@@ -175,7 +175,7 @@ const StaffMovies = () => {
         sx={{ mb: 3 }}
       >
         <Box>
-          <Typography variant="h4" sx={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Typography variant="h4" color="text.primary" sx={{ fontWeight: 800, display: 'flex', alignItems: 'center', gap: 1 }}>
             <MovieFilterRoundedIcon color="primary" /> Quản lý phim
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>

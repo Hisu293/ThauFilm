@@ -15,7 +15,8 @@ const getStaffAccess = () => {
 
 export const refundService = {
   staffAccess: getStaffAccess,
-  staffList: () => api.get('/api/staff/refunds').then(unwrap),
+  staffList: (params) => api.get('/api/staff/refunds', { params }).then(unwrap),
+  staffDetail: (id) => api.get(`/api/staff/refunds/${id}`).then(unwrap),
   staffCreate: (payload) => api.post('/api/staff/refunds', payload).then(unwrap),
   staffApprove: (id) => api.post(`/api/staff/refunds/${id}/approve`).then(unwrap),
   staffReject: (id, reason) => api.post(`/api/staff/refunds/${id}/reject`, { reason }).then(unwrap),
