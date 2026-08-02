@@ -31,11 +31,6 @@ const REACTION_OPTIONS = [
 
 const money = (value) => new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(Number(value) || 0);
 
-const getPublicAppUrl = () => {
-  const configuredUrl = String(import.meta.env.VITE_PUBLIC_APP_URL || '').trim();
-  return (configuredUrl || window.location.origin).replace(/\/+$/, '');
-};
-
 export default function WatchPartyPage() {
   const { roomId } = useParams();
   const location = useLocation();
@@ -63,7 +58,7 @@ export default function WatchPartyPage() {
   const [bankBin, setBankBin] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
 
-  const inviteUrl = room ? `${getPublicAppUrl()}${room.invitePath || `/watch-party/${room.id}`}` : '';
+  const inviteUrl = room ? `${window.location.origin}${room.invitePath || `/watch-party/${room.id}`}` : '';
   const me = room?.members?.find((member) => member.currentUser);
   const members = room?.members || [];
   const paidMemberCount = members.filter((member) => member.paid).length;
