@@ -77,8 +77,8 @@ const MoviesPage = () => {
     if (!root) return undefined;
     const updateRadius = () => {
       const { width, height } = root.getBoundingClientRect();
-      const minimum = width < 700 ? 410 : 560;
-      root.style.setProperty('--radius', `${Math.max(minimum, Math.min(width * 0.72, height * 1.35))}px`);
+      const minimum = width < 700 ? 370 : 500;
+      root.style.setProperty('--radius', `${Math.max(minimum, Math.min(width * 0.62, height * 1.15))}px`);
     };
     updateRadius();
     const observer = new ResizeObserver(updateRadius);
@@ -114,7 +114,13 @@ const MoviesPage = () => {
   }, [domeItems.length]);
 
   const handlePointerDown = (event) => {
-    if (event.button !== 0 || event.target.closest('.movie-dome-member-bar')) return;
+    // Buttons inside a poster must keep ownership of the pointer through pointerup.
+    // Capturing it on the dome page retargets the click to <main>, so the booking
+    // navigation and trailer dialog never run.
+    if (
+      event.button !== 0
+      || event.target.closest('button, a, input, select, textarea, [role="link"], .movie-dome-member-bar')
+    ) return;
     draggedRef.current = false;
     suppressClickRef.current = false;
     inertiaRef.current = { x: 0, y: 0 };

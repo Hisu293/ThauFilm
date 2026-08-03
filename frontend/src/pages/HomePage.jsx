@@ -41,7 +41,7 @@ const MovieConveyor = ({ movies }) => {
   const handlePointerDown = (event) => {
     if (
       event.button !== 0
-      || event.target.closest('input, select, textarea')
+      || event.target.closest('button, a, input, select, textarea, [role="button"], [role="link"]')
     ) return;
     draggedRef.current = false;
     scrollPositionRef.current = railRef.current.scrollLeft;
