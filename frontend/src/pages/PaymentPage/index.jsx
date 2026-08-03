@@ -112,7 +112,8 @@ const seatMatchesDiscount = (discount, selectedSeats = []) => {
   const selectedTypes = selectedSeats
     .map((seat) => String(seat.type || '').trim().toUpperCase())
     .filter(Boolean);
-  if (selectedTypes.length === 0) return false;
+  // Vé online không có ghế; backend tiếp tục kiểm tra điều kiện kênh ONLINE.
+  if (selectedTypes.length === 0) return true;
 
   return selectedTypes.some((type) => allowedTypes.includes(type));
 };
@@ -278,13 +279,23 @@ export const PaymentPage = () => {
 
     const loadPromotions = async () => {
       if (bookingMode === 'ONLINE_MOVIE') {
-        setDiscounts([]);
         setCombos([]);
-        setSelectedDiscountId('');
         setSelectedComboIds([]);
         setOriginalComboIds([]);
-        setLoadingPromotions(false);
-        setPromotionNotice('Vé xem phim online không áp dụng mã giảm giá hoặc combo bắp nước.');
+        setLoadingPromotions(true);
+        try {
+          const discountRes = await bookingApi.fetchActiveDiscounts();
+          if (!active) return;
+          const rawDiscounts = discountRes?.data ?? discountRes ?? [];
+          setDiscounts(bookingService.normalizeDiscounts(rawDiscounts));
+          setPromotionNotice('Đã tải các mã khuyến mãi áp dụng cho vé online.');
+        } catch {
+          if (!active) return;
+          setDiscounts([]);
+          setPromotionNotice('Không thể tải mã khuyến mãi cho vé online.');
+        } finally {
+          if (active) setLoadingPromotions(false);
+        }
         return;
       }
 
@@ -422,7 +433,7 @@ export const PaymentPage = () => {
         qr_pay: 'PAYOS',
       };
       const backendPaymentMethod = paymentMethodMap[paymentMethod] || 'CASH';
-      const discountCode = isOnlineMovieBooking ? '' : (selectedDiscount?.code || '');
+      const discountCode = selectedDiscount?.code || '';
       const comboSelectionChanged =
         !isOnlineMovieBooking && [...selectedComboIds].sort().join(',') !== [...originalComboIds].sort().join(',');
       updateBookingState({ bookingId, paymentStatus: 'PAYING' });

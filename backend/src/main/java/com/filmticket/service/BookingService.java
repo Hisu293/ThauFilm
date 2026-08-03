@@ -434,6 +434,7 @@ public class BookingService {
         BigDecimal originalAmount = booking.getTotalAmount();
         BigDecimal discountAmount = BigDecimal.ZERO;
         String discountCode = null;
+        UUID discountId = null;
 
         if (request.getDiscountCode() != null && !request.getDiscountCode().isBlank()) {
             List<BookingSeat> bsForDiscount = bookingSeatRepository.findByBookingId(bookingId);
@@ -443,8 +444,11 @@ public class BookingService {
                     .map(s -> s.getType().toStorageValue())
                     .distinct()
                     .toList();
-            discountAmount = discountService.calculateDiscount(request.getDiscountCode(), originalAmount, userId, seatTypes);
-            discountCode = request.getDiscountCode();
+            DiscountService.AppliedDiscount appliedDiscount = discountService.evaluateDiscount(
+                    request.getDiscountCode(), originalAmount, userId, seatTypes, booking);
+            discountAmount = appliedDiscount.amount();
+            discountCode = appliedDiscount.code();
+            discountId = appliedDiscount.discountId();
         }
 
         BigDecimal finalAmount = originalAmount.subtract(discountAmount);
@@ -454,6 +458,10 @@ public class BookingService {
                 .bookingId(booking.getId())
                 .paidByUserId(userId)
                 .amount(finalAmount)
+                .originalAmount(originalAmount)
+                .discountId(discountId)
+                .discountCode(discountCode)
+                .discountAmount(discountAmount)
                 .paymentMethod(paymentMethod)
                 .provider(resolveProvider(paymentMethod))
                 .status(isExternalProvider(paymentMethod) ? PaymentStatus.PENDING : PaymentStatus.PAID)
@@ -553,6 +561,9 @@ public class BookingService {
                                                       BigDecimal originalAmount, BigDecimal discountAmount,
                                                       String discountCode) {
 
+        if (discountCode == null) discountCode = payment.getDiscountCode();
+        if (payment.getDiscountAmount() != null) discountAmount = payment.getDiscountAmount();
+
         booking.setStatus(BookingStatus.CONFIRMED);
         booking.setConfirmedAt(now());
 
@@ -560,6 +571,7 @@ public class BookingService {
         markHeldSeatsSold(booking, bookingSeats);
 
         booking = bookingRepository.save(booking);
+        discountService.confirmUsage(payment);
         User user = userRepository.findById(booking.getUserId()).orElse(null);
 
         List<Ticket> tickets = ticketRepository.findByBookingId(booking.getId());

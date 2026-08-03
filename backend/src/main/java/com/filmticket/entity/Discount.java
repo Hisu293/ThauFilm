@@ -5,6 +5,7 @@ import lombok.*;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.UUID;
 
 @Entity
@@ -58,6 +59,53 @@ public class Discount {
     // Comma-separated seat types e.g. "STANDARD,VIP,COUPLE". NULL = applies to all seat types.
     @Column(length = 100)
     private String applicableSeatTypes;
+
+    @Column(name = "minimum_member_tier", nullable = false, length = 20)
+    @Builder.Default
+    private String minimumMemberTier = "V_STAR";
+
+    @Column(name = "customer_segment", nullable = false, length = 20)
+    @Builder.Default
+    private String customerSegment = "ALL";
+
+    @Column(name = "applicable_movie_ids", columnDefinition = "TEXT")
+    private String applicableMovieIds;
+
+    @Column(name = "applicable_genres", columnDefinition = "TEXT")
+    private String applicableGenres;
+
+    @Column(name = "applicable_theater_ids", columnDefinition = "TEXT")
+    private String applicableTheaterIds;
+
+    @Column(name = "applicable_room_ids", columnDefinition = "TEXT")
+    private String applicableRoomIds;
+
+    @Column(name = "applicable_showtime_ids", columnDefinition = "TEXT")
+    private String applicableShowtimeIds;
+
+    @Column(name = "applicable_channels", nullable = false, length = 100)
+    @Builder.Default
+    private String applicableChannels = "CINEMA";
+
+    @Column(name = "applicable_weekdays", length = 100)
+    private String applicableWeekdays;
+
+    @Column(name = "start_hour")
+    private LocalTime startHour;
+
+    @Column(name = "end_hour")
+    private LocalTime endHour;
+
+    @Column(name = "per_user_limit", nullable = false)
+    @Builder.Default
+    private Integer perUserLimit = 1;
+
+    @Column(name = "budget_limit", precision = 14, scale = 2)
+    private BigDecimal budgetLimit;
+
+    @Column(name = "budget_used", nullable = false, precision = 14, scale = 2)
+    @Builder.Default
+    private BigDecimal budgetUsed = BigDecimal.ZERO;
 
     @PrePersist
     public void prePersist() {

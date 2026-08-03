@@ -48,6 +48,7 @@ export default function WatchPartyPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [discountCode, setDiscountCode] = useState('');
   const [inviteCopied, setInviteCopied] = useState(false);
   const [streamUrl, setStreamUrl] = useState('');
   const [streamExpiresAt, setStreamExpiresAt] = useState('');
@@ -231,7 +232,7 @@ export default function WatchPartyPage() {
   const pay = async () => {
     setBusy(true);
     try {
-      const next = await watchPartyService.pay(roomId);
+      const next = await watchPartyService.pay(roomId, discountCode.trim().toUpperCase());
       setRoom(next);
       if (next?.checkoutUrl) {
         window.location.href = next.checkoutUrl;
@@ -351,6 +352,7 @@ export default function WatchPartyPage() {
               {inviteCopied ? 'Đã copy' : 'Copy link mời'}
             </Button>
             {!me?.paid && <Button variant="outlined" disabled={busy} onClick={syncPayment}>Cập nhật thanh toán</Button>}
+            {!me?.paid && <TextField size="small" label="Mã khuyến mãi" value={discountCode} onChange={(event) => setDiscountCode(event.target.value.toUpperCase())} sx={{ minWidth: 150 }} />}
             {!me?.paid && <Button variant="contained" disabled={busy} onClick={pay}>Thanh toán phần tôi</Button>}
             {room.readyToWatch && <Button variant="contained" startIcon={<PlayArrowRoundedIcon />} onClick={() => videoRef.current?.play()}>Xem</Button>}
             {me?.paid && (

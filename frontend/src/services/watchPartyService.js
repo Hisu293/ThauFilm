@@ -20,7 +20,7 @@ export const watchPartyService = {
     null,
     viewingConfig(),
   )),
-  pay: async (roomId) => unwrap(await api.post(`/api/member/watch-parties/${roomId}/pay`)),
+  pay: async (roomId, discountCode = '') => unwrap(await api.post(`/api/member/watch-parties/${roomId}/pay`, { discountCode })),
   syncPayment: async (roomId) => unwrap(await api.post(`/api/member/watch-parties/${roomId}/sync-payment`)),
   refund: async (roomId, payload) => unwrap(await api.post(`/api/member/watch-parties/${roomId}/refund`, payload)),
 };

@@ -28,20 +28,20 @@ public class StaffPromotionController {
     @Operation(summary = "List promotions for staff")
     @GetMapping
     public ResponseEntity<ApiResponse<List<DiscountResponse>>> listPromotions() {
-        return ResponseEntity.ok(ApiResponse.success("Promotions fetched successfully", staffPromotionService.listPromotions()));
+        return ResponseEntity.ok(ApiResponse.success("Đã tải danh sách chiến dịch khuyến mãi", staffPromotionService.listPromotions()));
     }
 
     @Operation(summary = "Create promotion")
     @PostMapping
     public ResponseEntity<ApiResponse<DiscountResponse>> createPromotion(@Valid @RequestBody StaffPromotionRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.success("Promotion created successfully", staffPromotionService.createPromotion(request)));
+                .body(ApiResponse.success("Đã tạo chiến dịch khuyến mãi", staffPromotionService.createPromotion(request)));
     }
 
     @Operation(summary = "Get promotion detail")
     @GetMapping("/{promotionId}")
     public ResponseEntity<ApiResponse<DiscountResponse>> getPromotion(@PathVariable UUID promotionId) {
-        return ResponseEntity.ok(ApiResponse.success("Promotion fetched successfully", staffPromotionService.getPromotion(promotionId)));
+        return ResponseEntity.ok(ApiResponse.success("Đã tải chi tiết chiến dịch khuyến mãi", staffPromotionService.getPromotion(promotionId)));
     }
 
     @Operation(summary = "Update promotion")
@@ -50,24 +50,30 @@ public class StaffPromotionController {
             @PathVariable UUID promotionId,
             @Valid @RequestBody StaffPromotionRequest request
     ) {
-        return ResponseEntity.ok(ApiResponse.success("Promotion updated successfully", staffPromotionService.updatePromotion(promotionId, request)));
+        return ResponseEntity.ok(ApiResponse.success("Đã cập nhật chiến dịch khuyến mãi", staffPromotionService.updatePromotion(promotionId, request)));
     }
 
     @Operation(summary = "Enable promotion")
     @PutMapping("/{promotionId}/enable")
     public ResponseEntity<ApiResponse<DiscountResponse>> enablePromotion(@PathVariable UUID promotionId) {
-        return ResponseEntity.ok(ApiResponse.success("Promotion enabled successfully", staffPromotionService.enablePromotion(promotionId)));
+        return ResponseEntity.ok(ApiResponse.success("Đã kích hoạt chiến dịch khuyến mãi", staffPromotionService.enablePromotion(promotionId)));
     }
 
     @Operation(summary = "Disable promotion")
     @PutMapping("/{promotionId}/disable")
     public ResponseEntity<ApiResponse<DiscountResponse>> disablePromotion(@PathVariable UUID promotionId) {
-        return ResponseEntity.ok(ApiResponse.success("Promotion disabled successfully", staffPromotionService.disablePromotion(promotionId)));
+        return ResponseEntity.ok(ApiResponse.success("Đã tạm ngưng chiến dịch khuyến mãi", staffPromotionService.disablePromotion(promotionId)));
     }
 
     @Operation(summary = "Get promotion usage tracking")
     @GetMapping("/{promotionId}/usage")
     public ResponseEntity<ApiResponse<?>> getUsage(@PathVariable UUID promotionId) {
-        return ResponseEntity.ok(ApiResponse.success("Usage fetched successfully", staffPromotionService.getUsage(promotionId)));
+        return ResponseEntity.ok(ApiResponse.success("Đã tải thống kê lượt sử dụng", staffPromotionService.getUsage(promotionId)));
+    }
+
+    @Operation(summary = "Xem dashboard hiệu quả chiến dịch")
+    @GetMapping("/{promotionId}/dashboard")
+    public ResponseEntity<ApiResponse<?>> getDashboard(@PathVariable UUID promotionId) {
+        return ResponseEntity.ok(ApiResponse.success("Đã tải dashboard chiến dịch", staffPromotionService.getDashboard(promotionId)));
     }
 }

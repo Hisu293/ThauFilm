@@ -13,6 +13,19 @@ export const STAFF_PROMOTION_FIELDS = [
   'usageLimit',
   'active',
   'applicableSeatTypes',
+  'minimumMemberTier',
+  'customerSegment',
+  'applicableMovieIds',
+  'applicableGenres',
+  'applicableTheaterIds',
+  'applicableRoomIds',
+  'applicableShowtimeIds',
+  'applicableChannels',
+  'applicableWeekdays',
+  'startHour',
+  'endHour',
+  'perUserLimit',
+  'budgetLimit',
 ];
 
 /**
@@ -37,7 +50,7 @@ export const toPromotionPayload = (form) => {
   for (const key of STAFF_PROMOTION_FIELDS) {
     if (form[key] !== undefined && form[key] !== '') payload[key] = form[key];
   }
-  ['value', 'minPurchaseAmount', 'maxDiscountAmount', 'usageLimit'].forEach((k) => {
+  ['value', 'minPurchaseAmount', 'maxDiscountAmount', 'usageLimit', 'perUserLimit', 'budgetLimit'].forEach((k) => {
     if (payload[k] !== undefined) payload[k] = Number(payload[k]);
   });
   if (form.active !== undefined) payload.active = Boolean(form.active);
@@ -53,6 +66,7 @@ export const staffPromotionService = {
 
   /** GET /api/staff/promotions/{id}/usage — thống kê số lần sử dụng */
   getUsage: (promotionId) => api.get(`/api/staff/promotions/${promotionId}/usage`).then(unwrap),
+  getDashboard: (promotionId) => api.get(`/api/staff/promotions/${promotionId}/dashboard`).then(unwrap),
 
   /** POST /api/staff/promotions — tạo mã giảm giá */
   create: (form) => api.post('/api/staff/promotions', toPromotionPayload(form)).then(unwrap),

@@ -30,10 +30,15 @@ import {
   InputAdornment,
   Checkbox,
   FormControlLabel,
+  Stepper,
+  Step,
+  StepLabel,
+  Divider,
 } from '@mui/material';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import EditRoundedIcon from '@mui/icons-material/EditRounded';
 import LocalOfferRoundedIcon from '@mui/icons-material/LocalOfferRounded';
+import AnalyticsRoundedIcon from '@mui/icons-material/AnalyticsRounded';
 import { staffPromotionService } from '../../services/staffPromotionService';
 import { fromUTCToLocal, toBackendLocalDateTime } from '../../services/adminShowtimeService';
 import useStaffList from '../../hooks/useStaffList';
@@ -62,10 +67,26 @@ const SEAT_TYPE_OPTIONS = [
 
 const emptyForm = {
   code: '', name: '', type: 'PERCENTAGE', value: '',
-  minPurchaseAmount: '', maxDiscountAmount: '',
+  minPurchaseAmount: 0, maxDiscountAmount: 0,
   validFrom: '', validTo: '', usageLimit: '', active: true,
   applicableSeatTypes: '',
+  minimumMemberTier: 'V_STAR', customerSegment: 'ALL',
+  applicableMovieIds: '', applicableGenres: '', applicableTheaterIds: '',
+  applicableRoomIds: '', applicableShowtimeIds: '',
+  applicableChannels: 'CINEMA', applicableWeekdays: '',
+  startHour: '', endHour: '', perUserLimit: 1, budgetLimit: '',
 };
+
+const STEPS = ['Quyền lợi', 'Đối tượng áp dụng', 'Thời gian và ngân sách'];
+const CHANNEL_OPTIONS = [
+  { value: 'CINEMA', label: 'Vé tại rạp' },
+  { value: 'ONLINE', label: 'Vé online' },
+  { value: 'WATCH_PARTY', label: 'Watch Party' },
+];
+const WEEKDAY_OPTIONS = [
+  ['MONDAY', 'Thứ Hai'], ['TUESDAY', 'Thứ Ba'], ['WEDNESDAY', 'Thứ Tư'],
+  ['THURSDAY', 'Thứ Năm'], ['FRIDAY', 'Thứ Sáu'], ['SATURDAY', 'Thứ Bảy'], ['SUNDAY', 'Chủ Nhật'],
+];
 
 const formatDate = (iso) => {
   if (!iso) return '—';
@@ -115,6 +136,9 @@ const StaffPromotions = () => {
   const [saving, setSaving] = useState(false);
   const [togglingId, setTogglingId] = useState(null);
   const [toast, setToast] = useState(null);
+  const [activeStep, setActiveStep] = useState(0);
+  const [dashboard, setDashboard] = useState(null);
+  const [dashboardLoading, setDashboardLoading] = useState(false);
 
   const loadPromos = useCallback(async () => {
     setLoading(true);
@@ -138,6 +162,7 @@ const StaffPromotions = () => {
     setForm(emptyForm);
     setFormError('');
     setDialog({ mode: 'add' });
+    setActiveStep(0);
   };
 
   const openEdit = (p) => {
@@ -150,6 +175,7 @@ const StaffPromotions = () => {
     });
     setFormError('');
     setDialog({ mode: 'edit', id: p.id });
+    setActiveStep(0);
   };
 
   const closeDialog = () => {
@@ -228,6 +254,49 @@ const StaffPromotions = () => {
     matchesSearch: matchesPromotionSearch,
     dateFields: PROMOTION_DATE_FIELDS,
   });
+
+  const toggleCsvValue = (field, value) => {
+    const current = parseSeatTypes(form[field]);
+    const next = current.includes(value) ? current.filter((item) => item !== value) : [...current, value];
+    setForm({ ...form, [field]: next.join(',') });
+  };
+
+  const validateStep = () => {
+    if (activeStep === 0 && (!form.code.trim() || !form.name.trim() || !form.value)) {
+      setFormError('Vui lòng nhập mã, tên chương trình và giá trị giảm.');
+      return false;
+    }
+    if (activeStep === 2 && (!form.validFrom || !form.validTo || !form.usageLimit)) {
+      setFormError('Vui lòng nhập thời gian áp dụng và tổng lượt sử dụng.');
+      return false;
+    }
+    setFormError('');
+    return true;
+  };
+
+  const openDashboard = async (promotion) => {
+    setDashboard({ promotion, data: null });
+    setDashboardLoading(true);
+    try {
+      const data = await staffPromotionService.getDashboard(promotion.id);
+      setDashboard({ promotion, data });
+    } catch (err) {
+      setToast({ severity: 'error', message: err.message || 'Không thể tải dashboard chiến dịch.' });
+      setDashboard(null);
+    } finally {
+      setDashboardLoading(false);
+    }
+  };
+
+  const previewText = () => {
+    const benefit = ['PERCENT', 'PERCENTAGE'].includes(form.type)
+      ? `Giảm ${form.value || 0}%` : `Giảm ${formatCurrency(form.value || 0)}`;
+    const maximum = form.maxDiscountAmount ? `, tối đa ${formatCurrency(form.maxDiscountAmount)}` : '';
+    const tier = form.minimumMemberTier === 'V_PLATINUM' ? 'V-Platinum'
+      : form.minimumMemberTier === 'V_DIAMOND' ? 'V-Diamond trở lên' : 'mọi hạng thành viên';
+    const channels = CHANNEL_OPTIONS.filter((item) => parseSeatTypes(form.applicableChannels).includes(item.value)).map((item) => item.label).join(', ');
+    return `${benefit}${maximum}, dành cho ${tier}, áp dụng ${channels || 'mọi kênh'}, tối đa ${form.usageLimit || 0} lượt.`;
+  };
 
   return (
     <Box>
@@ -326,6 +395,11 @@ const StaffPromotions = () => {
                           )}
                         </TableCell>
                         <TableCell align="right">
+                          <Tooltip title="Dashboard chiến dịch">
+                            <IconButton size="small" color="info" onClick={() => openDashboard(p)}>
+                              <AnalyticsRoundedIcon fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
                           <Tooltip title="Sửa">
                             <IconButton size="small" color="primary" onClick={() => openEdit(p)}>
                               <EditRoundedIcon fontSize="small" />
@@ -358,8 +432,12 @@ const StaffPromotions = () => {
           {dialog?.mode === 'add' ? 'Tạo mã giảm giá' : 'Cập nhật mã giảm giá'}
         </DialogTitle>
         <DialogContent dividers>
+          <Stepper activeStep={activeStep} alternativeLabel sx={{ mb: 3 }}>
+            {STEPS.map((label) => <Step key={label}><StepLabel>{label}</StepLabel></Step>)}
+          </Stepper>
           <Stack spacing={2.5} sx={{ mt: 0.5 }}>
             {formError && <Alert severity="error">{formError}</Alert>}
+            {activeStep === 0 && <>
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
               <TextField label="Mã giảm giá" fullWidth value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value.toUpperCase() })} />
               <TextField select label="Loại" fullWidth value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value })}>
@@ -381,6 +459,16 @@ const StaffPromotions = () => {
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
               <TextField label="Đơn tối thiểu (đ)" type="number" fullWidth value={form.minPurchaseAmount} onChange={(e) => setForm({ ...form, minPurchaseAmount: e.target.value })} />
               <TextField label="Giới hạn lượt dùng" type="number" fullWidth value={form.usageLimit} onChange={(e) => setForm({ ...form, usageLimit: e.target.value })} />
+            </Stack>
+            </>}
+            {activeStep === 1 && <>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+              <TextField select label="Hạng thành viên tối thiểu" fullWidth value={form.minimumMemberTier} onChange={(e) => setForm({ ...form, minimumMemberTier: e.target.value })}>
+                <MenuItem value="V_STAR">V-Star</MenuItem><MenuItem value="V_DIAMOND">V-Diamond</MenuItem><MenuItem value="V_PLATINUM">V-Platinum</MenuItem>
+              </TextField>
+              <TextField select label="Nhóm khách hàng" fullWidth value={form.customerSegment} onChange={(e) => setForm({ ...form, customerSegment: e.target.value })}>
+                <MenuItem value="ALL">Tất cả</MenuItem><MenuItem value="NEW">Khách hàng mới</MenuItem><MenuItem value="RETURNING">Khách quay lại</MenuItem>
+              </TextField>
             </Stack>
             <Box>
               <Typography variant="subtitle2" sx={{ fontWeight: 700, mb: 0.5 }}>
@@ -404,18 +492,73 @@ const StaffPromotions = () => {
                 Khong chon loai ghe nao thi ma giam gia ap dung cho ca ghe thuong, VIP va ghe doi.
               </Typography>
             </Box>
+            <Box><Typography variant="subtitle2" fontWeight={700}>Kênh mua vé</Typography>
+              <Stack direction="row" flexWrap="wrap">
+                {CHANNEL_OPTIONS.map((option) => <FormControlLabel key={option.value} control={<Checkbox checked={parseSeatTypes(form.applicableChannels).includes(option.value)} onChange={() => toggleCsvValue('applicableChannels', option.value)} />} label={option.label} />)}
+              </Stack>
+            </Box>
+            <TextField label="ID phim áp dụng" value={form.applicableMovieIds} onChange={(e) => setForm({ ...form, applicableMovieIds: e.target.value })} helperText="Để trống để áp dụng mọi phim; nhiều ID cách nhau bằng dấu phẩy." />
+            <TextField label="Thể loại áp dụng" value={form.applicableGenres} onChange={(e) => setForm({ ...form, applicableGenres: e.target.value })} helperText="Ví dụ: ACTION,COMEDY. Để trống để áp dụng mọi thể loại." />
+            <TextField label="ID rạp áp dụng" value={form.applicableTheaterIds} onChange={(e) => setForm({ ...form, applicableTheaterIds: e.target.value })} helperText="Để trống để áp dụng mọi rạp." />
+            <TextField label="ID phòng chiếu áp dụng" value={form.applicableRoomIds} onChange={(e) => setForm({ ...form, applicableRoomIds: e.target.value })} />
+            <TextField label="ID suất chiếu áp dụng" value={form.applicableShowtimeIds} onChange={(e) => setForm({ ...form, applicableShowtimeIds: e.target.value })} />
+            </>}
+            {activeStep === 2 && <>
+            <Box><Typography variant="subtitle2" fontWeight={700}>Ngày áp dụng trong tuần</Typography>
+              <Stack direction="row" flexWrap="wrap">
+                {WEEKDAY_OPTIONS.map(([value, label]) => <FormControlLabel key={value} control={<Checkbox checked={parseSeatTypes(form.applicableWeekdays).includes(value)} onChange={() => toggleCsvValue('applicableWeekdays', value)} />} label={label} />)}
+              </Stack>
+            </Box>
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
               <TextField label="Bắt đầu" type="datetime-local" fullWidth InputLabelProps={{ shrink: true }} value={form.validFrom} onChange={(e) => setForm({ ...form, validFrom: e.target.value })} />
               <TextField label="Kết thúc" type="datetime-local" fullWidth InputLabelProps={{ shrink: true }} value={form.validTo} onChange={(e) => setForm({ ...form, validTo: e.target.value })} />
             </Stack>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+              <TextField label="Giờ bắt đầu" type="time" fullWidth InputLabelProps={{ shrink: true }} value={form.startHour} onChange={(e) => setForm({ ...form, startHour: e.target.value })} />
+              <TextField label="Giờ kết thúc" type="time" fullWidth InputLabelProps={{ shrink: true }} value={form.endHour} onChange={(e) => setForm({ ...form, endHour: e.target.value })} />
+            </Stack>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+              <TextField label="Lượt tối đa mỗi thành viên" type="number" fullWidth value={form.perUserLimit} onChange={(e) => setForm({ ...form, perUserLimit: e.target.value })} />
+              <TextField label="Ngân sách tối đa (đ)" type="number" fullWidth value={form.budgetLimit} onChange={(e) => setForm({ ...form, budgetLimit: e.target.value })} />
+            </Stack>
+            <Alert severity="info"><b>Xem trước:</b> {previewText()}</Alert>
+            </>}
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>
           <Button onClick={closeDialog} disabled={saving}>Hủy</Button>
-          <Button variant="contained" onClick={handleSave} disabled={saving} startIcon={saving ? <CircularProgress size={16} color="inherit" /> : null}>
-            {saving ? 'Đang lưu…' : dialog?.mode === 'add' ? 'Tạo' : 'Lưu'}
-          </Button>
+          {activeStep > 0 && <Button onClick={() => { setFormError(''); setActiveStep((step) => step - 1); }}>Quay lại</Button>}
+          {activeStep < STEPS.length - 1 ? (
+            <Button variant="contained" onClick={() => { if (validateStep()) setActiveStep((step) => step + 1); }}>Tiếp tục</Button>
+          ) : (
+            <Button variant="contained" onClick={handleSave} disabled={saving} startIcon={saving ? <CircularProgress size={16} color="inherit" /> : null}>
+              {saving ? 'Đang lưu…' : dialog?.mode === 'add' ? 'Phát hành chiến dịch' : 'Lưu thay đổi'}
+            </Button>
+          )}
         </DialogActions>
+      </Dialog>
+
+      <Dialog open={!!dashboard} onClose={() => setDashboard(null)} maxWidth="md" fullWidth>
+        <DialogTitle fontWeight={800}>Dashboard chiến dịch {dashboard?.promotion?.code}</DialogTitle>
+        <DialogContent dividers>
+          {dashboardLoading ? <Box textAlign="center" py={5}><CircularProgress /></Box> : dashboard?.data ? <Stack spacing={2}>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+              {[['Đang giữ', dashboard.data.heldCount], ['Đã dùng', dashboard.data.usedCount], ['Thất bại', dashboard.data.failedCount], ['Chuyển đổi', `${dashboard.data.conversionRate || 0}%`]].map(([label, value]) => (
+                <Card key={label} sx={{ flex: 1 }}><CardContent><Typography color="text.secondary" variant="caption">{label}</Typography><Typography variant="h5" fontWeight={900}>{value}</Typography></CardContent></Card>
+              ))}
+            </Stack>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+              <Alert severity="info" sx={{ flex: 1 }}>Doanh thu trước giảm: <b>{formatCurrency(dashboard.data.revenueBeforeDiscount)}</b><br />Doanh thu sau giảm: <b>{formatCurrency(dashboard.data.revenueAfterDiscount)}</b></Alert>
+              <Alert severity="warning" sx={{ flex: 1 }}>Ngân sách đã dùng: <b>{formatCurrency(dashboard.data.budgetUsed)}</b><br />Ngân sách tối đa: <b>{dashboard.data.budgetLimit ? formatCurrency(dashboard.data.budgetLimit) : 'Không giới hạn'}</b></Alert>
+            </Stack>
+            <Divider />
+            <Typography fontWeight={800}>Booking sử dụng gần nhất</Typography>
+            <TableContainer><Table size="small"><TableHead><TableRow><TableCell>Booking</TableCell><TableCell>Trước giảm</TableCell><TableCell>Đã giảm</TableCell><TableCell>Thực trả</TableCell><TableCell>Trạng thái</TableCell></TableRow></TableHead><TableBody>
+              {(dashboard.data.bookings || []).map((item) => <TableRow key={item.paymentId}><TableCell>{String(item.bookingId).slice(0, 8)}</TableCell><TableCell>{formatCurrency(item.originalAmount)}</TableCell><TableCell>{formatCurrency(item.discountAmount)}</TableCell><TableCell>{formatCurrency(item.paidAmount)}</TableCell><TableCell>{item.status === 'PAID' ? 'Đã thanh toán' : item.status === 'PENDING' ? 'Đang chờ' : 'Thất bại'}</TableCell></TableRow>)}
+            </TableBody></Table></TableContainer>
+          </Stack> : null}
+        </DialogContent>
+        <DialogActions><Button onClick={() => setDashboard(null)}>Đóng</Button></DialogActions>
       </Dialog>
 
       <Snackbar

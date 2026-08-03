@@ -9,4 +9,5 @@ import java.util.UUID;
 @Repository
 public interface DiscountUsageRepository extends JpaRepository<DiscountUsage, UUID> {
     boolean existsByDiscountIdAndUserId(UUID discountId, UUID userId);
+    long countByDiscountIdAndUserId(UUID discountId, UUID userId);
 }

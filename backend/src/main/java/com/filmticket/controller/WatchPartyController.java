@@ -16,6 +16,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/member/watch-parties")
@@ -42,10 +43,12 @@ public class WatchPartyController {
     }
 
     @PostMapping("/{roomId}/pay")
-    public ResponseEntity<ApiResponse<WatchPartyDto.Response>> pay(@PathVariable UUID roomId) {
+    public ResponseEntity<ApiResponse<WatchPartyDto.Response>> pay(
+            @PathVariable UUID roomId,
+            @RequestBody(required = false) Map<String, String> payload) {
         return ResponseEntity.ok(ApiResponse.success(
                 "Đã tạo thanh toán phần của bạn",
-                watchPartyService.pay(roomId, userId())
+                watchPartyService.pay(roomId, userId(), payload == null ? null : payload.get("discountCode"))
         ));
     }
 

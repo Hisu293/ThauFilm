@@ -47,6 +47,7 @@ public class WatchPartyService {
     private final PaymentRepository paymentRepository;
     private final ShowtimeRepository showtimeRepository;
     private final RefundRequestService refundRequestService;
+    private final DiscountService discountService;
     private final Map<UUID, WatchPartyRoom> rooms = new ConcurrentHashMap<>();
     private final Map<String, PendingWatchPartyPayment> pendingPayments = new ConcurrentHashMap<>();
 
@@ -86,7 +87,7 @@ public class WatchPartyService {
     }
 
     @Transactional
-    public WatchPartyDto.Response pay(UUID roomId, UUID userId) {
+    public WatchPartyDto.Response pay(UUID roomId, UUID userId, String discountCode) {
         WatchPartyRoom room = requireRoom(roomId);
         synchronized (room) {
             WatchPartyMember member = ensureMember(room, userId);
@@ -111,10 +112,22 @@ public class WatchPartyService {
             booking = bookingRepository.save(booking);
             member.bookingId = booking.getId();
 
+            DiscountService.AppliedDiscount appliedDiscount = null;
+            if (discountCode != null && !discountCode.isBlank()) {
+                appliedDiscount = discountService.evaluateDiscount(
+                        discountCode, room.pricePerMember, userId, List.of(), booking);
+            }
+            BigDecimal discountAmount = appliedDiscount == null ? BigDecimal.ZERO : appliedDiscount.amount();
+            BigDecimal payableAmount = room.pricePerMember.subtract(discountAmount).max(BigDecimal.ZERO);
+
             Payment payment = Payment.builder()
                     .bookingId(booking.getId())
                     .paidByUserId(userId)
-                    .amount(room.pricePerMember)
+                    .amount(payableAmount)
+                    .originalAmount(room.pricePerMember)
+                    .discountId(appliedDiscount == null ? null : appliedDiscount.discountId())
+                    .discountCode(appliedDiscount == null ? null : appliedDiscount.code())
+                    .discountAmount(discountAmount)
                     .paymentMethod("PAYOS")
                     .provider("PAYOS")
                     .status(com.filmticket.entity.PaymentStatus.PENDING)
@@ -395,10 +408,12 @@ public class WatchPartyService {
         }
         if (member.paymentRecordId != null) {
             paymentRepository.findById(member.paymentRecordId).ifPresent(payment -> {
+                boolean newlyPaid = payment.getStatus() != com.filmticket.entity.PaymentStatus.PAID;
                 payment.setStatus(com.filmticket.entity.PaymentStatus.PAID);
                 payment.setPaidAt(java.time.LocalDateTime.now());
                 payment.setProviderPaymentId(paymentId);
                 paymentRepository.save(payment);
+                if (newlyPaid) discountService.confirmUsage(payment);
             });
         }
         if (member.bookingId != null) {

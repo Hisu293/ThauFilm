@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.UUID;
 
 @Data
@@ -28,6 +29,20 @@ public class DiscountResponse {
     private Integer usageCount;
     private boolean active;
     private String applicableSeatTypes;
+    private String minimumMemberTier;
+    private String customerSegment;
+    private String applicableMovieIds;
+    private String applicableGenres;
+    private String applicableTheaterIds;
+    private String applicableRoomIds;
+    private String applicableShowtimeIds;
+    private String applicableChannels;
+    private String applicableWeekdays;
+    private LocalTime startHour;
+    private LocalTime endHour;
+    private Integer perUserLimit;
+    private BigDecimal budgetLimit;
+    private BigDecimal budgetUsed;
 
     public static DiscountResponse fromDiscount(Discount discount) {
         return DiscountResponse.builder()
@@ -44,6 +59,20 @@ public class DiscountResponse {
                 .usageCount(discount.getUsageCount())
                 .active(discount.isActive())
                 .applicableSeatTypes(discount.getApplicableSeatTypes())
+                .minimumMemberTier(discount.getMinimumMemberTier())
+                .customerSegment(discount.getCustomerSegment())
+                .applicableMovieIds(discount.getApplicableMovieIds())
+                .applicableGenres(discount.getApplicableGenres())
+                .applicableTheaterIds(discount.getApplicableTheaterIds())
+                .applicableRoomIds(discount.getApplicableRoomIds())
+                .applicableShowtimeIds(discount.getApplicableShowtimeIds())
+                .applicableChannels(discount.getApplicableChannels())
+                .applicableWeekdays(discount.getApplicableWeekdays())
+                .startHour(discount.getStartHour())
+                .endHour(discount.getEndHour())
+                .perUserLimit(discount.getPerUserLimit())
+                .budgetLimit(discount.getBudgetLimit())
+                .budgetUsed(discount.getBudgetUsed())
                 .build();
     }
 }

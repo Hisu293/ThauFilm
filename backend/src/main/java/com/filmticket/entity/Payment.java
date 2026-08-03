@@ -32,6 +32,19 @@ public class Payment {
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal amount;
 
+    @Column(name = "discount_id")
+    private UUID discountId;
+
+    @Column(name = "discount_code", length = 50)
+    private String discountCode;
+
+    @Column(name = "original_amount", precision = 12, scale = 2)
+    private BigDecimal originalAmount;
+
+    @Column(name = "discount_amount", nullable = false, precision = 12, scale = 2)
+    @Builder.Default
+    private BigDecimal discountAmount = BigDecimal.ZERO;
+
     @Column(length = 50)
     private String paymentMethod;
 
